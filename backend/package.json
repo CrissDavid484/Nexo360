@@ -1,0 +1,19 @@
+{
+  "name": "nexo360-backend",
+  "version": "1.0.0",
+  "description": "Backend API para Nexo360 - Duoc UC PAEDIS con Scraping Puppeteer y Zero-Knowledge Auth",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "puppeteer": "^24.1.0",
+    "uuid": "^11.0.5"
+  }
+}

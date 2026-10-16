@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   ESTILOS DE ACCESIBILIDAD ESTRICTA (WCAG 2.2 AA)
+   ========================================================================== */
+
+/* 1. Visibilidad clara de foco para navegación por teclado (SC 2.4.7 y SC 2.4.11) */
+*:focus-visible {
+  outline: 3px solid #002B49 !important;
+  outline-offset: 3px !important;
+  border-radius: 4px;
+}
+
+/* 2. Escalabilidad de Tipografía */
+html.font-size-normal {
+  font-size: 16px;
+}
+
+html.font-size-large {
+  font-size: 18.5px;
+}
+
+html.font-size-xlarge {
+  font-size: 21px;
+}
+
+/* 3. Tipografía amigable para Dislexia */
+html.font-dyslexic,
+html.font-dyslexic body,
+html.font-dyslexic * {
+  font-family: 'OpenDyslexic', 'Comic Sans MS', cursive, sans-serif !important;
+  letter-spacing: 0.04em;
+  word-spacing: 0.1em;
+  line-height: 1.6;
+}
+
+/* 4. Modo de Alto Contraste (High Contrast Mode) */
+html.high-contrast {
+  background-color: #000000 !important;
+  color: #FFFF00 !important;
+}
+
+html.high-contrast body {
+  background-color: #000000 !important;
+  color: #FFFF00 !important;
+}
+
+html.high-contrast a,
+html.high-contrast button {
+  color: #FFFF00 !important;
+  border-color: #FFFFFF !important;
+}
+
+html.high-contrast *:focus-visible {
+  outline: 4px solid #00FFFF !important;
+  outline-offset: 3px !important;
+}
+
+html.high-contrast .bg-white,
+html.high-contrast .bg-slate-50,
+html.high-contrast .bg-slate-100,
+html.high-contrast .bg-slate-800,
+html.high-contrast .bg-duoc-navy {
+  background-color: #000000 !important;
+  color: #FFFF00 !important;
+  border: 2px solid #FFFFFF !important;
+}
+
+html.high-contrast .text-slate-600,
+html.high-contrast .text-slate-700,
+html.high-contrast .text-slate-500,
+html.high-contrast .text-slate-900 {
+  color: #FFFFFF !important;
+}
+
+html.high-contrast .border-slate-200,
+html.high-contrast .border-slate-300 {
+  border-color: #FFFFFF !important;
+}
+
+/* 5. Movimiento Reducido (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html.reduced-motion *,
+html.reduced-motion *::before,
+html.reduced-motion *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Ocultar visualmente pero mantener disponible para lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.sr-only-focusable:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.75rem 1.5rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  z-index: 9999;
+}
