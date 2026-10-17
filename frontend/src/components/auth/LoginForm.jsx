@@ -173,6 +173,30 @@ export const LoginForm = ({ onMfaRequired, onDirectSuccess }) => {
             <span>Ingresar de Forma Segura</span>
           )}
         </button>
+
+        {/* Acceso Rápido para Demostración Capstone */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              onDirectSuccess('demo-token-cristian', {
+                nombre: 'Cristian Guzman Garcia',
+                rut: '19.876.543-2',
+                email: 'c.guzmang@duocuc.cl',
+                carrera: 'Ingeniería en Informática',
+                sede: 'Sede San Joaquín',
+                paedis: {
+                  isEnrolled: true,
+                  tutorParAsignado: 'Tania Montes (Tutor PAR)',
+                  diagnosticoDeclarado: 'Ajuste de Accesibilidad Sensorial / Motriz',
+                },
+              });
+            }}
+            className="w-full py-2.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-xs rounded-xl border border-amber-300 transition-colors flex items-center justify-center gap-2 shadow-2xs"
+          >
+            <span>⚡ Ingreso Rápido: Cristian Guzmán (Demo Capstone Vivo Duoc)</span>
+          </button>
+        </div>
       </form>
 
       {/* Recordatorio de Privacidad y Accesibilidad */}

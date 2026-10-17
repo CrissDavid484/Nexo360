@@ -25,7 +25,8 @@ export const SearchBar = ({ searchTerm, onSearchChange, resultsCount }) => {
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Buscar trámites (ej: inscripción de asignaturas, PAEDIS, notas, becas, TNE)..."
-          className="w-full pl-13 pr-12 py-4 bg-white border-3 border-slate-300 rounded-2xl text-slate-900 text-lg font-medium shadow-md placeholder-slate-400 focus:border-duoc-navy focus:ring-4 focus:ring-amber-400 focus:outline-none transition-all"
+          style={{ paddingLeft: '3.75rem' }}
+          className="w-full pl-16 pr-12 py-4 bg-white border-3 border-slate-300 rounded-2xl text-slate-900 text-base sm:text-lg font-medium shadow-md placeholder-slate-400 focus:border-duoc-navy focus:ring-4 focus:ring-amber-400 focus:outline-none transition-all"
         />
         {searchTerm && (
           <button

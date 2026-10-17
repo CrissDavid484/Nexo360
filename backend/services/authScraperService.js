@@ -247,17 +247,20 @@ class AuthScraperService {
         const namePart = email.split('@')[0].replace('.', ' ').toUpperCase();
         user = await UserProfile.create({
           email,
-          nombre: `Estudiante ${namePart}`,
+          nombre: email.toLowerCase().includes('cristian') || email.toLowerCase().includes('c.guzman')
+            ? 'Cristian Guzman Garcia'
+            : `Estudiante ${namePart}`,
           rut: '19.876.543-2',
           carrera: 'Ingeniería en Informática',
-          sede: 'Sede San Joaquín / Duoc UC',
+          sede: 'Sede Alameda',
           paedis: {
             isEnrolled: true,
+            sede: 'Sede Alameda',
             diagnosticoDeclarado: 'Ajuste de Accesibilidad Sensorial / Motriz',
-            tutorParAsignado: 'Tania Montes (Tutor PAR)',
             ajustesAprobados: [
-              { tipo: 'Evaluaciones', descripcion: '50% tiempo adicional y texto en alto contraste' },
+              { tipo: 'Evaluaciones', descripcion: 'Formatos accesibles, pruebas ampliadas y certámenes digitales' },
               { tipo: 'Materiales', descripcion: 'Transcripción y formato accesible de guías AVA' },
+              { tipo: 'Biblioteca', descripcion: 'Prioridad de reserva en salas inclusivas con equipamiento asistivo en Sede Alameda' },
             ],
           },
           accessibilityPreferences: {
@@ -279,13 +282,13 @@ class AuthScraperService {
       return {
         _id: 'mock-user-' + Date.now(),
         email,
-        nombre: 'Estudiante PAEDIS Duoc UC',
+        nombre: 'Cristian Guzman Garcia',
         rut: '19.876.543-2',
         carrera: 'Ingeniería en Informática',
-        sede: 'Sede San Joaquín',
+        sede: 'Sede Alameda',
         paedis: {
           isEnrolled: true,
-          tutorParAsignado: 'Tania Montes (Tutor PAR)',
+          sede: 'Sede Alameda',
           diagnosticoDeclarado: 'Ajuste de Accesibilidad Sensorial / Motriz',
         },
         accessibilityPreferences: {

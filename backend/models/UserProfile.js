@@ -33,21 +33,21 @@ const UserProfileSchema = new mongoose.Schema(
     sede: {
       type: String,
       trim: true,
-      default: 'Sede Central',
+      default: 'Sede Alameda',
     },
     // Estado y apoyos específicos del programa PAEDIS
     paedis: {
       isEnrolled: {
         type: Boolean,
-        default: true, // Diseñado exclusivamente para estudiantes PAEDIS
+        default: true, // Diseñado para estudiantes PAEDIS Alameda
+      },
+      sede: {
+        type: String,
+        default: 'Sede Alameda',
       },
       diagnosticoDeclarado: {
         type: String,
         default: 'Estudiante con Ajustes Razonables',
-      },
-      tutorParAsignado: {
-        type: String,
-        default: 'Tania Montes (Tutor PAR)',
       },
       ajustesAprobados: [{
         tipo: String, // Ej: 'Tiempo adicional en evaluaciones', 'Formato accesible'
