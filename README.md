@@ -1,6 +1,6 @@
 # Nexo360 • Plataforma One-Stop-Shop Duoc UC PAEDIS
 
-> **Proyecto Oficial Independiente**  
+> **Proyecto Oficial Capstone 2026**  
 > Plataforma web centralizada y altamente accesible (WCAG 2.2 AA) diseñada para estudiantes del **Programa de Apoyo a Estudiantes con Discapacidad (PAEDIS)** de Duoc UC.
 
 ---
