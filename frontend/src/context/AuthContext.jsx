@@ -29,8 +29,8 @@ export const AuthProvider = ({ children }) => {
           logout();
         }
       } catch (err) {
-        console.warn('Error verificando sesión existente:', err);
-        // Mantener sesión offline si hay token para no interrumpir navegación en pruebas
+        console.warn('Error verificando sesión existente, cerrando sesión por seguridad:', err);
+        logout();
       } finally {
         setIsLoading(false);
       }

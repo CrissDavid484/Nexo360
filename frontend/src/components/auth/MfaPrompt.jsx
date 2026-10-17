@@ -11,6 +11,7 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
   const [pollCount, setPollCount] = useState(0);
   const { announce } = useAccessibility();
   const pollIntervalRef = useRef(null);
+  const MAX_POLL_COUNT = 150; // 5 minutos (150 intentos × 2 segundos)
 
   // Anunciar código al montar el componente
   useEffect(() => {
@@ -33,6 +34,14 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
         if (!isMounted) return;
 
         setPollCount((prev) => prev + 1);
+
+        // Verificar si la sesión MFA expiró (máx 5 minutos)
+        if (pollCount >= MAX_POLL_COUNT) {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          setPollError('La sesión de aprobación expiró. Por favor vuelve a iniciar sesión.');
+          announce('La sesión de aprobación expiró.', 'assertive');
+          return;
+        }
 
         if (res.mfaCode && res.mfaCode !== currentCode) {
           setCurrentCode(res.mfaCode);

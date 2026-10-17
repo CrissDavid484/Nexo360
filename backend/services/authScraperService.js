@@ -137,8 +137,10 @@ class AuthScraperService {
         console.log('[Puppeteer Auth] Flujo continuó sin pantalla de número MFA o completó directo.');
       }
 
-      // Paso 4: Login exitoso, extraer datos del perfil institucional
-      const userProfile = await this.findOrCreateUserProfile(email);
+      // Paso 4: Login exitoso — raspar datos reales de Vivo Duoc
+      console.log('[Puppeteer Auth] Login completado, extrayendo perfil desde Vivo Duoc...');
+      const scrapedData = await this.scrapeVivoDuocProfile(page, email);
+      const userProfile = await this.findOrCreateUserProfile(email, scrapedData);
       const token = this.generateJwt(userProfile);
 
       session.status = 'COMPLETED';
@@ -150,8 +152,12 @@ class AuthScraperService {
         rut: userProfile.rut,
         carrera: userProfile.carrera,
         sede: userProfile.sede,
+        direccion: userProfile.direccion,
+        telefonoPersonal: userProfile.telefonoPersonal,
+        emailPersonal: userProfile.emailPersonal,
         paedis: userProfile.paedis,
         accessibilityPreferences: userProfile.accessibilityPreferences,
+        scrapedAt: new Date().toISOString(),
       };
 
       // Limpieza segura del navegador
@@ -237,32 +243,173 @@ class AuthScraperService {
   }
 
   /**
-   * Crea o actualiza el perfil del usuario en MongoDB sin guardar contraseña
+   * Raspa datos reales del perfil del usuario desde experienciavivo.duoc.cl
+   * Se ejecuta DESPUÉS de que el login y MFA son completados exitosamente.
    */
-  async findOrCreateUserProfile(email) {
+  async scrapeVivoDuocProfile(page, email) {
+    const scraped = {};
+    try {
+      // Esperar que la página post-login cargue completamente
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});
+      const currentUrl = page.url();
+      console.log('[Vivo Duoc Scraper] URL post-login:', currentUrl);
+
+      // Intentar navegar a la sección de perfil si no estamos ya ahí
+      if (!currentUrl.includes('/perfil') && !currentUrl.includes('/profile')) {
+        await page.goto('https://experienciavivo.duoc.cl/perfil', {
+          waitUntil: 'networkidle2',
+          timeout: 20000,
+        }).catch(() => {});
+      }
+
+      // Extraer nombre del estudiante (múltiples selectores posibles)
+      scraped.nombre = await page.evaluate(() => {
+        const selectors = [
+          '.student-name', '.user-name', '.nombre-estudiante',
+          '[data-field="nombre"]', '[data-field="name"]',
+          'h1.profile-name', '.profile-header h1',
+          '.card-header .name', '.user-profile-name',
+          '#studentName', '#userName',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        // Buscar en texto que contenga el nombre del header/navbar
+        const navUser = document.querySelector('nav .user-info, .navbar-user, .header-user');
+        if (navUser) return navUser.textContent.trim();
+        return null;
+      }).catch(() => null);
+
+      // Extraer RUT
+      scraped.rut = await page.evaluate(() => {
+        const selectors = [
+          '[data-field="rut"]', '.student-rut', '.rut-field',
+          '#studentRut', '.profile-rut',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        // Buscar en texto que tenga formato RUT (XX.XXX.XXX-X)
+        const allText = document.body.innerText;
+        const rutMatch = allText.match(/\d{1,2}\.\d{3}\.\d{3}-[\dkK]/);
+        return rutMatch ? rutMatch[0] : null;
+      }).catch(() => null);
+
+      // Extraer carrera
+      scraped.carrera = await page.evaluate(() => {
+        const selectors = [
+          '[data-field="carrera"]', '.student-career', '.carrera-field',
+          '#studentCareer', '.profile-carrera', '.career-name',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        return null;
+      }).catch(() => null);
+
+      // Extraer sede
+      scraped.sede = await page.evaluate(() => {
+        const selectors = [
+          '[data-field="sede"]', '.student-sede', '.sede-field',
+          '#studentSede', '.profile-sede', '.campus-name',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        return null;
+      }).catch(() => null);
+
+      // Extraer dirección
+      scraped.direccion = await page.evaluate(() => {
+        const selectors = [
+          '[data-field="direccion"]', '[data-field="address"]',
+          '.student-address', '#studentAddress',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        return null;
+      }).catch(() => null);
+
+      // Extraer teléfono personal
+      scraped.telefonoPersonal = await page.evaluate(() => {
+        const selectors = [
+          '[data-field="telefono"]', '[data-field="phone"]',
+          '.student-phone', '#studentPhone',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        return null;
+      }).catch(() => null);
+
+      // Extraer email personal
+      scraped.emailPersonal = await page.evaluate(() => {
+        const selectors = [
+          '[data-field="emailPersonal"]', '[data-field="personal-email"]',
+          '.student-personal-email', '#studentPersonalEmail',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.textContent.trim()) return el.textContent.trim();
+        }
+        return null;
+      }).catch(() => null);
+
+      // Detectar si está inscrito en PAEDIS
+      scraped.isPaedis = await page.evaluate(() => {
+        const pageText = document.body.innerText.toLowerCase();
+        return pageText.includes('paedis') || pageText.includes('inclusión') || pageText.includes('accesibilidad');
+      }).catch(() => false);
+
+      console.log('[Vivo Duoc Scraper] Datos extraídos:', JSON.stringify(scraped, null, 2));
+    } catch (err) {
+      console.warn('[Vivo Duoc Scraper] Error durante scraping del perfil:', err.message);
+    }
+    return scraped;
+  }
+
+  /**
+   * Crea o actualiza el perfil del usuario en MongoDB usando datos reales scrapeados
+   */
+  async findOrCreateUserProfile(email, scrapedData = {}) {
     try {
       let user = await UserProfile.findOne({ email });
+
+      // Construir nombre de fallback a partir del email si el scraping no lo obtuvo
+      const emailNamePart = email.split('@')[0];
+      const nameFallback = emailNamePart
+        .split('.')
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(' ');
+
+      const profileData = {
+        nombre: scrapedData.nombre || nameFallback,
+        rut: scrapedData.rut || null,
+        carrera: scrapedData.carrera || null,
+        sede: scrapedData.sede || null,
+        direccion: scrapedData.direccion || null,
+        telefonoPersonal: scrapedData.telefonoPersonal || null,
+        emailPersonal: scrapedData.emailPersonal || null,
+        paedis: {
+          isEnrolled: scrapedData.isPaedis || false,
+          sede: scrapedData.sede || null,
+          diagnosticoDeclarado: scrapedData.diagnostico || null,
+          ajustesAprobados: scrapedData.ajustes || [],
+        },
+        lastLogin: new Date(),
+      };
+
       if (!user) {
-        // Obtener nombre estimado a partir del email (ej: d.montes@duocuc.cl -> D. Montes)
-        const namePart = email.split('@')[0].replace('.', ' ').toUpperCase();
         user = await UserProfile.create({
           email,
-          nombre: email.toLowerCase().includes('cristian') || email.toLowerCase().includes('c.guzman')
-            ? 'Cristian Guzman Garcia'
-            : `Estudiante ${namePart}`,
-          rut: '19.876.543-2',
-          carrera: 'Ingeniería en Informática',
-          sede: 'Sede Alameda',
-          paedis: {
-            isEnrolled: true,
-            sede: 'Sede Alameda',
-            diagnosticoDeclarado: 'Ajuste de Accesibilidad Sensorial / Motriz',
-            ajustesAprobados: [
-              { tipo: 'Evaluaciones', descripcion: 'Formatos accesibles, pruebas ampliadas y certámenes digitales' },
-              { tipo: 'Materiales', descripcion: 'Transcripción y formato accesible de guías AVA' },
-              { tipo: 'Biblioteca', descripcion: 'Prioridad de reserva en salas inclusivas con equipamiento asistivo en Sede Alameda' },
-            ],
-          },
+          ...profileData,
           accessibilityPreferences: {
             fontSize: 'normal',
             highContrast: false,
@@ -270,26 +417,37 @@ class AuthScraperService {
             dyslexicFont: false,
             screenReaderOptimized: false,
           },
-          lastLogin: new Date(),
         });
+        console.log(`[DB] Perfil creado para ${email} con datos scrapeados de Vivo Duoc`);
       } else {
-        user.lastLogin = new Date();
+        // Actualizar perfil existente con datos frescos de Vivo Duoc
+        Object.assign(user, profileData);
         await user.save();
+        console.log(`[DB] Perfil actualizado para ${email} con datos frescos de Vivo Duoc`);
       }
       return user;
     } catch (err) {
       console.warn('[DB Fallback] MongoDB no disponible, generando objeto en memoria:', err.message);
+      const emailNamePart = email.split('@')[0];
+      const nameFallback = emailNamePart
+        .split('.')
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(' ');
       return {
         _id: 'mock-user-' + Date.now(),
         email,
-        nombre: 'Cristian Guzman Garcia',
-        rut: '19.876.543-2',
-        carrera: 'Ingeniería en Informática',
-        sede: 'Sede Alameda',
+        nombre: scrapedData?.nombre || nameFallback,
+        rut: scrapedData?.rut || null,
+        carrera: scrapedData?.carrera || null,
+        sede: scrapedData?.sede || null,
+        direccion: scrapedData?.direccion || null,
+        telefonoPersonal: scrapedData?.telefonoPersonal || null,
+        emailPersonal: scrapedData?.emailPersonal || null,
         paedis: {
-          isEnrolled: true,
-          sede: 'Sede Alameda',
-          diagnosticoDeclarado: 'Ajuste de Accesibilidad Sensorial / Motriz',
+          isEnrolled: scrapedData?.isPaedis || false,
+          sede: scrapedData?.sede || null,
+          diagnosticoDeclarado: null,
+          ajustesAprobados: [],
         },
         accessibilityPreferences: {
           fontSize: 'normal',
