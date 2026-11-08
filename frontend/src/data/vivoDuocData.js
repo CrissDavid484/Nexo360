@@ -1,26 +1,26 @@
 /**
- * Datos oficiales y estructurados de Vivo Duoc para Nexo360
- * Adaptado a Cristian Guzmán García • Duoc UC Sede Alameda (PAEDIS 2026).
+ * Datos estructurados de Vivo Duoc para Nexo360
+ * Adaptado para Cristian Guzmán • Duoc UC Sede Alameda.
  */
 
 export const VIVO_STUDENT_PROFILE = {
-  nombre: 'Cristian Guzman Garcia',
+  nombre: 'Cristian Guzmán',
   rut: '19.876.543-2',
   carrera: 'Ingeniería en Informática',
   sede: 'Sede Alameda',
   direccion: 'Las Moreras 12196',
-  emailDuoc: 'c.guzmang@duocuc.cl',
+  emailDuoc: 'c.guzman@duocuc.cl',
   telefonoPersonal: '+56 9 3016 6745',
   emailPersonal: 'cristian.david.g123@gmail.com',
-  paedis: {
-    isEnrolled: true,
+  preferenciasAccesibilidad: {
     sede: 'Sede Alameda',
-    acreditacion: 'Estudiante Acreditado PAEDIS Alameda',
-    perfilAccesibilidad: 'Accesibilidad Universal y Autonomía Digital',
+    diagnosticoDeclarado: 'Ajuste de Accesibilidad Sensorial / Motriz',
+    ajustesVisuales: 'Plataforma adaptada a lectores de pantalla, alto contraste y navegación por teclado',
+    recursosPreferidos: 'Salas de estudio colaborativas e individuales en Biblioteca Alameda',
     ajustesAprobados: [
-      { tipo: 'Accesibilidad Digital', descripcion: 'Plataforma adaptada a lectores de pantalla, alto contraste y navegación por teclado' },
-      { tipo: 'Biblioteca Alameda', descripcion: 'Acceso y reserva de salas de estudio colaborativas e individuales' },
-      { tipo: 'Simulador Toma de Ramos', descripcion: 'Simulación previa para planificación y selección de secciones sin estrés' },
+      { tipo: 'Tiempo Adicional', descripcion: '50% de tiempo adicional en certámenes y evaluaciones teóricas' },
+      { tipo: 'Material Digital Accesible', descripcion: 'Entrega de material en formatos accesibles compatibles con lectores de pantalla' },
+      { tipo: 'Mobiliario y Entorno', descripcion: 'Ubicación preferencial en primera fila y acceso a salas de estudio adaptadas' },
     ],
   },
 };
@@ -30,13 +30,13 @@ export const VIVO_HORARIOS = [
     dia: 'Lunes',
     carrera: 'INGENIERÍA EN INFORMÁTICA',
     items: [],
-    emptyMessage: 'No tienes ramos para este día',
+    emptyMessage: 'No tienes clases programadas para este día',
   },
   {
     dia: 'Martes',
     carrera: 'INGENIERÍA EN INFORMÁTICA',
     items: [],
-    emptyMessage: 'No tienes ramos para este día',
+    emptyMessage: 'No tienes clases programadas para este día',
   },
   {
     dia: 'Miércoles',
@@ -70,13 +70,13 @@ export const VIVO_HORARIOS = [
     dia: 'Viernes',
     carrera: 'INGENIERÍA EN INFORMÁTICA',
     items: [],
-    emptyMessage: 'No tienes ramos para este día',
+    emptyMessage: 'No tienes clases programadas para este día',
   },
   {
     dia: 'Sábado',
     carrera: 'INGENIERÍA EN INFORMÁTICA',
     items: [],
-    emptyMessage: 'No tienes ramos para este día',
+    emptyMessage: 'No tienes clases programadas para este día',
   },
 ];
 
@@ -90,7 +90,7 @@ export const VIVO_NOTAS = [
     evaluaciones: [
       { nombre: 'Parcial 1 - Levantamiento y Alcance', ponderacion: '25%', nota: '6.8' },
       { nombre: 'Parcial 2 - Arquitectura y Prototipo Accesible', ponderacion: '35%', nota: '6.5' },
-      { nombre: 'Parcial 3 - Integración y Scraping', ponderacion: '20%', nota: '--' },
+      { nombre: 'Parcial 3 - Integración de Servicios', ponderacion: '20%', nota: '--' },
       { nombre: 'Examen Transversal - Defensa de Título', ponderacion: '20%', nota: '--' },
     ],
   },
@@ -102,7 +102,7 @@ export const VIVO_NOTAS = [
     estado: 'Aprobado',
     evaluaciones: [
       { nombre: 'Certamen 1 - Patrones y Microservicios', ponderacion: '30%', nota: '6.2' },
-      { nombre: 'Certamen 2 - Ciberseguridad Zero-Knowledge', ponderacion: '35%', nota: '7.0' },
+      { nombre: 'Certamen 2 - Ciberseguridad y Autenticación', ponderacion: '35%', nota: '7.0' },
       { nombre: 'Proyecto Final - API Gateway', ponderacion: '35%', nota: '6.6' },
     ],
   },
@@ -171,24 +171,3 @@ export const DUOC_BIBLIOTECAS_SEDES = [
   'Biblioteca Valparaíso',
   'Biblioteca Viña del Mar',
 ];
-
-export const VIVO_SOLICITUDES_CATALOGO = {
-  categorias: [
-    'Académica',
-    'Evaluaciones y Exámenes',
-    'Accesibilidad PAEDIS Alameda',
-    'Asistencias y Justificativos',
-    'Convalidaciones y Homologación',
-    'Financiamiento y Matrícula',
-  ],
-  servicios: {
-    'Académica': ['Revisión de Asignatura', 'Cambio de Sección', 'Ajuste de Carga Académica'],
-    'Evaluaciones y Exámenes': ['Revisión de Nota Examen', 'Solicitud Examen Pendiente', 'Formato Digital Accesible'],
-    'Accesibilidad PAEDIS Alameda': ['Solicitud de Formato Alternativo de Materiales', 'Acompañamiento en Evaluaciones', 'Acceso y Espacio Físico Accesible'],
-    'Asistencias y Justificativos': ['Justificación Médica por Licencia', 'Justificación por Tratamiento de Salud', 'Ajuste de Asistencia por Discapacidad'],
-    'Convalidaciones y Homologación': ['Convalidación de Ramos Previos', 'Homologación de Práctica Profesional'],
-    'Financiamiento y Matrícula': ['Certificado Alumno Regular para Gratuidad', 'Reprogramación de Cuota'],
-  },
-  subServicios: ['Plataforma AVA', 'Prueba Escrita de Cátedra', 'Laboratorio Computación', 'Proyecto Integrador'],
-  tipos: ['Prioridad Accesible PAEDIS Alameda', 'Ordinaria', 'Urgente por Plazo Académico'],
-};

@@ -1,36 +1,41 @@
 import React from 'react';
 import { VIVO_ASISTENCIAS } from '../../data/vivoDuocData';
-import { CheckCircle2, FilePlus2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, FilePlus2 } from 'lucide-react';
 
 export const AsistenciasView = ({ onNavigate }) => {
   return (
-    <div className="space-y-6">
-      {/* Título y descripción oficial (Screenshot 5) */}
+    // A11y: Uso de elemento semántico <section> con encabezado accesible
+    <section aria-labelledby="asistencias-heading" className="space-y-6">
+      {/* Título y descripción oficial */}
       <div className="border-b border-slate-200 pb-4">
-        <h1 className="text-2xl sm:text-3xl font-normal text-slate-800 tracking-tight">
-          Asistencias
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-3xl leading-relaxed">
-          Por reglamento académico tienes que tener un 70% de asistencia en cada uno de tus ramos para aprobar el curso, en esta sección podrás revisar el avance y así no repetir por no ir a clases.
+        <h2 id="asistencias-heading" className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Mis Asistencias a Clases
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-700 mt-2 max-w-3xl leading-relaxed font-medium">
+          Por reglamento académico de Duoc UC, necesitas un 70% de asistencia mínima en cada uno de tus ramos. En esta sección puedes monitorear tu avance por curso.
         </p>
       </div>
 
-      {/* Tabla Oficial de Asistencias (Screenshot 5) */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      {/* Tabla Oficial de Asistencias */}
+      <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden shadow-sm">
         {/* Cabecera azul marino con título oficial */}
-        <div className="bg-[#002B49] text-white px-6 py-3 flex items-center justify-between">
-          <h2 className="text-base font-bold tracking-wide">
-            Asistencias
-          </h2>
-          <span className="text-xs text-amber-300 font-semibold hidden sm:inline">
+        <header className="bg-[#002B49] text-white px-6 py-4 flex items-center justify-between border-b-2 border-[#FFB81C]">
+          <h3 className="text-base font-black tracking-wide">
+            Registro de Asistencia Semestral
+          </h3>
+          <span className="text-xs text-[#FFB81C] font-black hidden sm:inline">
             Mínimo exigido: 70%
           </span>
-        </div>
+        </header>
 
         {/* Tabla con scroll horizontal accesible */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tabla desplazable de asistencia por asignaturas">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/80 text-slate-600 font-semibold border-b border-dashed border-slate-300">
+            {/* A11y: <caption> para accesibilidad con lectores de pantalla */}
+            <caption className="sr-only">
+              Tabla de porcentaje de asistencia y número de clases registradas por asignatura
+            </caption>
+            <thead className="bg-slate-100 text-slate-800 font-black border-b-2 border-slate-300">
               <tr>
                 <th scope="col" className="px-6 py-3.5">
                   Curso
@@ -39,32 +44,32 @@ export const AsistenciasView = ({ onNavigate }) => {
                   N° de Clases Registradas
                 </th>
                 <th scope="col" className="px-6 py-3.5 text-center">
-                  Asistencia
+                  Asistencia Realizada
                 </th>
                 <th scope="col" className="px-6 py-3.5 text-right">
                   Porcentaje de Asistencia Actual
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {VIVO_ASISTENCIAS.map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-slate-900">
+                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-black text-slate-900">
                     <div className="flex items-center gap-2">
                       <span>{item.curso}</span>
                       {item.porcentajeNum >= 70 && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" aria-hidden="true" />
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-center font-medium text-slate-700">
+                  <td className="px-6 py-4 text-center font-bold text-slate-800">
                     {item.clasesRegistradas}
                   </td>
-                  <td className="px-6 py-4 text-center font-medium text-slate-700">
+                  <td className="px-6 py-4 text-center font-bold text-slate-800">
                     {item.asistencia}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <span className="text-base font-black text-slate-900 tracking-tight">
+                    <span className="text-base font-black text-slate-950 tracking-tight">
                       {item.porcentaje}
                     </span>
                   </td>
@@ -76,25 +81,26 @@ export const AsistenciasView = ({ onNavigate }) => {
       </div>
 
       {/* Justificación de Inasistencias Integrada con Solicitudes */}
-      <div className="p-5 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+      <article className="p-6 bg-white rounded-2xl border-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
         <div>
-          <h3 className="font-bold text-slate-900 text-sm">
-            ¿Faltaste a clases por motivos de salud, terapia médica o PAEDIS?
+          <h3 className="font-black text-slate-900 text-sm sm:text-base">
+            ¿Faltaste a clases por motivos de salud o fuerza mayor?
           </h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-            Recuerda que tienes hasta 5 días hábiles para adjuntar tu certificado médico o respaldo de adecuación curricular desde la pestaña de Solicitudes.
+          <p className="text-xs sm:text-sm text-slate-700 mt-1 max-w-2xl font-medium leading-relaxed">
+            Recuerda que tienes hasta 5 días hábiles para adjuntar tu certificado médico o documento de respaldo.
           </p>
         </div>
 
+        {/* A11y: Botón con tamaño mínimo táctil 44x44px y foco ultra-visible Duoc */}
         <button
           type="button"
           onClick={() => onNavigate('solicitudes')}
-          className="px-4 py-2.5 bg-[#002B49] hover:bg-slate-800 text-white text-xs font-bold rounded-lg shrink-0 flex items-center gap-2 transition-colors focus:ring-2 focus:ring-amber-400"
+          className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001f35] text-white text-xs sm:text-sm font-black rounded-xl shrink-0 flex items-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 shadow-sm"
         >
-          <FilePlus2 className="w-4 h-4 text-amber-400" aria-hidden="true" />
+          <FilePlus2 className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
           <span>Ingresar Justificativo</span>
         </button>
-      </div>
-    </div>
+      </article>
+    </section>
   );
 };

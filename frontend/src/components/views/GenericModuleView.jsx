@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, CheckCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { ExternalLink, CheckCircle, ArrowLeft } from 'lucide-react';
 
 export const GenericModuleView = ({ moduleId, onBackToInicio }) => {
   const moduleConfig = {
@@ -8,7 +8,7 @@ export const GenericModuleView = ({ moduleId, onBackToInicio }) => {
       description: 'Accede a tus asignaturas virtuales, material de cátedra, foros de discusión y entregas de proyectos.',
       url: 'https://ava.duoc.cl',
       btnText: 'Abrir AVA en pestaña segura',
-      badges: ['Autenticación SSO Integrada', 'Formato Accesible PAEDIS'],
+      badges: ['Autenticación SSO Integrada', 'Formato Accesible Universal'],
       highlights: [
         'Todas las rúbricas y material multimedia cuentan con compatibilidad para lectores de pantalla.',
         'Las evaluaciones en AVA tienen precargado el ajuste de 50% de tiempo adicional.',
@@ -52,11 +52,11 @@ export const GenericModuleView = ({ moduleId, onBackToInicio }) => {
       ],
     },
     apoyo: {
-      title: 'Acompañamiento y Accesibilidad PAEDIS',
-      description: 'Servicios de apoyo técnico, adecuaciones curriculares, tecnologías adaptativas y recursos inclusivos en Sede Alameda.',
-      url: 'https://experienciavivo.duoc.cl/paedis',
-      btnText: 'Solicitar Apoyo PAEDIS',
-      badges: ['PAEDIS Sede Alameda', 'Atención Presencial y Online'],
+      title: 'Acompañamiento y Accesibilidad Estudiantil',
+      description: 'Servicios de apoyo técnico, adecuaciones curriculares, tecnologías adaptativas y recursos de accesibilidad en Sede Alameda.',
+      url: 'https://experienciavivo.duoc.cl/apoyo',
+      btnText: 'Solicitar Apoyo Estudiantil',
+      badges: ['Sede Alameda', 'Atención Presencial y Online'],
       highlights: [
         'Préstamo y configuración de tecnologías asistivas (lectores de pantalla, softwares de magnificación).',
         'Coordinación directa de adecuaciones curriculares y formatos de evaluación accesibles.',
@@ -65,12 +65,12 @@ export const GenericModuleView = ({ moduleId, onBackToInicio }) => {
     },
     correo: {
       title: 'Correo Institucional Microsoft Outlook',
-      description: 'Bandeja de entrada oficial de tu cuenta c.guzmang@duocuc.cl para comunicaciones docentes, avisos institucionales y confirmaciones de biblioteca.',
+      description: 'Bandeja de entrada oficial de tu cuenta c.guzman@duocuc.cl para comunicaciones docentes, avisos institucionales y confirmaciones de biblioteca.',
       url: 'https://outlook.office.com',
       btnText: 'Abrir Correo en Microsoft 365',
       badges: ['Almacenamiento OneDrive 1TB', 'Office 365 ProPlus'],
       highlights: [
-        'Notificaciones en tiempo real sobre aprobación de ajustes PAEDIS y notas.',
+        'Notificaciones en tiempo real sobre resoluciones de solicitudes y notas.',
         'Códigos de ingreso a salas de biblioteca enviados automáticamente.',
         'Integración con Microsoft Teams para clases remotas y reuniones con docentes.',
       ],
@@ -87,12 +87,12 @@ export const GenericModuleView = ({ moduleId, onBackToInicio }) => {
         'Talleres de Ciberseguridad, Inteligencia Artificial y Cloud Computing.',
       ],
     },
-    'paedis-programas': {
-      title: 'Programas de Apoyo al Estudiante (PAEDIS)',
-      description: 'El corazón del Programa de Apoyo a Estudiantes con Discapacidad de Duoc UC. Diseñado para garantizar equidad, autonomía e inclusión en tu experiencia formativa.',
-      url: 'https://www.duoc.cl/alumnos/paedis/',
-      btnText: 'Conocer más de PAEDIS',
-      badges: ['Acompañamiento 360°', 'Ley N° 21.790'],
+    'programas-apoyo': {
+      title: 'Programas de Apoyo al Estudiante',
+      description: 'Programas institucionales de Duoc UC diseñados para garantizar equidad, autonomía e inclusión en tu experiencia formativa.',
+      url: 'https://www.duoc.cl/alumnos/apoyo/',
+      btnText: 'Conocer más de los Programas',
+      badges: ['Acompañamiento 360°', 'Inclusión Institucional'],
       highlights: [
         'Coordinación directa de ajustes razonables en aula, laboratorios y evaluaciones.',
         'Asignación personalizada de Tutor PAR para apoyo pedagógico entre pares.',
@@ -111,33 +111,35 @@ export const GenericModuleView = ({ moduleId, onBackToInicio }) => {
   };
 
   return (
-    <div className="space-y-6">
+    // A11y: Elemento semántico <section> con encabezado accesible
+    <section aria-labelledby="generic-module-heading" className="space-y-6">
       <div className="border-b border-slate-200 pb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-normal text-slate-800 tracking-tight">
+          <h2 id="generic-module-heading" className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             {current.title}
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-3xl leading-relaxed">
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-700 mt-2 max-w-3xl leading-relaxed font-medium">
             {current.description}
           </p>
         </div>
 
+        {/* A11y: Botón volver con target size accesible */}
         <button
           type="button"
           onClick={onBackToInicio}
-          className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-[#002B49] hover:underline"
+          className="min-h-[44px] hidden sm:flex items-center gap-2 text-xs sm:text-sm font-black text-[#002B49] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded-lg px-2"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span>Volver al Inicio</span>
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+      <article className="bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
         <div className="flex flex-wrap items-center gap-2">
           {current.badges.map((badge, idx) => (
             <span
               key={idx}
-              className="bg-amber-100 text-amber-950 border border-amber-300 text-xs font-extrabold px-3 py-1 rounded-full"
+              className="bg-amber-100 text-amber-950 border border-amber-400 text-xs font-black px-3 py-1 rounded-full"
             >
               {badge}
             </span>
@@ -145,31 +147,33 @@ export const GenericModuleView = ({ moduleId, onBackToInicio }) => {
         </div>
 
         <div className="space-y-3 pt-2">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
             Detalles y Características del Servicio:
-          </h2>
+          </h3>
           <ul className="space-y-2.5">
             {current.highlights.map((item, idx) => (
-              <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
-                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
+              <li key={idx} className="flex items-start gap-3 text-xs sm:text-sm text-slate-800 font-medium">
+                <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
                 <span>{item}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4">
+        <div className="pt-4 border-t-2 border-slate-100 flex flex-wrap items-center gap-4">
+          {/* A11y: Enlace externo con target size >= 44px, indicación de nueva pestaña y foco accesible */}
           <a
             href={current.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-6 py-2.5 bg-[#002B49] hover:bg-slate-800 text-white rounded-lg text-xs sm:text-sm font-black shadow-sm flex items-center gap-2 transition-transform active:scale-95 focus:ring-4 focus:ring-amber-400"
+            aria-label={`${current.btnText} (se abre en una nueva pestaña)`}
+            className="min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001f35] text-white rounded-xl text-xs sm:text-sm font-black shadow-sm flex items-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
           >
             <span>{current.btnText}</span>
-            <ExternalLink className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
           </a>
         </div>
-      </div>
-    </div>
+      </article>
+    </section>
   );
 };

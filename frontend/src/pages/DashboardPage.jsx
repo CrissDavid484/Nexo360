@@ -10,50 +10,46 @@ import { AccessibilityBar } from '../components/common/AccessibilityBar';
 
 // Vistas complementarias
 import { BibliotecaView } from '../components/views/BibliotecaView';
-import { SolicitudesView } from '../components/views/SolicitudesView';
+import { ServiciosDigitalesTicketsView } from '../components/views/ServiciosDigitalesTicketsView';
 import { PerfilView } from '../components/views/PerfilView';
 import { VivoDuocSummaryView } from '../components/views/VivoDuocSummaryView';
 
 import {
-  ShieldCheck,
-  CheckCircle,
   HelpCircle,
   Clock,
-  BookMarked,
-  FilePlus,
   CheckSquare,
   ChevronDown,
   ChevronUp,
-  Sparkles,
+  Laptop,
+  Calendar,
 } from 'lucide-react';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('centro-ayuda');
-  const [isA11yOpen, setIsA11yOpen] = useState(false);
 
   // Estados para el Centro de Ayuda y Módulos Institucionales
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [faqExpanded, setFaqExpanded] = useState(null);
 
-  // Preguntas frecuentes del Centro de Ayuda Duoc UC (ayuda.duoc.cl)
+  // Preguntas frecuentes oficiales del Centro de Ayuda Duoc UC
   const officialDuocFaqs = [
     {
-      q: '¿Cómo funciona la justificación de inasistencias por salud o terapias?',
-      a: 'Tienes hasta 5 días hábiles desde ocurrida la inasistencia para ingresar a la pestaña "Solicitudes Académicas" de Nexo360, adjuntando tu licencia médica o certificado de terapias. Al estar en PAEDIS Sede Alameda, tu solicitud cuenta con prioridad accesible.',
+      q: '¿Cómo funciona la justificación de inasistencias por salud o fuerza mayor?',
+      a: 'Tienes hasta 5 días hábiles desde ocurrida la inasistencia para presentar tu certificado médico o respaldo formal en la coordinación docente de Sede Alameda.',
     },
     {
       q: '¿Cómo reservo una sala de estudio en Sede Alameda y cómo registro mi ingreso?',
-      a: 'Ve a la pestaña "Biblioteca (Reserva de Salas)", elige Biblioteca Alameda y tu bloque de horario. Recibirás un código como RES-ALM-8942 con el cual puedes hacer clic en "Registra el ingreso" al llegar a la biblioteca.',
+      a: 'Ingresa a la pestaña "Biblioteca (Instrucciones & Acceso)" para seguir los pasos oficiales. Puedes reservar salas grupales o individuales y confirmar tu asistencia en el mesón de biblioteca.',
     },
     {
       q: '¿Dónde revalido mi pase escolar TNE o consulto sobre Gratuidad?',
-      a: 'La revalidación TNE se hace en los tótems Bip habilitados en el hall de Sede Alameda. Para Gratuidad o Crédito CAE, asegúrate de firmar tu pagaré semestral en el portal de pagos de Duoc UC.',
+      a: 'La revalidación TNE se realiza en los tótems Bip habilitados en el hall de Sede Alameda o en puntos Metro. Para Gratuidad o CAE, asegúrate de firmar tu pagaré semestral en el portal de pagos de Duoc UC.',
     },
     {
       q: '¿Cómo puedo simular mi toma de ramos antes del día oficial?',
-      a: 'Nexo360 incorporará un simulador idéntico de toma de ramos para que los alumnos de PAEDIS Alameda planifiquen sus horarios y secciones con total tranquilidad y sin estrés.',
+      a: 'Revisa tu tramo de inscripción en Experiencia Vivo Duoc para planificar con anticipación las secciones y horarios más convenientes para tu semestre.',
     },
   ];
 
@@ -68,8 +64,7 @@ export const DashboardPage = () => {
       const matchSubmodules = category.submodules.some(
         (sub) =>
           sub.title.toLowerCase().includes(term) ||
-          sub.description.toLowerCase().includes(term) ||
-          (sub.paedisSupport && sub.paedisSupport.toLowerCase().includes(term))
+          sub.description.toLowerCase().includes(term)
       );
       return matchTitle || matchDesc || matchSubmodules;
     });
@@ -77,162 +72,120 @@ export const DashboardPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900 transition-colors">
-      {/* 1. Barra de Accesibilidad PAEDIS (desplegable) */}
-      {isA11yOpen && (
-        <div className="border-b border-amber-400/40 bg-slate-900">
-          <AccessibilityBar />
-        </div>
-      )}
+      {/* 1. Barra de Accesibilidad Universal Permanentemente Visible */}
+      <AccessibilityBar />
 
       {/* 2. Barra Superior Unificada con Pestañas Rápidas */}
       <UnifiedNavbar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        isA11yOpen={isA11yOpen}
-        onToggleAccessibility={() => setIsA11yOpen(!isA11yOpen)}
       />
 
-      {/* 3. Contenido Principal */}
+      {/* 3. Contenido Principal Semántico */}
       <main id="main-content" className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        {/* PESTAÑA 1: CENTRO DE AYUDA Y MÓDULOS INSTITUCIONALES (EL CORAZÓN DE NEXO360) */}
+        {/* PESTAÑA 1: CENTRO DE AYUDA Y MÓDULOS INSTITUCIONALES */}
         {activeTab === 'centro-ayuda' && (
           <div className="space-y-8">
-            {/* Banner de Estado del Estudiante PAEDIS Sede Alameda */}
+            {/* Banner Principal de Bienvenida (Ajustado, centrado y limpio) */}
             <section
-              aria-labelledby="paedis-summary-heading"
-              className="bg-gradient-to-r from-[#002B49] via-[#0b3152] to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border-2 border-amber-400"
+              aria-labelledby="main-summary-heading"
+              className="bg-gradient-to-r from-[#002B49] via-[#09355c] to-slate-900 text-white rounded-3xl p-8 sm:p-10 shadow-xl border-4 border-[#FFB81C]"
             >
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-amber-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                      <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-                      Estudiante Activo PAEDIS
-                    </span>
-                    <span className="text-slate-300 text-xs hidden sm:inline">
-                      Periodo Académico 2026 • Sede Alameda
-                    </span>
-                  </div>
-
-                  <h1 id="paedis-summary-heading" className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-                    ¡Bienvenido, {user?.nombre || VIVO_STUDENT_PROFILE.nombre}!
-                  </h1>
-
-                  <p className="mt-2 text-slate-200 text-sm sm:text-base max-w-2xl font-medium leading-relaxed">
-                    Plataforma Centralizada de Accesibilidad Universal y Autonomía Digital: realiza trámites directamente mediante scraping, reserva salas de biblioteca y consulta tu avance académico en un solo lugar.
-                  </p>
-                </div>
-
-                {/* Tarjeta de Autonomía y Acreditación PAEDIS Alameda (Reemplaza a Tutorías) */}
-                <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl w-full lg:w-auto min-w-[280px]">
-                  <span className="text-xs text-amber-400 font-bold uppercase tracking-wider block mb-1">
-                    Acreditación PAEDIS Alameda
+              <div className="max-w-4xl">
+                {/* Píldora de periodo académico oficial */}
+                <div className="mb-3">
+                  <span className="bg-[#FFB81C] text-slate-950 font-black text-xs px-3.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 shadow-xs">
+                    <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Periodo Académico 2026 • Sede Alameda</span>
                   </span>
-                  <p className="font-extrabold text-base text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-amber-400" aria-hidden="true" />
-                    Autonomía y Accesibilidad Total
-                  </p>
-                  <p className="text-xs text-slate-300 mt-1">
-                    Trámites 100% integrados sin intermediarios ni webs externas
-                  </p>
                 </div>
+
+                {/* Único <h1> de la vista con el nombre oficial del estudiante */}
+                <h1 id="main-summary-heading" className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white">
+                  ¡Bienvenido, {user?.nombre || VIVO_STUDENT_PROFILE.nombre}!
+                </h1>
+
+                <p className="mt-3 text-slate-200 text-sm sm:text-base lg:text-lg font-medium leading-relaxed max-w-3xl">
+                  Plataforma Centralizada de Información y Servicios Institucionales: consulta instrucciones de trámites, revisa tus accesos de biblioteca, orientaciones de Vivo Duoc y gestiona tickets de soporte a servicios digitales en un solo lugar.
+                </p>
               </div>
             </section>
 
-            {/* BARRA DE ACCESOS RÁPIDOS VIVO DUOC */}
-            <section aria-label="Accesos rápidos a servicios oficiales">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Asistencia */}
+            {/* BARRA DE ACCESOS RÁPIDOS VIVO DUOC (3 tarjetas balanceadas sin tarjeta de biblioteca) */}
+            <section aria-labelledby="quick-access-heading">
+              <h2 id="quick-access-heading" className="sr-only">
+                Accesos rápidos a servicios oficiales
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 1. Mi Asistencia */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('vivo-duoc')}
-                  className="bg-white p-4 rounded-2xl border-2 border-slate-200 hover:border-[#002B49] text-left transition-all hover:shadow-md flex items-center justify-between group focus:ring-4 focus:ring-amber-400"
+                  className="min-h-[88px] bg-white p-6 rounded-2xl border-2 border-slate-300 hover:border-[#002B49] text-left transition-all hover:shadow-lg flex items-center justify-between group focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
                 >
                   <div>
-                    <span className="text-[11px] font-bold text-slate-500 uppercase block">
+                    <span className="text-xs font-black text-slate-700 uppercase block tracking-wider">
                       Mi Asistencia
                     </span>
-                    <span className="text-xl font-black text-slate-900 block mt-0.5">
+                    <span className="text-2xl font-black text-slate-950 block mt-0.5">
                       Capstone 88.9%
                     </span>
-                    <span className="text-xs text-emerald-700 font-semibold">
+                    <span className="text-xs text-emerald-800 font-bold mt-1 block">
                       ✓ Asistencia Cumpliendo
                     </span>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-amber-400 transition-colors">
-                    <CheckSquare className="w-5 h-5" />
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-[#FFB81C] transition-colors" aria-hidden="true">
+                    <CheckSquare className="w-7 h-7" aria-hidden="true" />
                   </div>
                 </button>
 
-                {/* 2. Biblioteca */}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('biblioteca')}
-                  className="bg-white p-4 rounded-2xl border-2 border-slate-200 hover:border-[#002B49] text-left transition-all hover:shadow-md flex items-center justify-between group focus:ring-4 focus:ring-amber-400"
-                >
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-500 uppercase block">
-                      Biblioteca Duoc UC
-                    </span>
-                    <span className="text-xl font-black text-slate-900 block mt-0.5">
-                      Reserva de Salas
-                    </span>
-                    <span className="text-xs text-amber-700 font-semibold">
-                      Alameda • Check-in
-                    </span>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-amber-400 transition-colors">
-                    <BookMarked className="w-5 h-5" />
-                  </div>
-                </button>
-
-                {/* 3. Horarios */}
+                {/* 2. Mis Horarios */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('vivo-duoc')}
-                  className="bg-white p-4 rounded-2xl border-2 border-slate-200 hover:border-[#002B49] text-left transition-all hover:shadow-md flex items-center justify-between group focus:ring-4 focus:ring-amber-400"
+                  className="min-h-[88px] bg-white p-6 rounded-2xl border-2 border-slate-300 hover:border-[#002B49] text-left transition-all hover:shadow-lg flex items-center justify-between group focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
                 >
                   <div>
-                    <span className="text-[11px] font-bold text-slate-500 uppercase block">
+                    <span className="text-xs font-black text-slate-700 uppercase block tracking-wider">
                       Mis Horarios
                     </span>
-                    <span className="text-xl font-black text-slate-900 block mt-0.5">
+                    <span className="text-2xl font-black text-slate-950 block mt-0.5">
                       Miércoles 18:45
                     </span>
-                    <span className="text-xs text-slate-500 font-medium">
+                    <span className="text-xs text-slate-700 font-bold mt-1 block">
                       Sala 402 • Capstone Alameda
                     </span>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#002B49] flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-amber-400 transition-colors">
-                    <Clock className="w-5 h-5" />
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 text-[#002B49] flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-[#FFB81C] transition-colors" aria-hidden="true">
+                    <Clock className="w-7 h-7" aria-hidden="true" />
                   </div>
                 </button>
 
-                {/* 4. Solicitud Rápida */}
+                {/* 3. Tickets a Servicios Digitales */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('solicitudes')}
-                  className="bg-white p-4 rounded-2xl border-2 border-slate-200 hover:border-[#002B49] text-left transition-all hover:shadow-md flex items-center justify-between group focus:ring-4 focus:ring-amber-400"
+                  onClick={() => setActiveTab('tickets')}
+                  className="min-h-[88px] bg-white p-6 rounded-2xl border-2 border-slate-300 hover:border-[#002B49] text-left transition-all hover:shadow-lg flex items-center justify-between group focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
                 >
                   <div>
-                    <span className="text-[11px] font-bold text-slate-500 uppercase block">
-                      Gestión Académica
+                    <span className="text-xs font-black text-slate-700 uppercase block tracking-wider">
+                      Soporte Técnico
                     </span>
-                    <span className="text-xl font-black text-slate-900 block mt-0.5">
-                      Nueva Solicitud
+                    <span className="text-2xl font-black text-slate-950 block mt-0.5">
+                      Servicios Digitales
                     </span>
-                    <span className="text-xs text-slate-500 font-medium">
-                      Justificativos y Notas
+                    <span className="text-xs text-slate-700 font-bold mt-1 block">
+                      Cuentas, AVA, WiFi y Software
                     </span>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-amber-400 transition-colors">
-                    <FilePlus className="w-5 h-5" />
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-[#FFB81C] transition-colors" aria-hidden="true">
+                    <Laptop className="w-7 h-7" aria-hidden="true" />
                   </div>
                 </button>
               </div>
             </section>
 
-            {/* Barra de Búsqueda Accesible del Centro de Ayuda (Corregida sin solapamiento de lupa) */}
+            {/* Barra de Búsqueda Accesible */}
             <section aria-label="Buscador de trámites y centro de ayuda">
               <SearchBar
                 searchTerm={searchTerm}
@@ -243,33 +196,33 @@ export const DashboardPage = () => {
 
             {/* Grilla de las 9 Categorías Institucionales de Duoc UC */}
             <section aria-labelledby="modules-grid-heading">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
                 <div>
                   <h2 id="modules-grid-heading" className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                     Centro de Ayuda & Módulos Institucionales Duoc UC
                   </h2>
-                  <p className="text-sm text-slate-600 font-medium">
-                    Haz clic en cualquier tarjeta para realizar el trámite directamente mediante scraping sin salir de la plataforma.
+                  <p className="text-sm text-slate-700 font-bold mt-1">
+                    Selecciona cualquier categoría para conocer las instrucciones de cada trámite y acceder a los enlaces oficiales.
                   </p>
                 </div>
-                <span className="text-sm font-bold text-slate-500 hidden sm:inline">
-                  Mostrando {filteredCategories.length} de 9 módulos
+                <span className="text-sm font-black text-slate-700 shrink-0">
+                  Mostrando {filteredCategories.length} de 9 categorías
                 </span>
               </div>
 
               {filteredCategories.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8">
+                <div className="text-center py-12 bg-white rounded-3xl border-2 border-dashed border-slate-300 p-8">
                   <HelpCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" aria-hidden="true" />
-                  <h3 className="text-lg font-bold text-slate-800">No encontramos trámites con esa palabra</h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Prueba buscando "toma de ramos", "gratuidad", "PAEDIS", "asistencia" o "biblioteca".
+                  <h3 className="text-lg font-black text-slate-900">No encontramos trámites con esa palabra</h3>
+                  <p className="text-sm text-slate-700 mt-1 font-medium">
+                    Prueba buscando "toma de ramos", "gratuidad", "asistencia", "certificados" o "software".
                   </p>
                   <button
                     type="button"
                     onClick={() => setSearchTerm('')}
-                    className="mt-4 px-4 py-2 bg-[#002B49] text-white text-sm font-bold rounded-lg focus:ring-4 focus:ring-amber-400"
+                    className="mt-4 min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001f35] text-white text-xs sm:text-sm font-black rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-all"
                   >
-                    Ver todos los módulos
+                    Ver todas las categorías
                   </button>
                 </div>
               ) : (
@@ -290,40 +243,51 @@ export const DashboardPage = () => {
               aria-labelledby="faqs-heading"
               className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-slate-200 shadow-md space-y-4"
             >
-              <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
-                  <HelpCircle className="w-6 h-6 text-amber-700" aria-hidden="true" />
+              <div className="flex items-center gap-3 border-b-2 border-slate-100 pb-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold" aria-hidden="true">
+                  <HelpCircle className="w-7 h-7 text-amber-700" aria-hidden="true" />
                 </div>
                 <div>
                   <h2 id="faqs-heading" className="text-xl sm:text-2xl font-black text-slate-900">
                     Preguntas Frecuentes del Centro de Ayuda Duoc UC
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-500">
-                    Respuestas oficiales para estudiantes de Duoc UC Sede Alameda
+                  <p className="text-xs sm:text-sm text-slate-700 font-bold">
+                    Respuestas y orientaciones para estudiantes de Duoc UC Sede Alameda
                   </p>
                 </div>
               </div>
 
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-200">
                 {officialDuocFaqs.map((faq, idx) => {
                   const isOpen = faqExpanded === idx;
+                  const buttonId = `faq-btn-${idx}`;
+                  const panelId = `faq-panel-${idx}`;
+
                   return (
                     <div key={idx} className="py-4">
                       <button
+                        id={buttonId}
                         type="button"
                         onClick={() => setFaqExpanded(isOpen ? null : idx)}
-                        className="w-full flex items-center justify-between text-left gap-4 font-bold text-slate-900 text-sm sm:text-base hover:text-[#002B49] focus:outline-none focus:ring-2 focus:ring-[#002B49] rounded p-1"
                         aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        className="w-full min-h-[44px] flex items-center justify-between text-left gap-4 font-black text-slate-900 text-sm sm:text-base hover:text-[#002B49] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 rounded-xl p-2"
                       >
                         <span>{faq.q}</span>
                         {isOpen ? (
-                          <ChevronUp className="w-5 h-5 text-slate-500 shrink-0" />
+                          <ChevronUp className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
                         ) : (
-                          <ChevronDown className="w-5 h-5 text-slate-400 shrink-0" />
+                          <ChevronDown className="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true" />
                         )}
                       </button>
+
                       {isOpen && (
-                        <div className="mt-3 pl-3 border-l-2 border-amber-400 text-xs sm:text-sm text-slate-600 leading-relaxed animate-fadeIn">
+                        <div
+                          id={panelId}
+                          role="region"
+                          aria-labelledby={buttonId}
+                          className="mt-3 pl-4 border-l-4 border-[#FFB81C] text-xs sm:text-sm text-slate-800 font-medium leading-relaxed"
+                        >
                           {faq.a}
                         </div>
                       )}
@@ -335,22 +299,20 @@ export const DashboardPage = () => {
           </div>
         )}
 
-        {/* PESTAÑA 2: BIBLIOTECA DUOC (RESERVA DE SALAS & CHECK-IN/OUT) */}
+        {/* PESTAÑA 2: BIBLIOTECA DUOC */}
         {activeTab === 'biblioteca' && <BibliotecaView />}
 
-        {/* PESTAÑA 3: MI VIVO DUOC (NOTAS, ASISTENCIA, HORARIOS) */}
-        {activeTab === 'vivo-duoc' && (
-          <VivoDuocSummaryView initialTab="asistencia" onNavigate={setActiveTab} />
-        )}
+        {/* PESTAÑA 3: MI VIVO DUOC */}
+        {activeTab === 'vivo-duoc' && <VivoDuocSummaryView />}
 
-        {/* PESTAÑA 4: SOLICITUDES ACADÉMICAS */}
-        {activeTab === 'solicitudes' && <SolicitudesView onNavigate={setActiveTab} />}
+        {/* PESTAÑA 4: TICKETS A SERVICIOS DIGITALES */}
+        {activeTab === 'tickets' && <ServiciosDigitalesTicketsView />}
 
         {/* PESTAÑA 5: MI PERFIL */}
         {activeTab === 'perfil' && <PerfilView />}
       </main>
 
-      {/* Modal Interactivo de Submenús Institucionales con Tramitación Directa por Scraping */}
+      {/* Modal Interactivo de Submenús e Instrucciones de Trámites */}
       {selectedCategory && (
         <ModuleModal
           category={selectedCategory}
@@ -358,22 +320,28 @@ export const DashboardPage = () => {
         />
       )}
 
-      {/* Pie de Página Institucional */}
-      <footer className="bg-slate-900 text-slate-400 py-6 px-4 border-t-4 border-amber-400 mt-auto text-xs">
+      {/* A11y: Pie de Página Institucional semántico <footer> */}
+      <footer className="bg-slate-900 text-slate-200 py-8 px-4 border-t-4 border-[#FFB81C] mt-auto text-xs font-semibold">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <p className="font-bold text-slate-200">
-              Nexo360 • Centro de Ayuda Centralizado Duoc UC PAEDIS Alameda
+            <p className="font-black text-white text-sm">
+              Nexo360 • Centro de Ayuda Centralizado Duoc UC Sede Alameda
             </p>
-            <p className="text-slate-400 mt-0.5">
-              Diseñado con accesibilidad universal WCAG 2.2 AA y automatización headless.
+            <p className="text-slate-300 mt-1">
+              Plataforma diseñada bajo estándares de accesibilidad universal WCAG 2.2 AA.
             </p>
           </div>
           <div className="text-center sm:text-right">
-            <p className="text-slate-300">
-              Mesa de Ayuda PAEDIS Alameda: <span className="font-bold text-amber-400">paedis.alameda@duoc.cl</span>
+            <p className="text-slate-200">
+              Mesa de Ayuda Alameda:{' '}
+              <a
+                href="mailto:ayuda.alameda@duoc.cl"
+                className="font-black text-[#FFB81C] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded px-1"
+              >
+                ayuda.alameda@duoc.cl
+              </a>
             </p>
-            <p className="text-slate-500 mt-0.5">
+            <p className="text-slate-400 mt-1">
               Sede Alameda • Periodo Académico 2026
             </p>
           </div>

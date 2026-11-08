@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, ShieldCheck, HeartHandshake, ChevronRight, BookOpen, ExternalLink } from 'lucide-react';
+import { Clock, ChevronRight } from 'lucide-react';
 import { VIVO_STUDENT_PROFILE } from '../../data/vivoDuocData';
 
 export const InicioView = ({ onNavigate }) => {
@@ -9,7 +9,7 @@ export const InicioView = ({ onNavigate }) => {
     {
       id: 'cva',
       title: 'Centro Virtual de Aprendizaje (CVA)',
-      description: 'Transforma tu aprendizaje con estrategias y técnicas de estudio.',
+      description: 'Transforma tu aprendizaje con estrategias y técnicas de estudio inclusivas.',
       btnText: 'Visitar CVA',
       imgSrc: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500&auto=format&fit=crop&q=60',
       action: () => window.open('https://experienciavivo.duoc.cl/cva', '_blank'),
@@ -41,54 +41,51 @@ export const InicioView = ({ onNavigate }) => {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Saludo institucional y Fecha Oficial (Screenshot 2) */}
+    // A11y: Elemento semántico <section> con encabezado accesible
+    <section aria-labelledby="inicio-view-heading" className="space-y-6">
+      {/* Saludo institucional y Fecha Oficial */}
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-slate-200 pb-4">
-        <h1 className="text-2xl sm:text-3xl font-normal text-slate-800 tracking-tight">
-          Buenas noches, <span className="font-semibold">{VIVO_STUDENT_PROFILE.nombre.split(' ')[0]} {VIVO_STUDENT_PROFILE.nombre.split(' ')[1]}</span>.
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 font-medium">
+        <h2 id="inicio-view-heading" className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Buenas tardes, <span className="text-[#002B49]">{VIVO_STUDENT_PROFILE.nombre.split(' ')[0]} {VIVO_STUDENT_PROFILE.nombre.split(' ')[1]}</span>.
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-700 font-bold">
           {currentDate}
         </p>
       </div>
 
-      {/* Banner Superior con Carrusel: "¿Dónde está mi horario? Revísalo aquí" */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center transition-all hover:shadow-md">
-        <div className="flex items-center justify-center gap-2 text-slate-700 text-base sm:text-lg font-medium">
-          <span>¿Dónde está mi horario?</span>
-          <Clock className="w-5 h-5 text-slate-600 inline" aria-hidden="true" />
+      {/* Banner Superior: "¿Dónde está mi horario? Revísalo aquí" */}
+      <article className="bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-6 text-center transition-all hover:shadow-md">
+        <div className="flex flex-wrap items-center justify-center gap-2 text-slate-800 text-base sm:text-lg font-bold">
+          <span>¿Dónde está mi horario de clases?</span>
+          <Clock className="w-5 h-5 text-slate-700 inline" aria-hidden="true" />
           <span>Revísalo</span>
           <button
             type="button"
             onClick={() => onNavigate('horarios')}
-            className="text-[#002B49] font-black underline hover:text-amber-600 focus:ring-2 focus:ring-amber-400 rounded px-1"
+            className="min-h-[44px] inline-flex items-center text-[#002B49] font-black underline hover:text-amber-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded-lg px-2"
           >
-            aquí
+            aquí directamente
           </button>
         </div>
-        {/* Indicador de carrusel (punto activo) */}
-        <div className="flex justify-center mt-4">
-          <span className="w-2.5 h-2.5 bg-[#002B49] rounded-full inline-block" />
-        </div>
-      </div>
+      </article>
 
-      {/* Banner Especial PAEDIS / Acompañamiento Inclusivo */}
-      <div className="bg-gradient-to-r from-[#002B49] to-slate-900 text-white rounded-xl p-5 shadow-sm border border-amber-400 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 font-black">
-            ♿
+      {/* Banner de Acompañamiento e Inclusión */}
+      <article className="bg-gradient-to-r from-[#002B49] to-slate-900 text-white rounded-2xl p-6 shadow-md border-2 border-[#FFB81C] flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#FFB81C] text-slate-950 flex items-center justify-center shrink-0 font-black text-2xl shadow" aria-hidden="true">
+            🎓
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                Programa PAEDIS Activo
+              <span className="text-xs font-black uppercase tracking-wider text-[#FFB81C]">
+                Periodo Académico 2026
               </span>
-              <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+              <span className="bg-white/20 text-white text-[11px] px-2.5 py-0.5 rounded-full font-black">
                 Sede Alameda
               </span>
             </div>
-            <p className="text-sm font-semibold text-slate-100 mt-0.5">
-              Acreditación PAEDIS Sede Alameda • Portal adaptado para Accesibilidad Universal y Autonomía Digital.
+            <p className="text-sm font-bold text-slate-100 mt-1">
+              Portal Estudiantil Duoc UC • Experiencia adaptada con Accesibilidad Universal y Autonomía Digital.
             </p>
           </div>
         </div>
@@ -96,42 +93,41 @@ export const InicioView = ({ onNavigate }) => {
         <button
           type="button"
           onClick={() => onNavigate('perfil')}
-          className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold rounded-lg shrink-0 transition-colors focus:ring-2 focus:ring-white"
+          className="min-h-[44px] px-6 py-2.5 bg-[#FFB81C] hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-black rounded-xl shrink-0 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white focus-visible:ring-offset-2"
         >
-          Ver Ficha y Ajustes
+          Ver Mi Perfil
         </button>
-      </div>
+      </article>
 
-      {/* Sección: Vida Estudiantil (Screenshot 2) */}
-      <section aria-labelledby="vida-estudiantil-title" className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        {/* Barra de cabecera azul oscuro */}
-        <div className="bg-[#002B49] text-white px-6 py-3">
-          <h2 id="vida-estudiantil-title" className="text-lg font-bold tracking-wide">
-            Vida Estudiantil
-          </h2>
-        </div>
+      {/* Sección: Vida Estudiantil */}
+      <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden shadow-sm">
+        <header className="bg-[#002B49] text-white px-6 py-4 border-b-2 border-[#FFB81C]">
+          <h3 className="text-lg font-black tracking-wide">
+            Vida Estudiantil & Beneficios
+          </h3>
+        </header>
 
-        {/* Grilla 2x2 de tarjetas con imagen y botón azul */}
+        {/* Grilla de tarjetas */}
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           {vidaEstudiantilCards.map((card) => (
-            <div
+            <article
               key={card.id}
-              className="flex flex-col sm:flex-row bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+              className="flex flex-col sm:flex-row bg-white border-2 border-slate-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow"
             >
-              <div className="sm:w-44 h-36 sm:h-auto shrink-0 relative overflow-hidden bg-slate-100">
+              <div className="sm:w-44 h-40 sm:h-auto shrink-0 relative overflow-hidden bg-slate-100">
                 <img
                   src={card.imgSrc}
-                  alt={card.title}
+                  alt={`Fotografía representativa para ${card.title}`}
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
               </div>
-              <div className="p-4 flex flex-col justify-between flex-1">
+              <div className="p-5 flex flex-col justify-between flex-1">
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+                  <h4 className="font-black text-slate-900 text-base leading-snug">
                     {card.title}
-                  </h3>
-                  <p className="text-xs text-slate-600 mt-1.5 line-clamp-2">
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-700 mt-1.5 font-medium leading-relaxed">
                     {card.description}
                   </p>
                 </div>
@@ -139,17 +135,17 @@ export const InicioView = ({ onNavigate }) => {
                   <button
                     type="button"
                     onClick={card.action}
-                    className="px-4 py-2 bg-[#002B49] hover:bg-slate-800 text-white text-xs font-bold rounded-md transition-colors inline-flex items-center gap-1.5 focus:ring-2 focus:ring-amber-400"
+                    className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-slate-800 text-white text-xs sm:text-sm font-black rounded-xl transition-all inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
                   >
                     <span>{card.btnText}</span>
-                    <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    <ChevronRight className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
                   </button>
                 </div>
               </div>
-            </div>
+            </article>
           ))}
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 };

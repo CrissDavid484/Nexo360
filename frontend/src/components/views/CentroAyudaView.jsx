@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, HelpCircle, ChevronDown, ChevronUp, FilePlus, BookOpen, Laptop, ShieldCheck, HeartHandshake } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, FilePlus, BookOpen, Laptop, HeartHandshake } from 'lucide-react';
 
 export const CentroAyudaView = ({ onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -11,16 +11,16 @@ export const CentroAyudaView = ({ onNavigate }) => {
       icon: BookOpen,
       faqs: [
         {
-          q: '¿Cómo funciona la toma de ramos y qué prioridad tengo en PAEDIS?',
-          a: 'La inscripción de asignaturas se realiza en tramos horarios a través de Experiencia Vivo. Los estudiantes acreditados en PAEDIS cuentan con tramo de inscripción prioritaria garantizado para seleccionar horarios compatibles con traslados y terapias.',
+          q: '¿Cómo funciona la toma de ramos y la inscripción preferencial?',
+          a: 'La inscripción de asignaturas se realiza en tramos horarios a través de Experiencia Vivo. Los estudiantes con adecuaciones y asignación prioritaria disponen de un tramo inicial para seleccionar horarios compatibles con sus traslados y necesidades.',
         },
         {
           q: '¿Cómo justifico una inasistencia a clases o evaluaciones?',
-          a: 'Tienes 5 días hábiles desde ocurrida la inasistencia para ingresar a la sección "Solicitudes" de esta plataforma, seleccionar "Asistencias y Justificativos" y adjuntar tu certificado médico o respaldo de terapia.',
+          a: 'Tienes 5 días hábiles desde ocurrida la inasistencia para ingresar a la sección de trámites o contactar a tu sede y adjuntar tu certificado médico o documento de respaldo.',
         },
         {
           q: '¿Cómo hago valer mis ajustes de accesibilidad en las evaluaciones?',
-          a: 'Todos los estudiantes con Ficha PAEDIS Alameda aprobada cuentan con adecuaciones registradas automáticamente en el sistema del docente (formatos digitales accesibles, lectores de pantalla, pruebas ampliadas o condiciones preferenciales de aula).',
+          a: 'Todos los estudiantes con adecuaciones aprobadas cuentan con las especificaciones registradas automáticamente en el sistema del docente (formatos digitales accesibles, lectores de pantalla, pruebas ampliadas o condiciones preferenciales de aula).',
         },
       ],
     },
@@ -70,27 +70,32 @@ export const CentroAyudaView = ({ onNavigate }) => {
   }, [searchTerm]);
 
   return (
-    <div className="space-y-6">
+    // A11y: Elemento semántico <section> con encabezado accesible
+    <section aria-labelledby="centro-ayuda-heading" className="space-y-6">
       {/* Encabezado del Centro de Ayuda */}
       <div className="border-b border-slate-200 pb-4">
-        <h1 className="text-2xl sm:text-3xl font-normal text-slate-800 tracking-tight">
+        <h2 id="centro-ayuda-heading" className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
           Centro de Ayuda Duoc UC
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-3xl leading-relaxed">
-          Encuentra respuestas inmediatas a tus trámites, reglamentos, becas y beneficios institucionales, con acompañamiento especializado PAEDIS.
+        </h2>
+        <p className="text-xs sm:text-sm text-slate-700 mt-2 max-w-3xl leading-relaxed font-medium">
+          Encuentra respuestas inmediatas a tus trámites, reglamentos, becas y beneficios institucionales, con acompañamiento especializado.
         </p>
       </div>
 
-      {/* Buscador reactivo */}
+      {/* A11y: Buscador semántico con <label> explícito asociado */}
       <div className="relative">
+        <label htmlFor="ayuda-search-input" className="sr-only">
+          Buscar preguntas frecuentes y trámites en el Centro de Ayuda
+        </label>
         <input
-          type="text"
+          id="ayuda-search-input"
+          type="search"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Escribe tu consulta (ej: justificar inasistencia, gratuidad, toma de ramos, accesibilidad)..."
-          className="w-full text-xs sm:text-sm p-4 pl-12 rounded-xl border-2 border-slate-300 focus:border-[#002B49] focus:ring-4 focus:ring-amber-300 focus:outline-none bg-white font-medium shadow-xs"
+          className="w-full min-h-[50px] text-xs sm:text-sm p-4 pl-12 rounded-2xl border-2 border-slate-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 focus:border-[#002B49] bg-white font-bold text-slate-900 shadow-xs"
         />
-        <Search className="w-5 h-5 text-slate-400 absolute left-4 top-4" aria-hidden="true" />
+        <Search className="w-5 h-5 text-slate-500 absolute left-4 top-3.5" aria-hidden="true" />
       </div>
 
       {/* Temas y Preguntas Frecuentes */}
@@ -99,42 +104,52 @@ export const CentroAyudaView = ({ onNavigate }) => {
           const Icon = topic.icon;
 
           return (
-            <div
+            <article
               key={topicIdx}
-              className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"
+              className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden shadow-sm"
             >
-              <div className="bg-[#002B49] text-white px-6 py-3 flex items-center gap-2.5">
-                <Icon className="w-4 h-4 text-amber-400" aria-hidden="true" />
-                <h2 className="text-sm sm:text-base font-bold tracking-wide">
+              <header className="bg-[#002B49] text-white px-6 py-4 flex items-center gap-3 border-b-2 border-[#FFB81C]">
+                <Icon className="w-5 h-5 text-[#FFB81C] shrink-0" aria-hidden="true" />
+                <h3 className="text-sm sm:text-base font-black tracking-wide">
                   {topic.category}
-                </h2>
-              </div>
+                </h3>
+              </header>
 
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-200">
                 {topic.faqs.map((faq, faqIdx) => {
                   const faqKey = `${topicIdx}-${faqIdx}`;
                   const isOpen = expandedFaq === faqKey;
+                  const buttonId = `faq-btn-${faqKey}`;
+                  const panelId = `faq-panel-${faqKey}`;
 
                   return (
                     <div key={faqIdx} className="p-4 sm:p-5">
+                      {/* A11y: Botón acordeón con aria-expanded, aria-controls y tamaño mínimo 44px */}
                       <button
+                        id={buttonId}
                         type="button"
                         onClick={() => setExpandedFaq(isOpen ? null : faqKey)}
-                        className="w-full flex items-center justify-between text-left gap-4 focus:outline-none focus:ring-2 focus:ring-[#002B49] rounded p-1"
                         aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        className="w-full min-h-[44px] flex items-center justify-between text-left gap-4 rounded-xl p-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
                       >
-                        <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                        <span className="font-black text-slate-900 text-xs sm:text-sm">
                           {faq.q}
                         </span>
                         {isOpen ? (
-                          <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+                          <ChevronUp className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
                         ) : (
-                          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                          <ChevronDown className="w-5 h-5 text-slate-600 shrink-0" aria-hidden="true" />
                         )}
                       </button>
 
                       {isOpen && (
-                        <div className="mt-3 text-xs sm:text-sm text-slate-600 leading-relaxed pl-2 border-l-2 border-amber-400">
+                        <div
+                          id={panelId}
+                          role="region"
+                          aria-labelledby={buttonId}
+                          className="mt-3 text-xs sm:text-sm text-slate-800 font-medium leading-relaxed pl-4 border-l-4 border-[#FFB81C]"
+                        >
                           {faq.a}
                         </div>
                       )}
@@ -142,31 +157,32 @@ export const CentroAyudaView = ({ onNavigate }) => {
                   );
                 })}
               </div>
-            </div>
+            </article>
           );
         })}
       </div>
 
       {/* ¿No encontraste lo que buscabas? Crear solicitud */}
-      <div className="p-6 bg-slate-900 text-white rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md border border-amber-400">
+      <article className="p-6 bg-slate-900 text-white rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md border-2 border-[#FFB81C]">
         <div>
-          <h3 className="font-bold text-base text-amber-300">
+          <h3 className="font-black text-base sm:text-lg text-[#FFB81C]">
             ¿No encontraste respuesta para tu caso?
           </h3>
-          <p className="text-xs text-slate-300 mt-1">
-            Puedes abrir una solicitud formal directa a la coordinación académica o al equipo PAEDIS de tu sede.
+          <p className="text-xs sm:text-sm text-slate-200 mt-1 font-medium leading-relaxed">
+            Puedes abrir una solicitud o ticket formal directo a la coordinación académica o a Servicios Digitales.
           </p>
         </div>
 
+        {/* A11y: Botón con tamaño mínimo táctil 44x44px y foco ultra-visible */}
         <button
           type="button"
           onClick={() => onNavigate('solicitudes')}
-          className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-lg shrink-0 flex items-center gap-2 transition-transform active:scale-95 shadow-sm"
+          className="min-h-[44px] px-6 py-2.5 bg-[#FFB81C] hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-black rounded-xl shrink-0 flex items-center gap-2 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white focus-visible:ring-offset-2 shadow-sm"
         >
-          <FilePlus className="w-4 h-4" aria-hidden="true" />
+          <FilePlus className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
           <span>Ingresar Nueva Solicitud</span>
         </button>
-      </div>
-    </div>
+      </article>
+    </section>
   );
 };

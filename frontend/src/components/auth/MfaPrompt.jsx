@@ -13,17 +13,17 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
   const pollIntervalRef = useRef(null);
   const MAX_POLL_COUNT = 150; // 5 minutos (150 intentos × 2 segundos)
 
-  // Anunciar código al montar el componente
+  // A11y: Anuncio por voz accesible al montar el componente
   useEffect(() => {
     if (initialMfaCode && initialMfaCode !== '..') {
       announce(
-        `Aprobación requerida. Abre Microsoft Authenticator y selecciona el número ${initialMfaCode}`,
+        `Aprobación requerida. Abre Microsoft Authenticator en tu celular y pulsa el número ${initialMfaCode}`,
         'assertive'
       );
     }
   }, [initialMfaCode]);
 
-  // Polling cada 2 segundos
+  // Polling reactivo cada 2 segundos
   useEffect(() => {
     let isMounted = true;
 
@@ -35,11 +35,11 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
 
         setPollCount((prev) => prev + 1);
 
-        // Verificar si la sesión MFA expiró (máx 5 minutos)
         if (pollCount >= MAX_POLL_COUNT) {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          setPollError('La sesión de aprobación expiró. Por favor vuelve a iniciar sesión.');
-          announce('La sesión de aprobación expiró.', 'assertive');
+          const timeoutMsg = 'La sesión de aprobación expiró. Por favor vuelve a iniciar sesión.';
+          setPollError(timeoutMsg);
+          announce(timeoutMsg, 'assertive');
           return;
         }
 
@@ -49,13 +49,10 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
         }
 
         if (res.status === 'COMPLETED') {
-          // Detener polling
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-
           setIsApproved(true);
-          announce('Sesión iniciada con éxito. Redirigiendo al panel principal.', 'assertive');
+          announce('Sesión iniciada con éxito. Redirigiendo al panel principal de Nexo360.', 'assertive');
 
-          // Esperar breve momento para que el usuario perciba la confirmación
           setTimeout(() => {
             if (isMounted) {
               onApproved(res.token, res.user);
@@ -63,7 +60,8 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
           }, 1500);
         } else if (res.status === 'FAILED') {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          setPollError(res.errorMessage || 'La solicitud fue rechazada o expiró.');
+          const failMsg = res.errorMessage || 'La solicitud fue rechazada o expiró.';
+          setPollError(failMsg);
           announce('Error en la autenticación institucional.', 'assertive');
         }
       } catch (err) {
@@ -71,7 +69,6 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
       }
     };
 
-    // Iniciar primer chequeo inmediato y luego cada 2s
     checkStatus();
     pollIntervalRef.current = setInterval(checkStatus, 2000);
 
@@ -82,93 +79,105 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
   }, [sessionId, currentCode]);
 
   return (
-    <div
-      role="region"
+    // A11y: Uso de etiqueta semántica <section> con etiquetado accesible para lectores de pantalla
+    <section
       aria-labelledby="mfa-heading"
-      className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl border-2 border-amber-400 p-8 sm:p-10 transition-all text-center"
+      className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-2xl border-2 border-amber-400 p-8 sm:p-10 transition-all text-center"
     >
       {/* Icono de Teléfono / Authenticator */}
-      <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-50 text-amber-600 mb-6 border-4 border-amber-400 animate-pulse">
+      <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-50 text-[#002B49] mb-6 border-4 border-[#FFB81C] animate-pulse">
+        {/* A11y: Icono decorativo marcado con aria-hidden="true" */}
         <Smartphone className="w-10 h-10" aria-hidden="true" />
       </div>
 
+      {/* A11y: Título único asociado a la sección */}
       <h1 id="mfa-heading" className="text-3xl font-black text-slate-900 tracking-tight">
         Aprobación Requerida
       </h1>
 
-      <p className="mt-3 text-base text-slate-600">
-        Hemos enviado una notificación a la aplicación <strong className="text-slate-900">Microsoft Authenticator</strong> vinculada a tu cuenta institucional:
+      <p className="mt-3 text-sm sm:text-base text-slate-700 leading-relaxed font-medium">
+        Hemos enviado una notificación a la aplicación <strong className="text-slate-950 font-black">Microsoft Authenticator</strong> vinculada a tu cuenta institucional Duoc UC:
       </p>
 
-      <p className="text-sm font-semibold text-duoc-navy bg-slate-100 py-1.5 px-3 rounded-lg inline-block mt-2">
+      <p className="text-sm font-black text-[#002B49] bg-slate-100 py-2 px-4 rounded-lg inline-block mt-3 border border-slate-300">
         {email}
       </p>
 
-      {/* Caja Grande con el Número de Autenticación */}
-      <div className="my-8 p-6 bg-slate-950 text-amber-400 rounded-2xl border-4 border-amber-400 shadow-inner">
-        <span className="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">
+      {/* A11y: Caja de alta visibilidad para el número de autenticación con rol de estado */}
+      <div
+        role="region"
+        aria-label="Número de confirmación en dos pasos"
+        className="my-8 p-6 bg-slate-950 text-[#FFB81C] rounded-2xl border-4 border-[#FFB81C] shadow-inner"
+      >
+        <span className="block text-xs uppercase tracking-widest text-slate-300 font-bold mb-2">
           Número para marcar en tu teléfono
         </span>
         <div
-          aria-label={`Número de aprobación: ${currentCode}`}
-          className="text-7xl sm:text-8xl font-black font-mono tracking-widest select-all"
+          aria-live="polite"
+          aria-atomic="true"
+          className="text-7xl sm:text-8xl font-black font-mono tracking-widest select-all text-[#FFB81C]"
         >
           {currentCode}
         </div>
-        <p className="mt-3 text-xs text-slate-300">
+        <p className="mt-3 text-xs text-slate-200 font-medium">
           Abre la aplicación en tu celular y pulsa este número para verificar tu identidad.
         </p>
       </div>
 
-      {/* Estado del Polling / Éxito / Error */}
+      {/* A11y: Estado dinámico con notificaciones para tecnologías asistivas */}
       {isApproved ? (
         <div
           role="alert"
           aria-live="assertive"
-          className="p-4 bg-emerald-50 border-2 border-emerald-500 rounded-xl flex items-center justify-center gap-3 text-emerald-900 font-bold text-lg"
+          className="p-4 bg-emerald-50 border-2 border-emerald-600 rounded-xl flex items-center justify-center gap-3 text-emerald-950 font-black text-base sm:text-lg"
         >
-          <CheckCircle2 className="w-7 h-7 text-emerald-600" aria-hidden="true" />
+          <CheckCircle2 className="w-7 h-7 text-emerald-700 shrink-0" aria-hidden="true" />
           <span>¡Sesión Iniciada con Éxito! Redirigiendo...</span>
         </div>
       ) : pollError ? (
         <div
           role="alert"
           aria-live="assertive"
-          className="p-4 bg-red-50 border-2 border-red-500 rounded-xl text-red-900 font-medium text-sm text-left mb-4"
+          className="p-4 bg-red-50 border-2 border-red-600 rounded-xl text-red-950 font-bold text-sm text-left mb-4"
         >
-          <div className="flex items-center gap-2 font-bold mb-1">
-            <AlertTriangle className="w-5 h-5 text-red-600" aria-hidden="true" />
-            <span>Fallo de Aprobación</span>
+          <div className="flex items-center gap-2 mb-1 text-red-900">
+            <AlertTriangle className="w-5 h-5 text-red-700 shrink-0" aria-hidden="true" />
+            <span className="font-black">Fallo de Aprobación</span>
           </div>
-          <p>{pollError}</p>
+          <p className="text-xs text-red-900 mt-1">{pollError}</p>
+          {/* A11y: Botón con tamaño mínimo de toque 44px y foco ultra-visible */}
           <button
             type="button"
             onClick={onCancel}
-            className="mt-3 w-full py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 focus:ring-4 focus:ring-red-400"
+            className="mt-3 w-full min-h-[44px] py-2.5 px-4 bg-red-700 text-white rounded-lg font-black text-sm hover:bg-red-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-all"
           >
             Volver a Intentar
           </button>
         </div>
       ) : (
-        <div className="flex items-center justify-center gap-3 text-slate-600 text-sm font-medium py-2">
-          <Loader2 className="w-5 h-5 animate-spin text-amber-500" aria-hidden="true" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center justify-center gap-3 text-slate-800 text-sm font-bold py-2"
+        >
+          <Loader2 className="w-5 h-5 animate-spin text-amber-600 shrink-0" aria-hidden="true" />
           <span>Esperando aprobación en tu dispositivo móvil...</span>
         </div>
       )}
 
-      {/* Botón para Cancelar o Regresar */}
+      {/* A11y: Botón para Cancelar con tamaño táctil mínimo 44px */}
       {!isApproved && !pollError && (
         <div className="mt-8 pt-4 border-t border-slate-200">
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 focus:ring-4 focus:ring-amber-400"
+            className="min-h-[44px] inline-flex items-center gap-2 text-sm font-bold text-slate-700 hover:text-slate-950 px-5 py-2.5 rounded-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-all"
           >
-            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+            <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>Cancelar y volver al formulario</span>
           </button>
         </div>
       )}
-    </div>
+    </section>
   );
 };

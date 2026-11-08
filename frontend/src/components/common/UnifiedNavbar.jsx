@@ -4,53 +4,51 @@ import {
   HelpCircle,
   BookMarked,
   GraduationCap,
-  FileText,
+  Laptop,
   User,
   LogOut,
-  Sliders,
-  ShieldCheck,
 } from 'lucide-react';
 
 export const UnifiedNavbar = ({
   activeTab,
   onTabChange,
-  isA11yOpen,
-  onToggleAccessibility,
 }) => {
   const { user, logout } = useAuth();
 
   const navTabs = [
     { id: 'centro-ayuda', label: 'Centro de Ayuda & Trámites', icon: HelpCircle },
-    { id: 'biblioteca', label: 'Biblioteca (Reserva de Salas)', icon: BookMarked, badge: 'Duoc' },
-    { id: 'vivo-duoc', label: 'Mi Vivo Duoc (Notas/Asistencia)', icon: GraduationCap },
-    { id: 'solicitudes', label: 'Solicitudes Académicas', icon: FileText },
+    { id: 'biblioteca', label: 'Biblioteca (Instrucciones & Acceso)', icon: BookMarked },
+    { id: 'vivo-duoc', label: 'Mi Vivo Duoc (Guía & Acceso)', icon: GraduationCap },
+    { id: 'tickets', label: 'Tickets Servicios Digitales', icon: Laptop },
     { id: 'perfil', label: 'Mi Perfil', icon: User },
   ];
 
   return (
-    <header className="bg-[#002B49] text-white sticky top-0 z-40 shadow-md border-b-2 border-amber-400">
+    // A11y: Encabezado institucional semántico <header>
+    <header className="bg-[#002B49] text-white sticky top-0 z-40 shadow-md border-b-4 border-[#FFB81C]">
       {/* 1. Fila Superior: Marca y Acciones de Usuario */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
         {/* Marca institucional unificada */}
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => onTabChange('centro-ayuda')}
-            className="flex items-center gap-2 group text-left focus:outline-none focus:ring-2 focus:ring-amber-400 rounded-lg p-1"
+            className="min-h-[44px] flex items-center gap-3 group text-left rounded-xl p-1.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-transform"
+            aria-label="Ir al inicio de Nexo360 Centro de Ayuda & Trámites"
           >
-            <div className="w-10 h-10 rounded-xl bg-amber-400 text-[#002B49] font-black text-xl flex items-center justify-center shadow-sm">
+            <div
+              className="w-11 h-11 rounded-xl bg-[#FFB81C] text-[#002B49] font-black text-2xl flex items-center justify-center shadow border-2 border-white/20"
+              aria-hidden="true"
+            >
               N
             </div>
             <div>
-              <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-xl font-black tracking-tight text-white">
-                  Nexo<span className="text-amber-400">360</span>
-                </span>
-                <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-1.5 py-0.5 rounded uppercase">
-                  PAEDIS
+              <div className="flex items-center gap-2 leading-none">
+                <span className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                  Nexo<span className="text-[#FFB81C]">360</span>
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 font-medium mt-0.5">
+              <p className="text-xs text-slate-200 font-semibold mt-1">
                 Centro de Ayuda & Servicios Duoc UC
               </p>
             </div>
@@ -58,51 +56,35 @@ export const UnifiedNavbar = ({
         </div>
 
         {/* Acciones de usuario a la derecha */}
-        <div className="flex items-center gap-3">
-          {/* Botón Accesibilidad PAEDIS */}
-          <button
-            type="button"
-            onClick={onToggleAccessibility}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all focus:ring-2 focus:ring-amber-400 ${
-              isA11yOpen
-                ? 'bg-amber-400 text-slate-950 shadow-sm'
-                : 'bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/50'
-            }`}
-            title="Herramientas de accesibilidad WCAG 2.2 AA (Alto contraste, Dislexia, Tamaño de letra)"
-            aria-label="Abrir herramientas de accesibilidad"
-          >
-            <Sliders className="w-3.5 h-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Ajustes Accesibilidad</span>
-          </button>
-
-          {/* Nombre del alumno */}
-          <div className="hidden md:block text-right border-l border-white/20 pl-3">
-            <span className="text-xs font-bold text-white block">
-              {user?.nombre || 'Cristian Guzman Garcia'}
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* Nombre del alumno y Sede Alameda oficial */}
+          <div className="text-right border-l-2 border-white/20 pl-4 py-1">
+            <span className="text-xs sm:text-sm font-black text-white block">
+              {user?.nombre || 'Cristian Guzmán'}
             </span>
-            <span className="text-[10px] text-amber-300 block font-medium">
-              Ingeniería en Informática • San Joaquín
+            <span className="text-[11px] text-[#FFB81C] block font-bold">
+              Ingeniería en Informática • Sede Alameda
             </span>
           </div>
 
-          {/* Cerrar Sesión */}
+          {/* A11y: Botón de Cerrar Sesión con tamaño mínimo de 44x44px */}
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-1.5 border border-white/40 hover:bg-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors focus:ring-2 focus:ring-amber-400"
-            aria-label="Cerrar sesión"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center gap-2 border-2 border-white/40 hover:bg-white/15 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
+            aria-label="Cerrar sesión en Nexo360"
           >
-            <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+            <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span className="hidden sm:inline">Salir</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Fila Inferior: Pestañas Principales Grandes y Fáciles */}
+      {/* 2. Fila Inferior: Pestañas Principales Accesibles */}
       <div className="bg-[#00223a] border-t border-white/10 px-4 sm:px-6 lg:px-8">
         <nav
-          aria-label="Pestañas principales del portal"
-          className="max-w-7xl mx-auto flex items-center overflow-x-auto no-scrollbar gap-1 sm:gap-2 py-1.5"
+          aria-label="Pestañas principales de navegación del portal"
+          className="max-w-7xl mx-auto flex items-center overflow-x-auto gap-2 py-2"
         >
           {navTabs.map((tab) => {
             const Icon = tab.icon;
@@ -113,28 +95,15 @@ export const UnifiedNavbar = ({
                 key={tab.id}
                 type="button"
                 onClick={() => onTabChange(tab.id)}
-                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`min-h-[44px] flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shrink-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 ${
                   isActive
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                    : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                    ? 'bg-[#FFB81C] text-slate-950 font-black shadow-md'
+                    : 'text-slate-100 hover:bg-white/15 hover:text-white'
                 }`}
               >
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    isActive ? 'text-slate-950' : 'text-amber-400'
-                  }`}
-                  aria-hidden="true"
-                />
+                <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>{tab.label}</span>
-                {tab.badge && (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
-                      isActive ? 'bg-[#002B49] text-amber-300' : 'bg-white/20 text-white'
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}

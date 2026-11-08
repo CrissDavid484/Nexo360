@@ -21,27 +21,28 @@ export const VivoDuocSidebar = ({ activeTab, onTabChange }) => {
   const menuItems = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'horarios', label: 'Horarios de clases', icon: Clock },
-    { id: 'ava', label: 'AVA', icon: Laptop },
-    { id: 'notas', label: 'Notas', icon: GraduationCap },
-    { id: 'asistencia', label: 'Asistencia', icon: CheckSquare },
+    { id: 'ava', label: 'AVA Blackboard', icon: Laptop },
+    { id: 'notas', label: 'Notas y Certámenes', icon: GraduationCap },
+    { id: 'asistencia', label: 'Control de Asistencia', icon: CheckSquare },
     { id: 'progreso', label: 'Progreso Académico', icon: Gauge },
-    { id: 'tutoriales', label: 'Tutoriales', icon: Smartphone },
-    { id: 'biblioteca', label: 'Biblioteca', icon: BookMarked, badge: 'Reservas' },
+    { id: 'tutoriales', label: 'Tutoriales Accesibles', icon: Smartphone },
+    { id: 'biblioteca', label: 'Biblioteca Duoc', icon: BookMarked, badge: 'Reservas' },
     { id: 'bibliografia', label: 'Bibliografía de Asignaturas', icon: BookOpen },
     { id: 'apoyo', label: 'Apoyo al Estudio', icon: HeartHandshake },
-    { id: 'correo', label: 'Correo', icon: Mail },
-    { id: 'solicitudes', label: 'Solicitudes', icon: FileText, badge: 'Portal' },
+    { id: 'correo', label: 'Correo Institucional', icon: Mail },
+    { id: 'solicitudes', label: 'Solicitudes Académicas', icon: FileText, badge: 'Portal' },
     { id: 'ayuda', label: 'Centro de Ayuda', icon: HelpCircle },
     { id: 'eventos', label: 'Actividades y Eventos Online', icon: Calendar },
-    { id: 'paedis-programas', label: 'Programas de apoyo al estudiante', icon: Users, isSpecial: true },
+    { id: 'programas-apoyo', label: 'Programas de apoyo al estudiante', icon: Users, isSpecial: true },
   ];
 
   return (
+    // A11y: Barra lateral semántica <aside> con etiqueta accesible
     <aside
       aria-label="Navegación principal de Vivo Duoc"
-      className="w-full lg:w-64 bg-white border-r border-slate-200 flex flex-col py-4 shrink-0 transition-colors"
+      className="w-full lg:w-64 bg-white border-r-2 border-slate-200 flex flex-col py-4 shrink-0 transition-colors"
     >
-      <nav className="flex-1 space-y-0.5 px-2">
+      <nav aria-label="Menú de servicios estudiantiles" className="flex-1 space-y-1 px-3">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -51,23 +52,24 @@ export const VivoDuocSidebar = ({ activeTab, onTabChange }) => {
               key={item.id}
               type="button"
               onClick={() => onTabChange(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs sm:text-sm font-semibold rounded-lg text-left transition-all group focus:outline-none focus:ring-2 focus:ring-[#002B49] ${
+              aria-current={isActive ? 'page' : undefined}
+              className={`w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 ${
                 isActive
-                  ? 'bg-slate-100 text-[#002B49] font-black border-l-4 border-[#002B49] shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-[#002B49]'
-              } ${item.isSpecial ? 'mt-4 pt-3 border-t border-slate-200 text-amber-900 bg-amber-50/50' : ''}`}
+                  ? 'bg-slate-100 text-[#002B49] font-black border-l-4 border-[#002B49] shadow-xs'
+                  : 'text-slate-800 hover:bg-slate-100 hover:text-[#002B49]'
+              } ${item.isSpecial ? 'mt-4 pt-3 border-t-2 border-slate-200 text-amber-950 bg-amber-50/70 border border-amber-300' : ''}`}
             >
               <div className="flex items-center gap-3 truncate">
                 <Icon
                   className={`w-4 h-4 shrink-0 ${
-                    isActive ? 'text-[#002B49]' : 'text-slate-400 group-hover:text-[#002B49]'
+                    isActive ? 'text-[#002B49]' : 'text-slate-600'
                   }`}
                   aria-hidden="true"
                 />
                 <span className="truncate">{item.label}</span>
               </div>
               {item.badge && (
-                <span className="bg-[#002B49] text-amber-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1 shrink-0">
+                <span className="bg-[#002B49] text-[#FFB81C] text-[10px] font-black px-2 py-0.5 rounded-full ml-1 shrink-0">
                   {item.badge}
                 </span>
               )}
@@ -77,14 +79,15 @@ export const VivoDuocSidebar = ({ activeTab, onTabChange }) => {
       </nav>
 
       {/* Botón flotante oficial: Mesa de Servicios */}
-      <div className="p-3 border-t border-slate-100">
+      <div className="p-3 border-t-2 border-slate-200 mt-2">
         <a
           href="https://experienciavivo.duoc.cl/mesa-servicios"
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full py-2.5 px-3 bg-black text-white hover:bg-slate-800 rounded-lg text-xs font-bold text-center flex items-center justify-center gap-2 shadow-sm transition-all focus:ring-2 focus:ring-amber-400"
+          aria-label="Mesa de servicios estudiantiles Duoc UC (abre en nueva pestaña)"
+          className="w-full min-h-[44px] py-2.5 px-4 bg-slate-950 text-white hover:bg-slate-800 rounded-xl text-xs sm:text-sm font-black text-center flex items-center justify-center gap-2 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
         >
-          <HelpCircle className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+          <HelpCircle className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
           <span>Mesa de servicios</span>
         </a>
       </div>
