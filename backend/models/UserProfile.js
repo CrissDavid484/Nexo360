@@ -1,9 +1,42 @@
 const mongoose = require('mongoose');
 
+const ScheduleBlockSchema = new mongoose.Schema(
+  {
+    dia: { type: String, required: true, trim: true, maxlength: 20 },
+    bloqueId: { type: String, required: true, trim: true, maxlength: 10 },
+    texto: { type: String, trim: true, maxlength: 40, default: '' },
+    sala: { type: String, trim: true, maxlength: 60, default: '' },
+    salaCorta: { type: String, trim: true, maxlength: 30, default: '' },
+  },
+  { _id: false }
+);
+
+const EnrolledCourseSchema = new mongoose.Schema(
+  {
+    sigla: { type: String, required: true, trim: true, maxlength: 20 },
+    siglaEq: { type: String, trim: true, maxlength: 20, default: '' },
+    nombre: { type: String, required: true, trim: true, maxlength: 120 },
+    seccion: { type: String, required: true, trim: true, maxlength: 20 },
+    creditos: { type: Number, min: 0, max: 50, default: 0 },
+    sala: { type: String, trim: true, maxlength: 100, default: '' },
+    profesor: { type: String, trim: true, maxlength: 100, default: '' },
+    bloques: { type: [ScheduleBlockSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const ReasonableAdjustmentSchema = new mongoose.Schema(
+  {
+    tipo: { type: String, required: true, trim: true, maxlength: 80 },
+    descripcion: { type: String, required: true, trim: true, maxlength: 300 },
+  },
+  { _id: false }
+);
+
 /**
- * REGLA DE ARQUITECTURA CRÍTICA: ZERO-KNOWLEDGE CREDENTIALS
- * Este modelo NUNCA almacena ni debe almacenar la contraseña institucional del estudiante.
- * Solo se persisten datos de perfil público institucional y preferencias de accesibilidad.
+ * Esquema de Perfil de Estudiante para Nexo360
+ * REGLA DE SEGURIDAD (Zero-Knowledge Credentials):
+ * Jamás se almacena la contraseña institucional de Duoc UC en la base de datos.
  */
 const UserProfileSchema = new mongoose.Schema(
   {
@@ -13,48 +46,115 @@ const UserProfileSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/^[a-zA-Z0-9._%+-]+@(?:profesor\.)?duoc(?:uc)?\.cl$/, 'Debe ser un correo válido de Duoc UC (@duoc.cl o @duocuc.cl)'],
+      match: [
+        /^[a-zA-Z0-9._%+-]+@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/,
+        'Por favor ingrese un correo institucional Duoc UC válido',
+      ],
+    },
+    fullName: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: 'Cristian Guzmán',
+    },
+    role: {
+      type: String,
+      trim: true,
+      enum: [
+        'admin',
+        'estudiante_paedis',
+        'estudiante',
+        'tutor_par',
+        'profesor',
+        'director',
+        'subdirector',
+        'coordinador_paedis',
+        'administrativo',
+      ],
+      default: 'estudiante_paedis',
+    },
+    roleLabel: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: 'Estudiante Regular • PAEDIS',
+    },
+    isPaedis: {
+      type: Boolean,
+      default: true,
     },
     rut: {
       type: String,
       trim: true,
-      default: '',
+      maxlength: 20,
+      default: '19.276.735-0',
     },
-    nombre: {
+    career: {
       type: String,
       trim: true,
-      default: 'Estudiante Duoc UC',
+      maxlength: 120,
+      default: 'Ingeniería en Informática',
     },
-    carrera: {
+    campus: {
       type: String,
       trim: true,
-      default: 'Informática / Duoc UC',
-    },
-    sede: {
-      type: String,
-      trim: true,
+      maxlength: 80,
       default: 'Sede Alameda',
     },
-    // Estado y apoyos específicos del programa PAEDIS
-    paedis: {
-      isEnrolled: {
-        type: Boolean,
-        default: true, // Diseñado para estudiantes PAEDIS Alameda
-      },
-      sede: {
-        type: String,
-        default: 'Sede Alameda',
-      },
-      diagnosticoDeclarado: {
-        type: String,
-        default: 'Estudiante con Ajustes Razonables',
-      },
-      ajustesAprobados: [{
-        tipo: String, // Ej: 'Tiempo adicional en evaluaciones', 'Formato accesible'
-        descripcion: String,
-      }],
+    address: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: 'Las Moreras 12196',
     },
-    // Configuración de Accesibilidad (WCAG 2.2 AA)
+    personalEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      maxlength: 120,
+      default: 'cristian.david.g123@gmail.com',
+    },
+    phone: {
+      type: String,
+      trim: true,
+      maxlength: 30,
+      default: '+56 9 3016 6745',
+    },
+    emergencyContact: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: 'María Guzmán (Madre)',
+    },
+    emergencyPhone: {
+      type: String,
+      trim: true,
+      maxlength: 30,
+      default: '+56 9 1234 5678',
+    },
+    tutorParAsignado: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: 'Tania Montes (Tutor PAR)',
+    },
+    ajustesAprobados: {
+      type: [ReasonableAdjustmentSchema],
+      default: [
+        {
+          tipo: 'Tiempo Adicional',
+          descripcion: '50% de tiempo adicional en certámenes y evaluaciones teóricas',
+        },
+        {
+          tipo: 'Material Digital Accesible',
+          descripcion: 'Entrega de material en formatos compatibles con lectores de pantalla',
+        },
+        {
+          tipo: 'Mobiliario y Aula',
+          descripcion: 'Ubicación preferencial en primera fila y salas de estudio adaptadas',
+        },
+      ],
+    },
     accessibilityPreferences: {
       fontSize: {
         type: String,
@@ -65,23 +165,39 @@ const UserProfileSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
-      reducedMotion: {
+      dyslexicFont: {
         type: Boolean,
         default: false,
       },
-      dyslexicFont: {
+      reducedMotion: {
         type: Boolean,
         default: false,
       },
       screenReaderOptimized: {
         type: Boolean,
-        default: false,
+        default: true,
       },
-      letterSpacing: {
-        type: String,
-        enum: ['normal', 'wide', 'extra-wide'],
-        default: 'normal',
-      },
+    },
+    enrolledCourses: {
+      type: [EnrolledCourseSchema],
+      default: [
+        {
+          sigla: 'PTY4614',
+          siglaEq: '',
+          nombre: 'PROYECTO CAPSTONE',
+          seccion: '001D',
+          creditos: 10,
+          sala: 'AL-503A / AL-LAB-IP4',
+          profesor: 'Mauricio Gómez Arratia',
+          bloques: [
+            { dia: 'Miércoles', bloqueId: 'b1', texto: 'PTY4614-001D', sala: 'AL-503A' },
+            { dia: 'Miércoles', bloqueId: 'b2', texto: 'PTY4614-001D', sala: 'AL-503A' },
+            { dia: 'Viernes', bloqueId: 'b1', texto: 'PTY4614-001D', sala: 'AL-LAB-IP4' },
+            { dia: 'Viernes', bloqueId: 'b2', texto: 'PTY4614-001D', sala: 'AL-LAB-IP4' },
+            { dia: 'Viernes', bloqueId: 'b3', texto: 'PTY4614-001D', sala: 'AL-LAB-IP4' },
+          ],
+        },
+      ],
     },
     lastLogin: {
       type: Date,
@@ -90,14 +206,32 @@ const UserProfileSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    strict: true,
   }
 );
 
-// Garantizar que no se añada accidentalmente un campo password
+const FORBIDDEN_CREDENTIAL_FIELDS = ['password', 'passwd', 'passwordHash', 'hash', 'secret', 'clave'];
+
+// Hook Zero-Knowledge en guardado de documentos
 UserProfileSchema.pre('save', function (next) {
-  if (this.password || this._doc.password) {
-    delete this.password;
-    delete this._doc.password;
+  for (const field of FORBIDDEN_CREDENTIAL_FIELDS) {
+    if (this[field] !== undefined) {
+      this.set(field, undefined, { strict: false });
+      delete this._doc?.[field];
+    }
+  }
+  next();
+});
+
+// Hook Zero-Knowledge en actualizaciones por query
+UserProfileSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function (next) {
+  const update = this.getUpdate();
+  if (update && typeof update === 'object') {
+    for (const field of FORBIDDEN_CREDENTIAL_FIELDS) {
+      delete update[field];
+      if (update.$set) delete update.$set[field];
+      if (update.$setOnInsert) delete update.$setOnInsert[field];
+    }
   }
   next();
 });

@@ -14,8 +14,8 @@ const ProtectedRoute = ({ children }) => {
     return (
       <div className="flex-1 flex items-center justify-center p-12">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-700 font-bold">Cargando plataforma Nexo360...</p>
+          <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-slate-600 font-semibold text-sm">Cargando Nexo360...</p>
         </div>
       </div>
     );
@@ -29,10 +29,8 @@ const ProtectedRoute = ({ children }) => {
 };
 
 export const App = () => {
-  const { isAuthenticated } = useAuth();
-
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-900 transition-colors duration-200">
       {/* 1. Salto de accesibilidad para teclado (WCAG 2.4.1) */}
       <SkipLink />
 

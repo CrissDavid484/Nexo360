@@ -1,195 +1,327 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import {
   X,
-  Info,
   ArrowLeft,
   ExternalLink,
   BookOpen,
   CheckCircle,
+  Package,
+  HeartHandshake,
+  FileText,
+  ArrowRight,
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 
-export const ModuleModal = ({ category, onClose }) => {
+const TomaRamosSimulator = lazy(() =>
+  import('../simulation/TomaRamosSimulator').then((m) => ({ default: m.TomaRamosSimulator }))
+);
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export const ModuleModal = ({ category, initialSubmodule = null, onClose }) => {
   const { announce } = useAccessibility();
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
-  // Estado del Trámite seleccionado para ver sus instrucciones oficiales y enlace
-  const [activeTramite, setActiveTramite] = useState(null);
+  const [activeTramite, setActiveTramite] = useState(initialSubmodule);
+  const [showSimulator, setShowSimulator] = useState(false);
 
   useEffect(() => {
+    setActiveTramite(initialSubmodule || null);
+  }, [initialSubmodule, category]);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
     if (category) {
-      announce(`Abriendo ventana de opciones para ${category.title}. Presiona Escape para cerrar.`, 'polite');
-      setTimeout(() => {
+      announce(
+        `Abriendo información de ${initialSubmodule ? initialSubmodule.title : category.title}. Presiona Escape para cerrar.`,
+        'polite'
+      );
+      const timer = setTimeout(() => {
         closeButtonRef.current?.focus();
       }, 50);
+      return () => {
+        clearTimeout(timer);
+        if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
+          previousFocusRef.current.focus();
+        }
+      };
     }
+  }, [category, initialSubmodule, announce]);
 
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (activeTramite) {
+        e.preventDefault();
+        if (showSimulator) {
+          setShowSimulator(false);
+          announce('Cerrando simulador y regresando al trámite', 'polite');
+        } else if (activeTramite && !initialSubmodule) {
           setActiveTramite(null);
           announce('Regresando a la lista de trámites', 'polite');
         } else {
           onClose();
           announce('Ventana cerrada', 'polite');
         }
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = Array.from(modalRef.current.querySelectorAll(FOCUSABLE_SELECTOR));
+        if (focusableElements.length === 0) return;
+
+        const firstEl = focusableElements[0];
+        const lastEl = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl.focus();
+        } else if (!e.shiftKey && document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl.focus();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [category, activeTramite]);
+  }, [activeTramite, initialSubmodule, showSimulator, onClose, announce]);
 
   if (!category) return null;
 
   const handleSelectTramite = (sub) => {
     setActiveTramite(sub);
-    announce(`Abriendo instrucciones para ${sub.title}`);
+    announce(`Mostrando pasos para ${sub.title}`);
   };
 
   return (
-    // A11y: Diálogo modal accesible con role="dialog", aria-modal="true" y referencias de accesibilidad
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
       aria-describedby="modal-description"
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fade-in"
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border-2 border-slate-300 overflow-hidden flex flex-col max-h-[90vh] my-auto"
+        className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[90vh] my-auto animate-scale-in"
       >
-        {/* Cabecera del Modal */}
-        <header className="bg-[#002B49] text-white px-6 sm:px-8 py-6 flex items-start justify-between border-b-4 border-[#FFB81C]">
+        {/* Cabecera limpia y calmada */}
+        <header className="bg-white text-slate-900 px-6 sm:px-8 py-5 flex items-start justify-between border-b border-slate-200/80">
           <div>
-            <h2 id="modal-title" className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            <span className="text-xs font-semibold text-[#002B49] block mb-1">
+              {activeTramite ? category.title : 'Categoría de ayuda'}
+            </span>
+            <h2 id="modal-title" className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               {activeTramite ? activeTramite.title : category.title}
             </h2>
-            <p id="modal-description" className="text-slate-200 text-sm mt-1 font-medium">
+            <p id="modal-description" className="text-slate-600 text-xs sm:text-sm mt-1">
               {activeTramite ? activeTramite.description : category.description}
             </p>
           </div>
 
-          {/* A11y: Botón de Cerrar con target size mínimo 44x44px y foco ultra-visible */}
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            aria-label="Cerrar ventana de trámites (tecla Escape)"
-            className="min-h-[44px] min-w-[44px] p-2 text-slate-200 hover:text-white hover:bg-white/10 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-colors ml-4 shrink-0 flex items-center justify-center"
+            aria-label="Cerrar ventana"
+            className="min-h-[40px] min-w-[40px] p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors ml-4 shrink-0 flex items-center justify-center"
           >
-            <X className="w-7 h-7" aria-hidden="true" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </header>
 
-        {/* MODO A: PANTALLA DE INSTRUCCIONES DEL TRÁMITE SELECCIONADO */}
-        {activeTramite ? (
-          <div className="p-6 sm:p-8 space-y-6 overflow-y-auto">
-            {/* A11y: Botón volver con target size accesible */}
+        {/* Cuerpo del Modal */}
+        {showSimulator ? (
+          <div className="overflow-y-auto max-h-[82vh] animate-fade-in">
+            <Suspense
+              fallback={
+                <div className="p-12 text-center font-semibold text-slate-600">
+                  Cargando simulador de Toma de Ramos...
+                </div>
+              }
+            >
+              <TomaRamosSimulator onExit={() => setShowSimulator(false)} />
+            </Suspense>
+          </div>
+        ) : activeTramite ? (
+          /* VISTA DE DETALLE DEL TRÁMITE */
+          <div className="p-6 sm:p-8 space-y-6 overflow-y-auto animate-fade-in">
             <button
               type="button"
               onClick={() => setActiveTramite(null)}
-              className="min-h-[44px] inline-flex items-center gap-2 text-xs sm:text-sm font-black text-[#002B49] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded-lg px-2"
+              className="min-h-[38px] inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-[#002B49] rounded-lg px-2 -ml-2 hover:bg-slate-50 transition-colors"
             >
               <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span>Volver a la lista de trámites de {category.title}</span>
+              <span>Ver todos los temas de {category.title}</span>
             </button>
 
-            {/* Tarjeta de Instrucciones Oficiales */}
-            <article className="p-6 sm:p-8 bg-slate-50 border-2 border-slate-300 rounded-3xl space-y-6">
-              <div className="flex items-center gap-3 border-b-2 border-slate-200 pb-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#002B49] text-[#FFB81C] flex items-center justify-center shrink-0 shadow" aria-hidden="true">
-                  <BookOpen className="w-6 h-6" aria-hidden="true" />
+            <article className="space-y-6">
+              {/* Simulador de Toma de Ramos si corresponde */}
+              {activeTramite.id === 'inscripcion-asignaturas' && (
+                <div className="p-5 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-xs font-semibold text-amber-900 block">
+                      Práctica interactiva guiada
+                    </span>
+                    <p className="text-xs sm:text-sm text-slate-700 mt-1 leading-relaxed">
+                      Practica cómo inscribir asignaturas, revisar horarios y confirmar secciones sin afectar tu carga real.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSimulator(true);
+                      announce('Abriendo simulador de Toma de Ramos', 'polite');
+                    }}
+                    className="min-h-[42px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shrink-0 flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
+                  >
+                    <Package className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+                    <span>Practicar en el simulador</span>
+                  </button>
                 </div>
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900">
-                    Instrucciones y Pasos a Seguir
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-700 font-bold">
-                    Procedimiento institucional oficial en Duoc UC
-                  </p>
-                </div>
-              </div>
+              )}
 
-              {/* Texto de instrucciones */}
-              <div className="bg-white p-5 rounded-2xl border-2 border-slate-200 text-slate-900 leading-relaxed font-medium text-sm sm:text-base space-y-3">
-                <p>
-                  {activeTramite.instructions || 'Para realizar este trámite, ingresa con tu cuenta de correo institucional al portal oficial de Duoc UC y sigue los pasos requeridos.'}
+              {/* Pasos a seguir */}
+              <div className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl border border-slate-200/80 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl bg-[#002B49] text-[#FFB81C] flex items-center justify-center shrink-0"
+                    aria-hidden="true"
+                  >
+                    <BookOpen className="w-4 h-4" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                    Cómo realizar este trámite
+                  </h3>
+                </div>
+
+                <p className="whitespace-pre-line text-slate-700 leading-relaxed text-sm sm:text-base">
+                  {activeTramite.instructions ||
+                    'Ingresa con tu correo institucional al portal de Duoc UC y sigue los pasos indicados en la sección correspondiente.'}
                 </p>
-                <div className="pt-2 flex items-start gap-3 text-xs sm:text-sm text-slate-700">
-                  <CheckCircle className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
+
+                <div className="pt-2 border-t border-slate-200/70 flex items-start gap-2.5 text-xs text-slate-600">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
                   <span>
-                    Asegúrate de contar con tu sesión iniciada en el navegador o tus credenciales institucionales (@duocuc.cl) a mano.
+                    Recuerda tener tu sesión iniciada con tu cuenta institucional (@duocuc.cl).
                   </span>
                 </div>
               </div>
 
-              {/* Botón de Enlace Directo Oficial */}
-              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              {/* Apoyo PAEDIS limpio y amable */}
+              {activeTramite.paedisTip && (
+                <div
+                  role="note"
+                  aria-label="Apoyo e inclusión PAEDIS"
+                  className="p-4 sm:p-5 bg-sky-50/70 border border-sky-200/80 rounded-2xl flex items-start gap-3 text-slate-800"
+                >
+                  <HeartHandshake className="w-5 h-5 text-[#002B49] shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="text-xs sm:text-sm leading-relaxed">
+                    <span className="font-semibold text-[#002B49] block mb-0.5">
+                      Orientación de inclusión y apoyo PAEDIS
+                    </span>
+                    <p className="text-slate-700">{activeTramite.paedisTip}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Artículos relacionados */}
+              {Array.isArray(activeTramite.articles) && activeTramite.articles.length > 0 && (
+                <div className="space-y-3 pt-1">
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                    <span>Artículos de ayuda relacionados ({activeTramite.articles.length})</span>
+                  </h4>
+                  <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl bg-white overflow-hidden">
+                    {activeTramite.articles.map((art) => (
+                      <div
+                        key={art.id || art.title}
+                        className="p-4 hover:bg-slate-50/60 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="space-y-1">
+                          <h5 className="font-semibold text-slate-900 text-xs sm:text-sm">
+                            {art.title}
+                          </h5>
+                          {art.summary && (
+                            <p className="text-xs text-slate-600 line-clamp-2">{art.summary}</p>
+                          )}
+                        </div>
+                        {art.url && (
+                          <a
+                            href={art.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Leer guía: ${art.title} (nueva pestaña)`}
+                            className="min-h-[38px] px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-800 font-semibold text-xs rounded-xl shrink-0 inline-flex items-center gap-1.5 transition-colors self-start sm:self-center"
+                          >
+                            <span>Leer guía</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Acción principal */}
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <a
-                  href={activeTramite.link || 'https://www.duoc.cl'}
+                  href={activeTramite.link || activeTramite.directUrl || 'https://www.duoc.cl'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`Ir al sitio oficial para tramitar ${activeTramite.title} (se abre en una nueva pestaña)`}
-                  className="min-h-[48px] px-8 py-3 bg-[#002B49] hover:bg-[#001f35] text-white rounded-xl text-sm font-black shadow-md flex items-center justify-center gap-2.5 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
+                  className="min-h-[46px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                 >
-                  <span>Ir a la página oficial de Duoc UC para este trámite</span>
+                  <span>{activeTramite.actionLabel || 'Ir al portal oficial para este trámite'}</span>
                   <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
                 </a>
 
                 <button
                   type="button"
                   onClick={() => setActiveTramite(null)}
-                  className="min-h-[48px] px-6 py-2.5 border-2 border-slate-300 text-slate-800 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-colors"
+                  className="min-h-[46px] px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-colors"
                 >
-                  Volver a opciones
+                  Ver otros trámites
                 </button>
               </div>
             </article>
           </div>
         ) : (
-          /* MODO B: LISTA DE SUBMENÚS CON BOTONES "HACER TRÁMITE AQUÍ" */
-          <div className="overflow-y-auto p-6 sm:p-8 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xl font-black text-slate-900">
-                Opciones Disponibles ({category.submodules.length})
-              </h3>
-              <span className="text-xs text-slate-700 font-bold">
-                Instrucciones y enlaces directos oficiales
-              </span>
-            </div>
-
+          /* LISTA DE TRÁMITES DE LA CATEGORÍA */
+          <div className="overflow-y-auto p-6 sm:p-8 space-y-4 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {category.submodules.map((sub, index) => (
                 <article
                   key={sub.id || index}
-                  className="bg-slate-50 border-2 border-slate-200 hover:border-[#002B49] rounded-2xl p-5 flex flex-col justify-between transition-all hover:bg-white hover:shadow-md"
+                  className="bg-slate-50/70 hover:bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-md group"
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-black text-base text-slate-900">
-                        {sub.title}
-                      </h4>
-                      <span className="text-xs bg-slate-200 text-slate-800 px-2.5 py-0.5 rounded-full font-bold">
-                        #{index + 1}
-                      </span>
-                    </div>
+                    <h3 className="font-bold text-base text-slate-900 group-hover:text-[#002B49] transition-colors mb-1.5">
+                      {sub.title}
+                    </h3>
 
-                    <p className="text-xs sm:text-sm text-slate-700 mb-4 leading-relaxed font-medium">
+                    <p className="text-xs sm:text-sm text-slate-600 mb-3 leading-relaxed">
                       {sub.description}
                     </p>
                   </div>
 
-                  {/* A11y: Botón con tamaño táctil accesible mínimo 44px */}
-                  <div className="pt-3 border-t border-slate-200 mt-2">
+                  <div className="pt-3 border-t border-slate-200/60 mt-2 flex items-center justify-between gap-2">
                     <button
                       type="button"
                       onClick={() => handleSelectTramite(sub)}
-                      className="w-full min-h-[44px] py-2.5 px-4 bg-[#FFB81C] hover:bg-amber-300 text-slate-950 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
+                      className="w-full min-h-[40px] py-2 px-4 bg-white group-hover:bg-[#002B49] text-slate-800 group-hover:text-white border border-slate-200/90 group-hover:border-[#002B49] rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-between gap-2 transition-all duration-200 active:scale-[0.98]"
                     >
-                      <span>Hacer trámite aquí</span>
+                      <span>Ver pasos y enlaces</span>
+                      <ArrowRight
+                        className="w-4 h-4 text-slate-400 group-hover:text-[#FFB81C] group-hover:translate-x-0.5 transition-all"
+                        aria-hidden="true"
+                      />
                     </button>
                   </div>
                 </article>
@@ -199,18 +331,14 @@ export const ModuleModal = ({ category, onClose }) => {
         )}
 
         {/* Pie del Modal */}
-        <footer className="bg-slate-100 px-6 sm:px-8 py-4 border-t-2 border-slate-200 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-700">
-          <div className="flex items-center gap-2 font-bold">
-            <Info className="w-4 h-4 text-slate-600 shrink-0" aria-hidden="true" />
-            <span>Servicios y Trámites Oficiales • Duoc UC Sede Alameda.</span>
-          </div>
-
+        <footer className="bg-slate-50 px-6 sm:px-8 py-3.5 border-t border-slate-200/80 flex items-center justify-between gap-4 text-xs text-slate-500">
+          <span>Centro de Ayuda • Duoc UC</span>
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[44px] px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs sm:text-sm rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-colors"
+            className="min-h-[38px] px-4 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200/90 transition-colors"
           >
-            Cerrar Ventana
+            Cerrar
           </button>
         </footer>
       </div>

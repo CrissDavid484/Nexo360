@@ -5,84 +5,77 @@ import {
   LifeBuoy,
   Phone,
   Mail,
-  CheckCircle2,
   KeyRound,
   Wifi,
   FileCheck,
-  ShieldAlert,
 } from 'lucide-react';
 
 export const ServiciosDigitalesTicketsView = () => {
   const serviciosAtendidos = [
     {
-      titulo: 'Cuentas y Contraseñas',
+      titulo: 'Cuentas y contraseñas',
       icono: KeyRound,
-      desc: 'Bloqueo de acceso, recuperación de contraseña institucional @duocuc.cl y configuración de Microsoft Authenticator.',
+      desc: 'Recuperación de clave institucional @duocuc.cl, desbloqueo de acceso y configuración de Microsoft Authenticator.',
     },
     {
-      titulo: 'Aula Virtual AVA Blackboard',
+      titulo: 'Aula Virtual AVA',
       icono: Laptop,
-      desc: 'Dificultades para visualizar ramos inscritos, problemas con subida de evaluaciones o errores en foros de cátedra.',
+      desc: 'Consultas sobre visualización de asignaturas inscritas, carga de evaluaciones o acceso a salas de clases virtuales.',
     },
     {
-      titulo: 'Conectividad WiFi en Sedes',
+      titulo: 'Red WiFi en sede',
       icono: Wifi,
-      desc: 'Configuración de perfiles de conexión segura a la red WiFi institucional y Eduroam dentro de cualquier sede Duoc UC.',
+      desc: 'Asistencia para conectar tus dispositivos a la red WiFi estudiantil y Eduroam dentro de tu sede.',
     },
     {
-      titulo: 'Convenios de Software Educativo',
+      titulo: 'Software estudiantil',
       icono: FileCheck,
-      desc: 'Activación de licencias de Microsoft 365 (Word, Excel, Teams), Azure Dev Tools para Informática y Adobe Creative Cloud.',
+      desc: 'Activación de licencias gratuitas de Microsoft 365 (Word, Excel, Teams), Azure Dev Tools y software académico.',
     },
   ];
 
   return (
-    // A11y: Elemento semántico <section> con encabezado accesible
     <section aria-labelledby="tickets-view-title" className="space-y-6">
-      {/* 1. Encabezado Oficial */}
-      <div className="bg-[#002B49] text-white px-6 py-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-4 border-[#FFB81C] shadow-md">
+      {/* 1. Encabezado limpio y amigable */}
+      <div className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200/80 shadow-2xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-serif font-black text-xl text-white">DuocUC</span>
-            <span className="text-xs text-amber-300 font-sans tracking-widest uppercase border-l border-white/30 pl-2">
-              Mesa de Servicios Digitales
-            </span>
-          </div>
-          <h2 id="tickets-view-title" className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
-            Tickets y Soporte a Servicios Digitales
+          <span className="text-xs font-semibold text-[#002B49] block mb-1">
+            Mesa de Servicios Digitales • Duoc UC
+          </span>
+          <h2 id="tickets-view-title" className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Soporte técnico y tickets digitales
           </h2>
-          <p className="text-xs sm:text-sm text-slate-200 mt-1 max-w-2xl font-medium">
-            Información oficial y enlace directo para ingresar tickets de soporte técnico sobre cuentas, correo, AVA Blackboard, software y conectividad.
+          <p className="text-xs sm:text-sm text-slate-600 mt-1.5 max-w-2xl leading-relaxed">
+            Solicita ayuda técnica para tu correo institucional, AVA Blackboard, verificación en dos pasos (MFA), licencias y WiFi.
           </p>
         </div>
 
-        {/* Botón de Enlace Directo Principal */}
         <div className="shrink-0">
           <a
             href="https://experienciavivo.duoc.cl/mesa-servicios"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Abrir portal oficial para ingresar tickets en una nueva pestaña"
-            className="min-h-[48px] px-6 py-3 bg-[#FFB81C] hover:bg-amber-300 text-slate-950 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#002B49]"
+            aria-label="Abrir portal de Mesa de Servicios para crear un ticket (nueva pestaña)"
+            className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-semibold text-xs sm:text-sm inline-flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
           >
-            <span>Crear Ticket en Mesa de Servicios</span>
-            <ExternalLink className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
+            <span>Crear ticket de soporte</span>
+            <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
           </a>
         </div>
       </div>
 
-      {/* 2. ¿Cuándo ingresar un ticket técnico? */}
-      <article className="bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-        <div className="flex items-center gap-3 border-b-2 border-slate-100 pb-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#002B49] flex items-center justify-center shrink-0 shadow-xs" aria-hidden="true">
-            <LifeBuoy className="w-6 h-6 text-[#002B49]" aria-hidden="true" />
+      {/* 2. Áreas de soporte */}
+      <article className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-2xs space-y-6">
+        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#002B49] flex items-center justify-center shrink-0" aria-hidden="true">
+            <LifeBuoy className="w-5 h-5" aria-hidden="true" />
           </div>
           <div>
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900">
-              ¿Qué requerimientos se resuelven mediante un Ticket?
+            <h3 className="text-lg font-bold text-slate-900">
+              ¿En qué te puede ayudar Soporte TI?
             </h3>
-            <p className="text-xs sm:text-sm text-slate-700 font-bold">
-              Tipos de solicitudes atendidas por el equipo de soporte de Duoc UC
+            <p className="text-xs sm:text-sm text-slate-500">
+              Consultas frecuentes atendidas por la mesa de ayuda tecnológica.
             </p>
           </div>
         </div>
@@ -93,16 +86,16 @@ export const ServiciosDigitalesTicketsView = () => {
             return (
               <div
                 key={idx}
-                className="p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between"
+                className="p-5 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col justify-between hover:bg-white hover:shadow-sm transition-all duration-200"
               >
                 <div>
-                  <div className="w-10 h-10 rounded-xl bg-[#002B49] text-[#FFB81C] flex items-center justify-center mb-3 shadow-xs" aria-hidden="true">
-                    <Icon className="w-5 h-5" aria-hidden="true" />
+                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 text-[#002B49] flex items-center justify-center mb-3 shadow-2xs" aria-hidden="true">
+                    <Icon className="w-4 h-4" aria-hidden="true" />
                   </div>
-                  <h4 className="font-black text-slate-900 text-base mb-1">
+                  <h4 className="font-bold text-slate-900 text-sm sm:text-base mb-1">
                     {item.titulo}
                   </h4>
-                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+                  <p className="text-xs text-slate-600 leading-relaxed">
                     {item.desc}
                   </p>
                 </div>
@@ -112,59 +105,57 @@ export const ServiciosDigitalesTicketsView = () => {
         </div>
       </article>
 
-      {/* 3. Instrucciones de cómo ingresar y canales directos */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Pasos */}
-        <article className="md:col-span-7 bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
-          <h3 className="text-lg sm:text-xl font-black text-slate-900 border-b-2 border-slate-100 pb-3">
-            Pasos para Generar tu Ticket de Soporte
+      {/* 3. Instrucciones y canales de contacto */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+        <article className="md:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-4">
+          <h3 className="text-base sm:text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
+            Cómo ingresar un ticket paso a paso
           </h3>
-          <ol className="space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium list-decimal pl-4">
+          <ol className="space-y-2.5 text-xs sm:text-sm text-slate-600 leading-relaxed list-decimal pl-4">
             <li>
-              Haz clic en el botón <strong>"Crear Ticket en Mesa de Servicios"</strong> para ir al portal oficial.
+              Selecciona el botón <strong className="text-slate-800">Crear ticket de soporte</strong> para abrir la Mesa de Servicios.
             </li>
             <li>
-              Inicia sesión con tu correo <strong>@duocuc.cl</strong> y contraseña institucional.
+              Ingresa con tu correo <strong className="text-slate-800">@duocuc.cl</strong> y tu contraseña.
             </li>
             <li>
-              Selecciona la categoría correspondiente a tu requerimiento o incidencia técnica.
+              Elige la categoría que mejor describa tu problema (correo, AVA, clave o software).
             </li>
             <li>
-              Describe la situación indicando tu carrera y sede, y adjunta capturas de pantalla si aplica.
+              Explica brevemente lo que ocurre e indica tu sede. Puedes adjuntar una captura de pantalla si lo deseas.
             </li>
             <li>
-              Recibirás un <strong>código de ticket (ID de incidente)</strong> en tu correo para hacer seguimiento hasta su resolución.
+              Recibirás un número de seguimiento en tu correo para revisar la respuesta del equipo técnico.
             </li>
           </ol>
         </article>
 
-        {/* Canales de Contacto Directo */}
-        <aside className="md:col-span-5 bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
-          <h3 className="text-lg sm:text-xl font-black text-slate-900 border-b-2 border-slate-100 pb-3">
-            Canales de Atención Directa
+        <aside className="md:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-4">
+          <h3 className="text-base sm:text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
+            Contacto directo
           </h3>
-          <div className="space-y-4 text-xs sm:text-sm">
-            <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-              <Phone className="w-5 h-5 text-[#002B49] shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="space-y-3 text-xs sm:text-sm">
+            <div className="flex items-start gap-3 p-4 bg-slate-50/80 rounded-xl border border-slate-200/70">
+              <Phone className="w-4 h-4 text-[#002B49] shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <span className="font-black text-slate-900 block">Mesa de Servicios Telefónica:</span>
+                <span className="font-semibold text-slate-800 block">Teléfono Mesa de Servicios</span>
                 <a
                   href="tel:229993862"
-                  className="text-[#002B49] font-black text-sm hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded"
+                  className="text-[#002B49] font-bold text-sm hover:underline rounded mt-0.5 inline-block"
                 >
                   2 2999 3862
                 </a>
-                <span className="text-[11px] text-slate-600 block mt-0.5">Atención continua para estudiantes</span>
+                <span className="text-xs text-slate-500 block mt-0.5">Asistencia telefónica para estudiantes</span>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-              <Mail className="w-5 h-5 text-[#002B49] shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="flex items-start gap-3 p-4 bg-slate-50/80 rounded-xl border border-slate-200/70">
+              <Mail className="w-4 h-4 text-[#002B49] shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <span className="font-black text-slate-900 block">Correo Oficial de Soporte:</span>
+                <span className="font-semibold text-slate-800 block">Correo de soporte</span>
                 <a
                   href="mailto:mesadeservicios@duoc.cl"
-                  className="text-[#002B49] font-black hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded"
+                  className="text-[#002B49] font-bold hover:underline rounded mt-0.5 inline-block"
                 >
                   mesadeservicios@duoc.cl
                 </a>
@@ -176,4 +167,3 @@ export const ServiciosDigitalesTicketsView = () => {
     </section>
   );
 };
-

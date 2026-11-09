@@ -1,5 +1,19 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const UserProfile = require('../models/UserProfile');
+
+const getJwtSecret = () => {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('CRITICAL: JWT_SECRET debe estar definido en producción.');
+  }
+  return 'nexo360_duoc_paedis_secret_key_wcag_2026';
+};
+
+const isDemoTokenAllowed = (token) =>
+  token === 'demo-token-cristian' && process.env.NODE_ENV !== 'production';
 
 /**
  * Middleware para validar el JWT de Nexo360 en rutas protegidas
@@ -15,17 +29,23 @@ const verifyToken = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || 'nexo360_duoc_paedis_secret_key_wcag_2026';
-    const decoded = jwt.verify(token, secret);
 
-    try {
-      const user = await UserProfile.findById(decoded.id);
-      if (user) {
-        req.user = user;
-      } else {
+    // Soporte controlado para sesión Demo exclusivamente fuera de producción
+    if (isDemoTokenAllowed(token)) {
+      req.user = { email: 'c.guzman@duocuc.cl', fullName: 'Cristian Guzmán' };
+      return next();
+    }
+
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
+
+    if (decoded.id && mongoose.connection.readyState === 1) {
+      try {
+        const user = await UserProfile.findById(decoded.id).lean();
+        req.user = user || decoded;
+      } catch {
         req.user = decoded;
       }
-    } catch {
+    } else {
       req.user = decoded;
     }
 
@@ -38,4 +58,30 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken };
+/**
+ * Middleware opcional: si hay token válido adjunta el usuario; nunca suplanta identidad sin token
+ */
+const optionalToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      if (isDemoTokenAllowed(token)) {
+        req.user = { email: 'c.guzman@duocuc.cl', fullName: 'Cristian Guzmán' };
+        return next();
+      }
+      const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
+      if (decoded.id && mongoose.connection.readyState === 1) {
+        const user = await UserProfile.findById(decoded.id).lean().catch(() => null);
+        req.user = user || decoded;
+      } else {
+        req.user = decoded;
+      }
+    }
+  } catch {
+    // Continuar sin usuario autenticado
+  }
+  next();
+};
+
+module.exports = { verifyToken, optionalToken, getJwtSecret };

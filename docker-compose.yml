@@ -1,0 +1,76 @@
+services:
+  # =====================================================================
+  # 1. CONTENEDOR DE BASE DE DATOS (MongoDB 7)
+  # =====================================================================
+  mongodb:
+    image: mongo:7
+    container_name: nexo360-mongodb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - nexo360_mongodb_data:/data/db
+    networks:
+      - nexo360-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =====================================================================
+  # 2. CONTENEDOR DE BACKEND API (Node.js + Express + Mongoose)
+  # =====================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexo360-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/nexo360
+      - JWT_SECRET=${JWT_SECRET:-nexo360_duoc_paedis_secret_key_wcag_2026}
+      - MOCK_PUPPETEER=true
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - nexo360-net
+
+  # =====================================================================
+  # 3. CONTENEDOR DE FRONTEND (React + Vite + Tailwind CSS WCAG 2.2)
+  # =====================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexo360-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:5000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nexo360-net
+
+volumes:
+  nexo360_mongodb_data:
+    name: nexo360_mongodb_data
+
+networks:
+  nexo360-net:
+    name: nexo360-net
+    driver: bridge
+

@@ -8,9 +8,12 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
   const [currentCode, setCurrentCode] = useState(initialMfaCode || '..');
   const [isApproved, setIsApproved] = useState(false);
   const [pollError, setPollError] = useState(null);
-  const [pollCount, setPollCount] = useState(0);
   const { announce } = useAccessibility();
+
   const pollIntervalRef = useRef(null);
+  const redirectTimeoutRef = useRef(null);
+  const pollCountRef = useRef(0);
+  const currentCodeRef = useRef(initialMfaCode || '..');
   const MAX_POLL_COUNT = 150; // 5 minutos (150 intentos × 2 segundos)
 
   // A11y: Anuncio por voz accesible al montar el componente
@@ -21,11 +24,12 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
         'assertive'
       );
     }
-  }, [initialMfaCode]);
+  }, [initialMfaCode, announce]);
 
-  // Polling reactivo cada 2 segundos
+  // Polling reactivo cada 2 segundos sin stale closures
   useEffect(() => {
     let isMounted = true;
+    pollCountRef.current = 0;
 
     const checkStatus = async () => {
       try {
@@ -33,9 +37,9 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
 
         if (!isMounted) return;
 
-        setPollCount((prev) => prev + 1);
+        pollCountRef.current += 1;
 
-        if (pollCount >= MAX_POLL_COUNT) {
+        if (pollCountRef.current >= MAX_POLL_COUNT) {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           const timeoutMsg = 'La sesión de aprobación expiró. Por favor vuelve a iniciar sesión.';
           setPollError(timeoutMsg);
@@ -43,7 +47,8 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
           return;
         }
 
-        if (res.mfaCode && res.mfaCode !== currentCode) {
+        if (res.mfaCode && res.mfaCode !== currentCodeRef.current) {
+          currentCodeRef.current = res.mfaCode;
           setCurrentCode(res.mfaCode);
           announce(`Código de autenticación actualizado a: ${res.mfaCode}`, 'assertive');
         }
@@ -53,7 +58,7 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
           setIsApproved(true);
           announce('Sesión iniciada con éxito. Redirigiendo al panel principal de Nexo360.', 'assertive');
 
-          setTimeout(() => {
+          redirectTimeoutRef.current = setTimeout(() => {
             if (isMounted) {
               onApproved(res.token, res.user);
             }
@@ -75,8 +80,9 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
     return () => {
       isMounted = false;
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
     };
-  }, [sessionId, currentCode]);
+  }, [sessionId, announce, onApproved]);
 
   return (
     // A11y: Uso de etiqueta semántica <section> con etiquetado accesible para lectores de pantalla

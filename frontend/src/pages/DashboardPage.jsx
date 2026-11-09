@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense, lazy } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { DUOC_CATEGORIES } from '../data/duocModulesData';
+import { useAccessibility } from '../context/AccessibilityContext';
+import { DUOC_CATEGORIES, INTENT_SHORTCUTS } from '../data/duocModulesData';
 import { VIVO_STUDENT_PROFILE } from '../data/vivoDuocData';
 import { ModuleCard } from '../components/dashboard/ModuleCard';
 import { ModuleModal } from '../components/dashboard/ModuleModal';
@@ -8,277 +9,682 @@ import { SearchBar } from '../components/dashboard/SearchBar';
 import { UnifiedNavbar } from '../components/common/UnifiedNavbar';
 import { AccessibilityBar } from '../components/common/AccessibilityBar';
 
-// Vistas complementarias
-import { BibliotecaView } from '../components/views/BibliotecaView';
-import { ServiciosDigitalesTicketsView } from '../components/views/ServiciosDigitalesTicketsView';
-import { PerfilView } from '../components/views/PerfilView';
-import { VivoDuocSummaryView } from '../components/views/VivoDuocSummaryView';
+// Vistas complementarias con Code-Splitting (React.lazy)
+const BibliotecaView = lazy(() =>
+  import('../components/views/BibliotecaView').then((m) => ({ default: m.BibliotecaView }))
+);
+const ServiciosDigitalesTicketsView = lazy(() =>
+  import('../components/views/ServiciosDigitalesTicketsView').then((m) => ({
+    default: m.ServiciosDigitalesTicketsView,
+  }))
+);
+const PerfilView = lazy(() =>
+  import('../components/views/PerfilView').then((m) => ({ default: m.PerfilView }))
+);
+const VivoDuocSummaryView = lazy(() =>
+  import('../components/views/VivoDuocSummaryView').then((m) => ({
+    default: m.VivoDuocSummaryView,
+  }))
+);
 
 import {
   HelpCircle,
   Clock,
   CheckSquare,
   ChevronDown,
-  ChevronUp,
   Laptop,
   Calendar,
+  ArrowRight,
+  HeartHandshake,
+  CreditCard,
+  Award,
+  BookOpen,
+  ShieldAlert,
+  Compass,
+  ExternalLink,
+  FileText,
+  Layers,
 } from 'lucide-react';
+
+const INTENT_ICON_MAP = {
+  CheckSquare,
+  HeartHandshake,
+  Calendar,
+  Laptop,
+  CreditCard,
+  Award,
+  BookOpen,
+  ShieldAlert,
+};
+
+const PURPOSE_GROUPS = [
+  { id: 'all', label: 'Todas', ids: null },
+  {
+    id: 'academico',
+    label: 'Vida académica y admisión',
+    ids: ['vida-academica', 'admision-matricula', 'orientacion-nuevos', 'titulados'],
+  },
+  {
+    id: 'inclusion',
+    label: 'Inclusión, PAEDIS y bienestar',
+    ids: ['beneficios-estudiantiles', 'convivencia-inclusion'],
+  },
+  {
+    id: 'finanzas-digital',
+    label: 'Finanzas y soporte TI',
+    ids: ['pagos-deudas', 'servicios-digitales', 'sostenedor'],
+  },
+];
 
 export const DashboardPage = () => {
   const { user } = useAuth();
+  const { announce } = useAccessibility();
   const [activeTab, setActiveTab] = useState('centro-ayuda');
 
-  // Estados para el Centro de Ayuda y Módulos Institucionales
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedSubmodule, setSelectedSubmodule] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [faqExpanded, setFaqExpanded] = useState(null);
+  const [purposeFilter, setPurposeFilter] = useState('all');
+  const [faqExpanded, setFaqExpanded] = useState(0);
 
-  // Preguntas frecuentes oficiales del Centro de Ayuda Duoc UC
+  const handleOpenCategory = (category) => {
+    setSelectedCategory(category);
+    setSelectedSubmodule(null);
+  };
+
+  const handleOpenSubmodule = (category, submodule) => {
+    setSelectedCategory(category);
+    setSelectedSubmodule(submodule);
+  };
+
+  const handleSelectIntentShortcut = (shortcut) => {
+    const cat = DUOC_CATEGORIES.find((c) => c.id === shortcut.categoryId);
+    if (!cat) return;
+    const sub = cat.submodules.find((s) => s.id === shortcut.submoduleId) || null;
+    setSelectedCategory(cat);
+    setSelectedSubmodule(sub);
+  };
+
   const officialDuocFaqs = [
     {
-      q: '¿Cómo funciona la justificación de inasistencias por salud o fuerza mayor?',
-      a: 'Tienes hasta 5 días hábiles desde ocurrida la inasistencia para presentar tu certificado médico o respaldo formal en la coordinación docente de Sede Alameda.',
+      q: '¿Qué es el Programa PAEDIS, qué requisitos pide y qué apoyos entrega?',
+      a: 'El Programa de Acompañamiento a Estudiantes en situación de Discapacidad (PAEDIS) promueve la inclusión y equidad en tu trayectoria académica. Para ingresar debes ser estudiante matriculado y presentar tu Credencial de Discapacidad (RND/COMPIN) o certificado médico especialista. Entrega una Ficha de Ajustes Razonables para tus docentes, adecuaciones en evaluaciones y acompañamiento psicoeducativo.',
+      categoryId: 'beneficios-estudiantiles',
+      submoduleId: 'paedis-discapacidad',
+      articleUrl:
+        'https://centroayuda.duoc.cl/hc/es-419/articles/34877482210189--Qu%C3%A9-es-el-Programa-de-Acompa%C3%B1amiento-Estudiantes-con-Discapacidad-PAEDIS',
     },
     {
-      q: '¿Cómo reservo una sala de estudio en Sede Alameda y cómo registro mi ingreso?',
-      a: 'Ingresa a la pestaña "Biblioteca (Instrucciones & Acceso)" para seguir los pasos oficiales. Puedes reservar salas grupales o individuales y confirmar tu asistencia en el mesón de biblioteca.',
+      q: '¿Cómo justifico una inasistencia a evaluación y qué hago si estoy en riesgo de RI (70%)?',
+      a: 'El mínimo de asistencia en Duoc UC es 70%. Si faltaste a una evaluación por motivos médicos o fuerza mayor, tienes plazo para presentar tu certificado en Experiencia Vivo > Solicitudes. Si una condición de salud o laboral te pone en riesgo de Reprobación por Inasistencia (RI) o crees que tu RI es incorrecto, puedes ingresar una solicitud de apelación documentada.',
+      categoryId: 'vida-academica',
+      submoduleId: 'asistencias-inasistencias',
+      articleUrl:
+        'https://centroayuda.duoc.cl/hc/es-419/articles/45628967424525--Qu%C3%A9-puedo-hacer-si-una-situaci%C3%B3n-de-salud-o-laboral-afecta-mi-asistencia-y-me-pone-en-riesgo-de-Reprobaci%C3%B3n-por-Inasistencia-RI',
     },
     {
-      q: '¿Dónde revalido mi pase escolar TNE o consulto sobre Gratuidad?',
-      a: 'La revalidación TNE se realiza en los tótems Bip habilitados en el hall de Sede Alameda o en puntos Metro. Para Gratuidad o CAE, asegúrate de firmar tu pagaré semestral en el portal de pagos de Duoc UC.',
+      q: 'Soy estudiante cuidador/a (Ley N° 21.790): ¿cómo me acredito y qué flexibilidad tengo?',
+      a: 'La Ley N° 21.790 garantiza apoyos y flexibilidad académica a estudiantes que cuidan a personas con discapacidad, dependencia severa o niños/as. Acreditando tu condición en Duoc UC accedes a justificación de inasistencias por labores de cuidado, reprogramación de evaluaciones e inscripción prioritaria.',
+      categoryId: 'beneficios-estudiantiles',
+      submoduleId: 'apoyo-estudiantes-cuidadores',
+      articleUrl:
+        'https://centroayuda.duoc.cl/hc/es-419/articles/44621145254669-Ley-N-21-790-Apoyo-para-estudiantes-cuidadores',
     },
     {
-      q: '¿Cómo puedo simular mi toma de ramos antes del día oficial?',
-      a: 'Revisa tu tramo de inscripción en Experiencia Vivo Duoc para planificar con anticipación las secciones y horarios más convenientes para tu semestre.',
+      q: '¿Debo pagar matrícula si tengo Gratuidad o CAE y cómo firmo el Contrato de Continuidad?',
+      a: 'Si tienes Gratuidad asignada, estás exento del pago de matrícula y arancel durante la duración formal de la carrera. Si estás en 3° semestre o superior, recuerda firmar tu Contrato de Continuidad en el portal de finanzas para habilitar tu inscripción de asignaturas.',
+      categoryId: 'vida-academica',
+      submoduleId: 'continuidad-estudios-contrato',
+      articleUrl:
+        'https://centroayuda.duoc.cl/hc/es-419/articles/30497397424141--D%C3%B3nde-puedo-firmar-mi-Contrato-de-Continuidad',
+    },
+    {
+      q: '¿Cómo activo MFA (Verificación en dos pasos), cambio mi clave o accedo a AVA y WiFi?',
+      a: 'Con tu cuenta @duocuc.cl accedes a AVA Blackboard, Correo, WiFi de sede y Microsoft 365 gratuito. La verificación en dos pasos (MFA) se configura con Microsoft Authenticator; si cambiaste de teléfono o bloqueaste tu clave, puedes autogestionarla o abrir un ticket en Servicios Digitales.',
+      categoryId: 'servicios-digitales',
+      submoduleId: 'seguridad-autenticacion-mfa-clave',
+      articleUrl:
+        'https://centroayuda.duoc.cl/hc/es-419/articles/35999617868813-MFA-Verificaci%C3%B3n-en-dos-pasos',
     },
   ];
 
-  // Filtrado reactivo de módulos institucionales
-  const filteredCategories = useMemo(() => {
-    if (!searchTerm.trim()) return DUOC_CATEGORIES;
+  const searchAnalysis = useMemo(() => {
+    const rawTerm = searchTerm.trim().toLowerCase();
+    const activeGroup = PURPOSE_GROUPS.find((g) => g.id === purposeFilter);
 
-    const term = searchTerm.toLowerCase();
-    return DUOC_CATEGORIES.filter((category) => {
-      const matchTitle = category.title.toLowerCase().includes(term);
-      const matchDesc = category.description.toLowerCase().includes(term);
-      const matchSubmodules = category.submodules.some(
-        (sub) =>
-          sub.title.toLowerCase().includes(term) ||
-          sub.description.toLowerCase().includes(term)
-      );
-      return matchTitle || matchDesc || matchSubmodules;
+    const baseCategories = activeGroup?.ids
+      ? DUOC_CATEGORIES.filter((c) => activeGroup.ids.includes(c.id))
+      : DUOC_CATEGORIES;
+
+    if (!rawTerm) {
+      return {
+        categories: baseCategories,
+        matchedSubmodules: [],
+        matchedArticles: [],
+      };
+    }
+
+    const matchedSubmodules = [];
+    const matchedArticles = [];
+    const matchedCategoryIds = new Set();
+
+    DUOC_CATEGORIES.forEach((category) => {
+      const catMatches =
+        category.title.toLowerCase().includes(rawTerm) ||
+        category.description.toLowerCase().includes(rawTerm) ||
+        (category.shortIntent || '').toLowerCase().includes(rawTerm);
+
+      if (catMatches) {
+        matchedCategoryIds.add(category.id);
+      }
+
+      category.submodules.forEach((sub) => {
+        const subMatches =
+          sub.title.toLowerCase().includes(rawTerm) ||
+          (sub.description || '').toLowerCase().includes(rawTerm) ||
+          (sub.intentGoal || '').toLowerCase().includes(rawTerm) ||
+          (sub.instructions || '').toLowerCase().includes(rawTerm) ||
+          (sub.paedisTip || '').toLowerCase().includes(rawTerm) ||
+          (sub.intentTags || []).some((t) => t.toLowerCase().includes(rawTerm));
+
+        let articleMatchedInSub = false;
+
+        (sub.articles || []).forEach((art) => {
+          const artMatches =
+            art.title.toLowerCase().includes(rawTerm) ||
+            (art.summary || '').toLowerCase().includes(rawTerm);
+
+          if (artMatches) {
+            articleMatchedInSub = true;
+            matchedArticles.push({
+              ...art,
+              category,
+              submodule: sub,
+            });
+          }
+        });
+
+        if (subMatches || articleMatchedInSub) {
+          matchedCategoryIds.add(category.id);
+          matchedSubmodules.push({
+            category,
+            submodule: sub,
+          });
+        }
+      });
     });
-  }, [searchTerm]);
+
+    const filteredCategories = DUOC_CATEGORIES.filter((c) => matchedCategoryIds.has(c.id));
+
+    return {
+      categories: filteredCategories,
+      matchedSubmodules,
+      matchedArticles,
+    };
+  }, [searchTerm, purposeFilter]);
+
+  const userName = user?.nombre || user?.fullName || user?.email || VIVO_STUDENT_PROFILE.nombre;
+  const userCareer = user?.career || user?.carrera || 'Ingeniería en Informática';
+  const userCampus = user?.campus || user?.sede || 'Sede Alameda';
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900 transition-colors">
-      {/* 1. Barra de Accesibilidad Universal Permanentemente Visible */}
+    <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-900 transition-colors">
+      {/* 1. Barra de Preferencias de Lectura y Visualización (Limpia y Amigable) */}
       <AccessibilityBar />
 
-      {/* 2. Barra Superior Unificada con Pestañas Rápidas */}
-      <UnifiedNavbar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      {/* 2. Navegación Principal Luminosa */}
+      <UnifiedNavbar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* 3. Contenido Principal Semántico */}
-      <main id="main-content" className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        {/* PESTAÑA 1: CENTRO DE AYUDA Y MÓDULOS INSTITUCIONALES */}
+      {/* 3. Contenido Principal */}
+      <main id="main-content" className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
         {activeTab === 'centro-ayuda' && (
-          <div className="space-y-8">
-            {/* Banner Principal de Bienvenida (Ajustado, centrado y limpio) */}
+          <div className="space-y-8 animate-fade-in-up">
+            {/* BIENVENIDA + BUSCADOR INTEGRADO (Baja sobrecarga sensorial, diseño limpio y humano) */}
             <section
               aria-labelledby="main-summary-heading"
-              className="bg-gradient-to-r from-[#002B49] via-[#09355c] to-slate-900 text-white rounded-3xl p-8 sm:p-10 shadow-xl border-4 border-[#FFB81C]"
+              className="bg-white rounded-3xl p-6 sm:p-9 border border-slate-200/80 shadow-2xs"
             >
-              <div className="max-w-4xl">
-                {/* Píldora de periodo académico oficial */}
-                <div className="mb-3">
-                  <span className="bg-[#FFB81C] text-slate-950 font-black text-xs px-3.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 shadow-xs">
-                    <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>Periodo Académico 2026 • Sede Alameda</span>
-                  </span>
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 mb-2">
+                  <span>{userCareer}</span>
+                  <span aria-hidden="true">•</span>
+                  <span>{userCampus}</span>
                 </div>
 
-                {/* Único <h1> de la vista con el nombre oficial del estudiante */}
-                <h1 id="main-summary-heading" className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white">
-                  ¡Bienvenido, {user?.nombre || VIVO_STUDENT_PROFILE.nombre}!
+                <h1
+                  id="main-summary-heading"
+                  className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900"
+                >
+                  Hola, {userName}
                 </h1>
 
-                <p className="mt-3 text-slate-200 text-sm sm:text-base lg:text-lg font-medium leading-relaxed max-w-3xl">
-                  Plataforma Centralizada de Información y Servicios Institucionales: consulta instrucciones de trámites, revisa tus accesos de biblioteca, orientaciones de Vivo Duoc y gestiona tickets de soporte a servicios digitales en un solo lugar.
+                <p className="mt-2 text-slate-600 text-sm sm:text-base leading-relaxed">
+                  ¿En qué te podemos ayudar hoy? Encuentra guías paso a paso, requisitos y enlaces directos a tus trámites estudiantiles.
                 </p>
               </div>
-            </section>
 
-            {/* BARRA DE ACCESOS RÁPIDOS VIVO DUOC (3 tarjetas balanceadas sin tarjeta de biblioteca) */}
-            <section aria-labelledby="quick-access-heading">
-              <h2 id="quick-access-heading" className="sr-only">
-                Accesos rápidos a servicios oficiales
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* 1. Mi Asistencia */}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('vivo-duoc')}
-                  className="min-h-[88px] bg-white p-6 rounded-2xl border-2 border-slate-300 hover:border-[#002B49] text-left transition-all hover:shadow-lg flex items-center justify-between group focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
-                >
-                  <div>
-                    <span className="text-xs font-black text-slate-700 uppercase block tracking-wider">
-                      Mi Asistencia
-                    </span>
-                    <span className="text-2xl font-black text-slate-950 block mt-0.5">
-                      Capstone 88.9%
-                    </span>
-                    <span className="text-xs text-emerald-800 font-bold mt-1 block">
-                      ✓ Asistencia Cumpliendo
-                    </span>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-[#FFB81C] transition-colors" aria-hidden="true">
-                    <CheckSquare className="w-7 h-7" aria-hidden="true" />
-                  </div>
-                </button>
-
-                {/* 2. Mis Horarios */}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('vivo-duoc')}
-                  className="min-h-[88px] bg-white p-6 rounded-2xl border-2 border-slate-300 hover:border-[#002B49] text-left transition-all hover:shadow-lg flex items-center justify-between group focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
-                >
-                  <div>
-                    <span className="text-xs font-black text-slate-700 uppercase block tracking-wider">
-                      Mis Horarios
-                    </span>
-                    <span className="text-2xl font-black text-slate-950 block mt-0.5">
-                      Miércoles 18:45
-                    </span>
-                    <span className="text-xs text-slate-700 font-bold mt-1 block">
-                      Sala 402 • Capstone Alameda
-                    </span>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 text-[#002B49] flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-[#FFB81C] transition-colors" aria-hidden="true">
-                    <Clock className="w-7 h-7" aria-hidden="true" />
-                  </div>
-                </button>
-
-                {/* 3. Tickets a Servicios Digitales */}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('tickets')}
-                  className="min-h-[88px] bg-white p-6 rounded-2xl border-2 border-slate-300 hover:border-[#002B49] text-left transition-all hover:shadow-lg flex items-center justify-between group focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
-                >
-                  <div>
-                    <span className="text-xs font-black text-slate-700 uppercase block tracking-wider">
-                      Soporte Técnico
-                    </span>
-                    <span className="text-2xl font-black text-slate-950 block mt-0.5">
-                      Servicios Digitales
-                    </span>
-                    <span className="text-xs text-slate-700 font-bold mt-1 block">
-                      Cuentas, AVA, WiFi y Software
-                    </span>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center group-hover:bg-[#002B49] group-hover:text-[#FFB81C] transition-colors" aria-hidden="true">
-                    <Laptop className="w-7 h-7" aria-hidden="true" />
-                  </div>
-                </button>
+              <div className="mt-6 pt-5 border-t border-slate-100">
+                <SearchBar
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  resultsCount={searchAnalysis.categories.length}
+                  matchedSectionsCount={searchAnalysis.matchedSubmodules.length}
+                  matchedArticlesCount={searchAnalysis.matchedArticles.length}
+                />
               </div>
             </section>
 
-            {/* Barra de Búsqueda Accesible */}
-            <section aria-label="Buscador de trámites y centro de ayuda">
-              <SearchBar
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                resultsCount={filteredCategories.length}
-              />
-            </section>
-
-            {/* Grilla de las 9 Categorías Institucionales de Duoc UC */}
-            <section aria-labelledby="modules-grid-heading">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-                <div>
-                  <h2 id="modules-grid-heading" className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                    Centro de Ayuda & Módulos Institucionales Duoc UC
-                  </h2>
-                  <p className="text-sm text-slate-700 font-bold mt-1">
-                    Selecciona cualquier categoría para conocer las instrucciones de cada trámite y acceder a los enlaces oficiales.
-                  </p>
-                </div>
-                <span className="text-sm font-black text-slate-700 shrink-0">
-                  Mostrando {filteredCategories.length} de 9 categorías
-                </span>
-              </div>
-
-              {filteredCategories.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-3xl border-2 border-dashed border-slate-300 p-8">
-                  <HelpCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" aria-hidden="true" />
-                  <h3 className="text-lg font-black text-slate-900">No encontramos trámites con esa palabra</h3>
-                  <p className="text-sm text-slate-700 mt-1 font-medium">
-                    Prueba buscando "toma de ramos", "gratuidad", "asistencia", "certificados" o "software".
-                  </p>
+            {/* RESULTADOS DIRECTOS DE BÚSQUEDA */}
+            {searchTerm.trim() !== '' && (
+              <section
+                aria-labelledby="direct-search-results-heading"
+                className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/90 shadow-md space-y-6 animate-fade-in-up"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                  <div>
+                    <h2
+                      id="direct-search-results-heading"
+                      className="text-lg sm:text-xl font-bold text-slate-900"
+                    >
+                      Resultados para &ldquo;{searchTerm}&rdquo;
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Selecciona un trámite para ver sus instrucciones o ir al portal oficial.
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setSearchTerm('')}
-                    className="mt-4 min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001f35] text-white text-xs sm:text-sm font-black rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-all"
+                    className="min-h-[38px] px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-semibold text-xs rounded-xl transition-colors self-start sm:self-center"
                   >
-                    Ver todas las categorías
+                    Cerrar búsqueda
+                  </button>
+                </div>
+
+                {searchAnalysis.matchedSubmodules.length === 0 &&
+                searchAnalysis.matchedArticles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <HelpCircle
+                      className="w-10 h-10 text-slate-400 mx-auto mb-2.5"
+                      aria-hidden="true"
+                    />
+                    <h3 className="text-base font-bold text-slate-900">
+                      No encontramos resultados para &ldquo;{searchTerm}&rdquo;
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                      Prueba con términos como &ldquo;PAEDIS&rdquo;, &ldquo;inasistencia&rdquo;, &ldquo;gratuidad&rdquo;, &ldquo;TNE&rdquo;, &ldquo;congelar&rdquo; o &ldquo;MFA&rdquo;.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Columna 1: Trámites Directos */}
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
+                        <span>
+                          Trámites y apartados ({searchAnalysis.matchedSubmodules.length})
+                        </span>
+                      </h3>
+                      <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                        {searchAnalysis.matchedSubmodules.slice(0, 8).map(({ category, submodule }) => (
+                          <div
+                            key={`${category.id}-${submodule.id}`}
+                            className="p-4 rounded-xl bg-slate-50/80 hover:bg-white border border-slate-200/80 hover:border-slate-300 transition-all flex flex-col justify-between gap-3"
+                          >
+                            <div>
+                              <span className="text-[11px] font-medium text-slate-500">
+                                {category.title}
+                              </span>
+                              <h4 className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
+                                {submodule.title}
+                              </h4>
+                              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                                {submodule.intentGoal || submodule.description}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSubmodule(category, submodule)}
+                                className="min-h-[36px] px-3.5 py-1.5 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 transition-colors"
+                              >
+                                <span>Ver pasos</span>
+                                <ArrowRight className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                              </button>
+                              <a
+                                href={submodule.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="min-h-[36px] px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200/90 inline-flex items-center gap-1.5 transition-colors"
+                              >
+                                <span>{submodule.actionLabel}</span>
+                                <ExternalLink className="w-3 h-3 text-slate-400" aria-hidden="true" />
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Columna 2: Artículos Oficiales */}
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
+                        <span>
+                          Artículos de ayuda ({searchAnalysis.matchedArticles.length})
+                        </span>
+                      </h3>
+                      <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                        {searchAnalysis.matchedArticles.slice(0, 8).map((art) => (
+                          <div
+                            key={art.id}
+                            className="p-4 rounded-xl bg-slate-50/80 hover:bg-white border border-slate-200/80 hover:border-slate-300 transition-all space-y-2"
+                          >
+                            <span className="text-[11px] font-medium text-slate-500 block">
+                              {art.submodule.title}
+                            </span>
+                            <h4 className="text-sm font-bold text-slate-900">
+                              {art.title}
+                            </h4>
+                            <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                              {art.summary}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSubmodule(art.category, art.submodule)}
+                                className="min-h-[34px] px-3 py-1 bg-white hover:bg-slate-100 text-[#002B49] font-semibold text-xs rounded-lg border border-slate-200/90 inline-flex items-center gap-1.5 transition-colors"
+                              >
+                                <span>Ver instrucciones</span>
+                                <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                              </button>
+                              <a
+                                href={art.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="min-h-[34px] px-3 py-1 text-slate-600 hover:text-slate-900 font-medium text-xs inline-flex items-center gap-1 hover:underline"
+                              >
+                                <span>Artículo oficial</span>
+                                <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* RESUMEN RÁPIDO DEL ESTUDIANTE (3 Tarjetas limpias y calmadas) */}
+            <section aria-labelledby="quick-access-heading">
+              <h2 id="quick-access-heading" className="sr-only">
+                Resumen rápido de mi estado académico y soporte
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('vivo-duoc')}
+                  aria-label="Ir a Mi Asistencia en Experiencia Vivo. Capstone 88.9%, cumpliendo el mínimo de 70%."
+                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between group"
+                >
+                  <div>
+                    <span className="text-xs font-medium text-slate-500 block">
+                      Asistencia actual
+                    </span>
+                    <span className="text-lg sm:text-xl font-bold text-slate-900 block mt-0.5">
+                      Capstone · 88.9%
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium mt-1.5 bg-emerald-50/80 px-2 py-0.5 rounded-full">
+                      Al día (mínimo 70%)
+                    </span>
+                  </div>
+                  <div
+                    className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <CheckSquare className="w-5 h-5" aria-hidden="true" />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('vivo-duoc')}
+                  aria-label="Ir a Mis Horarios en Experiencia Vivo. Próxima clase Miércoles 18:45, Sala 402."
+                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between group"
+                >
+                  <div>
+                    <span className="text-xs font-medium text-slate-500 block">
+                      Próxima clase
+                    </span>
+                    <span className="text-lg sm:text-xl font-bold text-slate-900 block mt-0.5">
+                      Miércoles · 18:45
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs text-sky-800 font-medium mt-1.5 bg-sky-50/80 px-2 py-0.5 rounded-full">
+                      Sala 402 · Sede Alameda
+                    </span>
+                  </div>
+                  <div
+                    className="w-11 h-11 rounded-xl bg-sky-50 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <Clock className="w-5 h-5" aria-hidden="true" />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('tickets')}
+                  aria-label="Ir a Soporte TI y Tickets de Servicios Digitales."
+                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between group"
+                >
+                  <div>
+                    <span className="text-xs font-medium text-slate-500 block">
+                      Mesa de ayuda TI
+                    </span>
+                    <span className="text-lg sm:text-xl font-bold text-slate-900 block mt-0.5">
+                      Soporte Digital
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-600 font-medium mt-1.5 bg-slate-100 px-2 py-0.5 rounded-full">
+                      Correo, AVA, MFA y WiFi
+                    </span>
+                  </div>
+                  <div
+                    className="w-11 h-11 rounded-xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <Laptop className="w-5 h-5" aria-hidden="true" />
+                  </div>
+                </button>
+              </div>
+            </section>
+
+            {/* CONSULTAS FRECUENTES (8 accesos directos limpios) */}
+            <section aria-labelledby="intent-shortcuts-heading" className="space-y-4">
+              <div>
+                <h2
+                  id="intent-shortcuts-heading"
+                  className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight"
+                >
+                  Consultas rápidas
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                  Elige una situación para ver directamente los requisitos y pasos a seguir.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {INTENT_SHORTCUTS.map((shortcut) => {
+                  const IconComp = INTENT_ICON_MAP[shortcut.iconName] || Compass;
+                  return (
+                    <button
+                      key={shortcut.id}
+                      type="button"
+                      onClick={() => handleSelectIntentShortcut(shortcut)}
+                      aria-haspopup="dialog"
+                      className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50/50 border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 group active:scale-[0.99]"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <div
+                            className="w-9 h-9 rounded-xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
+                            aria-hidden="true"
+                          >
+                            <IconComp className="w-4 h-4" aria-hidden="true" />
+                          </div>
+                          <span className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200/60">
+                            {shortcut.badge}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#002B49] transition-colors leading-snug">
+                          {shortcut.question}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                          {shortcut.subtitle}
+                        </p>
+                      </div>
+
+                      <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-[#002B49]">
+                        <span>Ver pasos</span>
+                        <ArrowRight
+                          className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#002B49] transition-transform duration-200 group-hover:translate-x-0.5"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* CATEGORÍAS DEL CENTRO DE AYUDA */}
+            <section aria-labelledby="modules-grid-heading" className="space-y-5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <h2
+                    id="modules-grid-heading"
+                    className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight"
+                  >
+                    Categorías de ayuda
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                    Explora por área o selecciona directamente uno de los trámites de cada tarjeta.
+                  </p>
+                </div>
+
+                {/* Filtro limpio tipo píldora */}
+                <div
+                  role="group"
+                  aria-label="Filtrar categorías por área"
+                  className="flex flex-wrap gap-1.5"
+                >
+                  {PURPOSE_GROUPS.map((group) => {
+                    const isSelected = purposeFilter === group.id;
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => {
+                          setPurposeFilter(group.id);
+                          announce(`Mostrando: ${group.label}`);
+                        }}
+                        aria-pressed={isSelected}
+                        className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 active:scale-[0.98] ${
+                          isSelected
+                            ? 'bg-[#002B49] text-white border-[#002B49] shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 border-slate-200/80'
+                        }`}
+                      >
+                        {group.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {searchAnalysis.categories.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-2xl border border-slate-200/80 p-8">
+                  <HelpCircle
+                    className="w-10 h-10 text-slate-400 mx-auto mb-2.5"
+                    aria-hidden="true"
+                  />
+                  <h3 className="text-base font-bold text-slate-900">
+                    No encontramos categorías con ese filtro
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setPurposeFilter('all');
+                    }}
+                    className="mt-4 min-h-[40px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-semibold rounded-xl transition-all"
+                  >
+                    Mostrar todas las categorías
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredCategories.map((category) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {searchAnalysis.categories.map((category) => (
                     <ModuleCard
                       key={category.id}
                       category={category}
-                      onSelect={(cat) => setSelectedCategory(cat)}
+                      onSelect={handleOpenCategory}
+                      onSelectSubmodule={handleOpenSubmodule}
                     />
                   ))}
                 </div>
               )}
             </section>
 
-            {/* SECCIÓN PREGUNTAS FRECUENTES DEL CENTRO DE AYUDA OFICIAL */}
+            {/* PREGUNTAS FRECUENTES */}
             <section
               aria-labelledby="faqs-heading"
-              className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-slate-200 shadow-md space-y-4"
+              className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-4"
             >
-              <div className="flex items-center gap-3 border-b-2 border-slate-100 pb-4">
-                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold" aria-hidden="true">
-                  <HelpCircle className="w-7 h-7 text-amber-700" aria-hidden="true" />
-                </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                 <div>
-                  <h2 id="faqs-heading" className="text-xl sm:text-2xl font-black text-slate-900">
-                    Preguntas Frecuentes del Centro de Ayuda Duoc UC
+                  <h2 id="faqs-heading" className="text-lg sm:text-xl font-bold text-slate-900">
+                    Preguntas frecuentes
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-700 font-bold">
-                    Respuestas y orientaciones para estudiantes de Duoc UC Sede Alameda
+                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                    Respuestas rápidas a las dudas más habituales del semestre.
                   </p>
                 </div>
+                <a
+                  href="https://centroayuda.duoc.cl/hc/es-419"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-h-[38px] px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200/80 inline-flex items-center gap-1.5 self-start sm:self-center transition-colors"
+                >
+                  <span>Ir a centroayuda.duoc.cl</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                </a>
               </div>
 
-              <div className="divide-y divide-slate-200">
+              <div className="divide-y divide-slate-100">
                 {officialDuocFaqs.map((faq, idx) => {
                   const isOpen = faqExpanded === idx;
                   const buttonId = `faq-btn-${idx}`;
                   const panelId = `faq-panel-${idx}`;
 
                   return (
-                    <div key={idx} className="py-4">
+                    <div key={idx} className="py-3.5">
                       <button
                         id={buttonId}
                         type="button"
                         onClick={() => setFaqExpanded(isOpen ? null : idx)}
                         aria-expanded={isOpen}
                         aria-controls={panelId}
-                        className="w-full min-h-[44px] flex items-center justify-between text-left gap-4 font-black text-slate-900 text-sm sm:text-base hover:text-[#002B49] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 rounded-xl p-2"
+                        className="w-full min-h-[42px] flex items-center justify-between text-left gap-4 font-semibold text-slate-800 hover:text-[#002B49] text-sm sm:text-base rounded-lg py-1.5 transition-colors"
                       >
                         <span>{faq.q}</span>
-                        {isOpen ? (
-                          <ChevronUp className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true" />
-                        )}
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                            isOpen ? 'rotate-180 text-[#002B49]' : ''
+                          }`}
+                          aria-hidden="true"
+                        />
                       </button>
 
                       {isOpen && (
@@ -286,9 +692,35 @@ export const DashboardPage = () => {
                           id={panelId}
                           role="region"
                           aria-labelledby={buttonId}
-                          className="mt-3 pl-4 border-l-4 border-[#FFB81C] text-xs sm:text-sm text-slate-800 font-medium leading-relaxed"
+                          className="mt-2.5 pl-4 border-l-2 border-[#FFB81C] space-y-3 animate-fade-in"
                         >
-                          {faq.a}
+                          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-[75ch]">
+                            {faq.a}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSelectIntentShortcut({
+                                  categoryId: faq.categoryId,
+                                  submoduleId: faq.submoduleId,
+                                })
+                              }
+                              className="min-h-[36px] px-3.5 py-1.5 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-colors"
+                            >
+                              <span>Ver pasos del trámite</span>
+                              <ArrowRight className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                            </button>
+                            <a
+                              href={faq.articleUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="min-h-[36px] px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200/80 inline-flex items-center gap-1.5 transition-colors"
+                            >
+                              <span>Artículo en centroayuda.duoc.cl</span>
+                              <ExternalLink className="w-3 h-3 text-slate-400" aria-hidden="true" />
+                            </a>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -299,50 +731,76 @@ export const DashboardPage = () => {
           </div>
         )}
 
-        {/* PESTAÑA 2: BIBLIOTECA DUOC */}
-        {activeTab === 'biblioteca' && <BibliotecaView />}
+        {/* Vistas secundarias con animación de entrada suave */}
+        <Suspense
+          fallback={
+            <div
+              role="status"
+              aria-live="polite"
+              className="p-12 text-center bg-white rounded-2xl border border-slate-200/80 font-medium text-slate-600"
+            >
+              Cargando sección...
+            </div>
+          }
+        >
+          {activeTab === 'biblioteca' && (
+            <div className="animate-fade-in-up">
+              <BibliotecaView />
+            </div>
+          )}
 
-        {/* PESTAÑA 3: MI VIVO DUOC */}
-        {activeTab === 'vivo-duoc' && <VivoDuocSummaryView />}
+          {activeTab === 'vivo-duoc' && (
+            <div className="animate-fade-in-up">
+              <VivoDuocSummaryView />
+            </div>
+          )}
 
-        {/* PESTAÑA 4: TICKETS A SERVICIOS DIGITALES */}
-        {activeTab === 'tickets' && <ServiciosDigitalesTicketsView />}
+          {activeTab === 'tickets' && (
+            <div className="animate-fade-in-up">
+              <ServiciosDigitalesTicketsView />
+            </div>
+          )}
 
-        {/* PESTAÑA 5: MI PERFIL */}
-        {activeTab === 'perfil' && <PerfilView />}
+          {activeTab === 'perfil' && (
+            <div className="animate-fade-in-up">
+              <PerfilView />
+            </div>
+          )}
+        </Suspense>
       </main>
 
-      {/* Modal Interactivo de Submenús e Instrucciones de Trámites */}
+      {/* Modal de Categorías y Trámites */}
       {selectedCategory && (
         <ModuleModal
           category={selectedCategory}
-          onClose={() => setSelectedCategory(null)}
+          initialSubmodule={selectedSubmodule}
+          onClose={() => {
+            setSelectedCategory(null);
+            setSelectedSubmodule(null);
+          }}
         />
       )}
 
-      {/* A11y: Pie de Página Institucional semántico <footer> */}
-      <footer className="bg-slate-900 text-slate-200 py-8 px-4 border-t-4 border-[#FFB81C] mt-auto text-xs font-semibold">
+      {/* Pie de Página Limpio */}
+      <footer className="bg-white text-slate-500 py-6 px-4 border-t border-slate-200/80 mt-12 text-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <p className="font-black text-white text-sm">
-              Nexo360 • Centro de Ayuda Centralizado Duoc UC Sede Alameda
+            <p className="font-semibold text-slate-800">
+              Nexo360 • Centro de Ayuda y Servicios Duoc UC
             </p>
-            <p className="text-slate-300 mt-1">
-              Plataforma diseñada bajo estándares de accesibilidad universal WCAG 2.2 AA.
+            <p className="text-slate-500 mt-0.5">
+              Información oficial sincronizada con centroayuda.duoc.cl • Sede Alameda
             </p>
           </div>
           <div className="text-center sm:text-right">
-            <p className="text-slate-200">
-              Mesa de Ayuda Alameda:{' '}
+            <p>
+              Contacto sede:{' '}
               <a
                 href="mailto:ayuda.alameda@duoc.cl"
-                className="font-black text-[#FFB81C] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded px-1"
+                className="font-semibold text-[#002B49] hover:underline rounded px-1"
               >
                 ayuda.alameda@duoc.cl
               </a>
-            </p>
-            <p className="text-slate-400 mt-1">
-              Sede Alameda • Periodo Académico 2026
             </p>
           </div>
         </div>

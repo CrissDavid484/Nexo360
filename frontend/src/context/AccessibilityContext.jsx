@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from 'react';
+import { api } from '../services/api';
 
 const AccessibilityContext = createContext();
 
@@ -23,17 +32,31 @@ export const AccessibilityProvider = ({ children }) => {
   // Estado para anuncios de lectores de pantalla (WCAG 4.1.3 Status Messages)
   const [announcement, setAnnouncement] = useState('');
   const [announcementPriority, setAnnouncementPriority] = useState('polite');
+  const announceTimerRef = useRef(null);
+  const isInitialMountRef = useRef(true);
+  const skipBackendSyncRef = useRef(false);
 
-  // Función para anunciar cambios dinámicos a lectores de pantalla (NVDA, JAWS, VoiceOver)
-  const announce = (message, priority = 'polite') => {
+  // Función memoizada para anunciar cambios dinámicos a lectores de pantalla (NVDA, JAWS, VoiceOver)
+  const announce = useCallback((message, priority = 'polite') => {
+    if (announceTimerRef.current) {
+      clearTimeout(announceTimerRef.current);
+    }
     setAnnouncementPriority(priority);
     setAnnouncement('');
-    setTimeout(() => {
+    announceTimerRef.current = setTimeout(() => {
       setAnnouncement(message);
     }, 50);
-  };
+  }, []);
 
-  // Sincronizar clases con el elemento raíz <html>
+  useEffect(() => {
+    return () => {
+      if (announceTimerRef.current) {
+        clearTimeout(announceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Sincronizar clases con el elemento raíz <html> y persistir solo ante cambios del usuario autenticado
   useEffect(() => {
     const root = document.documentElement;
 
@@ -65,80 +88,139 @@ export const AccessibilityProvider = ({ children }) => {
       root.classList.remove('reduced-motion');
     }
     localStorage.setItem('nexo360_reduced_motion', String(reducedMotion));
+
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
+    if (skipBackendSyncRef.current) {
+      skipBackendSyncRef.current = false;
+      return;
+    }
+
+    // Sincronizar preferencias de accesibilidad con MongoDB únicamente si existe sesión activa
+    if (localStorage.getItem('nexo360_token')) {
+      api
+        .saveAccessibilityPreferences({
+          fontSize,
+          highContrast,
+          dyslexicFont,
+          reducedMotion,
+          screenReaderOptimized: true,
+        })
+        .catch(() => {});
+    }
   }, [fontSize, highContrast, dyslexicFont, reducedMotion]);
 
-  // Controles de tamaño de fuente
-  const increaseFontSize = () => {
-    if (fontSize === 'normal') {
-      setFontSize('large');
-      announce('Tamaño de texto aumentado a grande');
-    } else if (fontSize === 'large') {
-      setFontSize('xlarge');
-      announce('Tamaño de texto aumentado a extra grande');
-    }
-  };
+  // Controles de tamaño de fuente memoizados
+  const increaseFontSize = useCallback(() => {
+    setFontSize((prev) => {
+      if (prev === 'normal') {
+        announce('Tamaño de texto aumentado a grande');
+        return 'large';
+      }
+      if (prev === 'large') {
+        announce('Tamaño de texto aumentado a extra grande');
+        return 'xlarge';
+      }
+      return prev;
+    });
+  }, [announce]);
 
-  const decreaseFontSize = () => {
-    if (fontSize === 'xlarge') {
-      setFontSize('large');
-      announce('Tamaño de texto reducido a grande');
-    } else if (fontSize === 'large') {
-      setFontSize('normal');
-      announce('Tamaño de texto restablecido a tamaño normal');
-    }
-  };
+  const decreaseFontSize = useCallback(() => {
+    setFontSize((prev) => {
+      if (prev === 'xlarge') {
+        announce('Tamaño de texto reducido a grande');
+        return 'large';
+      }
+      if (prev === 'large') {
+        announce('Tamaño de texto restablecido a tamaño normal');
+        return 'normal';
+      }
+      return prev;
+    });
+  }, [announce]);
 
-  const toggleHighContrast = () => {
+  const toggleHighContrast = useCallback(() => {
     setHighContrast((prev) => {
       const next = !prev;
       announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
       return next;
     });
-  };
+  }, [announce]);
 
-  const toggleDyslexicFont = () => {
+  const toggleDyslexicFont = useCallback(() => {
     setDyslexicFont((prev) => {
       const next = !prev;
       announce(next ? 'Fuente de alta legibilidad activada' : 'Fuente estándar activada');
       return next;
     });
-  };
+  }, [announce]);
 
-  const toggleReducedMotion = () => {
+  const toggleReducedMotion = useCallback(() => {
     setReducedMotion((prev) => {
       const next = !prev;
       announce(next ? 'Animaciones reducidas activadas' : 'Animaciones activadas');
       return next;
     });
-  };
+  }, [announce]);
 
-  // Cargar preferencias guardadas del usuario desde el backend
-  const loadUserPreferences = (prefs) => {
+  const resetPreferences = useCallback(() => {
+    setFontSize('normal');
+    setHighContrast(false);
+    setDyslexicFont(false);
+    setReducedMotion(false);
+    announce('Preferencias de visualización restablecidas a los valores predeterminados');
+  }, [announce]);
+
+  // Cargar preferencias guardadas del usuario desde el backend sin disparar PUT redundante
+  const loadUserPreferences = useCallback((prefs) => {
     if (!prefs) return;
+    skipBackendSyncRef.current = true;
     if (prefs.fontSize) setFontSize(prefs.fontSize);
     if (typeof prefs.highContrast === 'boolean') setHighContrast(prefs.highContrast);
     if (typeof prefs.dyslexicFont === 'boolean') setDyslexicFont(prefs.dyslexicFont);
     if (typeof prefs.reducedMotion === 'boolean') setReducedMotion(prefs.reducedMotion);
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({
+      fontSize,
+      highContrast,
+      dyslexicFont,
+      reducedMotion,
+      announcement,
+      announcementPriority,
+      announce,
+      increaseFontSize,
+      decreaseFontSize,
+      toggleHighContrast,
+      toggleDyslexicFont,
+      toggleReducedMotion,
+      resetPreferences,
+      loadUserPreferences,
+    }),
+    [
+      fontSize,
+      highContrast,
+      dyslexicFont,
+      reducedMotion,
+      announcement,
+      announcementPriority,
+      announce,
+      increaseFontSize,
+      decreaseFontSize,
+      toggleHighContrast,
+      toggleDyslexicFont,
+      toggleReducedMotion,
+      resetPreferences,
+      loadUserPreferences,
+    ]
+  );
 
   return (
-    <AccessibilityContext.Provider
-      value={{
-        fontSize,
-        highContrast,
-        dyslexicFont,
-        reducedMotion,
-        announcement,
-        announcementPriority,
-        announce,
-        increaseFontSize,
-        decreaseFontSize,
-        toggleHighContrast,
-        toggleDyslexicFont,
-        toggleReducedMotion,
-        loadUserPreferences,
-      }}
-    >
+    <AccessibilityContext.Provider value={contextValue}>
       {children}
     </AccessibilityContext.Provider>
   );

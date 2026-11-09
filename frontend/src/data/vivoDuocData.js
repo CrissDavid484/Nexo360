@@ -5,7 +5,7 @@
 
 export const VIVO_STUDENT_PROFILE = {
   nombre: 'Cristian Guzmán',
-  rut: '19.876.543-2',
+  rut: '19.276.735-0',
   carrera: 'Ingeniería en Informática',
   sede: 'Sede Alameda',
   direccion: 'Las Moreras 12196',
@@ -170,4 +170,52 @@ export const DUOC_BIBLIOTECAS_SEDES = [
   'Biblioteca San Carlos de Apoquindo',
   'Biblioteca Valparaíso',
   'Biblioteca Viña del Mar',
+];
+
+export const VIVO_PROGRESO_ACADEMICO = {
+  carrera: 'Ingeniería en Informática',
+  totalCreditos: 418,
+  creditosAprobados: 216,
+  creditosInscritos: 22,
+  creditosOptativos: 28,
+  porcentajeAvance: 52,
+  asignaturasAprobadas: 39,
+  asignaturasInscritas: 1,
+  asignaturasReprobadas: 0,
+  asignaturasPendientes: 1,
+};
+
+export const VIVO_VIDA_ESTUDIANTIL = [
+  {
+    id: 'cva',
+    title: 'Centro Virtual de Aprendizaje (CVA)',
+    description: 'Transforma tu aprendizaje con estrategias y técnicas de estudio.',
+    btnText: 'Visitar CVA',
+    url: 'https://experienciavivo.duoc.cl/cva',
+    imgSrc: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500&auto=format&fit=crop&q=60',
+  },
+  {
+    id: 'cdp',
+    title: 'Centro de Desarrollo Profesional',
+    description: 'Recursos y herramientas de apoyo para enfrentar tu proceso de inserción laboral.',
+    btnText: 'Ir al sitio',
+    url: 'https://experienciavivo.duoc.cl/cdp',
+    imgSrc: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&auto=format&fit=crop&q=60',
+  },
+  {
+    id: 'eventos',
+    title: 'Eventos, actividades y apoyo online',
+    description: 'Accede a eventos y apoyos que tenemos disponibles para ti.',
+    btnText: 'Ir al sitio',
+    url: 'https://experienciavivo.duoc.cl/eventos',
+    imgSrc: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=500&auto=format&fit=crop&q=60',
+  },
+  {
+    id: 'bienestar',
+    title: 'Promotores del Bienestar',
+    description: 'Conviértete en un promotor/a del bienestar y descubre cómo ayudarte a ti y a otros.',
+    btnText: 'Conoce más',
+    url: 'https://experienciavivo.duoc.cl/bienestar',
+    imgSrc: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&auto=format&fit=crop&q=60',
+  },
 ];

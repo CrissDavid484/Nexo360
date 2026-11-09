@@ -1,147 +1,286 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { VIVO_STUDENT_PROFILE } from '../../data/vivoDuocData';
-import { Camera, ShieldCheck, CheckCircle2, X } from 'lucide-react';
+import { Camera, ShieldCheck, CheckCircle2, X, AlertCircle, HeartHandshake, Pencil } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export const PerfilView = () => {
   const { announce } = useAccessibility();
-  const [profile, setProfile] = useState(VIVO_STUDENT_PROFILE);
+  const { user, updateUser } = useAuth();
+
+  const [profile, setProfile] = useState(() => ({
+    ...VIVO_STUDENT_PROFILE,
+    ...(user || {}),
+    nombre: user?.nombre || user?.fullName || VIVO_STUDENT_PROFILE.nombre,
+    emailDuoc: user?.email || user?.emailDuoc || VIVO_STUDENT_PROFILE.emailDuoc,
+    direccion: user?.direccion || user?.address || VIVO_STUDENT_PROFILE.direccion,
+    telefonoPersonal: user?.telefonoPersonal || user?.phone || VIVO_STUDENT_PROFILE.telefonoPersonal,
+    emailPersonal: user?.emailPersonal || user?.personalEmail || VIVO_STUDENT_PROFILE.emailPersonal,
+  }));
+
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({
     direccion: profile.direccion,
     telefonoPersonal: profile.telefonoPersonal,
     emailPersonal: profile.emailPersonal,
   });
   const [saveAlert, setSaveAlert] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    setProfile({
-      ...profile,
-      ...editForm,
-    });
+  const editButtonRef = useRef(null);
+  const modalRef = useRef(null);
+  const firstInputRef = useRef(null);
+
+  useEffect(() => {
+    if (user) {
+      const nextDireccion = user.direccion || user.address || VIVO_STUDENT_PROFILE.direccion;
+      const nextTelefono = user.telefonoPersonal || user.phone || VIVO_STUDENT_PROFILE.telefonoPersonal;
+      const nextEmailPersonal = user.emailPersonal || user.personalEmail || VIVO_STUDENT_PROFILE.emailPersonal;
+
+      setProfile((prev) => ({
+        ...prev,
+        ...user,
+        nombre: user.nombre || user.fullName || prev.nombre,
+        emailDuoc: user.email || user.emailDuoc || prev.emailDuoc,
+        direccion: nextDireccion,
+        telefonoPersonal: nextTelefono,
+        emailPersonal: nextEmailPersonal,
+      }));
+      setEditForm({
+        direccion: nextDireccion,
+        telefonoPersonal: nextTelefono,
+        emailPersonal: nextEmailPersonal,
+      });
+    }
+  }, [user]);
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+    };
+  }, [photoPreviewUrl]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const focusTimer = setTimeout(() => {
+      firstInputRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsEditing(false);
+        announce('Edición cancelada', 'polite');
+        editButtonRef.current?.focus();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusables = Array.from(modalRef.current.querySelectorAll(FOCUSABLE_SELECTOR));
+        if (focusables.length === 0) return;
+        const firstEl = focusables[0];
+        const lastEl = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl.focus();
+        } else if (!e.shiftKey && document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(focusTimer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isEditing, announce]);
+
+  const handleCloseModal = () => {
     setIsEditing(false);
-    setSaveAlert(true);
-    announce('Datos de contacto actualizados exitosamente en tu perfil institucional.', 'polite');
-    setTimeout(() => setSaveAlert(false), 4000);
+    editButtonRef.current?.focus();
   };
 
-  const handlePhotoChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      announce(`Foto seleccionada: ${e.target.files[0].name}`, 'polite');
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+
+    const updatedData = {
+      direccion: editForm.direccion.trim(),
+      telefonoPersonal: editForm.telefonoPersonal.trim(),
+      emailPersonal: editForm.emailPersonal.trim(),
+      phone: editForm.telefonoPersonal.trim(),
+      address: editForm.direccion.trim(),
+      personalEmail: editForm.emailPersonal.trim(),
+    };
+
+    try {
+      const res = await api.updateProfile(updatedData);
+      const mergedProfile = {
+        ...profile,
+        ...updatedData,
+        ...(res?.user || {}),
+      };
+      setProfile(mergedProfile);
+      updateUser(mergedProfile);
+    } catch {
+      const mergedProfile = { ...profile, ...updatedData };
+      setProfile(mergedProfile);
+      updateUser(mergedProfile);
+    } finally {
+      setIsSaving(false);
+      setIsEditing(false);
+      setSaveAlert(true);
+      announce('Datos de contacto actualizados exitosamente.', 'polite');
+      editButtonRef.current?.focus();
+      setTimeout(() => setSaveAlert(false), 4000);
     }
   };
 
+  const handlePhotoChange = (e) => {
+    setPhotoError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      const msg = 'Formato no válido. Solo se permiten imágenes JPG o PNG.';
+      setPhotoError(msg);
+      announce(msg, 'assertive');
+      return;
+    }
+
+    const maxBytes = 2 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      const msg = 'El archivo supera el tamaño máximo permitido de 2 MB.';
+      setPhotoError(msg);
+      announce(msg, 'assertive');
+      return;
+    }
+
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+    }
+    const nextUrl = URL.createObjectURL(file);
+    setPhotoPreviewUrl(nextUrl);
+    announce(`Fotografía actualizada: ${file.name}`, 'polite');
+  };
+
   return (
-    // A11y: Elemento semántico <section> con encabezado accesible asociado
     <section aria-labelledby="perfil-view-heading" className="space-y-6 max-w-4xl mx-auto">
-      {/* Alerta de guardado con role="status" y aria-live="polite" */}
       {saveAlert && (
         <div
           role="status"
           aria-live="polite"
-          className="p-4 bg-emerald-50 border-2 border-emerald-500 text-emerald-950 rounded-2xl text-xs sm:text-sm font-black flex items-center gap-3 shadow-xs"
+          className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs sm:text-sm font-semibold flex items-center gap-3 shadow-2xs animate-fade-in"
         >
-          <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" aria-hidden="true" />
-          <span>¡Datos de contacto actualizados exitosamente en el portal institucional Duoc UC!</span>
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
+          <span>Datos de contacto actualizados correctamente.</span>
         </div>
       )}
 
-      {/* TARJETA OFICIAL: PERFIL DuocUC */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#002B49] via-[#09355c] to-[#001f35] text-white p-8 sm:p-10 shadow-xl border-4 border-[#FFB81C]">
-        {/* Curvas decorativas con aria-hidden="true" */}
-        <div className="absolute inset-0 opacity-15 pointer-events-none" aria-hidden="true">
-          <svg className="w-full h-full" viewBox="0 0 800 500" fill="none" preserveAspectRatio="none">
-            <path
-              d="M0 300 C 200 150, 500 450, 800 200 L 800 500 L 0 500 Z"
-              fill="currentColor"
-              className="text-white"
-            />
-          </svg>
+      {photoError && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="p-4 bg-red-50 border border-red-200 text-red-900 rounded-2xl text-xs sm:text-sm font-semibold flex items-center gap-3 shadow-2xs animate-fade-in"
+        >
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" aria-hidden="true" />
+          <span>{photoError}</span>
         </div>
+      )}
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-8">
-          {/* Lado izquierdo: Título, Nombre y Datos */}
+      {/* TARJETA DE PERFIL PRINCIPAL (Limpia, moderna y humana) */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-9 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-8">
           <div className="space-y-6 flex-1">
             <div>
-              <span className="text-xs font-black tracking-widest text-[#FFB81C] uppercase block">
-                PERFIL OFICIAL DUOC UC • ESTUDIANTE REGULAR
+              <span className="text-xs font-semibold text-[#002B49] bg-slate-100 px-3 py-1 rounded-full inline-block mb-2">
+                {profile.roleLabel || 'Estudiante Regular'}
               </span>
-              <h2 id="perfil-view-heading" className="text-2xl sm:text-3xl font-black text-white mt-1 tracking-tight">
+              <h2 id="perfil-view-heading" className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 {profile.nombre}
               </h2>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                {profile.career || profile.carrera || 'Ingeniería en Informática'} • {profile.campus || profile.sede || 'Sede Alameda'}
+              </p>
             </div>
 
-            {/* Campos de información */}
-            <div className="space-y-4 text-xs sm:text-sm">
-              <div>
-                <span className="text-slate-300 font-bold block text-xs">Dirección Particular</span>
-                <span className="text-white font-black text-sm sm:text-base">
-                  {profile.direccion}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-slate-300 font-bold block text-xs">Email Duoc Institucional</span>
-                <span className="text-white font-black text-sm sm:text-base">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100 text-xs sm:text-sm">
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+                <span className="text-slate-500 font-medium block text-xs">Correo institucional</span>
+                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
                   {profile.emailDuoc}
                 </span>
               </div>
 
-              {/* Subsección: Datos de Contacto */}
-              <div className="pt-3 border-t border-white/20 space-y-3">
-                <div>
-                  <h3 className="text-base font-black text-white">
-                    Datos de Contacto Actualizables
-                  </h3>
-                  <span className="text-xs text-amber-300 font-semibold">
-                    Campos obligatorios (*)
-                  </span>
-                </div>
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+                <span className="text-slate-500 font-medium block text-xs">Dirección particular</span>
+                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                  {profile.direccion}
+                </span>
+              </div>
 
-                <div>
-                  <span className="text-slate-300 font-bold block text-xs">
-                    Teléfono personal*
-                  </span>
-                  <span className="text-white font-black text-sm sm:text-base">
-                    {profile.telefonoPersonal}
-                  </span>
-                </div>
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+                <span className="text-slate-500 font-medium block text-xs">Teléfono personal</span>
+                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                  {profile.telefonoPersonal}
+                </span>
+              </div>
 
-                <div>
-                  <span className="text-slate-300 font-bold block text-xs">
-                    Email Personal*
-                  </span>
-                  <span className="text-white font-black text-sm sm:text-base">
-                    {profile.emailPersonal}
-                  </span>
-                </div>
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+                <span className="text-slate-500 font-medium block text-xs">Correo personal</span>
+                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                  {profile.emailPersonal}
+                </span>
               </div>
             </div>
 
-            {/* Botón blanco: Editar con target size >= 44px */}
-            <div className="pt-2">
+            <div>
               <button
+                ref={editButtonRef}
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="min-h-[44px] px-7 py-2.5 bg-white text-slate-950 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-black transition-all shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
+                aria-haspopup="dialog"
+                className="min-h-[42px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98]"
               >
-                Editar Datos de Contacto
+                <Pencil className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                <span>Editar datos de contacto</span>
               </button>
             </div>
           </div>
 
-          {/* Lado derecho: Recuadro Subir Foto accesible */}
+          {/* Fotografía de perfil */}
           <div className="shrink-0 flex flex-col items-center">
-            {/* A11y: Reemplazo del <div> clickable por un <label> con <input type="file"> accesible por teclado */}
             <label
               htmlFor="foto-perfil-upload"
-              className="w-32 h-36 rounded-2xl border-2 border-white/80 bg-white/10 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center cursor-pointer hover:bg-white/20 transition-all focus-within:ring-4 focus-within:ring-[#FFB81C] min-h-[44px]"
+              className="w-32 h-36 rounded-2xl border border-dashed border-slate-300 hover:border-[#002B49] bg-slate-50 hover:bg-slate-100/70 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition-all overflow-hidden relative group"
             >
-              <Camera className="w-8 h-8 text-white mb-2" aria-hidden="true" />
-              <span className="text-xs font-black text-white underline">
-                Subir foto
-              </span>
+              {photoPreviewUrl ? (
+                <img
+                  src={photoPreviewUrl}
+                  alt={`Fotografía de perfil de ${profile.nombre}`}
+                  className="w-full h-full object-cover rounded-xl"
+                />
+              ) : (
+                <>
+                  <Camera className="w-7 h-7 text-slate-400 group-hover:text-[#002B49] transition-colors mb-2" aria-hidden="true" />
+                  <span className="text-xs font-semibold text-slate-700 group-hover:text-[#002B49]">
+                    Cambiar foto
+                  </span>
+                </>
+              )}
               <input
                 id="foto-perfil-upload"
                 type="file"
@@ -150,73 +289,77 @@ export const PerfilView = () => {
                 className="sr-only"
               />
             </label>
-            <span className="text-xs text-slate-300 mt-2 text-center max-w-[140px] font-medium">
-              Formato JPG/PNG máx 2MB
+            <span className="text-[11px] text-slate-400 mt-2 text-center">
+              JPG o PNG (máx. 2 MB)
             </span>
           </div>
         </div>
       </div>
 
-      {/* TARJETA: Ficha y Ajustes Razonables de Accesibilidad */}
-      <article className="bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
-        <div className="flex items-center gap-3 border-b-2 border-slate-100 pb-4">
-          <div className="p-3 rounded-2xl bg-amber-100 text-amber-950 font-black text-xl" aria-hidden="true">
-            ♿
+      {/* TARJETA: Acompañamiento y Ajustes Razonables */}
+      <article className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-2xs space-y-5">
+        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-sky-50 text-[#002B49] flex items-center justify-center shrink-0" aria-hidden="true">
+            <HeartHandshake className="w-5 h-5" aria-hidden="true" />
           </div>
           <div>
-            <h3 className="text-lg font-black text-slate-900">
-              Ficha y Ajustes Razonables de Accesibilidad
+            <h3 className="text-lg font-bold text-slate-900">
+              Acompañamiento e inclusión académica (PAEDIS)
             </h3>
-            <p className="text-xs text-slate-700 font-bold">
-              Registrado en Sede Alameda • Carrera de Ingeniería en Informática
+            <p className="text-xs text-slate-500">
+              Estado de apoyos registrados para el periodo académico vigente.
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-5 rounded-2xl bg-slate-50 border-2 border-slate-200">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider block mb-1">
-              Acompañamiento Institucional
+          <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+            <span className="text-xs font-medium text-slate-500 block mb-1">
+              Unidad de acompañamiento
             </span>
-            <p className="text-sm font-black text-slate-900 flex items-center gap-2">
+            <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
-              <span>Inclusión y Accesibilidad • Sede Alameda</span>
-            </p>
-            <p className="text-xs text-slate-700 mt-1 font-medium">
-              Portal adaptado con accesibilidad universal, autonomía digital y tramitación directa.
+              <span>{profile.tutorParAsignado || 'Inclusión y Bienestar • Sede Alameda'}</span>
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl bg-slate-50 border-2 border-slate-200">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider block mb-1">
-              Adecuaciones / Ajustes Aprobados
+          <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+            <span className="text-xs font-medium text-slate-500 block mb-1">
+              Estado en programa PAEDIS
             </span>
-            <p className="text-sm font-black text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" aria-hidden="true" />
-              <span>{profile.preferenciasAccesibilidad?.diagnosticoDeclarado || profile.ajustes?.diagnosticoDeclarado || 'Ajustes de Accesibilidad Universal'}</span>
-            </p>
-            <p className="text-xs text-slate-700 mt-1 font-medium">
-              Acreditación institucional vigente para el año académico 2026.
+            <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
+              <span>
+                {profile.isPaedis
+                  ? 'Adscrito/a con ajustes académicos activos'
+                  : `Perfil regular (${profile.roleLabel || 'Sin adscripción PAEDIS'})`}
+              </span>
             </p>
           </div>
         </div>
 
-        <div className="space-y-3 pt-2">
-          <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-            Ajustes Razonables Registrados:
+        <div className="space-y-3 pt-1">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+            Ajustes académicos registrados
           </span>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {(profile.preferenciasAccesibilidad?.ajustesAprobados || profile.ajustes?.ajustesAprobados || [
-              { tipo: 'Tiempo Adicional', descripcion: '50% de tiempo adicional en certámenes y evaluaciones teóricas' },
-              { tipo: 'Material Digital Accesible', descripcion: 'Entrega de material en formatos compatibles con lectores de pantalla' },
-              { tipo: 'Mobiliario y Aula', descripcion: 'Ubicación preferencial en primera fila y salas de estudio adaptadas' },
-            ]).map((ajuste, idx) => (
-              <div key={idx} className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl text-xs">
-                <span className="font-black text-amber-950 block text-sm">{ajuste.tipo}</span>
-                <span className="text-slate-800 font-medium block mt-1 leading-relaxed">{ajuste.descripcion}</span>
-              </div>
-            ))}
-          </div>
+          {Array.isArray(profile.ajustesAprobados) && profile.ajustesAprobados.length === 0 ? (
+            <div className="p-4 bg-slate-50/70 border border-slate-200/70 rounded-xl text-xs text-slate-600">
+              No registras ajustes individuales PAEDIS en este momento. Puedes utilizar las preferencias de lectura en la barra superior cuando lo necesites.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(profile.ajustesAprobados || [
+                { tipo: 'Tiempo adicional', descripcion: '50% de tiempo adicional en certámenes y evaluaciones teóricas.' },
+                { tipo: 'Material accesible', descripcion: 'Material de clases compatible con lectores de pantalla.' },
+                { tipo: 'Ubicación en aula', descripcion: 'Ubicación preferencial en primera fila y salas adaptadas.' },
+              ]).map((ajuste, idx) => (
+                <div key={idx} className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl text-xs">
+                  <span className="font-bold text-slate-900 block text-sm">{ajuste.tipo}</span>
+                  <span className="text-slate-600 block mt-1 leading-relaxed">{ajuste.descripcion}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </article>
 
@@ -226,82 +369,87 @@ export const PerfilView = () => {
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-edit-profile-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleCloseModal();
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-slate-300">
-            <div className="flex items-center justify-between border-b-2 border-slate-200 pb-4 mb-4">
-              <h3 id="modal-edit-profile-title" className="text-xl font-black text-slate-900">
-                Editar Datos de Contacto
+          <div
+            ref={modalRef}
+            className="bg-white w-full max-w-md rounded-2xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 animate-scale-in"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              <h3 id="modal-edit-profile-title" className="text-lg font-bold text-slate-900">
+                Editar datos de contacto
               </h3>
               <button
                 type="button"
-                onClick={() => setIsEditing(false)}
-                aria-label="Cerrar ventana de edición"
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-600 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                onClick={handleCloseModal}
+                aria-label="Cerrar ventana"
+                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-5">
+            <form onSubmit={handleSave} className="space-y-4">
               <div>
-                {/* A11y: <label> explícito con htmlFor coincidiendo con el id del input */}
-                <label htmlFor="edit-direccion" className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">
-                  Dirección particular: <span className="text-red-700" aria-hidden="true">*</span>
+                <label htmlFor="edit-direccion" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Dirección particular
                 </label>
                 <input
+                  ref={firstInputRef}
                   id="edit-direccion"
                   type="text"
                   value={editForm.direccion}
                   onChange={(e) => setEditForm({ ...editForm, direccion: e.target.value })}
-                  className="w-full min-h-[44px] text-xs sm:text-sm p-3 border-2 border-slate-300 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] text-slate-900 font-bold"
+                  className="w-full min-h-[42px] text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 focus:border-[#002B49] rounded-xl text-slate-900 font-medium"
                   required
                 />
               </div>
 
               <div>
-                {/* A11y: <label> explícito con htmlFor coincidiendo con el id del input */}
-                <label htmlFor="edit-telefono" className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">
-                  Teléfono personal: <span className="text-red-700" aria-hidden="true">*</span>
+                <label htmlFor="edit-telefono" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Teléfono personal
                 </label>
                 <input
                   id="edit-telefono"
                   type="tel"
                   value={editForm.telefonoPersonal}
                   onChange={(e) => setEditForm({ ...editForm, telefonoPersonal: e.target.value })}
-                  className="w-full min-h-[44px] text-xs sm:text-sm p-3 border-2 border-slate-300 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] text-slate-900 font-bold"
+                  className="w-full min-h-[42px] text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 focus:border-[#002B49] rounded-xl text-slate-900 font-medium"
                   required
                 />
               </div>
 
               <div>
-                {/* A11y: <label> explícito con htmlFor coincidiendo con el id del input */}
-                <label htmlFor="edit-email" className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">
-                  Email Personal: <span className="text-red-700" aria-hidden="true">*</span>
+                <label htmlFor="edit-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Correo personal
                 </label>
                 <input
                   id="edit-email"
                   type="email"
                   value={editForm.emailPersonal}
                   onChange={(e) => setEditForm({ ...editForm, emailPersonal: e.target.value })}
-                  className="w-full min-h-[44px] text-xs sm:text-sm p-3 border-2 border-slate-300 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] text-slate-900 font-bold"
+                  className="w-full min-h-[42px] text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 focus:border-[#002B49] rounded-xl text-slate-900 font-medium"
                   required
                 />
               </div>
 
-              <div className="pt-4 flex justify-end gap-3 border-t-2 border-slate-100">
+              <div className="pt-4 flex justify-end gap-2.5 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="min-h-[44px] px-5 py-2.5 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                  onClick={handleCloseModal}
+                  className="min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001f35] text-white font-black text-xs sm:text-sm rounded-xl shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                  disabled={isSaving}
+                  className="min-h-[40px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60"
                 >
-                  Guardar Cambios
+                  {isSaving ? 'Guardando...' : 'Guardar cambios'}
                 </button>
               </div>
             </form>

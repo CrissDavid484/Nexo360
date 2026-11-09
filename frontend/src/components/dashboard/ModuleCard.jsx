@@ -10,7 +10,8 @@ import {
   ShieldAlert,
   Users,
   ChevronRight,
-  Sparkles,
+  ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 
 const ICON_MAP = {
@@ -25,75 +26,112 @@ const ICON_MAP = {
   Users,
 };
 
-export const ModuleCard = ({ category, onSelect }) => {
+/**
+ * Tarjeta de Categoría del Centro de Ayuda
+ * Diseño limpio, estructurado como lista editorial de temas para evitar sobrecarga sensorial.
+ */
+export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
   const IconComponent = ICON_MAP[category.iconName] || BookOpen;
-  const isHighlighted = category.highlight;
+  const previewSubmodules = category.submodules.slice(0, 4);
+  const remainingCount = Math.max(0, category.submodules.length - previewSubmodules.length);
 
   return (
-    // A11y: Uso de elemento interactivo nativo <button type="button"> en lugar de <article role="button">
-    // A11y: Cumple con activación nativa de teclado (Enter y Espacio) sin emulaciones frágiles de keydown.
-    <button
-      type="button"
-      onClick={() => onSelect(category)}
-      aria-haspopup="dialog"
-      aria-label={`Módulo ${category.title}. ${category.description}. Abrir ventana de trámites.`}
-      className={`group w-full min-h-[200px] flex flex-col justify-between bg-white rounded-3xl p-7 transition-all duration-200 text-left shadow-md hover:shadow-2xl hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 border-2 ${
-        isHighlighted
-          ? 'border-amber-400 bg-gradient-to-br from-white via-amber-50/30 to-amber-100/40'
-          : 'border-slate-300 hover:border-[#002B49]'
-      }`}
+    <article
+      aria-labelledby={`cat-heading-${category.id}`}
+      className="group w-full flex flex-col justify-between rounded-2xl bg-white p-6 text-left border border-slate-200/80 shadow-2xs hover:shadow-lg hover:border-slate-300/90 transition-all duration-300 hover:-translate-y-0.5"
     >
       <div className="w-full">
-        {/* Fila Superior: Icono y Badge */}
-        <div className="flex items-center justify-between gap-3 mb-5">
-          {/* A11y: Contenedor con ícono decorativo marcado con aria-hidden="true" */}
+        {/* Cabecera limpia: Ícono suave y contador simple */}
+        <div className="flex items-center justify-between gap-3 mb-4">
           <div
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm border ${
-              isHighlighted
-                ? 'bg-[#FFB81C] text-[#002B49] border-amber-500'
-                : 'bg-[#002B49] text-[#FFB81C] border-[#002B49]'
-            }`}
+            className="w-11 h-11 rounded-xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center shrink-0 transition-colors duration-200"
             aria-hidden="true"
           >
-            <IconComponent className="w-8 h-8" aria-hidden="true" />
+            <IconComponent className="w-5 h-5" aria-hidden="true" />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {isHighlighted && (
-              <span className="flex items-center gap-1 bg-[#FFB81C] text-slate-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                Principal
-              </span>
-            )}
-            <span className="bg-slate-100 text-slate-900 text-xs font-black px-3 py-1 rounded-full border border-slate-300">
-              {category.badge}
-            </span>
-          </div>
+          <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200/70">
+            {category.submodules.length} trámites
+          </span>
         </div>
 
-        {/* A11y: Jerarquía de encabezados corregida a <h3> para respetar el <h2> de la sección */}
-        <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight group-hover:text-[#002B49] transition-colors mb-3">
-          {category.title}
+        {/* Título de categoría */}
+        <h3
+          id={`cat-heading-${category.id}`}
+          className="text-lg font-bold text-slate-900 tracking-tight mb-1.5 leading-snug"
+        >
+          <button
+            type="button"
+            onClick={() => onSelect(category)}
+            className="text-left hover:text-[#002B49] transition-colors rounded-md"
+          >
+            {category.title}
+          </button>
         </h3>
 
-        {/* A11y: Descripción con contraste reforzado AAA */}
-        <p className="text-slate-700 text-sm sm:text-base leading-relaxed mb-6 font-medium">
+        {/* Descripción breve y humana */}
+        <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-4">
           {category.description}
         </p>
-      </div>
 
-      {/* Pie de Tarjeta con Acción Visual */}
-      <div className="w-full pt-4 border-t border-slate-200 flex items-center justify-between text-[#002B49] font-black text-sm">
-        <span className="group-hover:underline flex items-center gap-1">
-          Ver opciones y trámites
-        </span>
-        <div
-          className="w-9 h-9 rounded-full bg-slate-100 group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors"
-          aria-hidden="true"
-        >
-          <ChevronRight className="w-5 h-5" aria-hidden="true" />
+        {/* Lista limpia de apartados directos */}
+        <div className="mb-4 border-t border-slate-100 pt-2">
+          <ul className="divide-y divide-slate-100" aria-label={`Apartados frecuentes de ${category.title}`}>
+            {previewSubmodules.map((sub) => (
+              <li key={sub.id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSelectSubmodule ? onSelectSubmodule(category, sub) : onSelect(category)
+                  }
+                  aria-label={`Ver ${sub.title} en ${category.title}`}
+                  className="w-full min-h-[38px] py-2 px-2 -mx-2 rounded-lg text-left text-xs sm:text-sm font-medium text-slate-700 hover:text-[#002B49] hover:bg-slate-50/90 flex items-center justify-between gap-2 transition-colors group/row"
+                >
+                  <span className="truncate">{sub.title}</span>
+                  <ChevronRight
+                    className="w-4 h-4 text-slate-400 group-hover/row:text-[#002B49] group-hover/row:translate-x-0.5 transition-all shrink-0"
+                    aria-hidden="true"
+                  />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
-    </button>
+
+      {/* Pie de tarjeta con botón pulido */}
+      <div className="w-full pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => onSelect(category)}
+          aria-haspopup="dialog"
+          aria-label={`Ver todos los apartados de ${category.title}`}
+          className="min-h-[42px] flex-1 bg-slate-50 hover:bg-[#002B49] text-slate-800 hover:text-white px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-between gap-2 border border-slate-200/80 hover:border-[#002B49] transition-all duration-200 group/btn active:scale-[0.98]"
+        >
+          <span>
+            {remainingCount > 0
+              ? `Ver todos (${category.submodules.length})`
+              : 'Explorar categoría'}
+          </span>
+          <ArrowRight
+            className="w-4 h-4 text-slate-400 group-hover/btn:text-[#FFB81C] group-hover/btn:translate-x-0.5 transition-all shrink-0"
+            aria-hidden="true"
+          />
+        </button>
+
+        {category.officialCategoryUrl && (
+          <a
+            href={category.officialCategoryUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Abrir ${category.title} en centroayuda.duoc.cl`}
+            aria-label={`Abrir ${category.title} en el sitio web oficial (nueva pestaña)`}
+            className="min-h-[42px] min-w-[42px] p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-[#002B49] border border-slate-200/80 flex items-center justify-center transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" aria-hidden="true" />
+          </a>
+        )}
+      </div>
+    </article>
   );
 };

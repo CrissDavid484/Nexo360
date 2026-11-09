@@ -1,8 +1,9 @@
+const mongoose = require('mongoose');
 const ScrapedDataCache = require('../models/ScrapedDataCache');
 
 /**
  * SERVICIO DE SCRAPING Y GESTIÓN DE CACHÉ DE MÓDULOS INSTITUCIONALES DUOC UC
- * Implementa la lógica de caché con TTL para evitar scraping redundante.
+ * Implementa la lógica de caché con TTL y escritura por lotes (bulkWrite) para evitar scraping redundante.
  */
 
 // Datos base institucionales Duoc UC para PAEDIS 2026
@@ -210,16 +211,25 @@ const DEFAULT_INSTITUTIONAL_MODULES = [
 
 class DataScraperService {
   /**
-   * Obtiene todos los módulos, consultando primero el caché de MongoDB
+   * Obtiene todos los módulos, consultando primero el caché de MongoDB y validando su TTL
    */
   async getAllModules() {
+    if (mongoose.connection.readyState !== 1) {
+      return DEFAULT_INSTITUTIONAL_MODULES;
+    }
+
     try {
       const cached = await ScrapedDataCache.find({});
-      if (cached && cached.length >= DEFAULT_INSTITUTIONAL_MODULES.length) {
+      const hasValidCache =
+        cached &&
+        cached.length >= DEFAULT_INSTITUTIONAL_MODULES.length &&
+        cached.every((doc) => !doc.isExpired());
+
+      if (hasValidCache) {
         return cached;
       }
 
-      // Si no están todos en caché o la BD está vacía, poblar con datos base
+      // Si no están todos en caché o expiraron, poblar/actualizar en lote
       await this.seedDefaultData();
       return DEFAULT_INSTITUTIONAL_MODULES;
     } catch (err) {
@@ -232,13 +242,15 @@ class DataScraperService {
    * Obtiene una categoría específica por su clave única
    */
   async getCategoryByKey(categoryKey) {
-    try {
-      const cached = await ScrapedDataCache.findOne({ categoryKey });
-      if (cached && !cached.isExpired()) {
-        return cached;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const cached = await ScrapedDataCache.findOne({ categoryKey });
+        if (cached && !cached.isExpired()) {
+          return cached;
+        }
+      } catch (err) {
+        console.warn('[DataScraperService] Error consultando caché de MongoDB:', err.message);
       }
-    } catch (err) {
-      console.warn('[DataScraperService] Error consultando caché de MongoDB:', err.message);
     }
 
     // Fallback directo a datos en memoria
@@ -246,18 +258,21 @@ class DataScraperService {
   }
 
   /**
-   * Siembra la base de datos de MongoDB con la estructura inicial
+   * Siembra la base de datos de MongoDB en una sola operación bulkWrite (evita problema N+1)
    */
   async seedDefaultData() {
     try {
-      for (const mod of DEFAULT_INSTITUTIONAL_MODULES) {
-        await ScrapedDataCache.findOneAndUpdate(
-          { categoryKey: mod.categoryKey },
-          { ...mod, last_updated: new Date() },
-          { upsert: true, new: true }
-        );
-      }
-      console.log('[DataScraperService] Datos institucionales cacheados con éxito en MongoDB.');
+      const now = new Date();
+      const operations = DEFAULT_INSTITUTIONAL_MODULES.map((mod) => ({
+        updateOne: {
+          filter: { categoryKey: mod.categoryKey },
+          update: { $set: { ...mod, last_updated: now } },
+          upsert: true,
+        },
+      }));
+
+      await ScrapedDataCache.bulkWrite(operations, { ordered: false });
+      console.log('[DataScraperService] Datos institucionales cacheados con éxito en MongoDB (bulkWrite).');
     } catch (err) {
       console.warn('[DataScraperService] No se pudo guardar caché inicial en MongoDB:', err.message);
     }

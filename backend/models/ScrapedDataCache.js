@@ -10,7 +10,6 @@ const ScrapedDataCacheSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true,
       trim: true,
       // Ej: 'admision-matricula', 'orientacion-nuevos', 'vida-academica', etc.
     },

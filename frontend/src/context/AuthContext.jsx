@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../services/api';
 import { useAccessibility } from './AccessibilityContext';
 
@@ -10,66 +10,79 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const { loadUserPreferences, announce } = useAccessibility();
 
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('nexo360_token');
+    announce('Sesión cerrada correctamente');
+  }, [announce]);
+
   useEffect(() => {
+    let isMounted = true;
+
     const verifyExistingAuth = async () => {
       if (!token) {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
         return;
       }
 
       try {
         const response = await api.getMe();
+        if (!isMounted) return;
+
         if (response.success && response.user) {
           setUser(response.user);
           if (response.user.accessibilityPreferences) {
             loadUserPreferences(response.user.accessibilityPreferences);
           }
         } else {
-          // Token inválido o expirado
           logout();
         }
       } catch (err) {
         console.warn('Error verificando sesión existente, cerrando sesión por seguridad:', err);
-        logout();
+        if (isMounted) logout();
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     verifyExistingAuth();
-  }, [token]);
+    return () => {
+      isMounted = false;
+    };
+  }, [token, loadUserPreferences, logout]);
 
-  const setAuthData = (newToken, newUser) => {
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem('nexo360_token', newToken);
+  const setAuthData = useCallback(
+    (newToken, newUser) => {
+      localStorage.setItem('nexo360_token', newToken);
+      setToken(newToken);
+      setUser(newUser);
 
-    if (newUser?.accessibilityPreferences) {
-      loadUserPreferences(newUser.accessibilityPreferences);
-    }
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('nexo360_token');
-    announce('Sesión cerrada correctamente');
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: !!token,
-        isLoading,
-        setAuthData,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+      if (newUser?.accessibilityPreferences) {
+        loadUserPreferences(newUser.accessibilityPreferences);
+      }
+    },
+    [loadUserPreferences]
   );
+
+  const updateUser = useCallback((updatedFields) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : updatedFields));
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({
+      user,
+      token,
+      isAuthenticated: Boolean(token),
+      isLoading,
+      setAuthData,
+      updateUser,
+      logout,
+    }),
+    [user, token, isLoading, setAuthData, updateUser, logout]
+  );
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
