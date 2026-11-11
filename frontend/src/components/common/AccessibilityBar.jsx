@@ -8,6 +8,8 @@ import {
   X,
   Moon,
   Sun,
+  Eye,
+  Sparkles,
 } from 'lucide-react';
 
 /**
@@ -21,11 +23,13 @@ export const AccessibilityBar = () => {
     highContrast,
     dyslexicFont,
     reducedMotion,
+    readingGuide,
     increaseFontSize,
     decreaseFontSize,
     toggleHighContrast,
     toggleDyslexicFont,
     toggleReducedMotion,
+    toggleReadingGuide,
     resetPreferences,
   } = useAccessibility();
 
@@ -36,7 +40,8 @@ export const AccessibilityBar = () => {
     (fontSize !== 'normal' ? 1 : 0) +
     (highContrast ? 1 : 0) +
     (dyslexicFont ? 1 : 0) +
-    (reducedMotion ? 1 : 0);
+    (reducedMotion ? 1 : 0) +
+    (readingGuide ? 1 : 0);
 
   const hasActivePreferences = activeCount > 0;
 
@@ -79,7 +84,7 @@ export const AccessibilityBar = () => {
         <div
           role="dialog"
           aria-label="Opciones de apariencia y lectura"
-          className="mb-3 w-[320px] sm:w-[350px] bg-white text-slate-900 rounded-2xl border border-slate-200/90 shadow-2xl p-5 space-y-4 animate-scale-in origin-bottom-right"
+          className="mb-3 w-[320px] sm:w-[350px] bg-white text-slate-900 rounded-2xl border border-slate-300 shadow-[0_20px_50px_rgba(0,43,73,0.2),0_10px_20px_rgba(0,0,0,0.1)] ring-1 ring-slate-900/5 p-5 space-y-4 animate-scale-in origin-bottom-right"
         >
           {/* Cabecera del panel */}
           <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -211,14 +216,14 @@ export const AccessibilityBar = () => {
             </div>
           </div>
 
-          {/* 3. Opciones de comodidad de lectura */}
+          {/* 3. Opciones de neurodiversidad y comodidad de lectura */}
           <div className="space-y-2 pt-1">
             {/* Lectura Cómoda / Dislexia */}
             <button
               type="button"
               onClick={toggleDyslexicFont}
               aria-pressed={dyslexicFont}
-              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 ${
+              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer ${
                 dyslexicFont
                   ? 'bg-[#002B49] text-white border-[#002B49]'
                   : 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-800 border-slate-200/80'
@@ -233,14 +238,14 @@ export const AccessibilityBar = () => {
                 />
                 <div>
                   <span className="text-xs font-bold block leading-tight">
-                    Lectura cómoda
+                    Lectura cómoda (Dislexia)
                   </span>
                   <span
                     className={`text-[11px] block mt-0.5 ${
-                      dyslexicFont ? 'text-slate-200' : 'text-slate-500'
-                    }`}
+                    dyslexicFont ? 'text-slate-200' : 'text-slate-500'
+                  }`}
                   >
-                    Tipografía amigable para dislexia
+                    Tipografía legible y espaciado adaptado
                   </span>
                 </div>
               </div>
@@ -259,12 +264,60 @@ export const AccessibilityBar = () => {
               </span>
             </button>
 
-            {/* Sin Animaciones */}
+            {/* Guía de Lectura / Regla de Enfoque (TDAH & Dislexia) */}
+            <button
+              id="a11y-toggle-reading-guide"
+              type="button"
+              onClick={toggleReadingGuide}
+              aria-label="Activar o desactivar guía de lectura para enfocar líneas"
+              aria-pressed={readingGuide}
+              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer ${
+                readingGuide
+                  ? 'bg-[#002B49] text-white border-[#002B49]'
+                  : 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-800 border-slate-200/80'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Eye
+                  className={`w-4 h-4 shrink-0 ${
+                    readingGuide ? 'text-[#FFB81C]' : 'text-[#002B49]'
+                  }`}
+                  aria-hidden="true"
+                />
+                <div>
+                  <span className="text-xs font-bold block leading-tight">
+                    Guía de lectura (Enfoque)
+                  </span>
+                  <span
+                    className={`text-[11px] block mt-0.5 ${
+                    readingGuide ? 'text-slate-200' : 'text-slate-500'
+                  }`}
+                  >
+                    Resalta la línea bajo el cursor para no perderse
+                  </span>
+                </div>
+              </div>
+
+              <span
+                aria-hidden="true"
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 flex items-center shrink-0 ${
+                  readingGuide ? 'bg-[#FFB81C]' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`a11y-switch-thumb w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
+                    readingGuide ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </span>
+            </button>
+
+            {/* Sin Animaciones (TDAH / Sobrecarga Sensorial) */}
             <button
               type="button"
               onClick={toggleReducedMotion}
               aria-pressed={reducedMotion}
-              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 ${
+              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer ${
                 reducedMotion
                   ? 'bg-[#002B49] text-white border-[#002B49]'
                   : 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-800 border-slate-200/80'
@@ -279,14 +332,14 @@ export const AccessibilityBar = () => {
                 />
                 <div>
                   <span className="text-xs font-bold block leading-tight">
-                    Sin animaciones
+                    Sin animaciones (Sensorial)
                   </span>
                   <span
                     className={`text-[11px] block mt-0.5 ${
-                      reducedMotion ? 'text-slate-200' : 'text-slate-500'
-                    }`}
+                    reducedMotion ? 'text-slate-200' : 'text-slate-500'
+                  }`}
                   >
-                    Pausa efectos y transiciones
+                    Pausa efectos y reduce distracciones
                   </span>
                 </div>
               </div>
@@ -308,29 +361,33 @@ export const AccessibilityBar = () => {
         </div>
       )}
 
-      {/* Botón flotante principal (FAB) corregido y pulido */}
+      {/* Botón flotante principal (FAB) con sombra y borde definidos */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label="Abrir ajustes de apariencia y lectura"
-        className={`a11y-fab-btn min-h-[46px] px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl flex items-center gap-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 border ${
+        className={`a11y-fab-btn min-h-[46px] px-4 py-2.5 rounded-full flex items-center gap-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 border ${
           isOpen || hasActivePreferences
-            ? 'bg-[#002B49] text-white border-slate-700'
-            : 'bg-white text-slate-800 hover:bg-slate-50 border-slate-200/90'
+            ? 'bg-[#002B49] text-white border-[#002B49] shadow-xl'
+            : 'bg-white text-slate-800 hover:bg-slate-50 border-slate-300 shadow-[0_10px_28px_-4px_rgba(0,43,73,0.22),0_4px_10px_-2px_rgba(0,0,0,0.08)] hover:shadow-[0_14px_34px_-4px_rgba(0,43,73,0.3)] ring-1 ring-slate-900/5'
         }`}
       >
-        <SlidersHorizontal
-          className={`w-4 h-4 shrink-0 ${
-            isOpen || hasActivePreferences ? 'text-[#FFB81C]' : 'text-[#002B49]'
+        <div
+          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
+            isOpen || hasActivePreferences
+              ? 'bg-white/10 text-[#FFB81C]'
+              : 'bg-slate-100 text-[#002B49] border border-slate-200/80'
           }`}
           aria-hidden="true"
-        />
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+        </div>
         <span>Ajustes</span>
         {hasActivePreferences && (
           <span
-            className="a11y-fab-badge w-5 h-5 rounded-full bg-[#FFB81C] text-slate-950 text-[11px] font-extrabold flex items-center justify-center shadow-2xs"
+            className="a11y-fab-badge w-5 h-5 rounded-full bg-[#FFB81C] text-slate-950 text-[11px] font-extrabold flex items-center justify-center shadow-xs"
             aria-label={`${activeCount} ajustes activos`}
           >
             {activeCount}

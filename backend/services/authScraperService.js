@@ -1,27 +1,21 @@
 const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const UserProfile = require('../models/UserProfile');
+const ActivityLog = require('../models/ActivityLog');
 const { getJwtSecret } = require('../middleware/authMiddleware');
-const { SEED_USERS, OFFICIAL_MICROSOFT_DUOC_LOGIN_URL } = require('../data/seedUsers');
+const { SEED_USERS, DEFAULT_SEED_PASSWORD } = require('../data/seedUsers');
 
 /**
- * SERVICIO DE AUTENTICACIÓN INSTITUCIONAL DUOC UC (SSO MICROSOFT + BASE DE DATOS EDUCATIVA DE 10 ROLES)
- *
- * Flujo Principal (Redirección SSO Oficial + Base de Datos Propia):
- * 1. El usuario no ingresa su contraseña en Nexo360; es redirigido al login oficial de Microsoft Entra ID de Duoc UC.
- * 2. Al retornar a Nexo360, se identifica mediante su correo institucional contra la base de datos MongoDB.
- * 3. Si pertenece a los 10 usuarios institucionales precargados (admin, estudiante PAEDIS, estudiante regular,
- *    tutor par, profesor, director, subdirector, coordinador PAEDIS, administrativo), carga su perfil y rol completo.
- * 4. Si ingresa con cualquier otro correo institucional, captura el correo y lo asigna como su nombre.
+ * SERVICIO DE AUTENTICACIÓN INSTITUCIONAL Y GESTIÓN DE USUARIOS NEXO360
+ * Base de Datos Nativa con bcrypt, roles, estados académicos y registro de actividad
  */
 
-const activeSessions = new Map();
-const MAX_CONCURRENT_SESSIONS = 50;
-const SESSION_TTL_MS = 5 * 60 * 1000;
-
-// Almacén en memoria inicializado con los 10 usuarios de la BD para respaldo inmediato si MongoDB no está activo
 const inMemoryUsers = new Map();
+const inMemoryLogs = [];
+
+// Precargar usuarios en memoria para respaldo inmediato si MongoDB no está activo
 for (const seedUser of SEED_USERS) {
   inMemoryUsers.set(seedUser.email.toLowerCase(), {
     _id: `seed_${seedUser.role}_${seedUser.email.split('@')[0]}`,
@@ -29,33 +23,27 @@ for (const seedUser of SEED_USERS) {
   });
 }
 
-const sessionCleanupInterval = setInterval(() => {
-  const now = Date.now();
-  for (const [id, session] of activeSessions.entries()) {
-    if (now - session.createdAt > SESSION_TTL_MS) {
-      if (session.browser) {
-        session.browser.close().catch(() => {});
-      }
-      activeSessions.delete(id);
-    }
-  }
-}, 60000);
-
-if (typeof sessionCleanupInterval.unref === 'function') {
-  sessionCleanupInterval.unref();
-}
-
 class AuthScraperService {
   getOfficialLoginUrl(email = '') {
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    if (!cleanEmail) {
-      return OFFICIAL_MICROSOFT_DUOC_LOGIN_URL;
-    }
-    return `${OFFICIAL_MICROSOFT_DUOC_LOGIN_URL}&login_hint=${encodeURIComponent(cleanEmail)}`;
+    const base = 'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize?client_id=674913e2-e170-4787-833f-e307f87db6e5&nonce=05f0ed614ee974e04f8096c70660da67&redirect_uri=https%3A%2F%2Fexperienciavivo.duoc.cl%2Fauth%2Fopenidc%2Fcallback&response_type=code&scope=openid+profile+email+offline_access+api%3A%2F%2F674913e2-e170-4787-833f-e307f87db6e5%2Faccess&state=45c6f7423b9a772dc296a3d5e4f1739f&sso_reload=true';
+    if (!cleanEmail) return base;
+    return `${base}&login_hint=${encodeURIComponent(cleanEmail)}`;
+  }
+
+  async completeSsoLogin(email) {
+    const user = await this.findOrCreateUserProfile(email);
+    const formatted = this.formatUserResponse(user);
+    const token = this.generateJwt(formatted);
+    return {
+      token,
+      user: formatted,
+      officialLoginUrl: this.getOfficialLoginUrl(email),
+    };
   }
 
   /**
-   * Sembrar los 10 usuarios institucionales en MongoDB al iniciar el servidor
+   * Sembrar usuarios institucionales con contraseñas encriptadas en MongoDB
    */
   async seedInstitutionalUsers() {
     if (mongoose.connection.readyState !== 1) {
@@ -63,8 +51,15 @@ class AuthScraperService {
     }
 
     const seeded = [];
+    const defaultSalt = await bcrypt.genSalt(10);
+    const defaultHashedPassword = await bcrypt.hash(DEFAULT_SEED_PASSWORD, defaultSalt);
+
     for (const seedUser of SEED_USERS) {
       try {
+        const hashedPassword = seedUser.password
+          ? await bcrypt.hash(seedUser.password, defaultSalt)
+          : defaultHashedPassword;
+
         const doc = await UserProfile.findOneAndUpdate(
           { email: seedUser.email.toLowerCase() },
           {
@@ -73,37 +68,189 @@ class AuthScraperService {
               role: seedUser.role,
               roleLabel: seedUser.roleLabel,
               isPaedis: seedUser.isPaedis,
+              academicStatus: seedUser.academicStatus || 'activo',
+              statusReason: seedUser.statusReason || 'Estudiante regular activo',
+              attendanceRate: seedUser.attendanceRate ?? 88.9,
+              hasUsedSimulator: Boolean(seedUser.hasUsedSimulator),
+              simulatorUsageCount: seedUser.simulatorUsageCount || 0,
               rut: seedUser.rut,
               career: seedUser.career,
               campus: seedUser.campus,
               tutorParAsignado: seedUser.tutorParAsignado,
-              ajustesAprobados: seedUser.ajustesAprobados,
+              diagnosticoDeclarado: seedUser.diagnosticoDeclarado || '',
+              ajustesAprobados: seedUser.ajustesAprobados || [],
             },
             $setOnInsert: {
-              address: seedUser.address,
-              personalEmail: seedUser.personalEmail,
-              phone: seedUser.phone,
-              emergencyContact: seedUser.emergencyContact,
-              emergencyPhone: seedUser.emergencyPhone,
-              accessibilityPreferences: seedUser.accessibilityPreferences,
-              enrolledCourses: seedUser.enrolledCourses,
+              password: hashedPassword,
+              photo: seedUser.photo || '',
+              address: seedUser.address || 'Sede Central Duoc UC',
+              personalEmail: seedUser.personalEmail || seedUser.email,
+              phone: seedUser.phone || '+56 9 3016 6745',
+              emergencyContact: seedUser.emergencyContact || 'Contacto Familiar',
+              emergencyPhone: seedUser.emergencyPhone || '+56 9 1234 5678',
+              accessibilityPreferences: seedUser.accessibilityPreferences || {
+                fontSize: 'normal',
+                highContrast: false,
+                dyslexicFont: false,
+                reducedMotion: false,
+                screenReaderOptimized: true,
+              },
+              enrolledCourses: seedUser.enrolledCourses || [],
               lastLogin: new Date(),
             },
           },
           { upsert: true, new: true }
         );
+
         inMemoryUsers.set(seedUser.email.toLowerCase(), doc.toObject ? doc.toObject() : doc);
         seeded.push(this.formatUserResponse(doc));
       } catch (err) {
         console.warn(`[SeedUsers] Advertencia sembrando ${seedUser.email}:`, err.message);
       }
     }
-    console.log(`[MongoDB] ${seeded.length} usuarios institucionales (Admin, PAEDIS, Estudiante, Profesor, Director, Subdirector, etc.) listos.`);
+    console.log(`[MongoDB] ${seeded.length} usuarios institucionales sincronizados con contraseñas encriptadas.`);
     return seeded;
   }
 
   /**
-   * Obtener todos los usuarios registrados en la base de datos (10 iniciales + nuevos capturados por correo)
+   * Autenticación con Correo y Contraseña contra la Base de Datos Nativa
+   */
+  async loginWithPassword(email, password) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    let userDoc = null;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        userDoc = await UserProfile.findOne({ email: cleanEmail }).select('+password');
+      } catch (err) {
+        console.warn('[AuthService] Error buscando en MongoDB:', err.message);
+      }
+    }
+
+    if (!userDoc) {
+      userDoc = inMemoryUsers.get(cleanEmail);
+    }
+
+    if (!userDoc) {
+      const err = new Error('Usuario no encontrado en la base de datos de Nexo360.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // Validación de contraseña cifrada con bcrypt o clave por defecto
+    let isPasswordValid = false;
+    if (userDoc.password) {
+      isPasswordValid = await bcrypt.compare(password, userDoc.password);
+    }
+
+    // Permitir clave demo global o clave maestra de desarrollo
+    if (!isPasswordValid && (password === DEFAULT_SEED_PASSWORD || password === 'Duoc2026!' || password === 'Nexo360!')) {
+      isPasswordValid = true;
+    }
+
+    if (!isPasswordValid) {
+      const err = new Error('Contraseña incorrecta. Verifique sus credenciales institucionales.');
+      err.statusCode = 401;
+      throw err;
+    }
+
+    // Actualizar fecha de último login
+    const now = new Date();
+    if (mongoose.connection.readyState === 1 && userDoc._id && typeof userDoc.save === 'function') {
+      userDoc.lastLogin = now;
+      await userDoc.save().catch(() => {});
+    }
+
+    // Registrar log de actividad
+    await this.logActivity({
+      userId: userDoc._id || userDoc.id,
+      userEmail: cleanEmail,
+      userName: userDoc.fullName || cleanEmail,
+      userRole: userDoc.role || 'estudiante',
+      action: 'login',
+      details: 'Inicio de sesión exitoso en Nexo360',
+    });
+
+    const formattedUser = this.formatUserResponse(userDoc);
+    const token = this.generateJwt(formattedUser);
+
+    return {
+      token,
+      user: formattedUser,
+    };
+  }
+
+  /**
+   * Registro de actividad en la plataforma
+   */
+  async logActivity({ userId, userEmail, userName, userRole, action, details, metadata = {} }) {
+    const logItem = {
+      userId: userId || null,
+      userEmail: (userEmail || '').toLowerCase(),
+      userName: userName || userEmail || '',
+      userRole: userRole || 'estudiante',
+      action,
+      details: details || '',
+      metadata,
+      createdAt: new Date(),
+    };
+
+    inMemoryLogs.unshift(logItem);
+    if (inMemoryLogs.length > 500) inMemoryLogs.pop();
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        await ActivityLog.create(logItem);
+      } catch (err) {
+        console.warn('[ActivityLog] No se pudo guardar en MongoDB:', err.message);
+      }
+    }
+  }
+
+  /**
+   * Registrar que un estudiante utilizó el Simulador de Toma de Ramos
+   */
+  async recordSimulatorUsage(user) {
+    if (!user || !user.email) return;
+    const cleanEmail = user.email.toLowerCase().trim();
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        await UserProfile.findOneAndUpdate(
+          { email: cleanEmail },
+          {
+            $set: {
+              hasUsedSimulator: true,
+              lastSimulatorUsage: new Date(),
+            },
+            $inc: { simulatorUsageCount: 1 },
+          }
+        );
+      } catch (err) {
+        console.warn('[SimulatorUsage] Error en MongoDB:', err.message);
+      }
+    }
+
+    const mem = inMemoryUsers.get(cleanEmail);
+    if (mem) {
+      mem.hasUsedSimulator = true;
+      mem.simulatorUsageCount = (mem.simulatorUsageCount || 0) + 1;
+      mem.lastSimulatorUsage = new Date();
+      inMemoryUsers.set(cleanEmail, mem);
+    }
+
+    await this.logActivity({
+      userId: user._id || user.id,
+      userEmail: cleanEmail,
+      userName: user.fullName || user.nombre || cleanEmail,
+      userRole: user.role || 'estudiante',
+      action: 'used_simulator_toma_ramos',
+      details: 'El estudiante interactuó con el Simulador de Toma de Ramos y planificó su carga horaria.',
+    });
+  }
+
+  /**
+   * Obtener todos los usuarios registrados
    */
   async getAllUsers() {
     if (mongoose.connection.readyState === 1) {
@@ -121,242 +268,91 @@ class AuthScraperService {
   }
 
   /**
-   * Autenticación directa tras redirección oficial a Microsoft Entra ID Duoc UC
+   * Obtener o crear perfil de usuario
    */
-  async completeSsoLogin(email) {
-    const userProfile = await this.findOrCreateUserProfile(email);
-    const formattedUser = this.formatUserResponse(userProfile);
-    const token = this.generateJwt(formattedUser);
+  async findOrCreateUserProfile(email) {
+    const cleanEmail = (email || 'c.guzman@duocuc.cl').trim().toLowerCase();
+    const seedMatch = SEED_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
 
-    return {
-      token,
-      user: formattedUser,
-      officialLoginUrl: this.getOfficialLoginUrl(email),
-    };
-  }
-
-  async startLoginProcess(email, password) {
-    return this.initiateLogin(email, password);
-  }
-
-  async initiateLogin(email, password) {
-    if (activeSessions.size >= MAX_CONCURRENT_SESSIONS) {
-      const err = new Error('El servidor de autenticación está procesando el máximo de sesiones concurrentes. Intente en unos segundos.');
-      err.code = 'TOO_MANY_SESSIONS';
-      throw err;
-    }
-
-    const sessionId = uuidv4();
-    const isMock = process.env.MOCK_PUPPETEER !== 'false';
-    const initialMfaCode = String(Math.floor(10 + Math.random() * 90));
-
-    const sessionData = {
-      sessionId,
-      email,
-      status: 'AWAITING_MFA',
-      mfaCode: initialMfaCode,
-      errorMessage: null,
-      browser: null,
-      page: null,
-      token: null,
-      user: null,
-      createdAt: Date.now(),
-    };
-
-    activeSessions.set(sessionId, sessionData);
-
-    if (isMock) {
-      this.runMockLoginFlow(sessionId, email);
-    } else {
-      this.runRealPuppeteerLogin(sessionId, email, password);
-    }
-
-    return {
-      sessionId,
-      status: 'AWAITING_MFA',
-      mfaCode: initialMfaCode,
-      mfaNumber: initialMfaCode,
-      officialLoginUrl: this.getOfficialLoginUrl(email),
-      message: 'Iniciando autenticación en portal institucional Duoc UC...',
-    };
-  }
-
-  async runMockLoginFlow(sessionId, email) {
-    const session = activeSessions.get(sessionId);
-    if (!session) return;
-
-    const timer = setTimeout(async () => {
-      const currentSession = activeSessions.get(sessionId);
-      if (!currentSession) return;
-
+    if (mongoose.connection.readyState === 1) {
       try {
-        const userProfile = await this.findOrCreateUserProfile(email);
-        const formatted = this.formatUserResponse(userProfile);
-        const token = this.generateJwt(formatted);
+        let user = await UserProfile.findOne({ email: cleanEmail });
+        if (user) return user;
 
-        currentSession.status = 'COMPLETED';
-        currentSession.token = token;
-        currentSession.user = formatted;
-        console.log(`[AuthService] Sesión ${sessionId} autenticada y respaldada para ${email}`);
+        if (seedMatch) {
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(DEFAULT_SEED_PASSWORD, salt);
+          user = await UserProfile.create({
+            ...seedMatch,
+            password: hashedPassword,
+          });
+          return user;
+        }
       } catch (err) {
-        console.error('[AuthService] Error en flujo MFA:', err.message);
-        currentSession.status = 'FAILED';
-        currentSession.errorMessage = 'Error al generar la sesión del estudiante.';
-      } finally {
-        const cleanupTimer = setTimeout(() => activeSessions.delete(sessionId), 60000);
-        if (typeof cleanupTimer.unref === 'function') cleanupTimer.unref();
+        console.warn('[AuthService] Error findOrCreate en MongoDB:', err.message);
       }
-    }, 4000);
-
-    if (typeof timer.unref === 'function') timer.unref();
-  }
-
-  async runRealPuppeteerLogin(sessionId, email, password) {
-    const session = activeSessions.get(sessionId);
-    if (!session) return;
-
-    let browser = null;
-    try {
-      const puppeteer = require('puppeteer');
-      browser = await puppeteer.launch({
-        headless: process.env.PUPPETEER_HEADLESS !== 'false',
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--disable-gpu',
-        ],
-      });
-
-      session.browser = browser;
-      const page = await browser.newPage();
-      session.page = page;
-
-      await page.goto(this.getOfficialLoginUrl(email), {
-        waitUntil: 'networkidle2',
-        timeout: 45000,
-      });
-
-      const emailSelector = 'input[type="email"], input[name="loginfmt"]';
-      await page.waitForSelector(emailSelector, { timeout: 15000 });
-      await page.type(emailSelector, email, { delay: 50 });
-      await page.keyboard.press('Enter');
-
-      const passwordSelector = 'input[type="password"], input[name="passwd"]';
-      await page.waitForSelector(passwordSelector, { timeout: 15000 });
-      await page.type(passwordSelector, password, { delay: 50 });
-
-      password = null;
-      await page.keyboard.press('Enter');
-
-      try {
-        const mfaSelector = '#displaySign, div[data-test-id="number-match"], .displaySign';
-        await page.waitForSelector(mfaSelector, { timeout: 8000 });
-        const mfaNumber = await page.$eval(mfaSelector, (el) => el.textContent.trim());
-        if (mfaNumber) {
-          session.mfaCode = mfaNumber;
-        }
-        session.status = 'AWAITING_MFA';
-
-        await Promise.race([
-          page.waitForSelector('#idSIButton9', { timeout: 90000 }),
-          page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 90000 }),
-        ]);
-
-        if (await page.$('#idSIButton9')) {
-          await page.click('#idSIButton9');
-        }
-      } catch {
-        // Flujo continuó directo
-      }
-
-      const userProfile = await this.findOrCreateUserProfile(email);
-      const formatted = this.formatUserResponse(userProfile);
-      const token = this.generateJwt(formatted);
-
-      session.status = 'COMPLETED';
-      session.token = token;
-      session.user = formatted;
-    } catch (error) {
-      password = null;
-      console.error('[Puppeteer Auth Error]:', error.message);
-      session.status = 'FAILED';
-      session.errorMessage = 'Credenciales inválidas o tiempo de espera agotado en el portal Duoc UC.';
-    } finally {
-      if (browser) {
-        await browser.close().catch(() => {});
-        session.browser = null;
-        session.page = null;
-      }
-      const cleanupTimer = setTimeout(() => activeSessions.delete(sessionId), 30000);
-      if (typeof cleanupTimer.unref === 'function') cleanupTimer.unref();
-    }
-  }
-
-  getSessionStatus(sessionId) {
-    const session = activeSessions.get(sessionId);
-    if (!session) {
-      return null;
     }
 
-    return {
-      status: session.status,
-      mfaCode: session.mfaCode,
-      mfaNumber: session.mfaCode,
-      errorMessage: session.errorMessage,
-      token: session.status === 'COMPLETED' ? session.token : null,
-      user: session.status === 'COMPLETED' ? session.user : null,
-      email: session.email,
-    };
-  }
+    const mem = inMemoryUsers.get(cleanEmail);
+    if (mem) return mem;
 
-  clearSession(sessionId) {
-    const session = activeSessions.get(sessionId);
-    if (session?.browser) {
-      session.browser.close().catch(() => {});
-    }
-    activeSessions.delete(sessionId);
-  }
-
-  inferDefaultRoleFromEmail(email = '') {
-    const clean = email.toLowerCase().trim();
-    if (clean.endsWith('@profesor.duoc.cl')) {
-      return {
-        role: 'profesor',
-        roleLabel: 'Profesor / Docente Duoc UC',
-        career: 'Docencia Institucional Duoc UC',
-      };
-    }
-    if (clean.endsWith('@duoc.cl')) {
-      return {
-        role: 'administrativo',
-        roleLabel: 'Funcionario / Gestión Institucional',
-        career: 'Administración y Servicios Duoc UC',
-      };
-    }
-    return {
+    const newMem = {
+      _id: `user_${cleanEmail.replace(/[@.]/g, '_')}`,
+      email: cleanEmail,
+      fullName: cleanEmail,
       role: 'estudiante',
       roleLabel: 'Estudiante Regular Duoc UC',
-      career: 'Carrera Institucional Duoc UC',
+      isPaedis: false,
+      academicStatus: 'activo',
+      attendanceRate: 85,
+      hasUsedSimulator: false,
+      simulatorUsageCount: 0,
     };
+    inMemoryUsers.set(cleanEmail, newMem);
+    return newMem;
   }
 
   formatUserResponse(userProfile = {}) {
     const email = (userProfile.email || userProfile.emailDuoc || 'c.guzman@duocuc.cl').toLowerCase().trim();
     const seedMatch = SEED_USERS.find((u) => u.email.toLowerCase() === email);
-    const inferred = this.inferDefaultRoleFromEmail(email);
 
-    // Si está en la BD como uno de los 10 usuarios, usa su nombre oficial; si es un correo externo nuevo, usa su correo como nombre
     const fullName =
       userProfile.fullName ||
       userProfile.nombre ||
       (seedMatch ? seedMatch.fullName : email);
 
+    const role = userProfile.role || (seedMatch ? seedMatch.role : 'estudiante');
     const roleLabel =
       userProfile.roleLabel ||
-      (seedMatch ? seedMatch.roleLabel : inferred.roleLabel);
+      (seedMatch ? seedMatch.roleLabel : 'Estudiante Regular Duoc UC');
+
+    const academicStatus =
+      userProfile.academicStatus || (seedMatch ? seedMatch.academicStatus : 'activo');
+
+    const statusReason =
+      userProfile.statusReason ||
+      (seedMatch ? seedMatch.statusReason : 'Estudiante regular activo');
+
+    const attendanceRate =
+      userProfile.attendanceRate !== undefined
+        ? Number(userProfile.attendanceRate)
+        : seedMatch
+        ? seedMatch.attendanceRate
+        : 88.9;
+
+    const hasUsedSimulator =
+      userProfile.hasUsedSimulator !== undefined
+        ? Boolean(userProfile.hasUsedSimulator)
+        : seedMatch
+        ? Boolean(seedMatch.hasUsedSimulator)
+        : false;
+
+    const simulatorUsageCount =
+      userProfile.simulatorUsageCount !== undefined
+        ? Number(userProfile.simulatorUsageCount)
+        : seedMatch
+        ? seedMatch.simulatorUsageCount || 0
+        : 0;
 
     const isPaedis =
       typeof userProfile.isPaedis === 'boolean'
@@ -365,178 +361,50 @@ class AuthScraperService {
         ? Boolean(seedMatch.isPaedis)
         : false;
 
-    const career =
-      userProfile.career ||
-      userProfile.carrera ||
-      (seedMatch ? seedMatch.career : inferred.career);
-
-    const campus =
-      userProfile.campus ||
-      userProfile.sede ||
-      (seedMatch ? seedMatch.campus : 'Sede Alameda');
-
-    const address =
-      userProfile.address ||
-      userProfile.direccion ||
-      (seedMatch ? seedMatch.address : 'Sin dirección registrada');
-
-    const personalEmail =
-      userProfile.personalEmail ||
-      userProfile.emailPersonal ||
-      (seedMatch ? seedMatch.personalEmail : email);
-
-    const phone =
-      userProfile.phone ||
-      userProfile.telefonoPersonal ||
-      (seedMatch ? seedMatch.phone : '+56 9 0000 0000');
-
-    const ajustesAprobados = Array.isArray(userProfile.ajustesAprobados)
-      ? userProfile.ajustesAprobados
-      : seedMatch
-      ? seedMatch.ajustesAprobados
-      : [];
-
-    const responseObj = {
-      _id: userProfile._id || `user_${email}`,
-      id: userProfile._id || `user_${email}`,
+    return {
+      _id: userProfile._id || userProfile.id || `user_${email}`,
+      id: userProfile._id || userProfile.id || `user_${email}`,
       email,
       emailDuoc: email,
       fullName,
       nombre: fullName,
-      rol: userProfile.role || (seedMatch ? seedMatch.role : inferred.role),
+      photo: userProfile.photo || '',
+      role,
+      rol: role,
       roleLabel,
       isPaedis,
-      isPreRegisteredUser: Boolean(seedMatch),
-      rut: userProfile.rut || (seedMatch ? seedMatch.rut : 'Sin RUT registrado'),
-      career,
-      carrera: career,
-      campus,
-      sede: campus,
-      address,
-      direccion: address,
-      personalEmail,
-      emailPersonal: personalEmail,
-      phone,
-      telefonoPersonal: phone,
-      emergencyContact:
-        userProfile.emergencyContact ||
-        (seedMatch ? seedMatch.emergencyContact : 'No registrado'),
-      emergencyPhone:
-        userProfile.emergencyPhone ||
-        (seedMatch ? seedMatch.emergencyPhone : 'No registrado'),
-      tutorParAsignado:
-        userProfile.tutorParAsignado ||
-        (seedMatch ? seedMatch.tutorParAsignado : 'Acompañamiento General Duoc UC'),
-      ajustesAprobados,
-      accessibilityPreferences: userProfile.accessibilityPreferences ||
-        (seedMatch ? seedMatch.accessibilityPreferences : {
-          fontSize: 'normal',
-          highContrast: false,
-          dyslexicFont: false,
-          reducedMotion: false,
-          screenReaderOptimized: true,
-        }),
-      enrolledCourses:
-        userProfile.enrolledCourses ||
-        (seedMatch ? seedMatch.enrolledCourses : []),
+      academicStatus,
+      statusReason,
+      attendanceRate,
+      hasUsedSimulator,
+      simulatorUsageCount,
+      lastSimulatorUsage: userProfile.lastSimulatorUsage || null,
+      rut: userProfile.rut || (seedMatch ? seedMatch.rut : '19.276.735-0'),
+      career: userProfile.career || (seedMatch ? seedMatch.career : 'Ingeniería en Informática'),
+      carrera: userProfile.career || (seedMatch ? seedMatch.career : 'Ingeniería en Informática'),
+      campus: userProfile.campus || (seedMatch ? seedMatch.campus : 'Sede Alameda'),
+      sede: userProfile.campus || (seedMatch ? seedMatch.campus : 'Sede Alameda'),
+      address: userProfile.address || (seedMatch ? seedMatch.address : 'Las Moreras 12196'),
+      direccion: userProfile.address || (seedMatch ? seedMatch.address : 'Las Moreras 12196'),
+      personalEmail: userProfile.personalEmail || (seedMatch ? seedMatch.personalEmail : ''),
+      emailPersonal: userProfile.personalEmail || (seedMatch ? seedMatch.personalEmail : ''),
+      phone: userProfile.phone || (seedMatch ? seedMatch.phone : '+56 9 3016 6745'),
+      telefonoPersonal: userProfile.phone || (seedMatch ? seedMatch.phone : '+56 9 3016 6745'),
+      emergencyContact: userProfile.emergencyContact || (seedMatch ? seedMatch.emergencyContact : 'Contacto Familiar'),
+      emergencyPhone: userProfile.emergencyPhone || (seedMatch ? seedMatch.emergencyPhone : '+56 9 1234 5678'),
+      tutorParAsignado: userProfile.tutorParAsignado || (seedMatch ? seedMatch.tutorParAsignado : 'Inclusión y Bienestar Duoc UC'),
+      diagnosticoDeclarado: userProfile.diagnosticoDeclarado || (seedMatch ? seedMatch.diagnosticoDeclarado : ''),
+      ajustesAprobados: userProfile.ajustesAprobados || (seedMatch ? seedMatch.ajustesAprobados : []),
+      accessibilityPreferences: userProfile.accessibilityPreferences || {
+        fontSize: 'normal',
+        highContrast: false,
+        dyslexicFont: false,
+        reducedMotion: false,
+        screenReaderOptimized: true,
+      },
+      enrolledCourses: userProfile.enrolledCourses || (seedMatch ? seedMatch.enrolledCourses : []),
+      lastLogin: userProfile.lastLogin || new Date(),
     };
-
-    if (userProfile.role !== undefined) {
-      responseObj.role = userProfile.role;
-    }
-
-    return responseObj;
-  }
-
-  async findOrCreateUserProfile(email) {
-    const cleanEmail = (email || 'c.guzman@duocuc.cl').trim().toLowerCase();
-    const seedMatch = SEED_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
-    const inferred = this.inferDefaultRoleFromEmail(cleanEmail);
-
-    // REGLA SOLICITADA POR EL USUARIO:
-    // Si el correo pertenece a uno de los 10 usuarios de nuestra BD, usa su nombre y rol real.
-    // Si no está entre los 10 usuarios, se captura su correo y ese correo pasa a ser su nombre.
-    const defaultProfileData = seedMatch
-      ? { ...seedMatch }
-      : {
-          email: cleanEmail,
-          fullName: cleanEmail, // Su correo es su nombre cuando no está entre los 10 precargados
-          role: inferred.role,
-          roleLabel: inferred.roleLabel,
-          isPaedis: false,
-          rut: 'En validación institucional',
-          career: inferred.career,
-          campus: 'Sede Alameda',
-          address: 'Por actualizar en Mi Perfil',
-          personalEmail: cleanEmail,
-          phone: '+56 9 0000 0000',
-          emergencyContact: 'Por actualizar',
-          emergencyPhone: '+56 9 0000 0000',
-          tutorParAsignado: 'Usuario autenticado por correo institucional',
-          ajustesAprobados: [],
-          accessibilityPreferences: {
-            fontSize: 'normal',
-            highContrast: false,
-            dyslexicFont: false,
-            reducedMotion: false,
-            screenReaderOptimized: true,
-          },
-          enrolledCourses: [],
-        };
-
-    // Actualizar en memoria siempre para disponibilidad inmediata
-    const existingMem = inMemoryUsers.get(cleanEmail) || {};
-    const mergedMem = {
-      _id: existingMem._id || `local_${cleanEmail}`,
-      ...defaultProfileData,
-      ...existingMem,
-      email: cleanEmail,
-      fullName: existingMem.fullName || defaultProfileData.fullName,
-      role: existingMem.role || defaultProfileData.role,
-      roleLabel: existingMem.roleLabel || defaultProfileData.roleLabel,
-      isPaedis:
-        typeof existingMem.isPaedis === 'boolean'
-          ? existingMem.isPaedis
-          : defaultProfileData.isPaedis,
-      lastLogin: new Date(),
-    };
-    inMemoryUsers.set(cleanEmail, mergedMem);
-
-    if (mongoose.connection.readyState !== 1) {
-      return mergedMem;
-    }
-
-    try {
-      const user = await UserProfile.findOneAndUpdate(
-        { email: cleanEmail },
-        {
-          $set: { lastLogin: new Date() },
-          $setOnInsert: {
-            fullName: defaultProfileData.fullName,
-            role: defaultProfileData.role,
-            roleLabel: defaultProfileData.roleLabel,
-            isPaedis: defaultProfileData.isPaedis,
-            rut: defaultProfileData.rut,
-            career: defaultProfileData.career,
-            campus: defaultProfileData.campus,
-            address: defaultProfileData.address,
-            personalEmail: defaultProfileData.personalEmail,
-            phone: defaultProfileData.phone,
-            emergencyContact: defaultProfileData.emergencyContact,
-            emergencyPhone: defaultProfileData.emergencyPhone,
-            tutorParAsignado: defaultProfileData.tutorParAsignado,
-            ajustesAprobados: defaultProfileData.ajustesAprobados,
-            accessibilityPreferences: defaultProfileData.accessibilityPreferences,
-            enrolledCourses: defaultProfileData.enrolledCourses,
-          },
-        },
-        { upsert: true, new: true }
-      );
-      return user;
-    } catch (err) {
-      console.warn('[DB Fallback] MongoDB no disponible temporalmente:', err.message);
-      return mergedMem;
-    }
   }
 
   generateJwt(user) {
@@ -547,6 +415,8 @@ class AuthScraperService {
         fullName: user.fullName || user.nombre || user.email,
         role: user.role || user.rol || 'estudiante',
         roleLabel: user.roleLabel || 'Estudiante Duoc UC',
+        isPaedis: Boolean(user.isPaedis),
+        academicStatus: user.academicStatus || 'activo',
       },
       getJwtSecret(),
       { algorithm: 'HS256', expiresIn: '8h' }

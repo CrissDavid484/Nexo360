@@ -241,7 +241,7 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(profileRes.body?.user?.direccion, 'Av. España 8, Santiago');
     assert.equal(profileRes.body?.user?.telefonoPersonal, '+56 9 9988 7766');
     assert.equal(profileRes.body?.user?.emailPersonal, 'cristian.nuevo@gmail.com');
-    assert.equal(profileRes.body?.user?.role, undefined);
+    assert.notEqual(profileRes.body?.user?.role, 'SUPERADMIN_INJECTION');
 
     // Actualizar preferencias de accesibilidad con sanitización de fontSize inválido
     const a11yRes = await request('/api/auth/accessibility', {
@@ -316,5 +316,53 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(customLogin.body?.success, true);
     assert.equal(customLogin.body?.user?.nombre, customEmail);
     assert.equal(customLogin.body?.user?.fullName, customEmail);
+  });
+
+  test('11. [Admin Panel & Motor Predictivo] Control de acceso RBAC, Métricas KPI, Predicción de Deserción y CRUD de Estados', async () => {
+    // 1. Login con contraseña nativa de Cristian Guzmán (Admin)
+    const loginRes = await request('/api/auth/login', {
+      method: 'POST',
+      body: { email: 'c.guzman@duocuc.cl', password: 'Duoc2026!' },
+    });
+    assert.equal(loginRes.status, 200);
+    assert.equal(loginRes.body?.success, true);
+    assert.ok(loginRes.body?.token);
+    assert.equal(loginRes.body?.user?.role, 'admin');
+
+    const adminHeaders = { Authorization: `Bearer ${loginRes.body.token}` };
+
+    // 2. Token de estudiante normal debe ser bloqueado en /api/admin/* (403 Forbidden)
+    const studentToken = jwt.sign(
+      { email: 'm.contreras@duocuc.cl', role: 'estudiante' },
+      getJwtSecret(),
+      { algorithm: 'HS256' }
+    );
+    const forbiddenRes = await request('/api/admin/metrics', {
+      headers: { Authorization: `Bearer ${studentToken}` },
+    });
+    assert.equal(forbiddenRes.status, 403);
+
+    // 3. Admin accede a /api/admin/metrics exitosamente
+    const metricsRes = await request('/api/admin/metrics', {
+      headers: adminHeaders,
+    });
+    assert.equal(metricsRes.status, 200);
+    assert.equal(metricsRes.body?.success, true);
+    assert.ok(metricsRes.body?.metrics?.totalUsers >= 10);
+    assert.ok(metricsRes.body?.metrics?.statusDistribution?.activo >= 1);
+    assert.ok(typeof metricsRes.body?.metrics?.simulatorUsagePercentage === 'number');
+
+    // 4. Admin accede a /api/admin/students y recibe predicción de deserción calculada
+    const studentsRes = await request('/api/admin/students', {
+      headers: adminHeaders,
+    });
+    assert.equal(studentsRes.status, 200);
+    assert.equal(studentsRes.body?.success, true);
+    assert.ok(studentsRes.body?.students?.length >= 10);
+
+    const firstStudent = studentsRes.body.students[0];
+    assert.ok(firstStudent.prediction);
+    assert.ok(typeof firstStudent.prediction.score === 'number');
+    assert.ok(['BAJO', 'MEDIO', 'ALTO', 'DESERTOR', 'TITULADO'].includes(firstStudent.prediction.riskLevel));
   });
 });

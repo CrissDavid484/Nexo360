@@ -16,10 +16,24 @@
 
 /* 2. Reglas de Presentación Visual Ergonómica (Baja sobrecarga sensorial) */
 body {
-  background-color: #F6F8FA;
+  background-color: #EEF2F6;
   color: #0F172A;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Transición global coordinada y fluida para cambio de tema claro / oscuro (60/120 FPS) */
+html:not(.reduced-motion) body,
+html:not(.reduced-motion) #root,
+html:not(.reduced-motion) main,
+html:not(.reduced-motion) header,
+html:not(.reduced-motion) .bg-white,
+html:not(.reduced-motion) .uiverse-bento-card,
+html:not(.reduced-motion) .a11y-fab-btn {
+  transition: background-color 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 p, li {
@@ -62,7 +76,8 @@ html.high-contrast,
 html.high-contrast body,
 html.high-contrast #root,
 html.high-contrast main,
-html.high-contrast .bg-\[\#F6F8FA\] {
+html.high-contrast .bg-\[\#F6F8FA\],
+html.high-contrast .bg-\[\#EEF2F6\] {
   background-color: #070B12 !important;
   color: #FFFFFF !important;
 }
@@ -249,17 +264,14 @@ html.high-contrast .a11y-switch-thumb {
 }
 
 /* ==========================================================================
-   6. THEME SWITCH SOL / LUNA / NUBES / ESTRELLAS (From Uiverse.io by Galahhad)
+   6. THEME SWITCH SOL / LUNA / NUBES / ESTRELLAS (Optimizado para 60/120 FPS)
    ========================================================================== */
 .theme-switch {
   --toggle-size: 16px;
-  /* the size is adjusted using font-size,
-     this is not transform scale,
-     so you can choose any size */
+  /* El tamaño base se escala limpiamente en ems mediante font-size */
   --container-width: 5.625em;
   --container-height: 2.5em;
   --container-radius: 6.25em;
-  /* radius 0 - minecraft mode :) */
   --container-light-bg: #3D7EAE;
   --container-night-bg: #1D1F2C;
   --circle-container-diameter: 3.375em;
@@ -271,10 +283,11 @@ html.high-contrast .a11y-switch-thumb {
   --stars-color: #fff;
   --clouds-color: #F3FDFF;
   --back-clouds-color: #AACADF;
-  --transition: .5s cubic-bezier(0, -0.02, 0.4, 1.25);
-  --circle-transition: .3s cubic-bezier(0, -0.02, 0.35, 1.17);
+  --transition: 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --circle-transition: 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
   display: inline-block;
   flex-shrink: 0;
+  user-select: none;
 }
 
 .theme-switch,
@@ -295,12 +308,10 @@ html.high-contrast .a11y-switch-thumb {
   border-radius: var(--container-radius);
   overflow: hidden;
   cursor: pointer;
-  -webkit-box-shadow: 0em -0.062em 0.062em rgba(0, 0, 0, 0.25), 0em 0.062em 0.125em rgba(255, 255, 255, 0.94);
   box-shadow: 0em -0.062em 0.062em rgba(0, 0, 0, 0.25), 0em 0.062em 0.125em rgba(255, 255, 255, 0.94);
-  -webkit-transition: var(--transition);
-  -o-transition: var(--transition);
-  transition: var(--transition);
+  transition: background-color var(--transition);
   position: relative;
+  will-change: background-color;
 }
 
 .theme-switch__container::before {
@@ -308,9 +319,9 @@ html.high-contrast .a11y-switch-thumb {
   position: absolute;
   z-index: 1;
   inset: 0;
-  -webkit-box-shadow: 0em 0.05em 0.187em rgba(0, 0, 0, 0.25) inset, 0em 0.05em 0.187em rgba(0, 0, 0, 0.25) inset;
-  box-shadow: 0em 0.05em 0.187em rgba(0, 0, 0, 0.25) inset, 0em 0.05em 0.187em rgba(0, 0, 0, 0.25) inset;
+  box-shadow: 0em 0.05em 0.187em rgba(0, 0, 0, 0.25) inset;
   border-radius: var(--container-radius);
+  pointer-events: none;
 }
 
 .theme-switch__checkbox {
@@ -325,14 +336,11 @@ html.high-contrast .a11y-switch-thumb {
   left: var(--circle-container-offset);
   top: var(--circle-container-offset);
   border-radius: var(--container-radius);
-  -webkit-box-shadow: inset 0 0 0 3.375em rgba(255, 255, 255, 0.1), inset 0 0 0 3.375em rgba(255, 255, 255, 0.1), 0 0 0 0.625em rgba(255, 255, 255, 0.1), 0 0 0 1.25em rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 0 0 3.375em rgba(255, 255, 255, 0.1), inset 0 0 0 3.375em rgba(255, 255, 255, 0.1), 0 0 0 0.625em rgba(255, 255, 255, 0.1), 0 0 0 1.25em rgba(255, 255, 255, 0.1);
-  display: -webkit-box;
-  display: -ms-flexbox;
+  box-shadow: inset 0 0 0 3.375em rgba(255, 255, 255, 0.1), 0 0 0 0.625em rgba(255, 255, 255, 0.1), 0 0 0 1.25em rgba(255, 255, 255, 0.1);
   display: flex;
-  -webkit-transition: var(--circle-transition);
-  -o-transition: var(--circle-transition);
-  transition: var(--circle-transition);
+  transform: translate3d(0, 0, 0);
+  transition: transform var(--circle-transition);
+  will-change: transform;
   pointer-events: none;
 }
 
@@ -345,29 +353,22 @@ html.high-contrast .a11y-switch-thumb {
   margin: auto;
   border-radius: var(--container-radius);
   background-color: var(--sun-bg);
-  -webkit-box-shadow: 0.062em 0.062em 0.062em 0em rgba(254, 255, 239, 0.61) inset, 0em -0.062em 0.062em 0em #a1872a inset;
   box-shadow: 0.062em 0.062em 0.062em 0em rgba(254, 255, 239, 0.61) inset, 0em -0.062em 0.062em 0em #a1872a inset;
-  -webkit-filter: drop-shadow(0.062em 0.125em 0.125em rgba(0, 0, 0, 0.25)) drop-shadow(0em 0.062em 0.125em rgba(0, 0, 0, 0.25));
-  filter: drop-shadow(0.062em 0.125em 0.125em rgba(0, 0, 0, 0.25)) drop-shadow(0em 0.062em 0.125em rgba(0, 0, 0, 0.25));
+  filter: drop-shadow(0.062em 0.125em 0.125em rgba(0, 0, 0, 0.25));
   overflow: hidden;
-  -webkit-transition: var(--transition);
-  -o-transition: var(--transition);
-  transition: var(--transition);
+  transition: background-color var(--transition);
+  will-change: background-color;
 }
 
 .theme-switch__moon {
-  -webkit-transform: translateX(100%);
-  -ms-transform: translateX(100%);
-  transform: translateX(100%);
+  transform: translate3d(100%, 0, 0);
   width: 100%;
   height: 100%;
   background-color: var(--moon-bg);
   border-radius: inherit;
-  -webkit-box-shadow: 0.062em 0.062em 0.062em 0em rgba(254, 255, 239, 0.61) inset, 0em -0.062em 0.062em 0em #969696 inset;
   box-shadow: 0.062em 0.062em 0.062em 0em rgba(254, 255, 239, 0.61) inset, 0em -0.062em 0.062em 0em #969696 inset;
-  -webkit-transition: var(--transition);
-  -o-transition: var(--transition);
-  transition: var(--transition);
+  transition: transform var(--transition);
+  will-change: transform;
   position: relative;
 }
 
@@ -379,7 +380,6 @@ html.high-contrast .a11y-switch-thumb {
   height: 0.75em;
   border-radius: var(--container-radius);
   background-color: var(--spot-color);
-  -webkit-box-shadow: 0em 0.0312em 0.062em rgba(0, 0, 0, 0.25) inset;
   box-shadow: 0em 0.0312em 0.062em rgba(0, 0, 0, 0.25) inset;
 }
 
@@ -405,23 +405,24 @@ html.high-contrast .a11y-switch-thumb {
   position: absolute;
   bottom: -0.625em;
   left: 0.312em;
-  -webkit-box-shadow: 0.937em 0.312em var(--clouds-color), -0.312em -0.312em var(--back-clouds-color), 1.437em 0.375em var(--clouds-color), 0.5em -0.125em var(--back-clouds-color), 2.187em 0 var(--clouds-color), 1.25em -0.062em var(--back-clouds-color), 2.937em 0.312em var(--clouds-color), 2em -0.312em var(--back-clouds-color), 3.625em -0.062em var(--clouds-color), 2.625em 0em var(--back-clouds-color), 4.5em -0.312em var(--clouds-color), 3.375em -0.437em var(--back-clouds-color), 4.625em -1.75em 0 0.437em var(--clouds-color), 4em -0.625em var(--back-clouds-color), 4.125em -2.125em 0 0.437em var(--back-clouds-color);
   box-shadow: 0.937em 0.312em var(--clouds-color), -0.312em -0.312em var(--back-clouds-color), 1.437em 0.375em var(--clouds-color), 0.5em -0.125em var(--back-clouds-color), 2.187em 0 var(--clouds-color), 1.25em -0.062em var(--back-clouds-color), 2.937em 0.312em var(--clouds-color), 2em -0.312em var(--back-clouds-color), 3.625em -0.062em var(--clouds-color), 2.625em 0em var(--back-clouds-color), 4.5em -0.312em var(--clouds-color), 3.375em -0.437em var(--back-clouds-color), 4.625em -1.75em 0 0.437em var(--clouds-color), 4em -0.625em var(--back-clouds-color), 4.125em -2.125em 0 0.437em var(--back-clouds-color);
-  -webkit-transition: 0.5s cubic-bezier(0, -0.02, 0.4, 1.25);
-  -o-transition: 0.5s cubic-bezier(0, -0.02, 0.4, 1.25);
-  transition: 0.5s cubic-bezier(0, -0.02, 0.4, 1.25);
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  transition: transform var(--transition), opacity var(--transition);
+  will-change: transform, opacity;
 }
 
 .theme-switch__stars-container {
   position: absolute;
   color: var(--stars-color);
-  top: -100%;
+  top: 50%;
   left: 0.312em;
   width: 2.75em;
   height: auto;
-  -webkit-transition: var(--transition);
-  -o-transition: var(--transition);
-  transition: var(--transition);
+  transform: translate3d(0, -140%, 0);
+  opacity: 0;
+  transition: transform var(--transition), opacity var(--transition);
+  will-change: transform, opacity;
 }
 
 .theme-switch__stars-container svg {
@@ -430,39 +431,36 @@ html.high-contrast .a11y-switch-thumb {
   display: block;
 }
 
-/* actions */
+/* Acciones y Estados de Activación (Procesados en GPU sin relayout) */
 
 .theme-switch__checkbox:checked + .theme-switch__container {
   background-color: var(--container-night-bg);
 }
 
 .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__circle-container {
-  left: calc(100% - var(--circle-container-offset) - var(--circle-container-diameter));
+  transform: translate3d(3.125em, 0, 0);
 }
 
 .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__circle-container:hover {
-  left: calc(100% - var(--circle-container-offset) - var(--circle-container-diameter) - 0.187em);
+  transform: translate3d(2.938em, 0, 0);
 }
 
 .theme-switch__circle-container:hover {
-  left: calc(var(--circle-container-offset) + 0.187em);
+  transform: translate3d(0.187em, 0, 0);
 }
 
 .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__moon {
-  -webkit-transform: translate(0);
-  -ms-transform: translate(0);
-  transform: translate(0);
+  transform: translate3d(0, 0, 0);
 }
 
 .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__clouds {
-  bottom: -4.062em;
+  transform: translate3d(0, 3.5em, 0);
+  opacity: 0;
 }
 
 .theme-switch__checkbox:checked + .theme-switch__container .theme-switch__stars-container {
-  top: 50%;
-  -webkit-transform: translateY(-50%);
-  -ms-transform: translateY(-50%);
-  transform: translateY(-50%);
+  transform: translate3d(0, -50%, 0);
+  opacity: 1;
 }
 
 /* 7. Movimiento Reducido Estricto (WCAG 2.2 SC 2.3.3 Animation from Interactions) */
@@ -486,17 +484,17 @@ html.reduced-motion *::after {
 @layer components {
   .uiverse-bento-card {
     background: #ffffff;
-    border: 1px solid rgba(226, 232, 240, 0.9);
+    border: 1px solid #E2E8F0;
     border-radius: 1.25rem;
     padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
     transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
   }
 
   .uiverse-bento-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 25px -5px rgba(0, 43, 73, 0.08), 0 4px 10px -4px rgba(0, 43, 73, 0.04);
-    border-color: rgba(0, 43, 73, 0.25);
+    box-shadow: 0 12px 28px -4px rgba(0, 43, 73, 0.12), 0 4px 10px -4px rgba(0, 43, 73, 0.06);
+    border-color: rgba(0, 43, 73, 0.3);
   }
 
   .uiverse-btn-tactile {

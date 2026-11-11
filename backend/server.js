@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const moduleRoutes = require('./routes/moduleRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -83,6 +84,7 @@ app.get('/api/health', (req, res) => {
 // Rutas principales de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/modules', moduleRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {

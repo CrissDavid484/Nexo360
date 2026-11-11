@@ -78,13 +78,66 @@ export const api = {
   },
 
   /**
-   * Iniciar autenticación institucional con Puppeteer / MFA
+   * Iniciar autenticación institucional con correo y contraseña contra la Base de Datos
    */
   async login(email, password) {
     return request('/auth/login', {
       method: 'POST',
       auth: false,
       body: { email, password },
+    });
+  },
+
+  /**
+   * Registrar uso del simulador en la base de datos
+   */
+  async logSimulatorUsage() {
+    return request('/auth/simulator-log', {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Métricas y KPIs del Panel de Administración
+   */
+  async getAdminMetrics() {
+    return request('/admin/metrics');
+  },
+
+  /**
+   * Directorio de estudiantes con analítica predictiva de deserción
+   */
+  async getAdminStudents(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/admin/students${qs ? `?${qs}` : ''}`);
+  },
+
+  /**
+   * Registrar nuevo usuario desde el Panel de Administración
+   */
+  async createAdminStudent(studentData) {
+    return request('/admin/students', {
+      method: 'POST',
+      body: studentData,
+    });
+  },
+
+  /**
+   * Actualizar estado académico del estudiante (activo, desercion, titulado)
+   */
+  async updateStudentStatus(id, academicStatus, statusReason) {
+    return request(`/admin/students/${encodeURIComponent(id)}/status`, {
+      method: 'PUT',
+      body: { academicStatus, statusReason },
+    });
+  },
+
+  /**
+   * Eliminar usuario desde el Panel de Administración
+   */
+  async deleteStudent(id) {
+    return request(`/admin/students/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
     });
   },
 

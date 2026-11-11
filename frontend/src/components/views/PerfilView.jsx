@@ -202,12 +202,14 @@ export const PerfilView = () => {
       )}
 
       {/* TARJETA DE PERFIL PRINCIPAL (Limpia, moderna y humana) */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-9 shadow-2xs">
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-9 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-8">
           <div className="space-y-6 flex-1">
             <div>
               <span className="text-xs font-semibold text-[#002B49] bg-slate-100 px-3 py-1 rounded-full inline-block mb-2">
-                {profile.roleLabel || 'Estudiante Regular'}
+                {profile.isPaedis
+                  ? profile.roleLabel || 'Estudiante Regular'
+                  : (profile.roleLabel || 'Estudiante Regular').replace(/\s*•\s*PAEDIS/gi, '')}
               </span>
               <h2 id="perfil-view-heading" className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 {profile.nombre}
@@ -296,72 +298,70 @@ export const PerfilView = () => {
         </div>
       </div>
 
-      {/* TARJETA: Acompañamiento y Ajustes Razonables */}
-      <article className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-2xs space-y-5">
-        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-          <div className="w-10 h-10 rounded-xl bg-sky-50 text-[#002B49] flex items-center justify-center shrink-0" aria-hidden="true">
-            <HeartHandshake className="w-5 h-5" aria-hidden="true" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Acompañamiento e inclusión académica (PAEDIS)
-            </h3>
-            <p className="text-xs text-slate-500">
-              Estado de apoyos registrados para el periodo académico vigente.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
-            <span className="text-xs font-medium text-slate-500 block mb-1">
-              Unidad de acompañamiento
-            </span>
-            <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
-              <span>{profile.tutorParAsignado || 'Inclusión y Bienestar • Sede Alameda'}</span>
-            </p>
+      {/* TARJETA: Acompañamiento y Ajustes Razonables (Solo visible si el estudiante cuenta con perfil PAEDIS activo) */}
+      {Boolean(profile.isPaedis) && (
+        <article className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-[#002B49] flex items-center justify-center shrink-0" aria-hidden="true">
+              <HeartHandshake className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                Acompañamiento e inclusión académica (PAEDIS)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Estado de apoyos registrados para el periodo académico vigente.
+              </p>
+            </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
-            <span className="text-xs font-medium text-slate-500 block mb-1">
-              Estado en programa PAEDIS
-            </span>
-            <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
-              <span>
-                {profile.isPaedis
-                  ? 'Adscrito/a con ajustes académicos activos'
-                  : `Perfil regular (${profile.roleLabel || 'Sin adscripción PAEDIS'})`}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+              <span className="text-xs font-medium text-slate-500 block mb-1">
+                Unidad de acompañamiento
               </span>
-            </p>
-          </div>
-        </div>
+              <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
+                <span>{profile.tutorParAsignado || 'Inclusión y Bienestar • Sede Alameda'}</span>
+              </p>
+            </div>
 
-        <div className="space-y-3 pt-1">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-            Ajustes académicos registrados
-          </span>
-          {Array.isArray(profile.ajustesAprobados) && profile.ajustesAprobados.length === 0 ? (
-            <div className="p-4 bg-slate-50/70 border border-slate-200/70 rounded-xl text-xs text-slate-600">
-              No registras ajustes individuales PAEDIS en este momento. Puedes utilizar las preferencias de lectura en la barra superior cuando lo necesites.
+            <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+              <span className="text-xs font-medium text-slate-500 block mb-1">
+                Estado en programa PAEDIS
+              </span>
+              <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
+                <span>Adscrito/a con ajustes académicos activos</span>
+              </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(profile.ajustesAprobados || [
-                { tipo: 'Tiempo adicional', descripcion: '50% de tiempo adicional en certámenes y evaluaciones teóricas.' },
-                { tipo: 'Material accesible', descripcion: 'Material de clases compatible con lectores de pantalla.' },
-                { tipo: 'Ubicación en aula', descripcion: 'Ubicación preferencial en primera fila y salas adaptadas.' },
-              ]).map((ajuste, idx) => (
-                <div key={idx} className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl text-xs">
-                  <span className="font-bold text-slate-900 block text-sm">{ajuste.tipo}</span>
-                  <span className="text-slate-600 block mt-1 leading-relaxed">{ajuste.descripcion}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </article>
+          </div>
+
+          <div className="space-y-3 pt-1">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+              Ajustes académicos registrados
+            </span>
+            {Array.isArray(profile.ajustesAprobados) && profile.ajustesAprobados.length === 0 ? (
+              <div className="p-4 bg-slate-50/70 border border-slate-200/70 rounded-xl text-xs text-slate-600">
+                No registras ajustes individuales en este momento. Puedes utilizar las preferencias de lectura en la barra superior cuando lo necesites.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(profile.ajustesAprobados || [
+                  { tipo: 'Tiempo adicional', descripcion: '50% de tiempo adicional en certámenes y evaluaciones teóricas.' },
+                  { tipo: 'Material accesible', descripcion: 'Material de clases compatible con lectores de pantalla.' },
+                  { tipo: 'Ubicación en aula', descripcion: 'Ubicación preferencial en primera fila y salas adaptadas.' },
+                ]).map((ajuste, idx) => (
+                  <div key={idx} className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl text-xs">
+                    <span className="font-bold text-slate-900 block text-sm">{ajuste.tipo}</span>
+                    <span className="text-slate-600 block mt-1 leading-relaxed">{ajuste.descripcion}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </article>
+      )}
 
       {/* MODAL PARA EDITAR DATOS DE CONTACTO */}
       {isEditing && (

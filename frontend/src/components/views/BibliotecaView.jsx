@@ -70,7 +70,7 @@ export const BibliotecaView = () => {
   return (
     <section aria-labelledby="biblioteca-view-title" className="space-y-6">
       {/* 1. Encabezado limpio de Bibliotecas Duoc UC */}
-      <div className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-slate-200/80 shadow-2xs">
+      <div className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-slate-200 shadow-sm">
         <div>
           <span className="text-xs font-semibold text-[#002B49] block mb-1">
             Bibliotecas Duoc UC • Reserva de Salas
@@ -104,7 +104,7 @@ export const BibliotecaView = () => {
       {/* 2. Video Tutorial + Pasos */}
       <article
         aria-labelledby="biblioteca-tutorial-heading"
-        className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-2xs space-y-6"
+        className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">

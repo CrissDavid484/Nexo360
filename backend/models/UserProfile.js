@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const ScheduleBlockSchema = new mongoose.Schema(
   {
@@ -29,14 +30,15 @@ const ReasonableAdjustmentSchema = new mongoose.Schema(
   {
     tipo: { type: String, required: true, trim: true, maxlength: 80 },
     descripcion: { type: String, required: true, trim: true, maxlength: 300 },
+    fechaAprobacion: { type: Date, default: Date.now },
   },
   { _id: false }
 );
 
 /**
- * Esquema de Perfil de Estudiante para Nexo360
- * REGLA DE SEGURIDAD (Zero-Knowledge Credentials):
- * Jamás se almacena la contraseña institucional de Duoc UC en la base de datos.
+ * Esquema de Usuario Institucional Nexo360 - Duoc UC
+ * Base de Datos Nativa con Autenticación Cifrada (bcryptjs),
+ * Estados Académicos (Activo, Deserción, Titulado), Métricas y PAEDIS.
  */
 const UserProfileSchema = new mongoose.Schema(
   {
@@ -48,14 +50,23 @@ const UserProfileSchema = new mongoose.Schema(
       trim: true,
       match: [
         /^[a-zA-Z0-9._%+-]+@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/,
-        'Por favor ingrese un correo institucional Duoc UC válido',
+        'Por favor ingrese un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl)',
       ],
+    },
+    password: {
+      type: String,
+      required: false, // Opcional al crear pero autogenerado si no se provee
+      select: true,
     },
     fullName: {
       type: String,
       trim: true,
       maxlength: 120,
-      default: 'Cristian Guzmán',
+      default: 'Estudiante Duoc UC',
+    },
+    photo: {
+      type: String,
+      default: '',
     },
     role: {
       type: String,
@@ -81,7 +92,39 @@ const UserProfileSchema = new mongoose.Schema(
     },
     isPaedis: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    academicStatus: {
+      type: String,
+      enum: ['activo', 'desercion', 'titulado'],
+      default: 'activo',
+    },
+    statusReason: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: 'Estudiante regular activo',
+    },
+    statusUpdatedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    attendanceRate: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 88.9,
+    },
+    hasUsedSimulator: {
+      type: Boolean,
+      default: false,
+    },
+    simulatorUsageCount: {
+      type: Number,
+      default: 0,
+    },
+    lastSimulatorUsage: {
+      type: Date,
     },
     rut: {
       type: String,
@@ -112,7 +155,7 @@ const UserProfileSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
       maxlength: 120,
-      default: 'cristian.david.g123@gmail.com',
+      default: '',
     },
     phone: {
       type: String,
@@ -124,7 +167,7 @@ const UserProfileSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 120,
-      default: 'María Guzmán (Madre)',
+      default: 'Contacto Familiar',
     },
     emergencyPhone: {
       type: String,
@@ -136,24 +179,17 @@ const UserProfileSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 120,
-      default: 'Tania Montes (Tutor PAR)',
+      default: 'Inclusión y Bienestar Duoc UC',
+    },
+    diagnosticoDeclarado: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: '',
     },
     ajustesAprobados: {
       type: [ReasonableAdjustmentSchema],
-      default: [
-        {
-          tipo: 'Tiempo Adicional',
-          descripcion: '50% de tiempo adicional en certámenes y evaluaciones teóricas',
-        },
-        {
-          tipo: 'Material Digital Accesible',
-          descripcion: 'Entrega de material en formatos compatibles con lectores de pantalla',
-        },
-        {
-          tipo: 'Mobiliario y Aula',
-          descripcion: 'Ubicación preferencial en primera fila y salas de estudio adaptadas',
-        },
-      ],
+      default: [],
     },
     accessibilityPreferences: {
       fontSize: {
@@ -180,24 +216,7 @@ const UserProfileSchema = new mongoose.Schema(
     },
     enrolledCourses: {
       type: [EnrolledCourseSchema],
-      default: [
-        {
-          sigla: 'PTY4614',
-          siglaEq: '',
-          nombre: 'PROYECTO CAPSTONE',
-          seccion: '001D',
-          creditos: 10,
-          sala: 'AL-503A / AL-LAB-IP4',
-          profesor: 'Mauricio Gómez Arratia',
-          bloques: [
-            { dia: 'Miércoles', bloqueId: 'b1', texto: 'PTY4614-001D', sala: 'AL-503A' },
-            { dia: 'Miércoles', bloqueId: 'b2', texto: 'PTY4614-001D', sala: 'AL-503A' },
-            { dia: 'Viernes', bloqueId: 'b1', texto: 'PTY4614-001D', sala: 'AL-LAB-IP4' },
-            { dia: 'Viernes', bloqueId: 'b2', texto: 'PTY4614-001D', sala: 'AL-LAB-IP4' },
-            { dia: 'Viernes', bloqueId: 'b3', texto: 'PTY4614-001D', sala: 'AL-LAB-IP4' },
-          ],
-        },
-      ],
+      default: [],
     },
     lastLogin: {
       type: Date,
@@ -210,30 +229,24 @@ const UserProfileSchema = new mongoose.Schema(
   }
 );
 
-const FORBIDDEN_CREDENTIAL_FIELDS = ['password', 'passwd', 'passwordHash', 'hash', 'secret', 'clave'];
-
-// Hook Zero-Knowledge en guardado de documentos
-UserProfileSchema.pre('save', function (next) {
-  for (const field of FORBIDDEN_CREDENTIAL_FIELDS) {
-    if (this[field] !== undefined) {
-      this.set(field, undefined, { strict: false });
-      delete this._doc?.[field];
+// Hash de contraseña automático con bcrypt antes de guardar si fue modificada
+UserProfileSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  try {
+    if (this.password && !this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
     }
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 });
 
-// Hook Zero-Knowledge en actualizaciones por query
-UserProfileSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function (next) {
-  const update = this.getUpdate();
-  if (update && typeof update === 'object') {
-    for (const field of FORBIDDEN_CREDENTIAL_FIELDS) {
-      delete update[field];
-      if (update.$set) delete update.$set[field];
-      if (update.$setOnInsert) delete update.$setOnInsert[field];
-    }
-  }
-  next();
-});
+// Método para verificar contraseñas
+UserProfileSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password || !candidatePassword) return false;
+  return bcrypt.compare(candidatePassword, this.password);
+};
 
 module.exports = mongoose.model('UserProfile', UserProfileSchema);

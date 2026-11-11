@@ -38,7 +38,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
   return (
     <article
       aria-labelledby={`cat-heading-${category.id}`}
-      className="group w-full flex flex-col justify-between rounded-2xl bg-white p-6 text-left border border-slate-200/80 shadow-2xs hover:shadow-lg hover:border-slate-300/90 transition-all duration-300 hover:-translate-y-0.5"
+      className="group w-full flex flex-col justify-between rounded-2xl bg-white p-6 text-left border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
     >
       <div className="w-full">
         {/* Cabecera limpia: Ícono suave y contador simple */}

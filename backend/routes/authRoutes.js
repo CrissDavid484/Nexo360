@@ -29,5 +29,6 @@ router.put('/profile', verifyToken, authController.updateProfile);
 router.get('/toma-ramos', verifyToken, authController.getTomaRamos);
 router.post('/toma-ramos', verifyToken, authController.saveTomaRamos);
 router.put('/toma-ramos', verifyToken, authController.saveTomaRamos);
+router.post('/simulator-log', verifyToken, authController.recordSimulatorUsage);
 
 module.exports = router;

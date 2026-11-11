@@ -29,6 +29,11 @@ export const AccessibilityProvider = ({ children }) => {
     return localStorage.getItem('nexo360_reduced_motion') === 'true';
   });
 
+  // Guía de lectura / regla de enfoque para Dislexia y TDAH (W3C COGA)
+  const [readingGuide, setReadingGuide] = useState(() => {
+    return localStorage.getItem('nexo360_reading_guide') === 'true';
+  });
+
   // Estado para anuncios de lectores de pantalla (WCAG 4.1.3 Status Messages)
   const [announcement, setAnnouncement] = useState('');
   const [announcementPriority, setAnnouncementPriority] = useState('polite');
@@ -166,11 +171,27 @@ export const AccessibilityProvider = ({ children }) => {
     });
   }, [announce]);
 
+  const toggleReadingGuide = useCallback(() => {
+    setReadingGuide((prev) => {
+      const next = !prev;
+      localStorage.setItem('nexo360_reading_guide', String(next));
+      announce(
+        next
+          ? 'Guía de lectura activada. Una regla visual resaltará la línea bajo el cursor.'
+          : 'Guía de lectura desactivada.',
+        'polite'
+      );
+      return next;
+    });
+  }, [announce]);
+
   const resetPreferences = useCallback(() => {
     setFontSize('normal');
     setHighContrast(false);
     setDyslexicFont(false);
     setReducedMotion(false);
+    setReadingGuide(false);
+    localStorage.removeItem('nexo360_reading_guide');
     announce('Preferencias de visualización restablecidas a los valores predeterminados');
   }, [announce]);
 
@@ -190,6 +211,7 @@ export const AccessibilityProvider = ({ children }) => {
       highContrast,
       dyslexicFont,
       reducedMotion,
+      readingGuide,
       announcement,
       announcementPriority,
       announce,
@@ -198,6 +220,7 @@ export const AccessibilityProvider = ({ children }) => {
       toggleHighContrast,
       toggleDyslexicFont,
       toggleReducedMotion,
+      toggleReadingGuide,
       resetPreferences,
       loadUserPreferences,
     }),
@@ -206,6 +229,7 @@ export const AccessibilityProvider = ({ children }) => {
       highContrast,
       dyslexicFont,
       reducedMotion,
+      readingGuide,
       announcement,
       announcementPriority,
       announce,
@@ -214,6 +238,7 @@ export const AccessibilityProvider = ({ children }) => {
       toggleHighContrast,
       toggleDyslexicFont,
       toggleReducedMotion,
+      toggleReadingGuide,
       resetPreferences,
       loadUserPreferences,
     ]

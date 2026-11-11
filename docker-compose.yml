@@ -37,6 +37,10 @@ services:
       - JWT_SECRET=${JWT_SECRET:-nexo360_duoc_paedis_secret_key_wcag_2026}
       - MOCK_PUPPETEER=true
       - FRONTEND_URL=http://localhost:5173
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: ["node", "server.js"]
     depends_on:
       mongodb:
         condition: service_healthy
@@ -59,6 +63,7 @@ services:
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/vite.config.js:/app/vite.config.js
     depends_on:
       backend:
         condition: service_healthy

@@ -1,4 +1,5 @@
-import React, { useState, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { DUOC_CATEGORIES, INTENT_SHORTCUTS } from '../data/duocModulesData';
@@ -25,6 +26,14 @@ const VivoDuocSummaryView = lazy(() =>
   import('../components/views/VivoDuocSummaryView').then((m) => ({
     default: m.VivoDuocSummaryView,
   }))
+);
+const TomaRamosSimulator = lazy(() =>
+  import('../components/simulation/TomaRamosSimulator').then((m) => ({
+    default: m.TomaRamosSimulator,
+  }))
+);
+const AdminPanelView = lazy(() =>
+  import('../components/views/AdminPanelView').then((m) => ({ default: m.AdminPanelView }))
 );
 
 import {
@@ -66,7 +75,7 @@ const PURPOSE_GROUPS = [
   },
   {
     id: 'inclusion',
-    label: 'Inclusión, PAEDIS y bienestar',
+    label: 'Inclusión y bienestar',
     ids: ['beneficios-estudiantiles', 'convivencia-inclusion'],
   },
   {
@@ -83,18 +92,34 @@ export const DashboardPage = () => {
 
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedSubmodule, setSelectedSubmodule] = useState(null);
+  const [selectedArticle, setSelectedArticle] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [faqExpanded, setFaqExpanded] = useState(0);
 
+  // Registrar uso del simulador para las métricas del panel de administración
+  useEffect(() => {
+    if (activeTab === 'toma-ramos') {
+      api.logSimulatorUsage().catch(() => {});
+    }
+  }, [activeTab]);
+
   const handleOpenCategory = (category) => {
     setSelectedCategory(category);
     setSelectedSubmodule(null);
+    setSelectedArticle(null);
   };
 
   const handleOpenSubmodule = (category, submodule) => {
     setSelectedCategory(category);
     setSelectedSubmodule(submodule);
+    setSelectedArticle(null);
+  };
+
+  const handleOpenArticleDirectly = (category, submodule, article) => {
+    setSelectedCategory(category);
+    setSelectedSubmodule(submodule);
+    setSelectedArticle(article);
   };
 
   const handleSelectIntentShortcut = (shortcut) => {
@@ -103,6 +128,7 @@ export const DashboardPage = () => {
     const sub = cat.submodules.find((s) => s.id === shortcut.submoduleId) || null;
     setSelectedCategory(cat);
     setSelectedSubmodule(sub);
+    setSelectedArticle(null);
   };
 
   const officialDuocFaqs = [
@@ -228,7 +254,7 @@ export const DashboardPage = () => {
   const userCampus = user?.campus || user?.sede || 'Sede Alameda';
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-900 transition-colors">
+    <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900 transition-colors">
       {/* 1. Barra de Preferencias de Lectura y Visualización (Limpia y Amigable) */}
       <AccessibilityBar />
 
@@ -242,7 +268,7 @@ export const DashboardPage = () => {
             {/* BIENVENIDA + BUSCADOR INTEGRADO (Baja sobrecarga sensorial, diseño limpio y humano) */}
             <section
               aria-labelledby="main-summary-heading"
-              className="bg-white rounded-3xl p-6 sm:p-9 border border-slate-200/80 shadow-2xs"
+              className="bg-white rounded-3xl p-6 sm:p-9 border border-slate-200 shadow-sm sm:shadow-md ring-1 ring-slate-900/[0.03]"
             >
               <div className="max-w-3xl">
                 <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 mb-2">
@@ -312,7 +338,7 @@ export const DashboardPage = () => {
                       No encontramos resultados para &ldquo;{searchTerm}&rdquo;
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                      Prueba con términos como &ldquo;PAEDIS&rdquo;, &ldquo;inasistencia&rdquo;, &ldquo;gratuidad&rdquo;, &ldquo;TNE&rdquo;, &ldquo;congelar&rdquo; o &ldquo;MFA&rdquo;.
+                      Prueba con términos como &ldquo;inasistencia&rdquo;, &ldquo;gratuidad&rdquo;, &ldquo;TNE&rdquo;, &ldquo;congelar&rdquo; o &ldquo;MFA&rdquo;.
                     </p>
                   </div>
                 ) : (
@@ -392,21 +418,20 @@ export const DashboardPage = () => {
                             <div className="flex flex-wrap items-center gap-2 pt-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleOpenSubmodule(art.category, art.submodule)}
-                                className="min-h-[34px] px-3 py-1 bg-white hover:bg-slate-100 text-[#002B49] font-semibold text-xs rounded-lg border border-slate-200/90 inline-flex items-center gap-1.5 transition-colors"
+                                onClick={() => handleOpenArticleDirectly(art.category, art.submodule, art)}
+                                className="min-h-[34px] px-3.5 py-1 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                               >
-                                <span>Ver instrucciones</span>
+                                <BookOpen className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                                <span>Leer guía</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSubmodule(art.category, art.submodule)}
+                                className="min-h-[34px] px-3 py-1 bg-white hover:bg-slate-100 text-[#002B49] font-semibold text-xs rounded-lg border border-slate-200/90 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <span>Ver trámite</span>
                                 <ArrowRight className="w-3 h-3" aria-hidden="true" />
                               </button>
-                              <a
-                                href={art.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="min-h-[34px] px-3 py-1 text-slate-600 hover:text-slate-900 font-medium text-xs inline-flex items-center gap-1 hover:underline"
-                              >
-                                <span>Artículo oficial</span>
-                                <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                              </a>
                             </div>
                           </div>
                         ))}
@@ -417,88 +442,7 @@ export const DashboardPage = () => {
               </section>
             )}
 
-            {/* RESUMEN RÁPIDO DEL ESTUDIANTE (3 Tarjetas limpias y calmadas) */}
-            <section aria-labelledby="quick-access-heading">
-              <h2 id="quick-access-heading" className="sr-only">
-                Resumen rápido de mi estado académico y soporte
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('vivo-duoc')}
-                  aria-label="Ir a Mi Asistencia en Experiencia Vivo. Capstone 88.9%, cumpliendo el mínimo de 70%."
-                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between group"
-                >
-                  <div>
-                    <span className="text-xs font-medium text-slate-500 block">
-                      Asistencia actual
-                    </span>
-                    <span className="text-lg sm:text-xl font-bold text-slate-900 block mt-0.5">
-                      Capstone · 88.9%
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium mt-1.5 bg-emerald-50/80 px-2 py-0.5 rounded-full">
-                      Al día (mínimo 70%)
-                    </span>
-                  </div>
-                  <div
-                    className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
-                    aria-hidden="true"
-                  >
-                    <CheckSquare className="w-5 h-5" aria-hidden="true" />
-                  </div>
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('vivo-duoc')}
-                  aria-label="Ir a Mis Horarios en Experiencia Vivo. Próxima clase Miércoles 18:45, Sala 402."
-                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between group"
-                >
-                  <div>
-                    <span className="text-xs font-medium text-slate-500 block">
-                      Próxima clase
-                    </span>
-                    <span className="text-lg sm:text-xl font-bold text-slate-900 block mt-0.5">
-                      Miércoles · 18:45
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-sky-800 font-medium mt-1.5 bg-sky-50/80 px-2 py-0.5 rounded-full">
-                      Sala 402 · Sede Alameda
-                    </span>
-                  </div>
-                  <div
-                    className="w-11 h-11 rounded-xl bg-sky-50 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
-                    aria-hidden="true"
-                  >
-                    <Clock className="w-5 h-5" aria-hidden="true" />
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('tickets')}
-                  aria-label="Ir a Soporte TI y Tickets de Servicios Digitales."
-                  className="bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between group"
-                >
-                  <div>
-                    <span className="text-xs font-medium text-slate-500 block">
-                      Mesa de ayuda TI
-                    </span>
-                    <span className="text-lg sm:text-xl font-bold text-slate-900 block mt-0.5">
-                      Soporte Digital
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-slate-600 font-medium mt-1.5 bg-slate-100 px-2 py-0.5 rounded-full">
-                      Correo, AVA, MFA y WiFi
-                    </span>
-                  </div>
-                  <div
-                    className="w-11 h-11 rounded-xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
-                    aria-hidden="true"
-                  >
-                    <Laptop className="w-5 h-5" aria-hidden="true" />
-                  </div>
-                </button>
-              </div>
-            </section>
 
             {/* CONSULTAS FRECUENTES (8 accesos directos limpios) */}
             <section aria-labelledby="intent-shortcuts-heading" className="space-y-4">
@@ -523,7 +467,7 @@ export const DashboardPage = () => {
                       type="button"
                       onClick={() => handleSelectIntentShortcut(shortcut)}
                       aria-haspopup="dialog"
-                      className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50/50 border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-md text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 group active:scale-[0.99]"
+                      className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50/60 border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-lg text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 group active:scale-[0.99]"
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-3">
@@ -592,8 +536,8 @@ export const DashboardPage = () => {
                         aria-pressed={isSelected}
                         className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 active:scale-[0.98] ${
                           isSelected
-                            ? 'bg-[#002B49] text-white border-[#002B49] shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 border-slate-200/80'
+                            ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 border-slate-200'
                         }`}
                       >
                         {group.label}
@@ -604,7 +548,7 @@ export const DashboardPage = () => {
               </div>
 
               {searchAnalysis.categories.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-2xl border border-slate-200/80 p-8">
+                <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-8 shadow-xs">
                   <HelpCircle
                     className="w-10 h-10 text-slate-400 mx-auto mb-2.5"
                     aria-hidden="true"
@@ -640,7 +584,7 @@ export const DashboardPage = () => {
             {/* PREGUNTAS FRECUENTES */}
             <section
               aria-labelledby="faqs-heading"
-              className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-4"
+              className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm sm:shadow-md space-y-4"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                 <div>
@@ -700,26 +644,34 @@ export const DashboardPage = () => {
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             <button
                               type="button"
+                              onClick={() => {
+                                const cat = DUOC_CATEGORIES.find((c) => c.id === faq.categoryId);
+                                const sub = cat?.submodules.find((s) => s.id === faq.submoduleId);
+                                const art = sub?.articles.find((a) => a.url === faq.articleUrl);
+                                if (cat && sub && art) {
+                                  handleOpenArticleDirectly(cat, sub, art);
+                                } else if (cat && sub) {
+                                  handleOpenSubmodule(cat, sub);
+                                }
+                              }}
+                              className="min-h-[36px] px-3.5 py-1.5 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                              <span>Leer guía en Nexo360</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() =>
                                 handleSelectIntentShortcut({
                                   categoryId: faq.categoryId,
                                   submoduleId: faq.submoduleId,
                                 })
                               }
-                              className="min-h-[36px] px-3.5 py-1.5 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-colors"
+                              className="min-h-[36px] px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200/80 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                             >
                               <span>Ver pasos del trámite</span>
-                              <ArrowRight className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                              <ArrowRight className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
                             </button>
-                            <a
-                              href={faq.articleUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="min-h-[36px] px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200/80 inline-flex items-center gap-1.5 transition-colors"
-                            >
-                              <span>Artículo en centroayuda.duoc.cl</span>
-                              <ExternalLink className="w-3 h-3 text-slate-400" aria-hidden="true" />
-                            </a>
                           </div>
                         </div>
                       )}
@@ -743,6 +695,12 @@ export const DashboardPage = () => {
             </div>
           }
         >
+          {activeTab === 'toma-ramos' && (
+            <div className="animate-fade-in-up">
+              <TomaRamosSimulator onExit={() => setActiveTab('centro-ayuda')} />
+            </div>
+          )}
+
           {activeTab === 'biblioteca' && (
             <div className="animate-fade-in-up">
               <BibliotecaView />
@@ -766,6 +724,12 @@ export const DashboardPage = () => {
               <PerfilView />
             </div>
           )}
+
+          {activeTab === 'admin-panel' && (
+            <div className="animate-fade-in-up">
+              <AdminPanelView />
+            </div>
+          )}
         </Suspense>
       </main>
 
@@ -774,9 +738,11 @@ export const DashboardPage = () => {
         <ModuleModal
           category={selectedCategory}
           initialSubmodule={selectedSubmodule}
+          initialArticle={selectedArticle}
           onClose={() => {
             setSelectedCategory(null);
             setSelectedSubmodule(null);
+            setSelectedArticle(null);
           }}
         />
       )}

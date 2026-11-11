@@ -32,7 +32,14 @@ const verifyToken = async (req, res, next) => {
 
     // Soporte controlado para sesión Demo exclusivamente fuera de producción
     if (isDemoTokenAllowed(token)) {
-      req.user = { email: 'c.guzman@duocuc.cl', fullName: 'Cristian Guzmán' };
+      req.user = {
+        _id: 'seed_admin_c_guzman',
+        id: 'seed_admin_c_guzman',
+        email: 'c.guzman@duocuc.cl',
+        fullName: 'Cristian Guzmán',
+        role: 'admin',
+        roleLabel: 'Administrador del Sistema Nexo360',
+      };
       return next();
     }
 
@@ -59,7 +66,20 @@ const verifyToken = async (req, res, next) => {
 };
 
 /**
- * Middleware opcional: si hay token válido adjunta el usuario; nunca suplanta identidad sin token
+ * Middleware para restringir acceso exclusivo a Administradores
+ */
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso restringido: Se requieren privilegios de Administrador para acceder a este módulo.',
+    });
+  }
+  next();
+};
+
+/**
+ * Middleware opcional: si hay token válido adjunta el usuario
  */
 const optionalToken = async (req, res, next) => {
   try {
@@ -67,7 +87,14 @@ const optionalToken = async (req, res, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       if (isDemoTokenAllowed(token)) {
-        req.user = { email: 'c.guzman@duocuc.cl', fullName: 'Cristian Guzmán' };
+        req.user = {
+          _id: 'seed_admin_c_guzman',
+          id: 'seed_admin_c_guzman',
+          email: 'c.guzman@duocuc.cl',
+          fullName: 'Cristian Guzmán',
+          role: 'admin',
+          roleLabel: 'Administrador del Sistema Nexo360',
+        };
         return next();
       }
       const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
@@ -84,4 +111,4 @@ const optionalToken = async (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, optionalToken, getJwtSecret };
+module.exports = { verifyToken, requireAdmin, optionalToken, getJwtSecret };

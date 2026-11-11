@@ -24,7 +24,7 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-900">
+    <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900">
       <AccessibilityBar />
 
       <main

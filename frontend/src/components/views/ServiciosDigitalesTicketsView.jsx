@@ -37,7 +37,7 @@ export const ServiciosDigitalesTicketsView = () => {
   return (
     <section aria-labelledby="tickets-view-title" className="space-y-6">
       {/* 1. Encabezado limpio y amigable */}
-      <div className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200/80 shadow-2xs">
+      <div className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200 shadow-sm">
         <div>
           <span className="text-xs font-semibold text-[#002B49] block mb-1">
             Mesa de Servicios Digitales • Duoc UC
@@ -65,7 +65,7 @@ export const ServiciosDigitalesTicketsView = () => {
       </div>
 
       {/* 2. Áreas de soporte */}
-      <article className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-2xs space-y-6">
+      <article className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
         <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
           <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#002B49] flex items-center justify-center shrink-0" aria-hidden="true">
             <LifeBuoy className="w-5 h-5" aria-hidden="true" />
@@ -107,7 +107,7 @@ export const ServiciosDigitalesTicketsView = () => {
 
       {/* 3. Instrucciones y canales de contacto */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-        <article className="md:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-4">
+        <article className="md:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-sm space-y-4">
           <h3 className="text-base sm:text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
             Cómo ingresar un ticket paso a paso
           </h3>
@@ -130,7 +130,7 @@ export const ServiciosDigitalesTicketsView = () => {
           </ol>
         </article>
 
-        <aside className="md:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-4">
+        <aside className="md:col-span-5 bg-white rounded-2xl border border-slate-200 p-6 sm:p-7 shadow-sm space-y-4">
           <h3 className="text-base sm:text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
             Contacto directo
           </h3>

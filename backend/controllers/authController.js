@@ -95,6 +95,7 @@ exports.ssoLogin = async (req, res) => {
 
 /**
  * POST /api/auth/login
+ * Inicio de sesión nativo contra la Base de Datos Nexo360 (con hash bcrypt)
  */
 exports.login = async (req, res) => {
   try {
@@ -123,23 +124,22 @@ exports.login = async (req, res) => {
     if (!EMAIL_REGEX.test(cleanEmail)) {
       return res.status(400).json({
         success: false,
-        message: 'El correo debe pertenecer al dominio institucional (@duocuc.cl o @duoc.cl).',
+        message: 'El correo debe pertenecer al dominio institucional (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).',
       });
     }
 
-    const sessionData = await authScraperService.startLoginProcess(cleanEmail, password);
+    const result = await authScraperService.loginWithPassword(cleanEmail, password);
 
     return res.status(200).json({
       success: true,
-      sessionId: sessionData.sessionId,
-      status: sessionData.status,
-      mfaCode: sessionData.mfaCode,
-      mfaNumber: sessionData.mfaCode,
-      message: 'Credenciales validadas. Esperando aprobación en Microsoft Authenticator.',
+      status: 'COMPLETED',
+      token: result.token,
+      user: result.user,
+      message: 'Inicio de sesión institucional exitoso en Nexo360.',
     });
   } catch (error) {
-    if (error.code === 'TOO_MANY_SESSIONS') {
-      return res.status(429).json({
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
         success: false,
         message: error.message,
       });
@@ -147,8 +147,24 @@ exports.login = async (req, res) => {
     console.error('[AuthController] Error en login:', error.message);
     return res.status(500).json({
       success: false,
-      message: 'Error al conectar con el servidor de autenticación institucional.',
+      message: 'Error al verificar las credenciales en la base de datos de Nexo360.',
     });
+  }
+};
+
+/**
+ * POST /api/auth/simulator-log
+ * Registra que un estudiante interactuó con el Simulador de Toma de Ramos
+ */
+exports.recordSimulatorUsage = async (req, res) => {
+  try {
+    await authScraperService.recordSimulatorUsage(req.user);
+    return res.status(200).json({
+      success: true,
+      message: 'Uso del simulador registrado en la base de datos.',
+    });
+  } catch (error) {
+    return res.status(200).json({ success: true });
   }
 };
 
@@ -399,9 +415,26 @@ exports.saveTomaRamos = async (req, res) => {
 
     const updatedUser = await UserProfile.findOneAndUpdate(
       { email: targetEmail },
-      { $set: { enrolledCourses: sanitizedCourses } },
+      {
+        $set: {
+          enrolledCourses: sanitizedCourses,
+          hasUsedSimulator: true,
+          lastSimulatorUsage: new Date(),
+        },
+        $inc: { simulatorUsageCount: 1 },
+      },
       { new: true, upsert: true, runValidators: true }
     );
+
+    // Registrar en ActivityLog
+    await authScraperService.logActivity({
+      userId: req.user._id || req.user.id,
+      userEmail: req.user.email,
+      userName: req.user.fullName || req.user.nombre || req.user.email,
+      userRole: req.user.role || 'estudiante',
+      action: 'saved_toma_ramos',
+      details: `El estudiante guardó ${sanitizedCourses.length} asignaturas en el Simulador de Toma de Ramos.`,
+    });
 
     return res.status(200).json({
       success: true,
