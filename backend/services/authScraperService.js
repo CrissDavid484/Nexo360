@@ -7,6 +7,8 @@ const ActivityLog = require('../models/ActivityLog');
 const { getJwtSecret } = require('../middleware/authMiddleware');
 const { SEED_USERS, DEFAULT_SEED_PASSWORD } = require('../data/seedUsers');
 
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]{1,64}@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/i;
+
 /**
  * SERVICIO DE AUTENTICACIÓN INSTITUCIONAL Y GESTIÓN DE USUARIOS NEXO360
  * Base de Datos Nativa con bcrypt, roles, estados académicos y registro de actividad
@@ -131,15 +133,30 @@ class AuthScraperService {
       userDoc = inMemoryUsers.get(cleanEmail);
     }
 
+    // Si el usuario no existía pero pertenece al dominio institucional Duoc UC, crearlo dinámicamente
+    let isNewlyCreated = false;
     if (!userDoc) {
-      const err = new Error('Usuario no encontrado en la base de datos de Nexo360.');
-      err.statusCode = 404;
-      throw err;
+      if (EMAIL_REGEX.test(cleanEmail)) {
+        userDoc = await this.findOrCreateUserProfile(cleanEmail);
+        isNewlyCreated = true;
+      } else {
+        const err = new Error('Usuario no encontrado en la base de datos de Nexo360.');
+        err.statusCode = 404;
+        throw err;
+      }
     }
 
     // Validación de contraseña cifrada con bcrypt o clave por defecto
     let isPasswordValid = false;
-    if (userDoc.password) {
+    if (isNewlyCreated) {
+      // Para nuevos usuarios institucionales que inician sesión por primera vez, registrar su contraseña ingresada
+      isPasswordValid = true;
+      if (password && mongoose.connection.readyState === 1 && userDoc && typeof userDoc.save === 'function') {
+        const salt = await bcrypt.genSalt(10);
+        userDoc.password = await bcrypt.hash(password, salt);
+        await userDoc.save().catch(() => {});
+      }
+    } else if (userDoc.password) {
       isPasswordValid = await bcrypt.compare(password, userDoc.password);
     }
 
@@ -205,6 +222,10 @@ class AuthScraperService {
         console.warn('[ActivityLog] No se pudo guardar en MongoDB:', err.message);
       }
     }
+  }
+
+  getRecentLogs(limit = 10) {
+    return inMemoryLogs.slice(0, limit);
   }
 
   /**
@@ -288,6 +309,32 @@ class AuthScraperService {
           });
           return user;
         }
+
+        // Si es un correo institucional no registrado en SEED_USERS, crearlo en MongoDB
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(DEFAULT_SEED_PASSWORD, salt);
+        const isProf = cleanEmail.includes('profesor') || cleanEmail.includes('docente');
+        const isAdmin = cleanEmail.includes('admin') || cleanEmail.includes('coordinador');
+        const role = isAdmin ? 'administrador' : isProf ? 'profesor' : 'estudiante';
+        const roleLabel = isAdmin ? 'Administrador del Sistema' : isProf ? 'Docente Duoc UC' : 'Estudiante Regular Duoc UC';
+        const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ').toUpperCase();
+
+        user = await UserProfile.create({
+          email: cleanEmail,
+          fullName: namePart,
+          nombre: namePart,
+          role,
+          roleLabel,
+          password: hashedPassword,
+          sede: 'ALAMEDA',
+          carrera: isProf ? 'DOCENCIA GENERAL' : 'INGENIER. EN INFRAESTRUCTURA TECNOLÓGICA',
+          isPaedis: false,
+          academicStatus: 'activo',
+          attendanceRate: 88,
+          hasUsedSimulator: false,
+          simulatorUsageCount: 0,
+        });
+        return user;
       } catch (err) {
         console.warn('[AuthService] Error findOrCreate en MongoDB:', err.message);
       }

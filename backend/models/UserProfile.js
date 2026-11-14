@@ -73,6 +73,7 @@ const UserProfileSchema = new mongoose.Schema(
       trim: true,
       enum: [
         'admin',
+        'administrador',
         'estudiante_paedis',
         'estudiante',
         'tutor_par',

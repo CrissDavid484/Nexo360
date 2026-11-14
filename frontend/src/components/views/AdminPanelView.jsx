@@ -21,12 +21,23 @@ import {
   TrendingDown,
   ChevronRight,
   UserCheck,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useAuth } from '../../context/AuthContext';
+import { CoursesAdminSection } from '../admin/CoursesAdminSection';
 
 export const AdminPanelView = () => {
   const { announce } = useAccessibility();
+  const { user } = useAuth();
+
+  // Coherencia de permisos y roles: administrador o coordinador_paedis
+  const userRole = user?.role?.toLowerCase() || '';
+  const canManageAdmin = userRole === 'admin' || userRole === 'administrador' || userRole === 'coordinador_paedis';
+
+  // Sub-pestaña activa del Panel Admin
+  const [adminSubTab, setAdminSubTab] = useState('estudiantes'); // 'estudiantes' | 'oferta-ramos'
 
   // Estados de datos
   const [metrics, setMetrics] = useState(null);
@@ -269,8 +280,25 @@ export const AdminPanelView = () => {
             </button>
             <button
               type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="min-h-[44px] px-5 py-2.5 bg-[#FFB81C] hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs sm:text-sm inline-flex items-center gap-2 shadow-md transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white cursor-pointer"
+              onClick={() => {
+                if (!canManageAdmin) {
+                  announce('Acción denegada: Requiere privilegios de Administrador o Coordinador PAEDIS.', 'assertive');
+                  return;
+                }
+                setIsCreateModalOpen(true);
+              }}
+              disabled={!canManageAdmin}
+              aria-disabled={!canManageAdmin}
+              title={
+                !canManageAdmin
+                  ? 'Acción restringida: Se requiere rol de Administrador o Coordinador PAEDIS'
+                  : 'Registrar nuevo estudiante o usuario'
+              }
+              className={`min-h-[44px] px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm inline-flex items-center gap-2 shadow-md transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 ${
+                canManageAdmin
+                  ? 'bg-[#FFB81C] hover:bg-amber-400 text-slate-950 cursor-pointer'
+                  : 'bg-slate-300 text-slate-600 cursor-not-allowed opacity-60'
+              }`}
             >
               <UserPlus className="w-4 h-4 text-slate-950" aria-hidden="true" />
               <span>Registrar Estudiante / Usuario</span>
@@ -278,6 +306,41 @@ export const AdminPanelView = () => {
           </div>
         </div>
       </section>
+
+      {/* Pestañas de Navegación del Panel de Administración */}
+      <nav aria-label="Secciones del Panel de Administración" className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => {
+            setAdminSubTab('estudiantes');
+            announce('Pestaña de Gestión de Estudiantes seleccionada.', 'polite');
+          }}
+          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            adminSubTab === 'estudiantes'
+              ? 'bg-[#002B49] text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Users className="w-4 h-4 text-amber-400" />
+          <span>Gestión de Estudiantes & Retención</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAdminSubTab('oferta-ramos');
+            announce('Pestaña de Oferta Académica y Carga de Ramos seleccionada.', 'polite');
+          }}
+          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            adminSubTab === 'oferta-ramos'
+              ? 'bg-[#002B49] text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+          <span>Oferta Académica & Simulador (Excel / BD)</span>
+        </button>
+      </nav>
 
       {/* Alerta de Feedback Accesible */}
       {feedbackMessage && (
@@ -309,6 +372,11 @@ export const AdminPanelView = () => {
         </div>
       )}
 
+      {/* Renderizado condicional según sub-pestaña */}
+      {adminSubTab === 'oferta-ramos' ? (
+        <CoursesAdminSection />
+      ) : (
+        <>
       {/* 2. TARJETAS KPI EJECUTIVAS */}
       <section aria-labelledby="kpis-heading" className="space-y-3.5">
         <div className="flex items-center justify-between">
@@ -827,15 +895,37 @@ export const AdminPanelView = () => {
                         <button
                           type="button"
                           onClick={() => handleOpenStatusModal(student)}
-                          className="min-h-[34px] px-3 py-1 bg-white hover:bg-[#002B49] text-[#002B49] hover:text-white border border-[#002B49]/40 hover:border-[#002B49] rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#FFB81C] cursor-pointer"
+                          disabled={!canManageAdmin}
+                          aria-disabled={!canManageAdmin}
+                          title={
+                            !canManageAdmin
+                              ? 'Acción restringida a Administradores y Coordinadores'
+                              : `Cambiar estado de ${student.fullName}`
+                          }
+                          className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 ${
+                            canManageAdmin
+                              ? 'bg-white hover:bg-[#002B49] text-[#002B49] hover:text-white border border-[#002B49]/40 hover:border-[#002B49] cursor-pointer'
+                              : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50'
+                          }`}
                         >
                           Cambiar Estado
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteStudent(student)}
+                          disabled={!canManageAdmin}
+                          aria-disabled={!canManageAdmin}
                           aria-label={`Eliminar a ${student.fullName}`}
-                          className="min-h-[34px] p-1.5 text-slate-400 hover:text-rose-700 rounded-lg hover:bg-rose-50 transition-colors inline-flex items-center justify-center cursor-pointer"
+                          title={
+                            !canManageAdmin
+                              ? 'Acción restringida a Administradores y Coordinadores'
+                              : `Eliminar a ${student.fullName}`
+                          }
+                          className={`min-h-[44px] min-w-[44px] p-2.5 rounded-xl transition-colors inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 ${
+                            canManageAdmin
+                              ? 'text-slate-500 hover:text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 cursor-pointer'
+                              : 'text-slate-300 cursor-not-allowed opacity-50'
+                          }`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -848,6 +938,8 @@ export const AdminPanelView = () => {
           </table>
         </div>
       </section>
+      </>
+      )}
 
       {/* MODAL 1: Cambiar Estado Académico (Activo, Deserción, Titulado) */}
       {isStatusModalOpen && selectedStudentForStatus && (

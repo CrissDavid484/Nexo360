@@ -156,10 +156,13 @@ exports.getMetrics = async (req, res) => {
       screenReaderOptimized: allUsers.filter((u) => u.accessibilityPreferences?.screenReaderOptimized).length,
     };
 
-    // Actividad reciente
+    // Actividad reciente (MongoDB con respaldo en memoria)
     let recentActivity = [];
     if (mongoose.connection.readyState === 1) {
       recentActivity = await ActivityLog.find({}).sort({ createdAt: -1 }).limit(10).lean();
+    }
+    if (!recentActivity || recentActivity.length === 0) {
+      recentActivity = authScraperService.getRecentLogs(10);
     }
 
     return res.status(200).json({
@@ -443,6 +446,162 @@ exports.deleteStudent = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error al eliminar el usuario de la base de datos.',
+    });
+  }
+};
+
+const courseService = require('../services/courseService');
+
+/**
+ * GET /api/admin/courses/summary
+ * Resumen de oferta académica y estado de la base de datos de asignaturas
+ */
+exports.getCoursesSummary = async (req, res) => {
+  try {
+    const careers = await courseService.getCareersSummary();
+    const totalSecciones = careers.reduce((acc, c) => acc + c.totalSecciones, 0);
+    const totalAsignaturas = careers.reduce((acc, c) => acc + c.totalAsignaturas, 0);
+
+    return res.status(200).json({
+      success: true,
+      summary: {
+        totalSecciones,
+        totalAsignaturas,
+        totalCarreras: careers.length,
+        periodoActivo: '2026 - 002',
+        careers,
+      },
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al obtener resumen de cursos:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar el resumen de asignaturas.',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * POST /api/admin/courses/import
+ * Importación masiva de asignaturas y secciones desde Excel (.xlsx/.xls), Markdown (.md) o JSON
+ * Soporta 'replace: true' para sobreescribir el catálogo anterior y limpiar períodos previos.
+ */
+exports.importCourses = async (req, res) => {
+  try {
+    const { rows, markdown, md, fileBase64, base64, textContent, replace, periodo } = req.body || {};
+    const payload = rows || markdown || md || fileBase64 || base64 || textContent || req.body;
+
+    if (!payload || (Array.isArray(payload) && payload.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar una lista de filas válida, texto Markdown o archivo codificado en el cuerpo de la solicitud.',
+      });
+    }
+
+    const result = await courseService.bulkImport(req.body, {
+      replace: Boolean(replace),
+      periodo: periodo || '2026 - 002',
+    });
+
+    await authScraperService.logActivity({
+      userId: req.user?._id || req.user?.id || 'admin',
+      userEmail: req.user?.email || 'admin@duocuc.cl',
+      userName: req.user?.fullName || req.user?.nombre || 'Administrador',
+      userRole: req.user?.role || 'admin',
+      action: 'IMPORT',
+      details: `Importación masiva (${result.sourceFormat || 'XLSX/MD/JSON'}): ${result.seccionesImportadas} secciones para ${result.carrerasDetectadas.length} carreras. Sobreescritura previa: ${Boolean(replace)}.`,
+      metadata: {
+        replace: Boolean(replace),
+        sourceFormat: result.sourceFormat,
+        seccionesImportadas: result.seccionesImportadas,
+        carreras: result.carrerasDetectadas,
+        totalFilas: result.totalFilas,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Se importaron ${result.seccionesImportadas} secciones exitosamente (${result.carrerasDetectadas.length} carreras).`,
+      result,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error en importación masiva de cursos:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Error al procesar e importar las asignaturas en la base de datos.',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * POST /api/admin/courses/seed
+ * Restablece y siembra el catálogo de ramos oficial Alameda 2026-002
+ */
+exports.seedCourses = async (req, res) => {
+  try {
+    const result = await courseService.seedInitialCourses({ force: true });
+
+    await authScraperService.logActivity({
+      userId: req.user?._id || req.user?.id || 'admin',
+      userEmail: req.user?.email || 'admin@duocuc.cl',
+      userName: req.user?.fullName || req.user?.nombre || 'Administrador',
+      userRole: req.user?.role || 'admin',
+      action: 'SEED',
+      details: `Restablecimiento de Catálogo Oficial Alameda 2026-002: ${result.count} secciones cargadas exitosamente.`,
+      metadata: {
+        count: result.count,
+        source: result.source,
+        periodo: '2026 - 002',
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Catálogo oficial de asignaturas Alameda 2026-002 restaurado exitosamente (${result.count} secciones).`,
+      result,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al sembrar cursos:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al sembrar el catálogo de cursos.',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * DELETE /api/admin/courses
+ * Limpia todas las asignaturas registradas
+ */
+exports.clearCourses = async (req, res) => {
+  try {
+    await courseService.clearAll();
+
+    await authScraperService.logActivity({
+      userId: req.user?._id || req.user?.id || 'admin',
+      userEmail: req.user?.email || 'admin@duocuc.cl',
+      userName: req.user?.fullName || req.user?.nombre || 'Administrador',
+      userRole: req.user?.role || 'admin',
+      action: 'CLEAR',
+      details: 'Vaciado completo del catálogo de asignaturas y secciones.',
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Base de datos de asignaturas vaciada correctamente.',
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al vaciar cursos:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al limpiar la base de datos de asignaturas.',
+      error: error.message,
     });
   }
 };

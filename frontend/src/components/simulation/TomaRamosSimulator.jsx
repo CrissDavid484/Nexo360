@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Check,
   CheckSquare,
+  Building2,
+  Sparkles,
 } from 'lucide-react';
 import {
   PORTAL_INSC_URL,
@@ -28,6 +30,8 @@ import {
   BLOQUES_HORARIOS_TOMA,
   ASIGNATURAS_DISPONIBLES,
   TOMA_RAMOS_TUTORIAL_VIDEO,
+  CARRERAS_DUOC,
+  getRandomCoursesForCareer,
 } from '../../data/tomaRamosData';
 import {
   SapSelectBoxIcon,
@@ -103,7 +107,16 @@ export const TomaRamosSimulator = ({ onExit }) => {
     return `${mins}:${secs}`;
   };
 
-  // Cursos inscritos en la sesión de práctica (inicia en 0 para permitir libre práctica)
+  // Carrera seleccionada para la simulación
+  const [selectedCarrera, setSelectedCarrera] = useState(CARRERAS_DUOC[0].nombre);
+  const [carreraInfo, setCarreraInfo] = useState(CARRERAS_DUOC[0]);
+
+  // Asignaturas activas para la simulación (generadas aleatoriamente o desde BD)
+  const [availableCourses, setAvailableCourses] = useState(() =>
+    getRandomCoursesForCareer(CARRERAS_DUOC[0].nombre, 7)
+  );
+
+  // Cursos inscritos en la sesión de práctica
   const [cursosInscritos, setCursosInscritos] = useState([]);
 
   // Cursos seleccionados en esta sesión (proyectados en el cuadro inferior y horario)
@@ -111,6 +124,56 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
   // Días de la grilla horaria
   const diasGrilla = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+  // Inicializar curso pre-inscrito para realismo SAP
+  useEffect(() => {
+    const preInscrito = availableCourses.find((c) => c.yaInscrito);
+    if (preInscrito && preInscrito.secciones?.[0]) {
+      const sec =
+        preInscrito.secciones.find((s) => s.seccion === preInscrito.seccionInscrita) ||
+        preInscrito.secciones[0];
+      setCursosInscritos([
+        {
+          sigla: preInscrito.sigla,
+          nombre: preInscrito.nombre,
+          creditos: preInscrito.creditos,
+          seccion: sec.seccion,
+          profesor: sec.profesor,
+          sala: sec.sala,
+          bloques: sec.bloques,
+          estado: 'inscrito',
+        },
+      ]);
+    } else {
+      setCursosInscritos([]);
+    }
+  }, [availableCourses]);
+
+  // Generar combinación aleatoria de asignaturas
+  const refreshRandomCourses = async (carreraName = selectedCarrera) => {
+    try {
+      const res = await api.getCourses({ carrera: carreraName, random: true, limit: 7 }).catch(() => null);
+      if (res?.success && Array.isArray(res.courses) && res.courses.length > 0) {
+        setAvailableCourses(res.courses);
+        announce(`Nuevos ramos aleatorios cargados para ${carreraName}.`, 'polite');
+        return;
+      }
+    } catch (e) {
+      // fallback
+    }
+    const localRandom = getRandomCoursesForCareer(carreraName, 7);
+    setAvailableCourses(localRandom);
+    announce(`Nuevos ramos aleatorios cargados para ${carreraName}.`, 'polite');
+  };
+
+  // Cambio de carrera
+  const handleSelectCarrera = (newCarreraName) => {
+    const info = CARRERAS_DUOC.find((c) => c.nombre === newCarreraName) || CARRERAS_DUOC[0];
+    setSelectedCarrera(newCarreraName);
+    setCarreraInfo(info);
+    setCursosSeleccionados([]);
+    refreshRandomCourses(newCarreraName);
+  };
 
   // Al entrar al simulador, asegurar un lienzo 100% limpio (empezar desde 0 para practicar)
   useEffect(() => {
@@ -239,18 +302,42 @@ export const TomaRamosSimulator = ({ onExit }) => {
   };
 
   // Función para volver a repetir la simulación limpia desde 0 (Asistida o Prueba Real)
-  const handleRepeatSimulation = (mode = 'asistido') => {
+  const handleRepeatSimulation = (mode = 'asistido', newRandom = false) => {
     setSimulationMode(mode);
     setIsGrabado(false);
     setIsHorarioUnlocked(false);
     setTimerSeconds(0);
     setIsTimerRunning(false);
     setCursosSeleccionados([]);
-    setCursosInscritos([]); // Inicia siempre en 0 para practicar limpiamente
     setLeftPanelView('lista');
     setCurrentAsignatura(null);
     setTopeHorarioError('');
     setStep('bienvenida');
+
+    if (newRandom) {
+      refreshRandomCourses(selectedCarrera);
+    } else {
+      const preInscrito = availableCourses.find((c) => c.yaInscrito);
+      if (preInscrito && preInscrito.secciones?.[0]) {
+        const sec =
+          preInscrito.secciones.find((s) => s.seccion === preInscrito.seccionInscrita) ||
+          preInscrito.secciones[0];
+        setCursosInscritos([
+          {
+            sigla: preInscrito.sigla,
+            nombre: preInscrito.nombre,
+            creditos: preInscrito.creditos,
+            seccion: sec.seccion,
+            profesor: sec.profesor,
+            sala: sec.sala,
+            bloques: sec.bloques,
+            estado: 'inscrito',
+          },
+        ]);
+      } else {
+        setCursosInscritos([]);
+      }
+    }
 
     // Asegurar limpieza de la base de datos para la nueva sesión
     api.saveTomaRamos([]).catch(() => {});
@@ -263,7 +350,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
   // Reiniciar simulador al inicio empezando desde 0
   const handleReset = () => {
-    handleRepeatSimulation(simulationMode);
+    handleRepeatSimulation(simulationMode, true);
   };
 
   // Salir del simulador garantizando borrado de ramos para la próxima visita
@@ -312,7 +399,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
   };
 
   // Cursos filtrados para la tabla de asignaturas
-  const asignaturasFiltradas = ASIGNATURAS_DISPONIBLES.filter((asig) => {
+  const asignaturasFiltradas = availableCourses.filter((asig) => {
     if (!filtroAsignaturas.trim()) return true;
     const q = filtroAsignaturas.toLowerCase();
     return asig.sigla.toLowerCase().includes(q) || asig.nombre.toLowerCase().includes(q);
@@ -360,7 +447,33 @@ export const TomaRamosSimulator = ({ onExit }) => {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          {/* Selector de Carrera y Generador Aleatorio */}
+          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-[11px]">
+            <Building2 className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
+            <select
+              value={selectedCarrera}
+              onChange={(e) => handleSelectCarrera(e.target.value)}
+              className="bg-transparent text-white font-medium text-[11px] focus:outline-none cursor-pointer max-w-[170px] sm:max-w-[220px] truncate"
+              aria-label="Seleccionar Carrera para la simulación"
+            >
+              {CARRERAS_DUOC.map((c) => (
+                <option key={c.codigo} value={c.nombre} className="bg-slate-900 text-white">
+                  {c.nombreCorto || c.nombre}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => refreshRandomCourses(selectedCarrera)}
+              title="Generar nueva combinación aleatoria de ramos para esta carrera"
+              className="ml-1 px-1.5 py-0.5 bg-amber-400/20 hover:bg-amber-400 text-amber-300 hover:text-slate-950 rounded text-[10px] font-bold flex items-center gap-1 transition-colors"
+            >
+              <Sparkles className="w-2.5 h-2.5" />
+              <span className="hidden sm:inline">Nuevos Ramos</span>
+            </button>
+          </div>
+
           {/* Botón Accesibilidad Cognitiva: Guía de Enfoque Visual */}
           <button
             type="button"
@@ -449,7 +562,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
           <div className="font-serif italic font-black text-sm tracking-wide text-slate-900 flex items-center gap-6">
             <span>{TOMA_RAMOS_ESTUDIANTE.nombre}</span>
             <span>RUT {TOMA_RAMOS_ESTUDIANTE.rut}</span>
-            <span>PERIODO {TOMA_RAMOS_ESTUDIANTE.periodo}</span>
+            <span>PERIODO {carreraInfo.periodo || TOMA_RAMOS_ESTUDIANTE.periodo}</span>
           </div>
 
           {/* Botón Cerrar Sesión con recuadro y signo de exclamación (Fiel a Imagen 3) */}
@@ -471,23 +584,23 @@ export const TomaRamosSimulator = ({ onExit }) => {
         <div className="max-w-[1400px] mx-auto mt-2 pt-1 border-t border-slate-400/40 grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-0.5 text-[10px] leading-tight text-slate-800 font-semibold">
           <div>
             <strong className="text-slate-950 font-black block">
-              {TOMA_RAMOS_ESTUDIANTE.codigoCarrera} {TOMA_RAMOS_ESTUDIANTE.carrera}
+              {carreraInfo.codigo || TOMA_RAMOS_ESTUDIANTE.codigoCarrera} {carreraInfo.nombre || TOMA_RAMOS_ESTUDIANTE.carrera}
             </strong>
-            <span>{TOMA_RAMOS_ESTUDIANTE.sede}</span><br />
-            <span>{TOMA_RAMOS_ESTUDIANTE.jornada}</span>
+            <span>{carreraInfo.sede || TOMA_RAMOS_ESTUDIANTE.sede}</span><br />
+            <span>{carreraInfo.jornada || TOMA_RAMOS_ESTUDIANTE.jornada}</span>
           </div>
           <div>
-            <span>Créditos Totales Currículum: <strong>{TOMA_RAMOS_ESTUDIANTE.creditosTotalesCurriculum}</strong></span><br />
-            <span>Créditos Aprobados Optativos Interdisciplinarios: <strong>{TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativosInterdisciplinarios}</strong></span><br />
-            <span>Créditos Aprobados Optativos: <strong>{TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativos}</strong></span>
+            <span>Créditos Totales Currículum: <strong>{carreraInfo.creditosTotalesCurriculum || TOMA_RAMOS_ESTUDIANTE.creditosTotalesCurriculum}</strong></span><br />
+            <span>Créditos Aprobados Optativos Interdisciplinarios: <strong>{carreraInfo.creditosAprobadosOptativosInterdisciplinarios ?? TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativosInterdisciplinarios}</strong></span><br />
+            <span>Créditos Aprobados Optativos: <strong>{carreraInfo.creditosAprobadosOptativos ?? TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativos}</strong></span>
           </div>
           <div>
-            <span>Créditos Inscritos Aprobados: <strong>{TOMA_RAMOS_ESTUDIANTE.creditosInscritosAprobados}</strong></span><br />
-            <span>Créditos Aprobados Optativos Formación Cristiana: <strong>{TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativosFormacionCristiana}</strong></span>
+            <span>Créditos Inscritos Aprobados: <strong>{carreraInfo.creditosInscritosAprobados || TOMA_RAMOS_ESTUDIANTE.creditosInscritosAprobados}</strong></span><br />
+            <span>Créditos Aprobados Optativos Formación Cristiana: <strong>{carreraInfo.creditosAprobadosOptativosFormacionCristiana ?? TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativosFormacionCristiana}</strong></span>
           </div>
           <div>
-            <span>Créditos Totales Optativos: <strong>{TOMA_RAMOS_ESTUDIANTE.creditosTotalesOptativos}</strong></span><br />
-            <span>Créditos Aprobados Optativos Profundización: <strong>{TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativosProfundizacion}</strong></span>
+            <span>Créditos Totales Optativos: <strong>{carreraInfo.creditosTotalesOptativos || TOMA_RAMOS_ESTUDIANTE.creditosTotalesOptativos}</strong></span><br />
+            <span>Créditos Aprobados Optativos Profundización: <strong>{carreraInfo.creditosAprobadosOptativosProfundizacion ?? TOMA_RAMOS_ESTUDIANTE.creditosAprobadosOptativosProfundizacion}</strong></span>
           </div>
         </div>
       </header>
@@ -716,26 +829,116 @@ export const TomaRamosSimulator = ({ onExit }) => {
       {/* 3. PANTALLA INICIAL: BIENVENIDA (Fiel a Imagen 3)        */}
       {/* ======================================================== */}
       {step === 'bienvenida' && (
-        <div className="flex-1 max-w-[1400px] w-full mx-auto p-4 flex flex-col justify-start">
+        <div className="flex-1 max-w-[1400px] w-full mx-auto p-4 flex flex-col justify-start space-y-4">
           {/* Contenedor oficial blanco con marco azul claro (Fiel a Imagen 3) */}
-          <div className="bg-white border border-[#9CB8D0] shadow-2xs p-3 min-h-[460px] rounded-xs">
+          <div className="bg-white border border-[#9CB8D0] shadow-2xs p-3.5 min-h-[460px] rounded-xs space-y-4">
             {/* Recuadro con el botón "Haz Click Para Continuar" (Fiel a Imagen 3) */}
-            <div className="border border-[#7FA5C5] bg-[#E8F1F8] p-1.5 inline-block rounded-xs shadow-2xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <div className="border border-[#7FA5C5] bg-[#E8F1F8] p-1.5 inline-block rounded-xs shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('inscripcion');
+                    setLeftPanelView('lista');
+                    setIsTimerRunning(true);
+                    announce('Simulación iniciada. Cronómetro en marcha.', 'polite');
+                  }}
+                  className="bg-gradient-to-b from-[#EEEEEE] to-[#DDDDDD] hover:from-white hover:to-[#E5E5E5] border border-slate-500 rounded-xs px-3.5 py-1.5 text-xs font-bold text-slate-800 flex items-center gap-2.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                >
+                  <span>Haz Click Para Continuar</span>
+                  <span className="w-5 h-5 bg-[#3B8E32] rounded-xs flex items-center justify-center text-white font-black text-xs">
+                    ▶
+                  </span>
+                </button>
+              </div>
+
+              {/* Botón rápido para barajar ramos */}
               <button
                 type="button"
-                onClick={() => {
-                  setStep('inscripcion');
-                  setLeftPanelView('lista');
-                  setIsTimerRunning(true);
-                  announce('Simulación iniciada. Cronómetro en marcha.', 'polite');
-                }}
-                className="bg-gradient-to-b from-[#EEEEEE] to-[#DDDDDD] hover:from-white hover:to-[#E5E5E5] border border-slate-500 rounded-xs px-3 py-1 text-xs font-bold text-slate-800 flex items-center gap-2.5 shadow-xs transition-transform active:scale-95"
+                onClick={() => refreshRandomCourses(selectedCarrera)}
+                className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-md flex items-center gap-1.5 shadow-2xs transition-colors"
               >
-                <span>Haz Click Para Continuar</span>
-                <span className="w-5 h-5 bg-[#3B8E32] rounded-xs flex items-center justify-center text-white font-black text-xs">
-                  ▶
-                </span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>🎲 Generar otra combinación de ramos</span>
               </button>
+            </div>
+
+            {/* Panel de Configuración de Carrera y Ramos Aleatorios */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#002B49]" />
+                  <span>Selección de Carrera para la Práctica</span>
+                </h3>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Elige la carrera para la cual deseas simular tu toma de ramos. Cada práctica genera secciones, cupos y horarios aleatorios según la carrera seleccionada:
+                </p>
+              </div>
+
+              {/* Selector interactivo de Carrera */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {CARRERAS_DUOC.map((c) => {
+                  const isSelected = selectedCarrera === c.nombre;
+                  return (
+                    <button
+                      key={c.codigo}
+                      type="button"
+                      onClick={() => handleSelectCarrera(c.nombre)}
+                      className={`p-3 rounded-lg border text-left transition-all text-xs flex flex-col justify-between gap-2 cursor-pointer ${
+                        isSelected
+                          ? 'border-[#002B49] bg-blue-50/90 ring-2 ring-[#002B49]/40 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono font-bold text-slate-500">
+                            Cód. {c.codigo}
+                          </span>
+                          {isSelected && (
+                            <span className="w-4 h-4 rounded-full bg-[#002B49] text-white flex items-center justify-center text-[10px] font-bold">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-bold text-slate-900 block mt-1 leading-snug">
+                          {c.nombreCorto || c.nombre}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-1">
+                        <span>{c.sede}</span>
+                        <span>{c.jornada}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Vista previa de Asignaturas Ofertadas Listas */}
+              <div className="bg-white border border-slate-200 rounded-md p-3 text-xs space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-600 border-b border-slate-100 pb-1.5">
+                  <span>
+                    Ramos asignados para <strong>{carreraInfo.nombreCorto || carreraInfo.nombre}</strong> (Periodo 2026 - 002):
+                  </span>
+                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 self-start sm:self-auto">
+                    {availableCourses.length} Asignaturas Ofertadas
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {availableCourses.map((c) => (
+                    <span
+                      key={c.sigla}
+                      className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded text-[11px] font-mono text-slate-800 flex items-center gap-1.5"
+                    >
+                      <strong className="text-[#002B49]">{c.sigla}</strong>
+                      <span className="text-slate-700 truncate max-w-[160px]">{c.nombre}</span>
+                      <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-1 rounded">
+                        {c.creditos} cr
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1648,21 +1851,21 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </span>
                 </div>
                 <div className="text-xs font-mono font-bold text-slate-900 mt-2 space-y-0.5">
-                  <p>SEDE: {TOMA_RAMOS_ESTUDIANTE.sede}</p>
+                  <p>SEDE: {carreraInfo.sede || TOMA_RAMOS_ESTUDIANTE.sede}</p>
                   <p>N°SEDE: {TOMA_RAMOS_ESTUDIANTE.numeroSede}</p>
                 </div>
               </div>
 
               <div className="text-right font-mono text-xs text-slate-900 space-y-0.5">
                 <p className="font-bold">Dirección de Docencia</p>
-                <p>Fecha emisión 17.01.2024</p>
+                <p>Fecha emisión 17.07.2026</p>
               </div>
             </div>
 
             {/* Título Oficial Centrado (Fiel a PDF oficial) */}
             <div className="text-center font-mono">
               <h2 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wider">
-                BOLETIN DE CARGA ACADEMICA 1er Sem. &nbsp;&nbsp; 2024
+                BOLETIN DE CARGA ACADEMICA 2do Sem. &nbsp;&nbsp; 2026
               </h2>
             </div>
 
@@ -1670,12 +1873,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1 text-xs text-slate-900 font-mono py-1">
               <div>
                 <p>Alumno: <strong>{TOMA_RAMOS_ESTUDIANTE.nombreBoletin}</strong></p>
-                <p>Carrera: &nbsp;&nbsp;&nbsp;<strong>{TOMA_RAMOS_ESTUDIANTE.carrera}</strong></p>
-                <p>Jornada: &nbsp;&nbsp;&nbsp;<strong>{TOMA_RAMOS_ESTUDIANTE.jornada}</strong></p>
+                <p>Carrera: &nbsp;&nbsp;&nbsp;<strong>{carreraInfo.nombre || TOMA_RAMOS_ESTUDIANTE.carrera}</strong></p>
+                <p>Jornada: &nbsp;&nbsp;&nbsp;<strong>{carreraInfo.jornada || TOMA_RAMOS_ESTUDIANTE.jornada}</strong></p>
               </div>
               <div className="sm:text-right">
                 <p>Rut: &nbsp;&nbsp;&nbsp;&nbsp;<strong>{TOMA_RAMOS_ESTUDIANTE.rutFormateado}</strong></p>
-                <p>N°<strong>{TOMA_RAMOS_ESTUDIANTE.codigoCarrera}</strong></p>
+                <p>N°<strong>{carreraInfo.codigo || TOMA_RAMOS_ESTUDIANTE.codigoCarrera}</strong></p>
               </div>
             </div>
 
@@ -1855,23 +2058,23 @@ export const TomaRamosSimulator = ({ onExit }) => {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               {/* Opción 1: Repetir Modo Asistido */}
               <button
                 type="button"
                 onClick={() => handleRepeatSimulation('asistido')}
-                className="p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-b from-amber-50 to-amber-100/60 hover:from-amber-100 hover:to-amber-200 text-left transition-all active:scale-[0.99] shadow-xs group"
+                className="p-3.5 rounded-xl border-2 border-amber-300 bg-gradient-to-b from-amber-50 to-amber-100/60 hover:from-amber-100 hover:to-amber-200 text-left transition-all active:scale-[0.99] shadow-xs group"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl">🎓</span>
-                  <span className="text-[10px] font-black uppercase text-amber-950 bg-amber-200/90 px-2 py-0.5 rounded">
+                  <span className="text-xl">🎓</span>
+                  <span className="text-[10px] font-black uppercase text-amber-950 bg-amber-200/90 px-1.5 py-0.5 rounded">
                     Recomendado • Desde 0
                   </span>
                 </div>
                 <h4 className="font-black text-sm text-slate-900 group-hover:text-amber-950">
-                  Volver a Repetir en Modo Asistido (Desde 0)
+                  Modo Asistido (Desde 0)
                 </h4>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
                   Borra todos los ramos anteriores e inicia un nuevo entrenamiento con tutor paso a paso y consejos visuales.
                 </p>
               </button>
@@ -1880,19 +2083,39 @@ export const TomaRamosSimulator = ({ onExit }) => {
               <button
                 type="button"
                 onClick={() => handleRepeatSimulation('real')}
-                className="p-4 rounded-xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50 to-emerald-100/60 hover:from-emerald-100 hover:to-emerald-200 text-left transition-all active:scale-[0.99] shadow-xs group"
+                className="p-3.5 rounded-xl border-2 border-emerald-300 bg-gradient-to-b from-emerald-50 to-emerald-100/60 hover:from-emerald-100 hover:to-emerald-200 text-left transition-all active:scale-[0.99] shadow-xs group"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl">⚡</span>
-                  <span className="text-[10px] font-black uppercase text-emerald-950 bg-emerald-200/90 px-2 py-0.5 rounded">
+                  <span className="text-xl">⚡</span>
+                  <span className="text-[10px] font-black uppercase text-emerald-950 bg-emerald-200/90 px-1.5 py-0.5 rounded">
                     Entorno Real • Desde 0
                   </span>
                 </div>
                 <h4 className="font-black text-sm text-slate-900 group-hover:text-emerald-950">
-                  Volver a Repetir en Modo Prueba Real (Desde 0)
+                  Prueba Real (Desde 0)
                 </h4>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
                   Reinicia en blanco con cronómetro y sin ayudas para medir tu agilidad en la plataforma oficial Duoc UC.
+                </p>
+              </button>
+
+              {/* Opción 3: Repetir con Nuevos Ramos al Azar */}
+              <button
+                type="button"
+                onClick={() => handleRepeatSimulation(simulationMode, true)}
+                className="p-3.5 rounded-xl border-2 border-blue-300 bg-gradient-to-b from-blue-50 to-blue-100/60 hover:from-blue-100 hover:to-blue-200 text-left transition-all active:scale-[0.99] shadow-xs group"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xl">🎲</span>
+                  <span className="text-[10px] font-black uppercase text-blue-950 bg-blue-200/90 px-1.5 py-0.5 rounded">
+                    Ramos al Azar
+                  </span>
+                </div>
+                <h4 className="font-black text-sm text-slate-900 group-hover:text-blue-950">
+                  Nuevos Ramos al Azar
+                </h4>
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                  Baraja aleatoriamente las asignaturas, secciones y horarios de {carreraInfo.nombreCorto || carreraInfo.nombre}.
                 </p>
               </button>
             </div>

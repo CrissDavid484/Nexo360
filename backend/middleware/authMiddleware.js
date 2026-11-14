@@ -69,10 +69,26 @@ const verifyToken = async (req, res, next) => {
  * Middleware para restringir acceso exclusivo a Administradores
  */
 const requireAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== 'admin') {
+  const allowed = ['admin', 'administrador'];
+  if (!req.user || !allowed.includes(req.user.role)) {
     return res.status(403).json({
       success: false,
       message: 'Acceso restringido: Se requieren privilegios de Administrador para acceder a este módulo.',
+    });
+  }
+  next();
+};
+
+/**
+ * Middleware para restringir acceso a Administradores y Coordinadores PAEDIS
+ * Exclusivo para gestión, importación, reseteo y borrado de catálogos de cursos
+ */
+const requireAdminOrCoordinator = (req, res, next) => {
+  const allowed = ['admin', 'administrador', 'coordinador_paedis'];
+  if (!req.user || !allowed.includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso restringido: Se requieren privilegios de Administrador o Coordinador PAEDIS para acceder a este módulo.',
     });
   }
   next();
@@ -111,4 +127,10 @@ const optionalToken = async (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, requireAdmin, optionalToken, getJwtSecret };
+module.exports = {
+  verifyToken,
+  requireAdmin,
+  requireAdminOrCoordinator,
+  optionalToken,
+  getJwtSecret,
+};

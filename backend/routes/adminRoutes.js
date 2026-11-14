@@ -1,19 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const { verifyToken, requireAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, requireAdmin, requireAdminOrCoordinator } = require('../middleware/authMiddleware');
 
-// Todas las rutas de administración están protegidas estrictamente con JWT y rol 'admin'
+// Todas las rutas de administración están protegidas estrictamente con JWT
 router.use(verifyToken);
-router.use(requireAdmin);
 
-// Métricas de uso de la plataforma, estadísticas PAEDIS y predicción
-router.get('/metrics', adminController.getMetrics);
+// Métricas de uso de la plataforma, estadísticas PAEDIS y predicción (Solo Administrador)
+router.get('/metrics', requireAdmin, adminController.getMetrics);
 
-// Gestión y directorio de estudiantes con cálculo predictivo
-router.get('/students', adminController.getStudents);
-router.post('/students', adminController.createStudent);
-router.put('/students/:id/status', adminController.updateStudentStatus);
-router.delete('/students/:id', adminController.deleteStudent);
+// Gestión y directorio de estudiantes con cálculo predictivo (Solo Administrador)
+router.get('/students', requireAdmin, adminController.getStudents);
+router.post('/students', requireAdmin, adminController.createStudent);
+router.put('/students/:id/status', requireAdmin, adminController.updateStudentStatus);
+router.delete('/students/:id', requireAdmin, adminController.deleteStudent);
+
+// Gestión y carga de asignaturas/oferta académica para Toma de Ramos (Excel/MD/DB)
+// Autorizado para Administradores y Coordinadores PAEDIS
+router.get('/courses/summary', requireAdminOrCoordinator, adminController.getCoursesSummary);
+router.post('/courses/import', requireAdminOrCoordinator, adminController.importCourses);
+router.post('/courses/seed', requireAdminOrCoordinator, adminController.seedCourses);
+router.delete('/courses', requireAdminOrCoordinator, adminController.clearCourses);
 
 module.exports = router;

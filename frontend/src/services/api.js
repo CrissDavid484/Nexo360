@@ -209,4 +209,63 @@ export const api = {
   async getModuleByKey(key) {
     return request(`/modules/${encodeURIComponent(key)}`);
   },
+
+  /**
+   * Catálogo de Asignaturas para el Simulador Toma de Ramos (con aleatorización y filtro por carrera)
+   */
+  async getCourses(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/courses${qs ? `?${qs}` : ''}`);
+  },
+
+  /**
+   * Obtener catálogo de asignaturas renderizado directamente en formato Markdown (.md)
+   */
+  async getCoursesMarkdown(params = {}) {
+    const qs = new URLSearchParams({ ...params, format: 'md' }).toString();
+    return request(`/courses?${qs}`);
+  },
+
+  /**
+   * Carreras disponibles en la oferta académica
+   */
+  async getCourseCareers() {
+    return request('/courses/careers');
+  },
+
+  /**
+   * Resumen administrativo de oferta académica (Toma de Ramos)
+   */
+  async getAdminCoursesSummary() {
+    return request('/admin/courses/summary');
+  },
+
+  /**
+   * Importación masiva de asignaturas desde Excel/CSV o Markdown procesado en el Panel Admin
+   * Soporta sobreescritura limpia del catálogo con replace: true por defecto
+   */
+  async importAdminCourses(rows, replace = true, rawMarkdown = null) {
+    return request('/admin/courses/import', {
+      method: 'POST',
+      body: { rows, replace, rawMarkdown },
+    });
+  },
+
+  /**
+   * Restaurar catálogo oficial semilla 2026-002
+   */
+  async seedAdminCourses() {
+    return request('/admin/courses/seed', {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Limpiar todas las asignaturas cargadas
+   */
+  async clearAdminCourses() {
+    return request('/admin/courses', {
+      method: 'DELETE',
+    });
+  },
 };

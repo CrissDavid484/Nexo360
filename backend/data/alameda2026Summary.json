@@ -1,0 +1,195 @@
+{
+  "periodo": "2026 - 002",
+  "sede": "ALAMEDA",
+  "totalFilas": 7174,
+  "totalSecciones": 2389,
+  "totalBloques": 12811,
+  "totalCarreras": 23,
+  "generadoEn": "2026-11-14T00:43:27.346Z",
+  "carreras": [
+    {
+      "carrera": "INGENIERÍA EN INFORMÁTICA",
+      "sede": "ALAMEDA",
+      "totalFilas": 2751,
+      "totalSecciones": 268,
+      "totalAsignaturas": 39,
+      "totalDocentes": 113
+    },
+    {
+      "carrera": "INGENIERÍA EN CONSTRUCCIÓN",
+      "sede": "ALAMEDA",
+      "totalFilas": 494,
+      "totalSecciones": 248,
+      "totalAsignaturas": 44,
+      "totalDocentes": 69
+    },
+    {
+      "carrera": "INGENIER. EN INFRAESTRUCTURA TECNOLÓGICA",
+      "sede": "ALAMEDA",
+      "totalFilas": 358,
+      "totalSecciones": 174,
+      "totalAsignaturas": 18,
+      "totalDocentes": 80
+    },
+    {
+      "carrera": "ING. EN INFRAEST. Y PLATAFORMAS TECN.",
+      "sede": "ALAMEDA",
+      "totalFilas": 358,
+      "totalSecciones": 174,
+      "totalAsignaturas": 18,
+      "totalDocentes": 80
+    },
+    {
+      "carrera": "INGENIERÍA EN CONECTIVIDAD Y REDES",
+      "sede": "ALAMEDA",
+      "totalFilas": 358,
+      "totalSecciones": 174,
+      "totalAsignaturas": 18,
+      "totalDocentes": 80
+    },
+    {
+      "carrera": "INGENIERÍA EN REDES Y TELECOMUNICACIONES",
+      "sede": "ALAMEDA",
+      "totalFilas": 358,
+      "totalSecciones": 174,
+      "totalAsignaturas": 18,
+      "totalDocentes": 80
+    },
+    {
+      "carrera": "ANALISTA PROGRAMADOR",
+      "sede": "ALAMEDA",
+      "totalFilas": 358,
+      "totalSecciones": 174,
+      "totalAsignaturas": 18,
+      "totalDocentes": 80
+    },
+    {
+      "carrera": "TÉCNICO EN REDES Y TELECOMUNICACIONES",
+      "sede": "ALAMEDA",
+      "totalFilas": 358,
+      "totalSecciones": 174,
+      "totalAsignaturas": 18,
+      "totalDocentes": 80
+    },
+    {
+      "carrera": "ADMIN. DE REDES Y TELECOMUNICACIONES",
+      "sede": "ALAMEDA",
+      "totalFilas": 358,
+      "totalSecciones": 174,
+      "totalAsignaturas": 18,
+      "totalDocentes": 80
+    },
+    {
+      "carrera": "OPTATIVOS DE COMPETENCIAS GLOBALES",
+      "sede": "SEDE VIRTUAL SINCRÓNICA",
+      "totalFilas": 87,
+      "totalSecciones": 87,
+      "totalAsignaturas": 11,
+      "totalDocentes": 48
+    },
+    {
+      "carrera": "INGENIERÍA EN PREVENCIÓN DE RIESGOS",
+      "sede": "ALAMEDA",
+      "totalFilas": 215,
+      "totalSecciones": 84,
+      "totalAsignaturas": 33,
+      "totalDocentes": 34
+    },
+    {
+      "carrera": "TÉCNICO EN CONSTRUCCIÓN",
+      "sede": "ALAMEDA",
+      "totalFilas": 146,
+      "totalSecciones": 62,
+      "totalAsignaturas": 24,
+      "totalDocentes": 26
+    },
+    {
+      "carrera": "INGENIERÍA EN COMERCIO EXTERIOR",
+      "sede": "ALAMEDA",
+      "totalFilas": 150,
+      "totalSecciones": 58,
+      "totalAsignaturas": 24,
+      "totalDocentes": 30
+    },
+    {
+      "carrera": "DIBUJO Y MOD. ARQUITEC. Y ESTRUCTURAL",
+      "sede": "ALAMEDA",
+      "totalFilas": 110,
+      "totalSecciones": 56,
+      "totalAsignaturas": 24,
+      "totalDocentes": 27
+    },
+    {
+      "carrera": "INGENIERÍA EN GESTIÓN LOGÍSTICA",
+      "sede": "ALAMEDA",
+      "totalFilas": 129,
+      "totalSecciones": 54,
+      "totalAsignaturas": 23,
+      "totalDocentes": 28
+    },
+    {
+      "carrera": "INGENIERÍA EN ADMINIST. MENCIÓN FINANZAS",
+      "sede": "ALAMEDA",
+      "totalFilas": 114,
+      "totalSecciones": 47,
+      "totalAsignaturas": 24,
+      "totalDocentes": 32
+    },
+    {
+      "carrera": "AUDITORÍA",
+      "sede": "ALAMEDA",
+      "totalFilas": 103,
+      "totalSecciones": 46,
+      "totalAsignaturas": 27,
+      "totalDocentes": 27
+    },
+    {
+      "carrera": "INGENIERÍA EN MARKETING DIGITAL",
+      "sede": "ALAMEDA",
+      "totalFilas": 101,
+      "totalSecciones": 38,
+      "totalAsignaturas": 20,
+      "totalDocentes": 17
+    },
+    {
+      "carrera": "TÉC. EN INSTAL. Y PROYECTOS ELÉCTRICOS",
+      "sede": "ALAMEDA",
+      "totalFilas": 59,
+      "totalSecciones": 29,
+      "totalAsignaturas": 18,
+      "totalDocentes": 13
+    },
+    {
+      "carrera": "RESTAURACIÓN DE BIENES PATRIMONIALES",
+      "sede": "ALAMEDA",
+      "totalFilas": 75,
+      "totalSecciones": 28,
+      "totalAsignaturas": 20,
+      "totalDocentes": 18
+    },
+    {
+      "carrera": "TÉCNICO TOPÓGRAFO GEOMÁTICO",
+      "sede": "ALAMEDA",
+      "totalFilas": 55,
+      "totalSecciones": 28,
+      "totalAsignaturas": 16,
+      "totalDocentes": 15
+    },
+    {
+      "carrera": "ING.EN ADMIN.MENCIÓN GESTIÓN DE PERSONAS",
+      "sede": "ALAMEDA",
+      "totalFilas": 60,
+      "totalSecciones": 27,
+      "totalAsignaturas": 25,
+      "totalDocentes": 18
+    },
+    {
+      "carrera": "ING. EN ADMINISTRACIÓN MENCIÓN FINANZAS",
+      "sede": "ALAMEDA",
+      "totalFilas": 19,
+      "totalSecciones": 11,
+      "totalAsignaturas": 11,
+      "totalDocentes": 10
+    }
+  ]
+}

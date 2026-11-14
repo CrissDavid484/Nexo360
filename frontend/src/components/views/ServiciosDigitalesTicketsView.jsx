@@ -52,11 +52,11 @@ export const ServiciosDigitalesTicketsView = () => {
 
         <div className="shrink-0">
           <a
-            href="https://experienciavivo.duoc.cl/mesa-servicios"
+            href="https://centroayuda.duoc.cl/hc/es-419/requests/new?ticket_form_id=31306954742157"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Abrir portal de Mesa de Servicios para crear un ticket (nueva pestaña)"
-            className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-semibold text-xs sm:text-sm inline-flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
+            aria-label="Abrir formulario oficial de tickets de Servicios Digitales en el Centro de Ayuda Duoc UC (nueva pestaña)"
+            className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-semibold text-xs sm:text-sm inline-flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
           >
             <span>Crear ticket de soporte</span>
             <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
@@ -113,7 +113,7 @@ export const ServiciosDigitalesTicketsView = () => {
           </h3>
           <ol className="space-y-2.5 text-xs sm:text-sm text-slate-600 leading-relaxed list-decimal pl-4">
             <li>
-              Selecciona el botón <strong className="text-slate-800">Crear ticket de soporte</strong> para abrir la Mesa de Servicios.
+              Selecciona el botón <strong className="text-slate-800">Crear ticket de soporte</strong> para abrir el formulario oficial de Servicios Digitales en el Centro de Ayuda.
             </li>
             <li>
               Ingresa con tu correo <strong className="text-slate-800">@duocuc.cl</strong> y tu contraseña.

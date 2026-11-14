@@ -17,6 +17,12 @@ const connectDB = async () => {
     // Sembrar los 10 perfiles institucionales de la BD (Admin, PAEDIS, Estudiante, Profesor, Director, Subdirector, etc.) y módulos en MongoDB
     await authScraperService.seedInstitutionalUsers();
     await dataScraperService.seedDefaultData();
+    try {
+      const courseService = require('../services/courseService');
+      await courseService.seedInitialCourses();
+    } catch (courseErr) {
+      console.warn(`[MongoDB] No se pudo sembrar cursos automáticamente: ${courseErr.message}`);
+    }
   } catch (error) {
     console.warn(
       `[MongoDB Advertencia] No se pudo conectar a MongoDB en (${mongoURI}): ${error.message}`
