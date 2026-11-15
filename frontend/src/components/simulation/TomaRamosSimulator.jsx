@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +23,13 @@ import {
   CheckSquare,
   Building2,
   Sparkles,
+  Trophy,
+  Target,
+  ChevronUp,
+  ChevronDown,
+  Flame,
+  Zap,
+  Clock,
 } from 'lucide-react';
 import {
   PORTAL_INSC_URL,
@@ -32,6 +39,13 @@ import {
   TOMA_RAMOS_TUTORIAL_VIDEO,
   CARRERAS_DUOC,
   getRandomCoursesForCareer,
+  generateTargetPackages,
+  DIFFICULTY_LEVELS,
+  getBoletinSemesterTitle,
+  formatStudentNameForBoletin,
+  PRACTICA_LABORAL_COURSE,
+  PRACTICA_PROFESIONAL_COURSE,
+  PORTAFOLIO_TITULO_COURSE,
 } from '../../data/tomaRamosData';
 import {
   SapSelectBoxIcon,
@@ -40,6 +54,7 @@ import {
   SapCursosTabIcon,
 } from './SapSelectBoxIcon';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 
 export const TomaRamosSimulator = ({ onExit }) => {
@@ -107,14 +122,103 @@ export const TomaRamosSimulator = ({ onExit }) => {
     return `${mins}:${secs}`;
   };
 
+  // Carrera real del estudiante extraída desde Vivo Duoc / Auth
+  const { user } = useAuth();
+  const studentCareer =
+    user?.career ||
+    user?.carrera ||
+    user?.vivoStudentProfile?.carrera ||
+    'Ingeniería en Informática';
+
+  const matchedInitialCarrera =
+    CARRERAS_DUOC.find(
+      (c) =>
+        c.nombre.toLowerCase().includes(studentCareer.toLowerCase()) ||
+        studentCareer.toLowerCase().includes(c.nombre.toLowerCase())
+    ) || CARRERAS_DUOC[0];
+
   // Carrera seleccionada para la simulación
-  const [selectedCarrera, setSelectedCarrera] = useState(CARRERAS_DUOC[0].nombre);
-  const [carreraInfo, setCarreraInfo] = useState(CARRERAS_DUOC[0]);
+  const [selectedCarrera, setSelectedCarrera] = useState(matchedInitialCarrera.nombre);
+  const [carreraInfo, setCarreraInfo] = useState(matchedInitialCarrera);
+
+  // Nivel de dificultad académica: 'facil' (3) | 'intermedio' (4 + práctica) | 'dificil' (8) | 'muy-dificil' (8 + 2 prácticas)
+  const [selectedDifficulty, setSelectedDifficulty] = useState('facil');
 
   // Asignaturas activas para la simulación (generadas aleatoriamente o desde BD)
   const [availableCourses, setAvailableCourses] = useState(() =>
-    getRandomCoursesForCareer(CARRERAS_DUOC[0].nombre, 7)
+    getRandomCoursesForCareer(matchedInitialCarrera.nombre, 8, 'facil')
   );
+
+  // Pre-flujo interactivo con fondo desenfocado (blur):
+  // isPreFlowActive: true hasta que el estudiante completa los pasos y pulsa "Iniciar toma de ramos"
+  // preFlowStep: 1 (Elección de Modo y Dificultad) | 2 (Selección de Paquete Objetivo con vista previa institucional)
+  const [isPreFlowActive, setIsPreFlowActive] = useState(true);
+  const [preFlowStep, setPreFlowStep] = useState(1);
+  const [selectedModeOption, setSelectedModeOption] = useState('guiado'); // 'guiado' o 'realista'
+  const [targetPackages, setTargetPackages] = useState(() => generateTargetPackages(availableCourses, 'facil'));
+  const [selectedTargetPackage, setSelectedTargetPackage] = useState(null);
+  const [isReferenceSheetExpanded, setIsReferenceSheetExpanded] = useState(true);
+
+  // Inicializar o actualizar paquetes objetivos cuando se cargan las asignaturas de la carrera o cambia la dificultad
+  useEffect(() => {
+    if (availableCourses && availableCourses.length > 0) {
+      const pkgs = generateTargetPackages(availableCourses, selectedDifficulty);
+      setTargetPackages(pkgs);
+      if (pkgs.length > 0) {
+        setSelectedTargetPackage((prev) => {
+          if (!prev) return pkgs[0];
+          const match = pkgs.find((p) => p.id === prev.id);
+          return match || pkgs[0];
+        });
+      }
+    }
+  }, [availableCourses, selectedDifficulty]);
+
+  // Garantizar coherencia absoluta: si cualquier ramo del paquete seleccionado no existe en availableCourses,
+  // re-vincular inmediatamente al paquete correspondiente generado desde availableCourses.
+  useEffect(() => {
+    if (!selectedTargetPackage?.targetCourses || !availableCourses || availableCourses.length === 0) return;
+    const hasDiscrepancy = selectedTargetPackage.targetCourses.some(
+      (tc) => !availableCourses.some((ac) => ac.sigla === tc.sigla)
+    );
+    if (hasDiscrepancy) {
+      const pkgs = generateTargetPackages(availableCourses, selectedDifficulty);
+      const match = pkgs.find((p) => p.id === selectedTargetPackage.id) || pkgs[0];
+      if (match) {
+        setSelectedTargetPackage(match);
+      }
+    }
+  }, [availableCourses, selectedTargetPackage, selectedDifficulty]);
+
+  // Actualizar la carrera y asignaturas cuando cambia o se carga el perfil del estudiante
+  useEffect(() => {
+    if (studentCareer) {
+      const match =
+        CARRERAS_DUOC.find(
+          (c) =>
+            c.nombre.toLowerCase().includes(studentCareer.toLowerCase()) ||
+            studentCareer.toLowerCase().includes(c.nombre.toLowerCase())
+        ) || {
+          codigo: '1446114',
+          nombre: studentCareer.toUpperCase(),
+          nombreCorto: studentCareer,
+          escuela: 'Escuela Duoc UC',
+          sede: user?.campus || user?.sede || user?.vivoStudentProfile?.sede || 'Sede Alameda',
+          jornada: 'Diurno',
+          periodo: '2026 - 002',
+          creditosTotalesCurriculum: 418,
+          creditosInscritosAprobados: 378,
+          creditosTotalesOptativos: 28,
+          creditosAprobadosOptativos: 28,
+          creditosAprobadosOptativosInterdisciplinarios: 4,
+          creditosAprobadosOptativosFormacionCristiana: 0,
+          creditosAprobadosOptativosProfundizacion: 0,
+        };
+      setSelectedCarrera(match.nombre);
+      setCarreraInfo(match);
+      refreshRandomCourses(match.nombre, selectedDifficulty);
+    }
+  }, [studentCareer]);
 
   // Cursos inscritos en la sesión de práctica
   const [cursosInscritos, setCursosInscritos] = useState([]);
@@ -124,6 +228,56 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
   // Días de la grilla horaria
   const diasGrilla = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+  // Gamificación y Cálculo de Logro del Paquete Objetivo
+  const diffConfig = DIFFICULTY_LEVELS.find((d) => d.id === selectedDifficulty) || DIFFICULTY_LEVELS[0];
+  const targetCourses = selectedTargetPackage?.targetCourses || [];
+  const allCurrentCourses = [...cursosInscritos, ...cursosSeleccionados];
+
+  const matchedTargetCourses = targetCourses.filter((tc) =>
+    allCurrentCourses.some((c) => c.sigla === tc.sigla && c.seccion === tc.seccion)
+  );
+  const matchedCount = matchedTargetCourses.length;
+  const totalTargetCount = targetCourses.length || diffConfig.totalTargetCount || 3;
+  const completionPercentage = Math.min(100, Math.round((matchedCount / totalTargetCount) * 100));
+
+  const wrongSectionCourses = targetCourses.filter((tc) =>
+    allCurrentCourses.some((c) => c.sigla === tc.sigla && c.seccion !== tc.seccion)
+  );
+
+  const baseScore = matchedCount * 350;
+  const perfectBonus = completionPercentage === 100 ? 500 : 0;
+  const speedBonus = isTimerRunning || isGrabado
+    ? Math.max(0, 300 - Math.floor(timerSeconds * 1.5))
+    : 300;
+  const penalty = wrongSectionCourses.length * 100;
+  const rawScore = Math.max(0, baseScore + perfectBonus + speedBonus - penalty);
+  const liveScore = Math.round(rawScore * (diffConfig.multiplier || 1.0));
+
+  const [personalRecordSeconds, setPersonalRecordSeconds] = useState(() => {
+    const saved = localStorage.getItem('nexo360_toma_ramos_record_seconds');
+    return saved ? parseInt(saved, 10) : null;
+  });
+  const [isNewRecordBeaten, setIsNewRecordBeaten] = useState(false);
+
+  useEffect(() => {
+    if (completionPercentage === 100 && (isGrabado || step === 'boletin')) {
+      if (!personalRecordSeconds || timerSeconds < personalRecordSeconds) {
+        localStorage.setItem('nexo360_toma_ramos_record_seconds', timerSeconds.toString());
+        setPersonalRecordSeconds(timerSeconds);
+        setIsNewRecordBeaten(true);
+      }
+    }
+  }, [completionPercentage, isGrabado, step, timerSeconds, personalRecordSeconds]);
+
+  // Transición desde el pre-flujo: desbloquea el fondo y pasa a la pantalla oficial de bienvenida
+  const handleStartSimulationFromPreFlow = () => {
+    setIsPreFlowActive(false);
+    announce(
+      'Simulador desbloqueado. Te encuentras en la pantalla de bienvenida. Haz clic en "Haz Click Para Continuar" para iniciar.',
+      'polite'
+    );
+  };
 
   // Inicializar curso pre-inscrito para realismo SAP
   useEffect(() => {
@@ -149,21 +303,46 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }
   }, [availableCourses]);
 
-  // Generar combinación aleatoria de asignaturas
-  const refreshRandomCourses = async (carreraName = selectedCarrera) => {
+  // Generar combinación aleatoria de asignaturas según carrera y dificultad
+  const refreshRandomCourses = async (carreraName = selectedCarrera, difficulty = selectedDifficulty) => {
     try {
-      const res = await api.getCourses({ carrera: carreraName, random: true, limit: 7 }).catch(() => null);
+      const res = await api.getCourses({ carrera: carreraName, random: true, limit: 12 }).catch(() => null);
       if (res?.success && Array.isArray(res.courses) && res.courses.length > 0) {
-        setAvailableCourses(res.courses);
+        setCursosSeleccionados([]);
+        let coursesList = [...res.courses];
+        if (difficulty === 'intermedio' || difficulty === 'muy-dificil') {
+          if (!coursesList.some((c) => c.sigla === PRACTICA_LABORAL_COURSE.sigla)) {
+            coursesList.push(PRACTICA_LABORAL_COURSE);
+          }
+        }
+        if (difficulty === 'muy-dificil') {
+          if (!coursesList.some((c) => c.sigla === PRACTICA_PROFESIONAL_COURSE.sigla)) {
+            coursesList.push(PRACTICA_PROFESIONAL_COURSE);
+          }
+        }
+        setAvailableCourses(coursesList);
+        const pkgs = generateTargetPackages(coursesList, difficulty);
+        setTargetPackages(pkgs);
+        if (pkgs.length > 0) setSelectedTargetPackage(pkgs[0]);
         announce(`Nuevos ramos aleatorios cargados para ${carreraName}.`, 'polite');
         return;
       }
     } catch (e) {
       // fallback
     }
-    const localRandom = getRandomCoursesForCareer(carreraName, 7);
+    const localRandom = getRandomCoursesForCareer(carreraName, 8, difficulty);
+    setCursosSeleccionados([]);
     setAvailableCourses(localRandom);
-    announce(`Nuevos ramos aleatorios cargados para ${carreraName}.`, 'polite');
+    const pkgs = generateTargetPackages(localRandom, difficulty);
+    setTargetPackages(pkgs);
+    if (pkgs.length > 0) setSelectedTargetPackage(pkgs[0]);
+    announce(`Nuevos ramos cargados para ${carreraName} en dificultad ${DIFFICULTY_LEVELS.find((d) => d.id === difficulty)?.name || difficulty}.`, 'polite');
+  };
+
+  // Cambio de dificultad
+  const handleSelectDifficulty = (diffId) => {
+    setSelectedDifficulty(diffId);
+    refreshRandomCourses(selectedCarrera, diffId);
   };
 
   // Cambio de carrera
@@ -258,14 +437,17 @@ export const TomaRamosSimulator = ({ onExit }) => {
       sigla: asig.sigla,
       siglaEq: asig.siglaEq || '',
       nombre: asig.nombre,
+      tipo: asig.tipo || 'obligatorio',
       seccion: seccion.seccion,
       creditos: asig.creditos,
       sala: seccion.sala,
       profesor: seccion.profesor,
-      bloques: seccion.bloques.map((b) => ({
+      bloques: (seccion.bloques || []).map((b) => ({
         ...b,
         texto: `${asig.sigla}-${seccion.seccion}`,
       })),
+      clasesPortafolio: seccion.clasesPortafolio || asig.clasesPortafolio,
+      detallePractica: seccion.detallePractica || asig.detallePractica,
     };
 
     setCursosSeleccionados([...cursosSeleccionados, nuevoCurso]);
@@ -304,8 +486,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
   // Función para volver a repetir la simulación limpia desde 0 (Asistida o Prueba Real)
   const handleRepeatSimulation = (mode = 'asistido', newRandom = false) => {
     setSimulationMode(mode);
+    setSelectedModeOption(mode === 'real' ? 'realista' : 'guiado');
     setIsGrabado(false);
     setIsHorarioUnlocked(false);
+    setShowSuccessModal(false);
+    setShowInfoModal(false);
     setTimerSeconds(0);
     setIsTimerRunning(false);
     setCursosSeleccionados([]);
@@ -313,9 +498,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
     setCurrentAsignatura(null);
     setTopeHorarioError('');
     setStep('bienvenida');
+    setIsPreFlowActive(true);
+    setPreFlowStep(1);
+    setIsNewRecordBeaten(false);
 
     if (newRandom) {
-      refreshRandomCourses(selectedCarrera);
+      refreshRandomCourses(selectedCarrera, selectedDifficulty);
     } else {
       const preInscrito = availableCourses.find((c) => c.yaInscrito);
       if (preInscrito && preInscrito.secciones?.[0]) {
@@ -326,12 +514,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
           {
             sigla: preInscrito.sigla,
             nombre: preInscrito.nombre,
+            tipo: preInscrito.tipo || 'obligatorio',
             creditos: preInscrito.creditos,
             seccion: sec.seccion,
             profesor: sec.profesor,
             sala: sec.sala,
             bloques: sec.bloques,
             estado: 'inscrito',
+            clasesPortafolio: sec.clasesPortafolio || preInscrito.clasesPortafolio,
+            detallePractica: sec.detallePractica || preInscrito.detallePractica,
           },
         ]);
       } else {
@@ -398,8 +589,26 @@ export const TomaRamosSimulator = ({ onExit }) => {
     return null;
   };
 
+  // Asignaturas requeridas por los paquetes objetivos de la sesión
+  const packageCourseSiglas = useMemo(() => {
+    const set = new Set();
+    (targetPackages || []).forEach((pkg) => {
+      (pkg.targetCourses || []).forEach((tc) => set.add(tc.sigla));
+    });
+    return set;
+  }, [targetPackages]);
+
+  // Cursos disponibles para la inscripción:
+  // Requisito oficial del usuario: "Pon solo para seleccionar, los ramos que salen en los paquetes, con sus respectivos horarios"
+  const asignaturasParaTomar = useMemo(() => {
+    if (!packageCourseSiglas.size) return availableCourses;
+    return availableCourses.filter(
+      (asig) => asig.yaInscrito || packageCourseSiglas.has(asig.sigla)
+    );
+  }, [availableCourses, packageCourseSiglas]);
+
   // Cursos filtrados para la tabla de asignaturas
-  const asignaturasFiltradas = availableCourses.filter((asig) => {
+  const asignaturasFiltradas = asignaturasParaTomar.filter((asig) => {
     if (!filtroAsignaturas.trim()) return true;
     const q = filtroAsignaturas.toLowerCase();
     return asig.sigla.toLowerCase().includes(q) || asig.nombre.toLowerCase().includes(q);
@@ -414,15 +623,53 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }, 4500);
   };
 
+  // Control de Acceso Institucional: Si el usuario NO está registrado en BD (isRegisteredInDb is false)
+  if (user && user.isRegisteredInDb === false) {
+    return (
+      <div
+        role="alert"
+        aria-live="assertive"
+        className="max-w-2xl mx-auto my-12 p-8 bg-white border-2 border-amber-300 rounded-3xl shadow-lg text-center space-y-5 animate-fade-in-up"
+      >
+        <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+          <Lock className="w-8 h-8" aria-hidden="true" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+            Acceso Restringido al Simulador
+          </h2>
+          <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-medium">
+            Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.
+          </p>
+        </div>
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onExit}
+            className="min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-sm rounded-xl transition-all shadow-xs cursor-pointer"
+          >
+            Volver al Centro de Ayuda
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       role="region"
       aria-label="Simulador Oficial de Toma de Ramos Duoc UC (SAP WebDynpro SICOL)"
-      className="bg-slate-200 min-h-screen text-slate-900 flex flex-col font-sans select-none"
+      className="bg-slate-200 min-h-screen text-slate-900 flex flex-col font-sans select-none relative"
     >
-      {/* ======================================================== */}
-      {/* 1. BARRA DE NAVEGADOR SIMULADO (URL OFICIAL DUOC UC)      */}
-      {/* ======================================================== */}
+      {/* Contenedor principal con desenfoque en pre-flujo */}
+      <div
+        className={`flex-1 flex flex-col transition-all duration-500 ${
+          isPreFlowActive ? 'filter blur-md pointer-events-none select-none opacity-60' : 'filter blur-0'
+        } ${selectedTargetPackage && step === 'inscripcion' ? 'pb-48' : ''}`}
+      >
+        {/* ======================================================== */}
+        {/* 1. BARRA DE NAVEGADOR SIMULADO (URL OFICIAL DUOC UC)      */}
+        {/* ======================================================== */}
       <div className="bg-slate-800 text-slate-200 px-3 py-1 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-slate-700">
         <div className="flex items-center gap-2 flex-1 min-w-[280px]">
           <div className="flex items-center gap-1 text-slate-400">
@@ -831,10 +1078,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
       {step === 'bienvenida' && (
         <div className="flex-1 max-w-[1400px] w-full mx-auto p-4 flex flex-col justify-start space-y-4">
           {/* Contenedor oficial blanco con marco azul claro (Fiel a Imagen 3) */}
-          <div className="bg-white border border-[#9CB8D0] shadow-2xs p-3.5 min-h-[460px] rounded-xs space-y-4">
-            {/* Recuadro con el botón "Haz Click Para Continuar" (Fiel a Imagen 3) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-              <div className="border border-[#7FA5C5] bg-[#E8F1F8] p-1.5 inline-block rounded-xs shadow-2xs">
+          <div className="bg-white border border-[#9CB8D0] shadow-2xs p-5 min-h-[460px] rounded-xs space-y-4">
+            {/* Recuadro con el botón "Haz Click Para Continuar" (Fiel a Imagen 3 y Portal Oficial Duoc UC) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <div className="border border-[#7FA5C5] bg-[#E8F1F8] p-2 inline-block rounded-xs shadow-2xs">
                 <button
                   type="button"
                   onClick={() => {
@@ -843,7 +1090,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     setIsTimerRunning(true);
                     announce('Simulación iniciada. Cronómetro en marcha.', 'polite');
                   }}
-                  className="bg-gradient-to-b from-[#EEEEEE] to-[#DDDDDD] hover:from-white hover:to-[#E5E5E5] border border-slate-500 rounded-xs px-3.5 py-1.5 text-xs font-bold text-slate-800 flex items-center gap-2.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="bg-gradient-to-b from-[#EEEEEE] to-[#DDDDDD] hover:from-white hover:to-[#E5E5E5] border border-slate-500 rounded-xs px-4 py-2 text-xs font-black text-[#002B49] flex items-center gap-2.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
                   <span>Haz Click Para Continuar</span>
                   <span className="w-5 h-5 bg-[#3B8E32] rounded-xs flex items-center justify-center text-white font-black text-xs">
@@ -852,93 +1099,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 </button>
               </div>
 
-              {/* Botón rápido para barajar ramos */}
+              {/* Botón rápido para barajar ramos de la carrera */}
               <button
                 type="button"
                 onClick={() => refreshRandomCourses(selectedCarrera)}
-                className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-md flex items-center gap-1.5 shadow-2xs transition-colors"
+                className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-md flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>🎲 Generar otra combinación de ramos</span>
               </button>
-            </div>
-
-            {/* Panel de Configuración de Carrera y Ramos Aleatorios */}
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-              <div>
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-[#002B49]" />
-                  <span>Selección de Carrera para la Práctica</span>
-                </h3>
-                <p className="text-[11px] text-slate-600 mt-0.5">
-                  Elige la carrera para la cual deseas simular tu toma de ramos. Cada práctica genera secciones, cupos y horarios aleatorios según la carrera seleccionada:
-                </p>
-              </div>
-
-              {/* Selector interactivo de Carrera */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {CARRERAS_DUOC.map((c) => {
-                  const isSelected = selectedCarrera === c.nombre;
-                  return (
-                    <button
-                      key={c.codigo}
-                      type="button"
-                      onClick={() => handleSelectCarrera(c.nombre)}
-                      className={`p-3 rounded-lg border text-left transition-all text-xs flex flex-col justify-between gap-2 cursor-pointer ${
-                        isSelected
-                          ? 'border-[#002B49] bg-blue-50/90 ring-2 ring-[#002B49]/40 shadow-xs'
-                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono font-bold text-slate-500">
-                            Cód. {c.codigo}
-                          </span>
-                          {isSelected && (
-                            <span className="w-4 h-4 rounded-full bg-[#002B49] text-white flex items-center justify-center text-[10px] font-bold">
-                              ✓
-                            </span>
-                          )}
-                        </div>
-                        <span className="font-bold text-slate-900 block mt-1 leading-snug">
-                          {c.nombreCorto || c.nombre}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-1">
-                        <span>{c.sede}</span>
-                        <span>{c.jornada}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Vista previa de Asignaturas Ofertadas Listas */}
-              <div className="bg-white border border-slate-200 rounded-md p-3 text-xs space-y-2">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-600 border-b border-slate-100 pb-1.5">
-                  <span>
-                    Ramos asignados para <strong>{carreraInfo.nombreCorto || carreraInfo.nombre}</strong> (Periodo 2026 - 002):
-                  </span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 self-start sm:self-auto">
-                    {availableCourses.length} Asignaturas Ofertadas
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {availableCourses.map((c) => (
-                    <span
-                      key={c.sigla}
-                      className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded text-[11px] font-mono text-slate-800 flex items-center gap-1.5"
-                    >
-                      <strong className="text-[#002B49]">{c.sigla}</strong>
-                      <span className="text-slate-700 truncate max-w-[160px]">{c.nombre}</span>
-                      <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-1 rounded">
-                        {c.creditos} cr
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -1475,15 +1644,92 @@ export const TomaRamosSimulator = ({ onExit }) => {
       {/* 5. PANTALLA: REVISIÓN DE ESTADOS (Colores exactos pedidos) */}
       {/* ======================================================== */}
       {step === 'estados' && (
-        <div className="flex-1 max-w-[1400px] w-full mx-auto p-4 space-y-4">
+        <div className="flex-1 max-w-[1400px] w-full mx-auto p-4 space-y-4 pb-24 animate-fade-in">
+          {/* Barra de Acciones Superiores de Alta Visibilidad */}
+          <div className="bg-[#002B49] text-white p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border border-slate-200/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shrink-0">
+                <CheckCircle className="w-6 h-6 text-[#002B49]" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+                  <span>Revisión Final: Confirma tu Carga Académica</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white">
+                    Paso Final
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-300">
+                  Revisa los estados de cada asignatura. Para finalizar y ver tu horario oficial, pulsa el botón verde <strong>&ldquo;Confirmar y Grabar Asignaturas&rdquo;</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('inscripcion');
+                  announce('Regresando a la pantalla de selección de asignaturas.', 'polite');
+                }}
+                className="flex-1 md:flex-initial px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <span>◀ Modificar Ramos</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInfoModal(true);
+                  announce('Abriendo confirmación de grabación.', 'polite');
+                }}
+                className="flex-1 md:flex-initial px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs sm:text-sm rounded-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer ring-2 ring-white/50"
+              >
+                <Save className="w-4 h-4 text-slate-950" />
+                <span>Confirmar y Grabar Asignaturas</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Resumen del Paquete Objetivo y Métricas */}
+          {selectedTargetPackage && (
+            <div className="bg-gradient-to-r from-blue-50 via-slate-50 to-amber-50/50 border border-slate-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="font-bold text-[#002B49] flex items-center gap-1.5">
+                  <Target className="w-4 h-4 text-blue-700" />
+                  <span>Meta Elegida:</span>
+                </span>
+                <span className="font-black text-slate-900 bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
+                  {selectedTargetPackage.name}
+                </span>
+                <span className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
+                  completionPercentage === 100
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-blue-100 text-blue-800 border border-blue-200'
+                }`}>
+                  🎯 {completionPercentage}% completado ({matchedCount}/{totalTargetCount} ramos objetivo)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 font-semibold text-slate-700">
+                <span className="bg-amber-100/80 text-amber-900 px-2.5 py-1 rounded-md border border-amber-200 font-bold flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{liveScore} pts</span>
+                </span>
+                <span className="font-mono text-slate-600">
+                  ⏱️ {formatTimer(timerSeconds)}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white border-2 border-slate-300 rounded p-6 shadow-md space-y-5">
             <header className="border-b border-slate-200 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-lg font-black text-slate-900">
-                  Revisión y Estados de Asignaturas
-                </h2>
+                <h3 className="text-base font-black text-slate-900">
+                  Tabla de Estados Académicos de Asignaturas
+                </h3>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Verifica el estado de cada una de tus asignaturas antes de confirmar la inscripción oficial.
+                  Las asignaturas con fondo amarillo corresponden a las seleccionadas en esta toma de ramos.
                 </p>
               </div>
 
@@ -1581,14 +1827,17 @@ export const TomaRamosSimulator = ({ onExit }) => {
               </table>
             </div>
 
-            {/* Botones de Acción */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-200">
+            {/* Botones de Acción Inferiores */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t-2 border-slate-200">
               <button
                 type="button"
-                onClick={() => setStep('inscripcion')}
-                className="px-4 py-2 border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded"
+                onClick={() => {
+                  setStep('inscripcion');
+                  announce('Regresando a la pantalla de selección de asignaturas.', 'polite');
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 border-2 border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                ◀ Volver a Modificar
+                <span>◀ Volver a Modificar Ramos</span>
               </button>
 
               <button
@@ -1597,9 +1846,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   setShowInfoModal(true);
                   announce('Abriendo confirmación de grabación.', 'polite');
                 }}
-                className="px-6 py-2.5 bg-gradient-to-b from-[#2E7D32] to-[#1B5E20] hover:from-[#388E3C] hover:to-[#2E7D32] text-white font-black text-xs sm:text-sm rounded shadow-md flex items-center gap-2"
+                className="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black text-sm rounded-xl shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer ring-4 ring-emerald-300/40"
               >
-                <Save className="w-4 h-4" />
+                <Save className="w-5 h-5 text-amber-300" />
                 <span>Confirmar y Grabar Asignaturas</span>
               </button>
             </div>
@@ -1730,6 +1979,36 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   A partir de este momento se ha desbloqueado la consulta de tu horario oficial. Las opciones de modificación han quedado cerradas.
                 </p>
               </div>
+
+              {/* Resumen de Gamificación y Logro de Paquete */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-2 text-left">
+                <div className="flex items-center justify-between font-bold text-slate-800">
+                  <span>Logro de Paquete Objetivo:</span>
+                  <span className={completionPercentage === 100 ? 'text-emerald-700 font-black' : 'text-blue-700 font-bold'}>
+                    {completionPercentage}% ({matchedCount}/{totalTargetCount} ramos)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Puntaje obtenido:</span>
+                  <span className="font-bold text-slate-900">{liveScore} pts</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Tiempo de sesión:</span>
+                  <span className="font-mono font-bold text-slate-900">{formatTimer(timerSeconds)}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Récord personal:</span>
+                  <span className="font-mono text-slate-700">
+                    {personalRecordSeconds ? formatTimer(personalRecordSeconds) : '02:30'}
+                  </span>
+                </div>
+                {isNewRecordBeaten && (
+                  <div className="text-center font-black text-emerald-700 text-xs pt-1.5 border-t border-slate-200 flex items-center justify-center gap-1">
+                    <span>🏆</span>
+                    <span>¡Nuevo récord personal de velocidad establecido!</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="bg-slate-100 px-4 py-2.5 border-t border-slate-300 flex flex-wrap items-center justify-center gap-2">
@@ -1840,45 +2119,45 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
           {/* Hoja Oficial del Boletín de Carga Académica (Idéntica a PDF Duoc UC) */}
           <div className="bg-white max-w-4xl mx-auto p-8 sm:p-12 rounded border border-slate-300 shadow-2xl space-y-6 font-mono text-slate-900">
-            {/* Membrete Institucional (Fiel a PDF oficial) */}
+            {/* Membrete Institucional (Fiel a PDF oficial con Logo Duoc UC oficial) */}
             <div className="flex items-start justify-between border-b border-black pb-3">
               <div>
-                <div className="flex items-center gap-2 font-sans font-black text-3xl tracking-tight text-[#002B49]">
-                  <span>Duoc</span>
-                  <span className="text-[#002B49]">UC</span>
-                  <span className="w-6 h-6 rounded-full border border-slate-600 inline-flex items-center justify-center text-[10px] font-serif text-slate-700 ml-1">
-                    ✠
-                  </span>
-                </div>
+                <img
+                  src="/duoc-uc-logo-boletin.png"
+                  alt="Duoc UC"
+                  className="h-10 sm:h-12 w-auto object-contain"
+                />
                 <div className="text-xs font-mono font-bold text-slate-900 mt-2 space-y-0.5">
-                  <p>SEDE: {carreraInfo.sede || TOMA_RAMOS_ESTUDIANTE.sede}</p>
-                  <p>N°SEDE: {TOMA_RAMOS_ESTUDIANTE.numeroSede}</p>
+                  <p>SEDE: {carreraInfo.sede ? carreraInfo.sede.replace(/^Sede\s+/i, '').toUpperCase() : 'ALAMEDA'}, N° 10</p>
                 </div>
               </div>
 
               <div className="text-right font-mono text-xs text-slate-900 space-y-0.5">
                 <p className="font-bold">Dirección de Docencia</p>
-                <p>Fecha emisión 17.07.2026</p>
+                <p>Fecha emisión {(() => {
+                  const today = new Date();
+                  return `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+                })()}</p>
               </div>
             </div>
 
-            {/* Título Oficial Centrado (Fiel a PDF oficial) */}
+            {/* Título Oficial Centrado con Semestre y Año Dinámicos */}
             <div className="text-center font-mono">
               <h2 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wider">
-                BOLETIN DE CARGA ACADEMICA 2do Sem. &nbsp;&nbsp; 2026
+                {getBoletinSemesterTitle(new Date())}
               </h2>
             </div>
 
             {/* Datos del Alumno en mayúsculas (Fiel a PDF oficial) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1 text-xs text-slate-900 font-mono py-1">
               <div>
-                <p>Alumno: <strong>{TOMA_RAMOS_ESTUDIANTE.nombreBoletin}</strong></p>
+                <p>Alumno: <strong>{formatStudentNameForBoletin(user?.name || user?.nombre || user?.vivoStudentProfile?.nombre || TOMA_RAMOS_ESTUDIANTE.nombre)}</strong></p>
                 <p>Carrera: &nbsp;&nbsp;&nbsp;<strong>{carreraInfo.nombre || TOMA_RAMOS_ESTUDIANTE.carrera}</strong></p>
-                <p>Jornada: &nbsp;&nbsp;&nbsp;<strong>{carreraInfo.jornada || TOMA_RAMOS_ESTUDIANTE.jornada}</strong></p>
+                <p>Jornada: &nbsp;&nbsp;&nbsp;<strong>{(selectedTargetPackage?.jornada || carreraInfo.jornada || TOMA_RAMOS_ESTUDIANTE.jornada).toUpperCase()}</strong></p>
               </div>
               <div className="sm:text-right">
-                <p>Rut: &nbsp;&nbsp;&nbsp;&nbsp;<strong>{TOMA_RAMOS_ESTUDIANTE.rutFormateado}</strong></p>
-                <p>N°<strong>{carreraInfo.codigo || TOMA_RAMOS_ESTUDIANTE.codigoCarrera}</strong></p>
+                <p>Rut: &nbsp;&nbsp;&nbsp;&nbsp;<strong>{user?.rut || '21.987.654-3'}</strong></p>
+                <p>N° <strong>{carreraInfo.codigo || TOMA_RAMOS_ESTUDIANTE.codigoCarrera}</strong></p>
               </div>
             </div>
 
@@ -1889,146 +2168,169 @@ export const TomaRamosSimulator = ({ onExit }) => {
               </h3>
             </div>
 
-            {/* Tabla Horario de Clases Fiel al PDF Institucional */}
-            <div className="border border-black overflow-x-auto">
-              <table className="w-full text-center text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-black font-bold text-[11px] bg-white">
-                    <th scope="col" className="p-1 border-r border-black w-24 text-center">
-                      Módulo<br />Horario
-                    </th>
-                    {diasGrilla.map((dia) => (
-                      <th key={dia} scope="col" className="p-1 border-r border-black last:border-r-0">
-                        {dia}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black text-[10px]">
-                  {BLOQUES_HORARIOS_TOMA.slice(0, 7).map((bloque) => {
-                    const partes = bloque.hora.split(' - ');
-                    const horaInicio = partes[0] || '08:31';
-                    const horaFin = partes[1] || '09:10';
+            {/* Grilla Horaria Adaptativa: Solo el rango de módulos requeridos preservando filas vacías internas */}
+            {(() => {
+              const enrolledBlocks = cursosInscritos.flatMap((c) => c.bloques || []);
+              let minBlockIdx = 0;
+              let maxBlockIdx = 6;
+              if (enrolledBlocks.length > 0) {
+                const indices = enrolledBlocks
+                  .map((b) => BLOQUES_HORARIOS_TOMA.findIndex((bh) => bh.id === b.bloqueId))
+                  .filter((idx) => idx !== -1);
+                if (indices.length > 0) {
+                  minBlockIdx = Math.min(...indices);
+                  maxBlockIdx = Math.max(...indices);
+                }
+              }
+              const adaptiveBlocks = BLOQUES_HORARIOS_TOMA.slice(minBlockIdx, maxBlockIdx + 1);
 
-                    return (
-                      <tr key={bloque.id} className="min-h-[44px]">
-                        {/* Módulo Horario Formateado: Hora Inicio / A / Hora Fin (Fiel al PDF) */}
-                        <td className="p-1 text-center font-bold border-r border-black text-[10px] leading-tight align-middle bg-white whitespace-nowrap">
-                          <div>{horaInicio}</div>
-                          <div className="font-normal text-[8px] my-0.5">A</div>
-                          <div>{horaFin}</div>
-                        </td>
-
-                        {/* Celdas de los Días */}
-                        {diasGrilla.map((dia) => {
-                          const match = getCeldaContenido(dia, bloque.id);
-
-                          return (
-                            <td
-                              key={dia}
-                              className="p-1 text-center border-r border-black last:border-r-0 text-[9px] leading-tight align-middle bg-white min-w-[90px]"
-                            >
-                              {match ? (
-                                <div className="space-y-0.5 py-1">
-                                  <span className="font-bold block uppercase leading-tight">
-                                    {match.nombre}
-                                  </span>
-                                  <span className="font-mono text-[8px] block text-slate-800">
-                                    {match.sigla}-{match.seccion}/{match.sala}
-                                  </span>
-                                </div>
-                              ) : null}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Detalle de las Clases de la Asignatura (Fiel a PDF oficial página 1) */}
-            {cursosInscritos.length > 0 && (
-              <div className="space-y-2 font-mono text-xs pt-2">
-                <p className="font-semibold text-slate-900">
-                  El Detalle de las clases de la asignatura &quot;{cursosInscritos[0].sigla}-{cursosInscritos[0].sigla}-{cursosInscritos[0].seccion}-{cursosInscritos[0].nombre}&quot; es:
-                </p>
-                <p className="font-semibold text-slate-900">
-                  Docente: {cursosInscritos[0].profesor || 'Mauricio Gómez Arratia'}
-                </p>
-
+              return (
                 <div className="border border-black overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="border-b border-black font-bold text-[11px] bg-white">
-                      <tr>
-                        <th scope="col" className="p-1.5 border-r border-black w-28 text-center">Nro. Clase</th>
-                        <th scope="col" className="p-1.5 border-r border-black text-center">Fecha</th>
-                        <th scope="col" className="p-1.5 border-r border-black w-36 text-center">Horario</th>
-                        <th scope="col" className="p-1.5 w-40 text-center">Sala</th>
+                  <table className="w-full text-center text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-black font-bold text-[11px] bg-white">
+                        <th scope="col" className="p-1 border-r border-black w-24 text-center">
+                          Módulo<br />Horario
+                        </th>
+                        {diasGrilla.map((dia) => (
+                          <th key={dia} scope="col" className="p-1 border-r border-black last:border-r-0">
+                            {dia}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-black text-[11px]">
-                      <tr>
-                        <td className="p-1.5 border-r border-black font-semibold text-center">Clase 01</td>
-                        <td className="p-1.5 border-r border-black px-3">Miércoles 04 de Marzo de 2026</td>
-                        <td className="p-1.5 border-r border-black text-center">08:31 a 09:50</td>
-                        <td className="p-1.5 text-center">AL-503A</td>
-                      </tr>
-                      <tr>
-                        <td className="p-1.5 border-r border-black font-semibold text-center">Clase 02</td>
-                        <td className="p-1.5 border-r border-black px-3">Viernes 06 de Marzo de 2026</td>
-                        <td className="p-1.5 border-r border-black text-center">08:31 a 10:40</td>
-                        <td className="p-1.5 text-center">AL-LAB-IP4</td>
-                      </tr>
-                      <tr>
-                        <td className="p-1.5 border-r border-black font-semibold text-center">Clase 03</td>
-                        <td className="p-1.5 border-r border-black px-3">Miércoles 11 de Marzo de 2026</td>
-                        <td className="p-1.5 border-r border-black text-center">08:31 a 09:50</td>
-                        <td className="p-1.5 text-center">AL-503A</td>
-                      </tr>
-                      <tr>
-                        <td className="p-1.5 border-r border-black font-semibold text-center">Clase 04</td>
-                        <td className="p-1.5 border-r border-black px-3">Viernes 13 de Marzo de 2026</td>
-                        <td className="p-1.5 border-r border-black text-center">08:31 a 10:40</td>
-                        <td className="p-1.5 text-center">AL-LAB-IP4</td>
-                      </tr>
+                    <tbody className="divide-y divide-black text-[10px]">
+                      {adaptiveBlocks.map((bloque) => {
+                        const partes = bloque.hora.split(' - ');
+                        const horaInicio = partes[0] || '08:31';
+                        const horaFin = partes[1] || '09:10';
+
+                        return (
+                          <tr key={bloque.id} className="min-h-[44px]">
+                            {/* Módulo Horario Formateado: Hora Inicio / A / Hora Fin (Fiel al PDF) */}
+                            <td className="p-1 text-center font-bold border-r border-black text-[10px] leading-tight align-middle bg-white whitespace-nowrap">
+                              <div>{horaInicio}</div>
+                              <div className="font-normal text-[8px] my-0.5">A</div>
+                              <div>{horaFin}</div>
+                            </td>
+
+                            {/* Celdas de los Días */}
+                            {diasGrilla.map((dia) => {
+                              const match = getCeldaContenido(dia, bloque.id);
+
+                              return (
+                                <td
+                                  key={dia}
+                                  className="p-1 text-center border-r border-black last:border-r-0 text-[9px] leading-tight align-middle bg-white min-w-[90px]"
+                                >
+                                  {match ? (
+                                    <div className="space-y-0.5 py-1">
+                                      <span className="font-bold block uppercase leading-tight">
+                                        {match.nombre}
+                                      </span>
+                                      <span className="font-mono text-[8px] block text-slate-800">
+                                        {match.sigla}-{match.seccion}/{match.sala}
+                                      </span>
+                                    </div>
+                                  ) : null}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
-            {/* Detalle Resumido de todas las Asignaturas Inscritas */}
-            <div className="space-y-2 font-mono text-xs pt-2">
-              <h4 className="font-black uppercase text-center">Detalle de Asignaturas Inscritas</h4>
-              <div className="border border-black overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="border-b border-black font-bold bg-white text-[11px]">
-                    <tr>
-                      <th scope="col" className="p-1.5 border-r border-black w-20">Sigla</th>
-                      <th scope="col" className="p-1.5 border-r border-black">Nombre Asignatura</th>
-                      <th scope="col" className="p-1.5 border-r border-black text-center w-16">Secc.</th>
-                      <th scope="col" className="p-1.5 border-r border-black">Docente</th>
-                      <th scope="col" className="p-1.5 border-r border-black text-center w-28">Sala</th>
-                      <th scope="col" className="p-1.5 text-center w-14">Créd.</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black text-[11px]">
-                    {cursosInscritos.map((c) => (
-                      <tr key={c.sigla}>
-                        <td className="p-1.5 font-bold border-r border-black">{c.sigla}</td>
-                        <td className="p-1.5 border-r border-black">{c.nombre}</td>
-                        <td className="p-1.5 font-bold border-r border-black text-center">{c.seccion}</td>
-                        <td className="p-1.5 border-r border-black">{c.profesor}</td>
-                        <td className="p-1.5 border-r border-black text-center">{c.sala}</td>
-                        <td className="p-1.5 text-center font-bold">{c.creditos}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {/* Detalle inferior condicional: Portafolio y Práctica (se omite si ninguno está inscrito) */}
+            {(() => {
+              const portafolioCourse = cursosInscritos.find(
+                (c) => c.tipo === 'portafolio' || c.sigla === 'PTF6101' || (c.nombre && c.nombre.toUpperCase().includes('PORTAFOLIO'))
+              );
+              const practicaCourses = cursosInscritos.filter(
+                (c) => c.tipo === 'practica' || c.sigla === 'PRL3100' || c.sigla === 'PPR4100' || (c.nombre && c.nombre.toUpperCase().includes('PRÁCTICA'))
+              );
+
+              if (!portafolioCourse && practicaCourses.length === 0) {
+                return null;
+              }
+
+              return (
+                <div className="space-y-4 font-mono text-xs pt-2">
+                  {/* Detalle de las Clases de Portafolio */}
+                  {portafolioCourse && (
+                    <div className="space-y-2">
+                      <p className="font-semibold text-slate-900">
+                        El Detalle de las clases de la asignatura &quot;{portafolioCourse.sigla}-{portafolioCourse.sigla}-{portafolioCourse.seccion}-{portafolioCourse.nombre}&quot; es:
+                      </p>
+                      <p className="font-semibold text-slate-900">
+                        Docente: {portafolioCourse.profesor || 'Mauricio Gómez Arratia'}
+                      </p>
+
+                      <div className="border border-black overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="border-b border-black font-bold text-[11px] bg-white">
+                            <tr>
+                              <th scope="col" className="p-1.5 border-r border-black w-28 text-center">Nro. Clase</th>
+                              <th scope="col" className="p-1.5 border-r border-black text-center">Fecha</th>
+                              <th scope="col" className="p-1.5 border-r border-black w-36 text-center">Horario</th>
+                              <th scope="col" className="p-1.5 w-40 text-center">Sala</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-black text-[11px]">
+                            {(portafolioCourse.clasesPortafolio || [
+                              { nro: 'Clase 01', fecha: 'Miércoles 04 de Marzo de 2026', horario: '08:31 a 09:50', sala: 'AL-503A' },
+                              { nro: 'Clase 02', fecha: 'Viernes 06 de Marzo de 2026', horario: '08:31 a 10:40', sala: 'AL-LAB-IP4' },
+                              { nro: 'Clase 03', fecha: 'Miércoles 11 de Marzo de 2026', horario: '08:31 a 09:50', sala: 'AL-503A' },
+                              { nro: 'Clase 04', fecha: 'Viernes 13 de Marzo de 2026', horario: '08:31 a 10:40', sala: 'AL-LAB-IP4' },
+                            ]).map((clase, idx) => (
+                              <tr key={idx}>
+                                <td className="p-1.5 border-r border-black font-semibold text-center">{clase.nro}</td>
+                                <td className="p-1.5 border-r border-black px-3">{clase.fecha}</td>
+                                <td className="p-1.5 border-r border-black text-center">{clase.horario}</td>
+                                <td className="p-1.5 text-center">{clase.sala}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Detalle de Prácticas Académicas */}
+                  {practicaCourses.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-slate-900 uppercase">Detalle de Prácticas Académicas Enroladas</h4>
+                      {practicaCourses.map((practica) => {
+                        const det = practica.detallePractica || {
+                          centroPractica: 'Empresa TI en Convenio • Sede Alameda',
+                          supervisor: 'Coordinador de Prácticas Laborales Escuela Informática',
+                          horas: '360 horas cronológicas',
+                          periodo: 'Primer y Segundo Semestre 2026',
+                        };
+                        return (
+                          <div key={practica.sigla} className="border border-black p-3 space-y-1.5 bg-slate-50/50">
+                            <div className="flex items-center justify-between font-bold border-b border-black pb-1">
+                              <span>{practica.sigla} - {practica.nombre} (Secc. {practica.seccion})</span>
+                              <span className="text-[10px] uppercase bg-slate-200 px-2 py-0.5 rounded">En Terreno / Empresa</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px] pt-1">
+                              <p><span className="font-semibold">Centro de práctica:</span> {det.centroPractica}</p>
+                              <p><span className="font-semibold">Supervisión:</span> {det.supervisor}</p>
+                              <p><span className="font-semibold">Horas acreditadas:</span> {det.horas}</p>
+                              <p><span className="font-semibold">Periodo:</span> {det.periodo}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Pie de Firma Institucional */}
             <div className="pt-4 border-t border-black text-center text-[10px] text-slate-700 font-mono space-y-0.5">
@@ -2133,6 +2435,511 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 <span>Finalizar y Volver a Nexo360</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      </div>
+
+      {/* ======================================================== */}
+      {/* 9. HOJA DE RUTA / PAQUETE OBJETIVO (VISTA DE REFERENCIA INFERIOR ESTILO PDF / CHEAT SHEET) */}
+      {/* ======================================================== */}
+      {selectedTargetPackage && step === 'inscripcion' && (
+        <aside
+          role="region"
+          aria-label="Hoja de referencia del paquete objetivo"
+          className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t-2 border-[#002B49] shadow-2xl transition-all duration-300"
+        >
+          {/* Barra superior de la hoja de referencia (Siempre visible, con métricas de gamificación) */}
+          <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#002B49] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                <FileText className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-900">
+                    {selectedTargetPackage.name}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                    {simulationMode === 'asistido' ? 'Modo Guiado' : 'Modo Realista'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 hidden sm:block">
+                  Hoja de Ruta de Referencia • Inscribe estas secciones para alcanzar el 100%
+                </p>
+              </div>
+            </div>
+
+            {/* Métricas de Gamificación: % Logro, Puntaje y Récord */}
+            <div className="flex items-center gap-3 sm:gap-5">
+              {/* Barra de Porcentaje de Logro */}
+              <div className="flex items-center gap-2">
+                <div className="w-24 sm:w-32 bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 rounded-full ${
+                      completionPercentage === 100
+                        ? 'bg-emerald-500'
+                        : completionPercentage >= 60
+                        ? 'bg-blue-600'
+                        : 'bg-amber-500'
+                    }`}
+                    style={{ width: `${completionPercentage}%` }}
+                  />
+                </div>
+                <span className="text-xs font-black text-slate-900">
+                  {completionPercentage}%
+                </span>
+                <span className="text-[11px] text-slate-500 hidden md:inline">
+                  ({matchedCount}/{totalTargetCount} ramos)
+                </span>
+              </div>
+
+              {/* Puntaje */}
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span>{liveScore} pts</span>
+              </div>
+
+              {/* Récord Personal */}
+              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 hidden lg:flex">
+                <span className="text-amber-500">🏆</span>
+                <span>
+                  Récord:{' '}
+                  <strong className="text-slate-900">
+                    {personalRecordSeconds ? formatTimer(personalRecordSeconds) : '02:30'}
+                  </strong>
+                </span>
+              </div>
+
+              {/* Botón Minimizar / Desplegar */}
+              <button
+                type="button"
+                onClick={() => setIsReferenceSheetExpanded((prev) => !prev)}
+                className="min-h-[32px] px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                aria-expanded={isReferenceSheetExpanded}
+                aria-label={isReferenceSheetExpanded ? 'Minimizar hoja de referencia' : 'Expandir hoja de referencia'}
+              >
+                <span>{isReferenceSheetExpanded ? 'Ocultar' : 'Ver Lista'}</span>
+                {isReferenceSheetExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Contenido desplegable: Lista Oficial del Paquete Objetivo (Fiel a Imagen 2 / Planificación Duoc UC) */}
+          {isReferenceSheetExpanded && (
+            <div className="border-t border-slate-300 bg-slate-100/90 px-3 sm:px-6 py-3 max-h-72 overflow-y-auto">
+              <div className="max-w-4xl mx-auto rounded-lg border-2 border-black overflow-hidden shadow-sm bg-white">
+                {/* Encabezado Verde Superior (Fiel a Imagen 2) */}
+                <div className="bg-[#1b5e20] text-white px-4 py-2 flex items-center justify-between font-mono font-black text-xs sm:text-sm border-b-2 border-emerald-950">
+                  <span>{carreraInfo.codigo || '1446114-6-D'}</span>
+                  <span>{selectedTargetPackage.name}</span>
+                </div>
+
+                {/* Sub-encabezado Amarillo (Fiel a Imagen 2) */}
+                <div className="bg-[#FFB81C] text-slate-950 px-4 py-1.5 grid grid-cols-12 font-black text-xs border-b border-black">
+                  <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">Sección:</div>
+                  <div className="col-span-5 sm:col-span-6 px-2">Nom. Asignatura:</div>
+                  <div className="col-span-4 sm:col-span-4 text-right">Horario / Estado</div>
+                </div>
+
+                {/* Lista de Asignaturas del Paquete (Fiel a Imagen 2) */}
+                <div className="divide-y divide-black text-xs font-mono">
+                  {targetCourses.map((tc) => {
+                    const hasExactMatch = allCurrentCourses.some(
+                      (c) => c.sigla === tc.sigla && c.seccion === tc.seccion
+                    );
+                    const hasWrongSection = allCurrentCourses.some(
+                      (c) => c.sigla === tc.sigla && c.seccion !== tc.seccion
+                    );
+                    const currentSelected = allCurrentCourses.find((c) => c.sigla === tc.sigla);
+                    const isOptativo = tc.tipo === 'optativo' || tc.tipo === 'practica';
+
+                    return (
+                      <div
+                        key={tc.sigla}
+                        className={`px-4 py-1.5 grid grid-cols-12 items-center transition-colors ${
+                          hasExactMatch
+                            ? 'bg-emerald-50'
+                            : isOptativo
+                            ? 'bg-[#bbdefb]'
+                            : 'bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        {/* Columna Sección */}
+                        <div className="col-span-3 sm:col-span-2 font-bold text-slate-900 border-r border-black pr-2 truncate">
+                          {tc.sigla}
+                        </div>
+
+                        {/* Columna Nom. Asignatura */}
+                        <div className="col-span-5 sm:col-span-6 px-2">
+                          <span className="font-bold text-slate-900 uppercase block truncate" title={tc.nombre}>
+                            {tc.nombre}
+                          </span>
+                          <span className="text-[10px] text-slate-600 font-sans block truncate">
+                            Meta: {tc.seccion} • {tc.horarioTexto}
+                          </span>
+                        </div>
+
+                        {/* Columna Estado y Horario */}
+                        <div className="col-span-4 sm:col-span-4 flex items-center justify-end gap-1.5 text-right font-sans">
+                          {hasExactMatch ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
+                              ✓ Inscrito
+                            </span>
+                          ) : hasWrongSection ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white" title={`Sección elegida: ${currentSelected?.seccion}`}>
+                              ⚠️ Secc. {currentSelected?.seccion}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-700">
+                              ⏳ Pendiente
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </aside>
+      )}
+
+      {/* ======================================================== */}
+      {/* 10. MODAL / SCREEN PRE-FLOW CON DESENFOQUE (PASO 1 Y PASO 2) */}
+      {/* ======================================================== */}
+      {isPreFlowActive && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="preflow-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
+        >
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-fade-in-up my-8 max-h-[92vh] overflow-y-auto">
+            {/* Encabezado con datos del estudiante y carrera real */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-[#002B49] uppercase tracking-wider mb-1">
+                  <Building2 className="w-4 h-4 text-[#FFB81C]" />
+                  <span>Simulador Oficial Duoc UC • {studentCareer}</span>
+                </div>
+                <h2 id="preflow-title" className="text-xl sm:text-2xl font-black text-slate-900">
+                  {preFlowStep === 1
+                    ? 'Paso 1: Modo de Simulación y Nivel de Dificultad'
+                    : 'Paso 2: Paquete Objetivo de Ramos y Vista Previa Institucional'}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                  {preFlowStep === 1
+                    ? 'Elige cómo deseas experimentar la simulación y define la carga académica a coordinar.'
+                    : 'Selecciona tu paquete de asignaturas sin colisiones. Verifica el membrete institucional con Nombre de Asignatura y Sección para cada ramo.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={onExit}
+                className="self-start sm:self-center px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            {/* PASO 1: MODO GUIADO VS REALISTA + 4 NIVELES DE DIFICULTAD */}
+            {preFlowStep === 1 && (
+              <div className="space-y-6">
+                {/* 1.1 MODO DE SIMULACIÓN */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                    <span>1.1 Selecciona el Modo de Simulación</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Opción A: Modo Guiado */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModeOption('guiado')}
+                      className={`p-5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-4 cursor-pointer ${
+                        selectedModeOption === 'guiado'
+                          ? 'border-[#002B49] bg-blue-50/70 ring-2 ring-[#002B49]/30 shadow-md'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#002B49] flex items-center justify-center font-bold">
+                            <Sparkles className="w-5 h-5 text-[#002B49]" />
+                          </div>
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-600 text-white">
+                            Recomendado
+                          </span>
+                        </div>
+                        <h4 className="text-base font-bold text-slate-900">
+                          Modo Guiado
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                          Acompañamiento interactivo paso a paso, explicaciones detalladas de los botones SAP WebDynpro, advertencias de topes y consejos institucionales.
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-200/60 text-xs font-semibold text-[#002B49] flex items-center justify-between">
+                        <span>Ideal para primera inscripción</span>
+                        <span className="text-sm font-bold">
+                          {selectedModeOption === 'guiado' ? '● Seleccionado' : '○ Elegir'}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Opción B: Modo Realista */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModeOption('realista')}
+                      className={`p-5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-4 cursor-pointer ${
+                        selectedModeOption === 'realista'
+                          ? 'border-[#002B49] bg-blue-50/70 ring-2 ring-[#002B49]/30 shadow-md'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                            <Flame className="w-5 h-5 text-amber-600" />
+                          </div>
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-white">
+                            Desafío Oficial
+                          </span>
+                        </div>
+                        <h4 className="text-base font-bold text-slate-900">
+                          Modo Realista
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                          Experiencia idéntica al portal de inscripción oficial Duoc UC. Sin ayudas intermedias, cronómetro activo y presión por vacantes disponibles.
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-200/60 text-xs font-semibold text-slate-700 flex items-center justify-between">
+                        <span>Compite contra tu récord</span>
+                        <span className="text-sm font-bold">
+                          {selectedModeOption === 'realista' ? '● Seleccionado' : '○ Elegir'}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1.2 NIVEL DE DIFICULTAD ACADÉMICA (4 NIVELES) */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                      <Target className="w-4 h-4 text-[#002B49]" />
+                      <span>1.2 Selecciona el Nivel de Dificultad Académica</span>
+                    </h3>
+                    <span className="text-xs text-slate-500 font-mono">
+                      Carga y complejidad variable
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {DIFFICULTY_LEVELS.map((diff) => {
+                      const isSelected = selectedDifficulty === diff.id;
+                      return (
+                        <button
+                          key={diff.id}
+                          type="button"
+                          onClick={() => handleSelectDifficulty(diff.id)}
+                          className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-3 cursor-pointer ${
+                            isSelected
+                              ? 'border-[#002B49] bg-blue-50/80 ring-2 ring-[#002B49]/30 shadow-md'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  diff.id === 'facil'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : diff.id === 'intermedio'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                    : diff.id === 'dificil'
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                    : 'bg-rose-100 text-rose-900 border border-rose-300'
+                                }`}
+                              >
+                                {diff.badge}
+                              </span>
+                              <span className="text-xs font-bold text-[#002B49]">
+                                {isSelected ? '● Activo' : '○'}
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-black text-slate-900">
+                              {diff.name}
+                            </h4>
+                            <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                              {diff.description}
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-200/70 text-[10px] font-bold text-slate-500 flex items-center justify-between">
+                            <span>Multiplicador de Puntaje:</span>
+                            <span className="font-mono text-slate-800">x{diff.multiplier}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSimulationMode(selectedModeOption === 'guiado' ? 'asistido' : 'real');
+                      setPreFlowStep(2);
+                      announce('Configuración guardada. Ahora selecciona tu paquete objetivo de ramos.', 'polite');
+                    }}
+                    className="min-h-[46px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-sm rounded-xl flex items-center gap-2 shadow-md transition-all hover:scale-[1.02] cursor-pointer"
+                  >
+                    <span>Continuar al Paquete Objetivo</span>
+                    <ArrowRight className="w-4 h-4 text-[#FFB81C]" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PASO 2: SELECCIÓN DE PAQUETE OBJETIVO CON VISTA PREVIA INSTITUCIONAL (MEMBRETE VERDE/AMARILLO) */}
+            {preFlowStep === 2 && (
+              <div className="space-y-4">
+                {/* Selector de Paquetes en Tabs Superiores */}
+                <div className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
+                    Selecciona tu combinación horaria preferida:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {targetPackages.map((pkg) => {
+                      const isSelected = selectedTargetPackage?.id === pkg.id;
+                      return (
+                        <button
+                          key={pkg.id}
+                          type="button"
+                          onClick={() => setSelectedTargetPackage(pkg)}
+                          className={`p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
+                            isSelected
+                              ? 'border-[#002B49] bg-blue-50/80 ring-2 ring-[#002B49]/30 shadow-md'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#002B49] text-white">
+                              {pkg.badge}
+                            </span>
+                            <span className="text-[11px] font-bold text-[#002B49]">
+                              {isSelected ? '✓ Activo' : 'Elegir'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-slate-900 leading-snug">{pkg.name}</h4>
+                            <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{pkg.description}</p>
+                          </div>
+                          <div className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded text-center">
+                            {pkg.targetCourses?.length || 0} Asignaturas
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Vista Previa Visual Institucional del Paquete con Encabezados Verde/Amarillo y Cards de Horario */}
+                {selectedTargetPackage && (
+                  <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                          <span>{selectedTargetPackage.name}</span>
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            {selectedTargetPackage.targetCourses?.length} ramos coordinados sin topes
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-600 mt-0.5">{selectedTargetPackage.description}</p>
+                      </div>
+                      <div className="text-xs font-bold text-[#002B49] bg-white px-3 py-1 rounded-lg border border-slate-200">
+                        Jornada: {selectedTargetPackage.jornada || carreraInfo.jornada || 'Diurno'}
+                      </div>
+                    </div>
+
+                    {/* Lista Oficial del Paquete Objetivo Fiel a Imagen 2 */}
+                    <div className="rounded-xl border-2 border-black overflow-hidden shadow-sm bg-white">
+                      {/* Encabezado Verde Superior (Fiel a Imagen 2) */}
+                      <div className="bg-[#1b5e20] text-white px-4 py-2 flex items-center justify-between font-mono font-black text-xs sm:text-sm border-b-2 border-emerald-950">
+                        <span>{carreraInfo.codigo || '1446114-6-D'}</span>
+                        <span>{selectedTargetPackage.name}</span>
+                      </div>
+
+                      {/* Sub-encabezado Amarillo (Fiel a Imagen 2) */}
+                      <div className="bg-[#FFB81C] text-slate-950 px-4 py-1.5 grid grid-cols-12 font-black text-xs border-b border-black">
+                        <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">Sección:</div>
+                        <div className="col-span-5 sm:col-span-6 px-2">Nom. Asignatura:</div>
+                        <div className="col-span-4 sm:col-span-4 text-right">Horario y Sala</div>
+                      </div>
+
+                      {/* Lista de Asignaturas del Paquete (Fiel a Imagen 2) */}
+                      <div className="divide-y divide-black text-xs font-mono max-h-72 overflow-y-auto">
+                        {selectedTargetPackage.targetCourses.map((tc) => {
+                          const isOptativo = tc.tipo === 'optativo' || tc.tipo === 'practica';
+                          return (
+                            <div
+                              key={tc.sigla}
+                              className={`px-4 py-2 grid grid-cols-12 items-center ${
+                                isOptativo ? 'bg-[#bbdefb]' : 'bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="col-span-3 sm:col-span-2 font-bold text-slate-900 border-r border-black pr-2 truncate">
+                                {tc.sigla}
+                              </div>
+                              <div className="col-span-5 sm:col-span-6 px-2">
+                                <span className="font-bold text-slate-900 uppercase block truncate" title={tc.nombre}>
+                                  {tc.nombre}
+                                </span>
+                                <span className="text-[10px] text-slate-600 font-sans block truncate">
+                                  Sección Oficial: {tc.seccion} • {tc.profesor}
+                                </span>
+                              </div>
+                              <div className="col-span-4 sm:col-span-4 text-right font-sans text-[11px] text-slate-700 truncate">
+                                <span className="font-semibold block">{tc.horarioTexto}</span>
+                                <span className="text-[10px] text-slate-500 font-mono block">Sala: {tc.sala}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setPreFlowStep(1)}
+                    className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+                  >
+                    ← Volver al Paso 1
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleStartSimulationFromPreFlow}
+                    className="min-h-[46px] px-7 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-black text-sm rounded-xl flex items-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer"
+                  >
+                    <span>Iniciar toma de ramos</span>
+                    <ArrowRight className="w-4 h-4 text-[#FFB81C]" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

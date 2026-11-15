@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Nexo360 • Duoc UC Portal Accesible (Overlay Oficial)",
+  "version": "1.0.0",
+  "description": "Transforma la interfaz oficial de Vivo Duoc (experienciavivo.duoc.cl) superponiendo el frontend accesible, predictivo y gamificado de Nexo360 sin bloqueos de CORS ni MFA.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://experienciavivo.duoc.cl/*",
+    "*://*.duoc.cl/*",
+    "http://localhost:5000/*",
+    "http://localhost:5173/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://experienciavivo.duoc.cl/*"
+      ],
+      "js": [
+        "contentScript.js"
+      ],
+      "css": [
+        "injectedOverlay.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Nexo360 • Control de Máscara Vivo Duoc"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injectedOverlay.css"
+      ],
+      "matches": [
+        "*://experienciavivo.duoc.cl/*"
+      ]
+    }
+  ]
+}

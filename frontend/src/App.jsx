@@ -4,8 +4,17 @@ import { useAuth } from './context/AuthContext';
 import { SkipLink } from './components/common/SkipLink';
 import { LiveAnnouncer } from './components/common/LiveAnnouncer';
 import { ReadingGuideOverlay } from './components/common/ReadingGuideOverlay';
+import { ThemeCurtainOverlay } from './components/common/ThemeCurtainOverlay';
 import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
+
+// Code-Splitting para optimización extrema de carga y rendimiento de red
+const DashboardPage = lazy(() =>
+  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
+);
+
+const NotFoundPage = lazy(() =>
+  import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
+);
 
 const TomaRamosSimulator = lazy(() =>
   import('./components/simulation/TomaRamosSimulator').then((m) => ({
@@ -13,7 +22,7 @@ const TomaRamosSimulator = lazy(() =>
   }))
 );
 
-// Componente para proteger la ruta del Dashboard
+// Componente para proteger las rutas privadas institucionales
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -22,7 +31,7 @@ const ProtectedRoute = ({ children }) => {
       <div className="flex-1 flex items-center justify-center p-12">
         <div className="text-center">
           <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-slate-600 font-semibold text-sm">Cargando Nexo360...</p>
+          <p className="text-slate-600 font-semibold text-sm">Verificando credenciales Duoc UC...</p>
         </div>
       </div>
     );
@@ -33,6 +42,24 @@ const ProtectedRoute = ({ children }) => {
   }
 
   return children;
+};
+
+// Ruta raíz inteligente: redirige al dashboard si ya está autenticado o al login si no
+const RootRoute = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-slate-600 font-semibold text-sm">Iniciando Nexo360...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
 };
 
 export const App = () => {
@@ -47,43 +74,46 @@ export const App = () => {
       {/* 2.1 Guía de lectura para Dislexia y TDAH (W3C COGA) */}
       <ReadingGuideOverlay />
 
+      {/* 2.2 Cortina de transición elegante entre temas claro / oscuro */}
+      <ThemeCurtainOverlay />
+
       {/* 3. Contenido Principal Rutas */}
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/toma-ramos"
-          element={
-            <ProtectedRoute>
-              <Suspense
-                fallback={
-                  <div className="flex-1 flex items-center justify-center p-12">
-                    <div className="text-center">
-                      <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
-                      <p className="text-slate-600 font-semibold text-sm">
-                        Cargando Simulador Oficial de Toma de Ramos Duoc UC...
-                      </p>
-                    </div>
-                  </div>
-                }
-              >
+      <Suspense
+        fallback={
+          <div className="flex-1 flex items-center justify-center p-12">
+            <div className="text-center">
+              <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-slate-600 font-semibold text-sm">Cargando Nexo360...</p>
+            </div>
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/" element={<RootRoute />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/toma-ramos"
+            element={
+              <ProtectedRoute>
                 <TomaRamosSimulator onExit={() => (window.location.href = '/dashboard')} />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/simulador" element={<Navigate to="/toma-ramos" replace />} />
-        <Route path="/simulador-toma-ramos" element={<Navigate to="/toma-ramos" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/simulador" element={<Navigate to="/toma-ramos" replace />} />
+          <Route path="/simulador-toma-ramos" element={<Navigate to="/toma-ramos" replace />} />
+          
+          {/* 4. Ruta 404 Institucional: Página no encontrada */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 };

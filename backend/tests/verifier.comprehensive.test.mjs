@@ -17,7 +17,6 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
     assert.strictEqual(seed.length, 7174, 'Debe contener exactamente 7,174 ofertas de cursos');
 
-    // Comprobar campos obligatorios en cada fila
     let sinSigla = 0, sinNombre = 0, sinSeccion = 0, sinHorario = 0, sinCarrera = 0;
     const carreras = new Set();
     const siglas = new Set();
@@ -46,7 +45,6 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     assert.strictEqual(secciones.size, 1100, 'Debe haber exactamente 1,100 códigos de sección únicos globales');
     assert.strictEqual(carreraSecciones.size, 2389, 'Debe haber exactamente 2,389 secciones consolidadas por carrera');
 
-    // Validar carreras críticas
     const carrerasList = Array.from(carreras);
     assert.ok(carrerasList.some(c => c.includes('INFRAESTRUCTURA TECNOLÓGICA')), 'Debe incluir Infraestructura Tecnológica');
     assert.ok(carrerasList.some(c => c.includes('INFORMÁTICA')), 'Debe incluir Informática');
@@ -63,6 +61,7 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     assert.ok(content.includes('BLOQUES_HORARIOS_TOMA'), 'Debe exportar BLOQUES_HORARIOS_TOMA');
     assert.ok(content.includes('CATALOGO_INFRAESTRUCTURA_TECNOLOGICA'), 'Debe exportar CATALOGO_INFRAESTRUCTURA_TECNOLOGICA');
     assert.ok(content.includes('getRandomCoursesForCareer'), 'Debe exportar getRandomCoursesForCareer');
+    assert.ok(content.includes('generateTargetPackages'), 'Debe exportar generateTargetPackages');
     assert.ok(content.includes('b17'), 'Debe contener bloques horarios hasta b17');
   });
 
@@ -91,7 +90,6 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     assert.ok(fs.existsSync(adminCompPath), 'CoursesAdminSection.jsx debe existir');
 
     const code = fs.readFileSync(adminCompPath, 'utf8');
-    // Chequear accesibilidad
     assert.ok(code.includes('focus-visible:ring-4'), 'Debe contener anillos de foco visibles ring-4');
     assert.ok(code.includes('aria-label'), 'Debe contener etiquetas ARIA');
     assert.ok(code.includes('replaceCatalog'), 'Debe contener estado replaceCatalog');
@@ -99,5 +97,234 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     assert.ok(code.includes('.xlsx'), 'Debe soportar .xlsx');
     assert.ok(code.includes('.md'), 'Debe soportar .md');
     assert.ok(code.includes('Descargar .md'), 'Debe ofrecer descarga de Markdown');
+  });
+
+  await t.test('5. [LEY 21.719 COMPLIANCE] Protección de Datos Personales, No contraseñas planas y Metadatos de Consentimiento', async () => {
+    const UserProfile = (await import('../models/UserProfile.js')).default;
+    const authScraperService = (await import('../services/authScraperService.js')).default;
+
+    // Verificar modelo UserProfile: toJSON y toObject eliminan campos sensibles de contraseña
+    const testDoc = new UserProfile({
+      email: 'ley21719.test@duocuc.cl',
+      password: 'PlainSecretPassword123!',
+      fullName: 'Estudiante Prueba Ley 21.719',
+      role: 'estudiante',
+    });
+    await testDoc.validate();
+
+    const jsonOutput = testDoc.toJSON();
+    assert.strictEqual(jsonOutput.password, undefined, 'toJSON no debe incluir password');
+    assert.strictEqual(jsonOutput.__v, undefined, 'toJSON no debe exponer __v');
+
+    const objOutput = testDoc.toObject();
+    assert.strictEqual(objOutput.password, undefined, 'toObject no debe incluir password');
+
+    // Verificar metadatos de consentimiento y limitación de finalidad
+    assert.ok(testDoc.consentMetadata, 'Debe poseer estructura de metadatos de consentimiento');
+    assert.strictEqual(testDoc.consentMetadata.consentGiven, true);
+    assert.ok(Array.isArray(testDoc.purposeLimitation), 'purposeLimitation debe ser un array');
+    assert.ok(testDoc.purposeLimitation.includes('gestion_academica'), 'Debe incluir finalidad academica');
+
+    // Verificar formato de respuesta en authScraperService
+    const formatted = authScraperService.formatUserResponse(testDoc);
+    assert.strictEqual(formatted.password, undefined, 'formatUserResponse jamás debe retornar contraseña');
+    assert.ok(formatted.consentMetadata, 'formatUserResponse debe incluir consentMetadata');
+    assert.ok(
+      (formatted.consentMetadata.law || formatted.consentMetadata.consentVersion).includes('21.719'),
+      'consentMetadata debe hacer referencia a la Ley N° 21.719'
+    );
+  });
+
+  await t.test('6. [VIVO DUOC LOGIN & SCRAPING DATA STRUCTURE] URL oficial y scraping de asistencia con fallback', async () => {
+    const authScraperService = (await import('../services/authScraperService.js')).default;
+
+    const loginUrl = authScraperService.getOfficialLoginUrl();
+    assert.ok(
+      loginUrl.includes('client_id=674913e2-e170-4787-833f-e307f87db6e5'),
+      'Debe contener client_id oficial'
+    );
+    assert.ok(
+      loginUrl.includes('nonce=890304a71c3cc708b8d73d6a4f6ab56c') ||
+        loginUrl.includes('nonce=23077c7bfb49e35770b10965bcbb9df5'),
+      'Debe contener nonce oficial de Vivo Duoc'
+    );
+    assert.ok(
+      loginUrl.includes('state=e8044508aa7459a37f5439328c7d6f39') ||
+        loginUrl.includes('state=181261858bac94807f59900cdd53d715'),
+      'Debe contener state oficial de Vivo Duoc'
+    );
+    assert.ok(
+      loginUrl.includes('redirect_uri=https%3A%2F%2Fexperienciavivo.duoc.cl%2Fauth%2Fopenidc%2Fcallback'),
+      'Debe redirigir a callback oficial de experienciavivo'
+    );
+
+    // Verificar scraping/fallback data structure
+    const sessionData = await authScraperService.maintainVivoDuocSession('c.guzman@duocuc.cl', {
+      user: { fullName: 'Cristian Guzmán', career: 'Ingeniería en Informática', attendanceRate: 88.9 },
+    });
+    assert.ok(sessionData, 'Debe devolver datos del estudiante');
+    assert.ok(Array.isArray(sessionData.enrolledCourses), 'Debe tener enrolledCourses');
+    assert.ok(sessionData.enrolledCourses.length > 0, 'Debe contener ramos parseados');
+
+    const capstone = sessionData.enrolledCourses.find(c => (c.nombre || '').includes('CAPSTONE') || (c.curso || '').includes('CAPSTONE'));
+    assert.ok(capstone, 'Debe contener la asignatura PROYECTO CAPSTONE');
+    assert.strictEqual(capstone.clasesRegistradas, 27, 'Debe tener 27 clases registradas');
+    assert.strictEqual(capstone.asistencia, 24, 'Debe registrar 24 asistencias');
+    assert.strictEqual(capstone.porcentajeAsistencia, 88.9, 'Porcentaje debe ser exactamente 88.9%');
+    assert.strictEqual(capstone.porcentajeAsistenciaActual, '88.9%');
+  });
+
+  await t.test('7. [REGISTRATION FORM, DYNAMIC PASSWORD, RUT & 4 ROLES] Admin-only creation of administrators', async () => {
+    const adminController = (await import('../controllers/adminController.js')).default || (await import('../controllers/adminController.js'));
+    const adminCodePath = path.resolve(backendDir, 'controllers/adminController.js');
+    const adminCode = fs.readFileSync(adminCodePath, 'utf8');
+
+    // 1. Password dinámico del año: formato Duoc + año + !
+    const currentYear = new Date().getFullYear();
+    assert.ok(
+      adminCode.includes('`Duoc${currentYear}!`'),
+      `adminController debe computar la contraseña dinámica como Duoc${currentYear}!`
+    );
+
+    // 2. Comprobar label RUT y 4 roles en código fuente del formulario
+    const adminViewPath = path.resolve(projectRootDir, 'frontend/src/components/views/AdminPanelView.jsx');
+    const adminViewCode = fs.readFileSync(adminViewPath, 'utf8');
+
+    assert.ok(adminViewCode.includes('RUT <span className="text-red-600">*</span>'), 'El label debe ser estrictamente RUT');
+    assert.ok(!adminViewCode.includes('RUT institucional <span'), 'No debe existir RUT institucional');
+
+    // 3. Comprobar que solo 4 roles institucionales están en las opciones
+    assert.ok(adminViewCode.includes('value="estudiante">Estudiante</option>'), 'Debe incluir rol Estudiante');
+    assert.ok(adminViewCode.includes('value="estudiante_paedis">Estudiante PAEDIS</option>'), 'Debe incluir rol Estudiante PAEDIS');
+    assert.ok(adminViewCode.includes('value="coordinador_paedis">Coordinador PAEDIS</option>'), 'Debe incluir rol Coordinador PAEDIS');
+    assert.ok(adminViewCode.includes('value="admin">Administrador</option>'), 'Debe incluir rol Administrador');
+
+    // 4. Comprobar que 'Estado académico', 'Asistencia estimada', 'Tutor par asignado' fueron eliminados del formulario de creación
+    assert.ok(!adminViewCode.includes('id="create-academic-status"'), 'No debe tener campo create-academic-status');
+    assert.ok(!adminViewCode.includes('id="create-attendance-rate"'), 'No debe tener campo create-attendance-rate');
+    assert.ok(!adminViewCode.includes('id="create-tutor-par"'), 'No debe tener campo create-tutor-par');
+
+    // 5. Restricción en backend: Coordinador PAEDIS no puede crear Administrador
+    let denied = false;
+    const mockRes = {
+      status(code) {
+        if (code === 403) denied = true;
+        return this;
+      },
+      json(payload) {
+        this.body = payload;
+        return this;
+      },
+    };
+
+    const mockReqFromCoordinador = {
+      user: { role: 'coordinador_paedis', email: 'coord@duocuc.cl' },
+      body: {
+        fullName: 'Nuevo Administrador Ilegal',
+        email: 'nuevo.admin@duocuc.cl',
+        role: 'admin',
+        rut: '12.345.678-9',
+      },
+    };
+
+    await adminController.createStudent(mockReqFromCoordinador, mockRes);
+    assert.ok(denied, 'Coordinador PAEDIS debe recibir 403 Forbidden al intentar crear un Administrador');
+    assert.ok(mockRes.body.message.includes('Solo un Administrador'), 'Mensaje de rechazo debe indicar exclusividad');
+  });
+
+  await t.test('8. [STUDENT DIRECTORY & DETAIL MODAL] Nombre y Sede únicamente en listado, modal con asistencias y semáforo', () => {
+    const adminViewPath = path.resolve(projectRootDir, 'frontend/src/components/views/AdminPanelView.jsx');
+    const adminViewCode = fs.readFileSync(adminViewPath, 'utf8');
+
+    // Comprobar que la tarjeta del directorio contiene únicamente Nombre y Sede
+    assert.ok(adminViewCode.includes('{student.fullName}'), 'Debe mostrar el nombre completo');
+    assert.ok(adminViewCode.includes('{studentSede}'), 'Debe mostrar la sede directamente debajo');
+
+    // Comprobar modal de detalle: Asistencia detallada por asignatura
+    assert.ok(adminViewCode.includes('Asistencia Detallada por Asignatura Cursada'), 'Modal debe incluir título de asistencia por asignatura');
+    assert.ok(adminViewCode.includes('selectedStudentForDetail.enrolledCourses'), 'Modal debe mapear los cursos inscritos');
+
+    // Comprobar semáforo de deserción: Verde (>75%), Amarillo (70-75%), Rojo (<70%)
+    assert.ok(adminViewCode.includes('Semáforo Predictivo de Retención vs. Deserción'), 'Debe incluir semáforo de retención');
+    assert.ok(adminViewCode.includes('Verde: Bajo Riesgo (> 75%)'), 'Debe contener regla de Verde');
+    assert.ok(adminViewCode.includes('Amarillo: Riesgo Moderado (70% - 75%)'), 'Debe contener regla de Amarillo');
+    assert.ok(adminViewCode.includes('Rojo: Alto Riesgo / RI (< 70%)'), 'Debe contener regla de Rojo');
+  });
+
+  await t.test('9. [HELP CENTER INTENTIONALITY SEARCH] Búsqueda de certificado de notas retorna URL oficial de Vivo Duoc', () => {
+    const modulesDataPath = path.resolve(projectRootDir, 'frontend/src/data/duocModulesData.js');
+    const modulesDataCode = fs.readFileSync(modulesDataPath, 'utf8');
+
+    assert.ok(modulesDataCode.includes('certificados-alumnos-notas'), 'Debe existir submódulo certificados-alumnos-notas');
+    assert.ok(
+      modulesDataCode.includes('https://experienciavivo.duoc.cl/alumnos/certificados'),
+      'Debe apuntar a https://experienciavivo.duoc.cl/alumnos/certificados'
+    );
+
+    // Comprobar DashboardPage.jsx detección semántica
+    const dashboardPath = path.resolve(projectRootDir, 'frontend/src/pages/DashboardPage.jsx');
+    const dashboardCode = fs.readFileSync(dashboardPath, 'utf8');
+
+    assert.ok(dashboardCode.includes('isCertificadoNotasIntent'), 'DashboardPage debe computar isCertificadoNotasIntent');
+    assert.ok(dashboardCode.includes("sub.id === 'certificados-alumnos-notas'"), 'Debe priorizar la sección certificados-alumnos-notas');
+  });
+
+  await t.test('10. [SIMULATOR ACCESS CONTROL & GAMIFICATION] Bloqueo a no registrados y paquetes sin colisiones', () => {
+    const dashboardPath = path.resolve(projectRootDir, 'frontend/src/pages/DashboardPage.jsx');
+    const dashboardCode = fs.readFileSync(dashboardPath, 'utf8');
+
+    const simulatorPath = path.resolve(projectRootDir, 'frontend/src/components/simulation/TomaRamosSimulator.jsx');
+    const simulatorCode = fs.readFileSync(simulatorPath, 'utf8');
+
+    // Mensaje accesible para no registrados
+    const expectedMsg = 'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.';
+    assert.ok(dashboardCode.includes(expectedMsg), 'DashboardPage debe desplegar aviso accesible para no registrados');
+    assert.ok(simulatorCode.includes(expectedMsg), 'TomaRamosSimulator debe desplegar aviso accesible para no registrados');
+
+    // Estructura de gamificación en el simulador
+    assert.ok(simulatorCode.includes('Modo Guiado'), 'Debe ofrecer Modo Guiado');
+    assert.ok(simulatorCode.includes('Modo Realista'), 'Debe ofrecer Modo Realista');
+    assert.ok(simulatorCode.includes('generateTargetPackages'), 'Debe llamar a generateTargetPackages');
+    assert.ok(simulatorCode.includes('Iniciar toma de ramos'), 'Debe tener botón Iniciar toma de ramos');
+    assert.ok(simulatorCode.includes('filter blur-md'), 'Debe desenfocar el fondo durante el pre-flujo');
+    assert.ok(simulatorCode.includes('achievementPct') || simulatorCode.includes('completionPercentage') || simulatorCode.includes('matchedTargetCourses.length / targetCourses.length'), 'Debe calcular porcentaje de logro');
+  });
+
+  await t.test('11. [READINGGUIDEOVERLAY Z-INDEX LAYER] z-[9999] como máxima capa sobre modales y paneles', () => {
+    const overlayPath = path.resolve(projectRootDir, 'frontend/src/components/common/ReadingGuideOverlay.jsx');
+    assert.ok(fs.existsSync(overlayPath), 'ReadingGuideOverlay.jsx debe existir');
+
+    const overlayCode = fs.readFileSync(overlayPath, 'utf8');
+    assert.ok(overlayCode.includes('z-[9999]'), 'ReadingGuideOverlay debe usar la clase z-[9999]');
+    assert.ok(overlayCode.includes('pointer-events-none'), 'ReadingGuideOverlay debe tener pointer-events-none');
+  });
+
+  await t.test('12. [BOLETÍN OFICIAL, DIFICULTADES & RUT BIBLIOTECA] 4 dificultades, boletín oficial PDF y RUT 21.987.654-3', () => {
+    // 1. Verificar BibliotecaView.jsx
+    const biblioPath = path.resolve(projectRootDir, 'frontend/src/components/views/BibliotecaView.jsx');
+    const biblioCode = fs.readFileSync(biblioPath, 'utf8');
+    assert.ok(biblioCode.includes('21.987.654-3'), 'BibliotecaView debe utilizar el RUT oficial 21.987.654-3');
+    assert.ok(!biblioCode.includes('19.276.735-0'), 'BibliotecaView no debe contener el RUT antiguo');
+
+    // 2. Verificar tomaRamosData.js: 4 dificultades y helpers de boletín
+    const tomaRamosPath = path.resolve(projectRootDir, 'frontend/src/data/tomaRamosData.js');
+    const tomaRamosCode = fs.readFileSync(tomaRamosPath, 'utf8');
+    assert.ok(tomaRamosCode.includes("'facil'"), 'Debe soportar dificultad facil');
+    assert.ok(tomaRamosCode.includes("'intermedio'"), 'Debe soportar dificultad intermedio');
+    assert.ok(tomaRamosCode.includes("'dificil'"), 'Debe soportar dificultad dificil');
+    assert.ok(tomaRamosCode.includes("'muy-dificil'"), 'Debe soportar dificultad muy-dificil');
+    assert.ok(tomaRamosCode.includes('getBoletinSemesterTitle'), 'Debe exportar getBoletinSemesterTitle');
+    assert.ok(tomaRamosCode.includes('formatStudentNameForBoletin'), 'Debe exportar formatStudentNameForBoletin');
+
+    // 3. Verificar TomaRamosSimulator.jsx: Boletín de Carga Académica PDF
+    const simPath = path.resolve(projectRootDir, 'frontend/src/components/simulation/TomaRamosSimulator.jsx');
+    const simCode = fs.readFileSync(simPath, 'utf8');
+    assert.ok(simCode.includes('/duoc-uc-logo-boletin.png'), 'Boletín debe renderizar el logo oficial Duoc UC');
+    assert.ok(simCode.includes('SEDE:') && simCode.includes('N° 10'), 'Boletín debe incluir la sede oficial y número de sede');
+    assert.ok(simCode.includes('Dirección de Docencia'), 'Boletín debe incluir Dirección de Docencia');
+    assert.ok(simCode.includes('Fecha emisión'), 'Boletín debe incluir Fecha emisión');
+    assert.ok(simCode.includes('adaptiveBlocks'), 'Boletín debe computar cuadrícula horaria adaptativa');
+    assert.ok(simCode.includes('bg-[#1b5e20]'), 'Pre-flujo debe usar el color verde institucional Duoc UC');
+    assert.ok(simCode.includes('bg-[#FFB81C]'), 'Pre-flujo debe usar el color amarillo/dorado oficial Duoc UC');
   });
 });

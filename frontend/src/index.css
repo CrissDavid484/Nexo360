@@ -22,6 +22,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Desactivar botón nativo de cancelar en inputs de búsqueda para evitar dobles 'X' */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none !important;
+}
+
 /* Transición global coordinada y fluida para cambio de tema claro / oscuro (60/120 FPS) */
 html:not(.reduced-motion) body,
 html:not(.reduced-motion) #root,
@@ -34,6 +44,68 @@ html:not(.reduced-motion) .a11y-fab-btn {
     border-color 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
     color 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
     box-shadow 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ==========================================================================
+   TRANSICIÓN CORTINA (CURTAIN WIPE REVEAL) AL CAMBIAR DE TEMA (CLARO <-> OSCURO)
+   ========================================================================== */
+::view-transition-old(root) {
+  animation: curtainFadeOut 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  animation: curtainWipeReveal 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+  z-index: 9998;
+}
+
+@keyframes curtainWipeReveal {
+  0% {
+    clip-path: inset(0 0 100% 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes curtainFadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.92;
+  }
+}
+
+html.reduced-motion ::view-transition-old(root),
+html.reduced-motion ::view-transition-new(root),
+html.reduced-motion ::view-transition-group(root) {
+  animation: none !important;
+}
+
+/* Haz dorado y cortina fallback */
+@keyframes curtainBeamSweep {
+  0% {
+    top: 0%;
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.animate-curtain-beam {
+  animation: curtainBeamSweep 0.48s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+html.reduced-motion .animate-curtain-beam,
+html.reduced-motion .theme-curtain-overlay {
+  display: none !important;
+  animation: none !important;
 }
 
 p, li {

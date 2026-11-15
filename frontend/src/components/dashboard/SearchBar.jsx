@@ -5,6 +5,7 @@ import { useAccessibility } from '../../context/AccessibilityContext';
 const QUICK_FILTERS = [
   { label: 'Inclusión y apoyos', query: 'apoyos' },
   { label: 'Justificar inasistencia', query: 'inasistencia' },
+  { label: 'Certificado de notas', query: 'certificado de notas' },
   { label: 'Toma de ramos', query: 'inscripción de asignaturas' },
   { label: 'Estudiante cuidador', query: 'cuidador' },
   { label: 'Gratuidad y CAE', query: 'gratuidad' },
@@ -63,11 +64,13 @@ export const SearchBar = ({
 
         <input
           id="dashboard-search"
-          type="search"
+          type="text"
+          role="searchbox"
+          autoComplete="off"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Busca un trámite o tema (ej. inasistencia, TNE, gratuidad, congelar...)"
-          className="w-full min-h-[54px] pl-12 pr-12 py-3.5 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-2xl text-slate-900 text-sm sm:text-base font-medium placeholder:text-slate-400 shadow-xs focus:shadow-md transition-all duration-200"
+          className="w-full min-h-[54px] pl-12 pr-12 py-3.5 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-2xl text-slate-900 text-sm sm:text-base font-medium placeholder:text-slate-400 shadow-xs focus:shadow-md transition-all duration-200 [&::-webkit-search-cancel-button]:hidden"
         />
 
         {searchTerm && (

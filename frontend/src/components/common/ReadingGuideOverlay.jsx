@@ -57,7 +57,7 @@ export const ReadingGuideOverlay = () => {
     <div
       id="reading-guide-overlay"
       aria-hidden="true"
-      className="pointer-events-none fixed inset-x-0 z-40 transition-transform duration-75 ease-out select-none"
+      className="pointer-events-none fixed inset-x-0 z-[9999] transition-transform duration-75 ease-out select-none"
       style={{
         top: 0,
         transform: `translateY(${mouseY - 20}px)`,

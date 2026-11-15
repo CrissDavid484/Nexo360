@@ -34,6 +34,9 @@ export const AccessibilityProvider = ({ children }) => {
     return localStorage.getItem('nexo360_reading_guide') === 'true';
   });
 
+  // Estado para la cortina de transición suave entre temas
+  const [isCurtainAnimating, setIsCurtainAnimating] = useState(false);
+
   // Estado para anuncios de lectores de pantalla (WCAG 4.1.3 Status Messages)
   const [announcement, setAnnouncement] = useState('');
   const [announcementPriority, setAnnouncementPriority] = useState('polite');
@@ -93,6 +96,7 @@ export const AccessibilityProvider = ({ children }) => {
       root.classList.remove('reduced-motion');
     }
     localStorage.setItem('nexo360_reduced_motion', String(reducedMotion));
+    localStorage.setItem('nexo360_reading_guide', String(readingGuide));
 
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
@@ -112,11 +116,12 @@ export const AccessibilityProvider = ({ children }) => {
           highContrast,
           dyslexicFont,
           reducedMotion,
+          readingGuide,
           screenReaderOptimized: true,
         })
         .catch(() => {});
     }
-  }, [fontSize, highContrast, dyslexicFont, reducedMotion]);
+  }, [fontSize, highContrast, dyslexicFont, reducedMotion, readingGuide]);
 
   // Controles de tamaño de fuente memoizados
   const increaseFontSize = useCallback(() => {
@@ -148,12 +153,43 @@ export const AccessibilityProvider = ({ children }) => {
   }, [announce]);
 
   const toggleHighContrast = useCallback(() => {
-    setHighContrast((prev) => {
-      const next = !prev;
-      announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
-      return next;
-    });
-  }, [announce]);
+    // Si el usuario tiene activo movimiento reducido, cambio instantáneo
+    if (reducedMotion) {
+      setHighContrast((prev) => {
+        const next = !prev;
+        announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
+        return next;
+      });
+      return;
+    }
+
+    // Cortina de transición elegante (View Transition API nativa o fallback)
+    if (typeof document !== 'undefined' && document.startViewTransition) {
+      setIsCurtainAnimating(true);
+      const transition = document.startViewTransition(() => {
+        setHighContrast((prev) => {
+          const next = !prev;
+          announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
+          return next;
+        });
+      });
+      transition.finished.finally(() => {
+        setIsCurtainAnimating(false);
+      });
+    } else {
+      setIsCurtainAnimating(true);
+      setTimeout(() => {
+        setHighContrast((prev) => {
+          const next = !prev;
+          announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
+          return next;
+        });
+      }, 200);
+      setTimeout(() => {
+        setIsCurtainAnimating(false);
+      }, 500);
+    }
+  }, [reducedMotion, announce]);
 
   const toggleDyslexicFont = useCallback(() => {
     setDyslexicFont((prev) => {
@@ -199,10 +235,26 @@ export const AccessibilityProvider = ({ children }) => {
   const loadUserPreferences = useCallback((prefs) => {
     if (!prefs) return;
     skipBackendSyncRef.current = true;
-    if (prefs.fontSize) setFontSize(prefs.fontSize);
-    if (typeof prefs.highContrast === 'boolean') setHighContrast(prefs.highContrast);
-    if (typeof prefs.dyslexicFont === 'boolean') setDyslexicFont(prefs.dyslexicFont);
-    if (typeof prefs.reducedMotion === 'boolean') setReducedMotion(prefs.reducedMotion);
+    if (prefs.fontSize) {
+      setFontSize(prefs.fontSize);
+      localStorage.setItem('nexo360_font_size', prefs.fontSize);
+    }
+    if (typeof prefs.highContrast === 'boolean') {
+      setHighContrast(prefs.highContrast);
+      localStorage.setItem('nexo360_high_contrast', String(prefs.highContrast));
+    }
+    if (typeof prefs.dyslexicFont === 'boolean') {
+      setDyslexicFont(prefs.dyslexicFont);
+      localStorage.setItem('nexo360_dyslexic_font', String(prefs.dyslexicFont));
+    }
+    if (typeof prefs.reducedMotion === 'boolean') {
+      setReducedMotion(prefs.reducedMotion);
+      localStorage.setItem('nexo360_reduced_motion', String(prefs.reducedMotion));
+    }
+    if (typeof prefs.readingGuide === 'boolean') {
+      setReadingGuide(prefs.readingGuide);
+      localStorage.setItem('nexo360_reading_guide', String(prefs.readingGuide));
+    }
   }, []);
 
   const contextValue = useMemo(
@@ -212,6 +264,7 @@ export const AccessibilityProvider = ({ children }) => {
       dyslexicFont,
       reducedMotion,
       readingGuide,
+      isCurtainAnimating,
       announcement,
       announcementPriority,
       announce,
@@ -230,6 +283,7 @@ export const AccessibilityProvider = ({ children }) => {
       dyslexicFont,
       reducedMotion,
       readingGuide,
+      isCurtainAnimating,
       announcement,
       announcementPriority,
       announce,

@@ -58,8 +58,8 @@ export const TOMA_RAMOS_TUTORIAL_VIDEO = {
 export const TOMA_RAMOS_ESTUDIANTE = {
   nombre: 'CRISTIAN GUZMAN GARCIA',
   nombreBoletin: 'GUZMAN, CRISTIAN DAVID',
-  rut: '192767350',
-  rutFormateado: '19.276.735-0',
+  rut: '219876543',
+  rutFormateado: '21.987.654-3',
   periodo: '2026 - 002',
   codigoCarrera: '1446114',
   carrera: 'INGENIERÍA EN INFORMÁTICA',
@@ -232,6 +232,18 @@ export const ASIGNATURAS_DISPONIBLES = [
           { dia: 'Viernes', bloqueId: 'b6', salaCorta: 'AL-LAB-IP3' },
         ],
       },
+      {
+        seccion: '004V',
+        cuposTotales: 30,
+        cuposDisponibles: 14,
+        sala: 'Laboratorio de Software IP2',
+        profesor: 'Andrés Silva Paredes',
+        horarioTexto: 'Lunes 19:01 - 20:20 (Vespertino)',
+        bloques: [
+          { dia: 'Lunes', bloqueId: 'b14', salaCorta: 'AL-LAB-IP2' },
+          { dia: 'Lunes', bloqueId: 'b15', salaCorta: 'AL-LAB-IP2' },
+        ],
+      },
     ],
   },
   {
@@ -275,6 +287,18 @@ export const ASIGNATURAS_DISPONIBLES = [
         bloques: [],
         sinCupos: true,
       },
+      {
+        seccion: '004V',
+        cuposTotales: 30,
+        cuposDisponibles: 12,
+        sala: 'Sala 402 Alameda',
+        profesor: 'Lorena Castillo V.',
+        horarioTexto: 'Martes 19:01 - 20:20 (Vespertino)',
+        bloques: [
+          { dia: 'Martes', bloqueId: 'b14', salaCorta: 'AL-402' },
+          { dia: 'Martes', bloqueId: 'b15', salaCorta: 'AL-402' },
+        ],
+      },
     ],
   },
   {
@@ -308,6 +332,18 @@ export const ASIGNATURAS_DISPONIBLES = [
           { dia: 'Jueves', bloqueId: 'b4', salaCorta: 'AL-LAB-QA' },
         ],
       },
+      {
+        seccion: '003V',
+        cuposTotales: 28,
+        cuposDisponibles: 10,
+        sala: 'Laboratorio QA AL-LAB-4',
+        profesor: 'Gabriel Arancibia N.',
+        horarioTexto: 'Miércoles 19:01 - 20:20 (Vespertino)',
+        bloques: [
+          { dia: 'Miércoles', bloqueId: 'b14', salaCorta: 'AL-LAB-QA' },
+          { dia: 'Miércoles', bloqueId: 'b15', salaCorta: 'AL-LAB-QA' },
+        ],
+      },
     ],
   },
   {
@@ -339,6 +375,18 @@ export const ASIGNATURAS_DISPONIBLES = [
         bloques: [
           { dia: 'Miércoles', bloqueId: 'b8', salaCorta: 'AL-LAB-CS' },
           { dia: 'Miércoles', bloqueId: 'b9', salaCorta: 'AL-LAB-CS' },
+        ],
+      },
+      {
+        seccion: '003V',
+        cuposTotales: 30,
+        cuposDisponibles: 15,
+        sala: 'Laboratorio Ciberseguridad IP5',
+        profesor: 'Hernán Carrasco D.',
+        horarioTexto: 'Jueves 19:01 - 20:20 (Vespertino)',
+        bloques: [
+          { dia: 'Jueves', bloqueId: 'b14', salaCorta: 'AL-LAB-CS' },
+          { dia: 'Jueves', bloqueId: 'b15', salaCorta: 'AL-LAB-CS' },
         ],
       },
     ],
@@ -1094,19 +1142,203 @@ export const CATALOGO_INFRAESTRUCTURA_TECNOLOGICA = [
 ];
 
 /**
- * Función que retorna asignaturas aleatorias según la carrera elegida
+ * Plantillas Institucionales para Prácticas y Portafolio Duoc UC
  */
-export function getRandomCoursesForCareer(carreraNombre, limit = 7) {
+export const PRACTICA_LABORAL_COURSE = {
+  sigla: 'PRL3100',
+  siglaEq: '',
+  nombre: 'PRÁCTICA LABORAL',
+  creditos: 0,
+  tipo: 'practica',
+  subtipo: 'laboral',
+  secciones: [
+    {
+      seccion: '001D',
+      cuposTotales: 60,
+      cuposDisponibles: 35,
+      sala: 'CENTRO DE PRÁCTICA',
+      profesor: 'COORDINACIÓN DE PRÁCTICAS DUOC UC',
+      horarioTexto: 'Supervisión en terreno (360 hrs)',
+      bloques: [],
+      detallePractica: {
+        tipo: 'Práctica Laboral',
+        centroPractica: 'Empresa TI en Convenio • Sede Alameda',
+        supervisor: 'Coordinador de Prácticas Laborales Escuela Informática',
+        horas: '360 horas cronológicas',
+        periodo: 'Primer y Segundo Semestre 2026',
+      },
+    },
+  ],
+};
+
+export const PRACTICA_PROFESIONAL_COURSE = {
+  sigla: 'PPR4100',
+  siglaEq: '',
+  nombre: 'PRÁCTICA PROFESIONAL',
+  creditos: 0,
+  tipo: 'practica',
+  subtipo: 'profesional',
+  secciones: [
+    {
+      seccion: '001D',
+      cuposTotales: 60,
+      cuposDisponibles: 40,
+      sala: 'EMPRESA / EN TERRENO',
+      profesor: 'DIRECCIÓN DE CARRERA Y EMPRESA',
+      horarioTexto: 'Supervisión profesional (480 hrs)',
+      bloques: [],
+      detallePractica: {
+        tipo: 'Práctica Profesional',
+        centroPractica: 'Entidad Empleadora TI / En Terreno',
+        supervisor: 'Comité de Titulación y Supervisor Institucional',
+        horas: '480 horas cronológicas',
+        periodo: 'Semestre de Egreso 2026',
+      },
+    },
+  ],
+};
+
+export const PORTAFOLIO_TITULO_COURSE = {
+  sigla: 'PTF6101',
+  siglaEq: '',
+  nombre: 'PORTAFOLIO DE TÍTULO',
+  creditos: 10,
+  tipo: 'portafolio',
+  secciones: [
+    {
+      seccion: '001D',
+      cuposTotales: 30,
+      cuposDisponibles: 18,
+      sala: 'AL-503A',
+      profesor: 'Mauricio Gómez Arratia',
+      horarioTexto: 'Mi 08:31 - 09:50 / Vi 08:31 - 10:40',
+      bloques: [
+        { dia: 'Miércoles', bloqueId: 'b1', salaCorta: 'AL-503A' },
+        { dia: 'Viernes', bloqueId: 'b1', salaCorta: 'AL-LAB-IP4' },
+      ],
+      clasesPortafolio: [
+        { nro: 'Clase 01', fecha: 'Miércoles 04 de Marzo de 2026', horario: '08:31 a 09:50', sala: 'AL-503A' },
+        { nro: 'Clase 02', fecha: 'Viernes 06 de Marzo de 2026', horario: '08:31 a 10:40', sala: 'AL-LAB-IP4' },
+        { nro: 'Clase 03', fecha: 'Miércoles 11 de Marzo de 2026', horario: '08:31 a 09:50', sala: 'AL-503A' },
+        { nro: 'Clase 04', fecha: 'Viernes 13 de Marzo de 2026', horario: '08:31 a 10:40', sala: 'AL-LAB-IP4' },
+      ],
+    },
+  ],
+};
+
+/**
+ * 4 Niveles de Dificultad para el Simulador
+ */
+export const DIFFICULTY_LEVELS = [
+  {
+    id: 'facil',
+    name: 'Fácil',
+    regularCount: 3,
+    totalTargetCount: 3,
+    hasPracticaLaboral: false,
+    hasPracticaProfesional: false,
+    description: '3 asignaturas regulares. Ideal para familiarizarse con la plataforma.',
+    badge: '3 Ramos',
+    color: 'emerald',
+    multiplier: 1.0,
+  },
+  {
+    id: 'intermedio',
+    name: 'Intermedio',
+    regularCount: 4,
+    totalTargetCount: 5,
+    hasPracticaLaboral: true,
+    hasPracticaProfesional: false,
+    description: '4 asignaturas regulares + Práctica Laboral. Carga estándar.',
+    badge: '4 Ramos + Práctica Laboral',
+    color: 'blue',
+    multiplier: 1.25,
+  },
+  {
+    id: 'dificil',
+    name: 'Difícil',
+    regularCount: 8,
+    totalTargetCount: 8,
+    hasPracticaLaboral: false,
+    hasPracticaProfesional: false,
+    description: '8 asignaturas regulares. Desafío de coordinación horaria completa sin topes.',
+    badge: '8 Ramos',
+    color: 'amber',
+    multiplier: 1.75,
+  },
+  {
+    id: 'muy-dificil',
+    name: 'Muy Difícil',
+    regularCount: 8,
+    totalTargetCount: 10,
+    hasPracticaLaboral: true,
+    hasPracticaProfesional: true,
+    description: '8 asignaturas regulares + Práctica Laboral + Práctica Profesional. Máxima complejidad académica.',
+    badge: '8 Ramos + 2 Prácticas',
+    color: 'rose',
+    multiplier: 2.5,
+  },
+];
+
+/**
+ * Retorna el título dinámico del Boletín de Carga Académica oficial
+ * Mar - 15 Jul: 1er Sem. / 16 Jul - 21 Dic: 2do Sem.
+ */
+export function getBoletinSemesterTitle(date = new Date()) {
+  const month = date.getMonth() + 1; // 1-12
+  const day = date.getDate();
+  const year = date.getFullYear();
+
+  let semester = '1er Sem.';
+  if (month >= 3 && (month < 7 || (month === 7 && day <= 15))) {
+    semester = '1er Sem.';
+  } else if ((month === 7 && day >= 16) || (month > 7 && (month < 12 || (month === 12 && day <= 21)))) {
+    semester = '2do Sem.';
+  } else {
+    semester = '1er Sem.';
+  }
+
+  return `BOLETIN DE CARGA ACADEMICA ${semester}    ${year}`;
+}
+
+/**
+ * Formatea el nombre del alumno para el boletín en formato oficial: APELLIDO, NOMBRE
+ */
+export function formatStudentNameForBoletin(fullName) {
+  if (!fullName) return 'GUZMAN, CRISTIAN';
+  const parts = fullName.trim().toUpperCase().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return `${parts[1]}, ${parts[0]}`;
+  if (parts.length === 3) return `${parts[1]} ${parts[2]}, ${parts[0]}`;
+  return `${parts.slice(2).join(' ')}, ${parts.slice(0, 2).join(' ')}`;
+}
+
+/**
+ * Función que retorna asignaturas aleatorias según la carrera elegida y nivel de dificultad
+ */
+export function getRandomCoursesForCareer(carreraNombre, limit = 7, difficulty = 'facil') {
   const norm = (carreraNombre || '').toLowerCase();
   let pool = [];
 
   if (norm.includes('infraestructura') || norm.includes('plataformas')) {
-    pool = [...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA];
-  } else if (norm.includes('informática') || norm.includes('informatica')) {
-    pool = [...ASIGNATURAS_DISPONIBLES];
-  } else {
-    // Combinado variado
     pool = [...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA, ...ASIGNATURAS_DISPONIBLES];
+  } else if (norm.includes('informática') || norm.includes('informatica')) {
+    pool = [...ASIGNATURAS_DISPONIBLES, ...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA];
+  } else {
+    pool = [...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA, ...ASIGNATURAS_DISPONIBLES];
+  }
+
+  // Asegurar catálogo de Portafolio
+  if (!pool.some((c) => c.sigla === PORTAFOLIO_TITULO_COURSE.sigla)) {
+    pool.unshift(PORTAFOLIO_TITULO_COURSE);
+  }
+
+  // Ajustar límite según dificultad
+  let effectiveLimit = limit;
+  if (difficulty === 'dificil' || difficulty === 'muy-dificil') {
+    effectiveLimit = Math.max(limit, 16);
+  } else if (difficulty === 'intermedio') {
+    effectiveLimit = Math.max(limit, 10);
   }
 
   // Barajado aleatorio Fisher-Yates
@@ -1116,13 +1348,220 @@ export function getRandomCoursesForCareer(carreraNombre, limit = 7) {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  const selected = shuffled.slice(0, Math.min(limit, shuffled.length));
+  const selected = shuffled.slice(0, Math.min(effectiveLimit, shuffled.length));
 
-  // Simular auténticamente 1 asignatura previamente inscrita
-  return selected.map((item, idx) => ({
+  // Simular 1 asignatura previamente inscrita
+  const list = selected.map((item, idx) => ({
     ...item,
     yaInscrito: idx === 0,
     seccionInscrita: idx === 0 && item.secciones[0] ? item.secciones[0].seccion : undefined,
   }));
+
+  // Agregar prácticas si la dificultad lo requiere
+  if (difficulty === 'intermedio' || difficulty === 'muy-dificil') {
+    if (!list.some((c) => c.sigla === PRACTICA_LABORAL_COURSE.sigla)) {
+      list.push(PRACTICA_LABORAL_COURSE);
+    }
+  }
+  if (difficulty === 'muy-dificil') {
+    if (!list.some((c) => c.sigla === PRACTICA_PROFESIONAL_COURSE.sigla)) {
+      list.push(PRACTICA_PROFESIONAL_COURSE);
+    }
+  }
+
+  return list;
+}
+
+/**
+ * Genera los paquetes objetivos predefinidos (Mañana, Media Tarde, Tarde y Vespertino)
+ * soportando los 4 niveles de dificultad (Fácil, Intermedio, Difícil, Muy Difícil).
+ */
+export function generateTargetPackages(courses, difficulty = 'facil') {
+  if (!courses || courses.length === 0) return [];
+
+  const diffConfig = DIFFICULTY_LEVELS.find((d) => d.id === difficulty) || DIFFICULTY_LEVELS[0];
+  const requiredRegularCount = diffConfig.regularCount;
+
+  const validCourses = courses.filter(
+    (c) =>
+      c.tipo !== 'practica' &&
+      Array.isArray(c.secciones) &&
+      c.secciones.some((s) => !s.sinCupos && (s.bloques || []).length > 0)
+  );
+
+  const selectableCourses = validCourses.filter((c) => !c.yaInscrito);
+  const coursesToUse = selectableCourses.length >= requiredRegularCount ? selectableCourses : validCourses;
+
+  // Registrar bloques de cualquier curso pre-inscrito en la sesión para evitar colisiones
+  const preInscrito = courses.find((c) => c.yaInscrito);
+  const preInscritoSlots = new Set();
+  if (preInscrito && Array.isArray(preInscrito.secciones) && preInscrito.secciones.length > 0) {
+    const preSec =
+      preInscrito.secciones.find((s) => s.seccion === preInscrito.seccionInscrita) ||
+      preInscrito.secciones[0];
+    (preSec.bloques || []).forEach((b) => preInscritoSlots.add(`${b.dia}-${b.bloqueId}`));
+  }
+
+  const configs = [
+    {
+      id: 'pkg-manana',
+      name: 'Paquete 1: Bloque Diurno Mañana',
+      badge: 'Jornada Mañana',
+      jornada: 'Diurno',
+      color: 'emerald',
+      description:
+        `Cursos en horario matutino (08:31 - 12:50 hrs). ${diffConfig.badge} coordinados sin topes.`,
+      filterBlock: (bId) => ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'].includes(bId),
+    },
+    {
+      id: 'pkg-media-tarde',
+      name: 'Paquete 2: Bloque Media Tarde',
+      badge: 'Media Tarde',
+      jornada: 'Diurno',
+      color: 'blue',
+      description:
+        `Cursos planificados entre 13:01 y 16:40 hrs. Diseñado para evitar traslados matutinos.`,
+      filterBlock: (bId) => ['b7', 'b8', 'b9', 'b10'].includes(bId),
+    },
+    {
+      id: 'pkg-tarde',
+      name: 'Paquete 3: Bloque Tarde',
+      badge: 'Jornada Tarde',
+      jornada: 'Diurno',
+      color: 'amber',
+      description:
+        `Cursos en la segunda mitad de la tarde (16:41 - 19:40 hrs). Ideal para liberar mañanas.`,
+      filterBlock: (bId) => ['b11', 'b12', 'b13', 'b14'].includes(bId),
+    },
+    {
+      id: 'pkg-vespertino',
+      name: 'Paquete 4: Bloque Vespertino',
+      badge: 'Jornada Vespertina',
+      jornada: 'Vespertino',
+      color: 'purple',
+      description:
+        `Asignaturas en horario vespertino (19:01 - 21:50 hrs). Compatibilidad laboral garantizada.`,
+      filterBlock: (bId) => ['b14', 'b15', 'b16', 'b17'].includes(bId),
+    },
+  ];
+
+  // Asignaturas curriculares requeridas para esta sesión (uniformes en todos los paquetes)
+  const targetSubjects = coursesToUse.slice(0, requiredRegularCount);
+
+  return configs.map((cfg, pIdx) => {
+    const selected = [];
+    const occupiedSlots = new Set(preInscritoSlots);
+
+    // Iterar de forma consistente sobre las mismas asignaturas curriculares del paquete
+    for (const course of targetSubjects) {
+      if (selected.length >= requiredRegularCount) break;
+      if (selected.some((s) => s.sigla === course.sigla)) continue;
+
+      const eligibleSections = (course.secciones || [])
+        .filter((sec) => !sec.sinCupos && (sec.bloques || []).length > 0)
+        .sort((s1, s2) => {
+          const match1 = (s1.bloques || []).some((b) => cfg.filterBlock(b.bloqueId)) ? 1 : 0;
+          const match2 = (s2.bloques || []).some((b) => cfg.filterBlock(b.bloqueId)) ? 1 : 0;
+          return match2 - match1;
+        });
+
+      for (const sec of eligibleSections) {
+        const hasConflict = (sec.bloques || []).some((b) =>
+          occupiedSlots.has(`${b.dia}-${b.bloqueId}`)
+        );
+
+        if (!hasConflict) {
+          selected.push({
+            sigla: course.sigla,
+            nombre: course.nombre,
+            creditos: course.creditos,
+            tipo: course.tipo || 'obligatorio',
+            seccion: sec.seccion,
+            profesor: sec.profesor || 'Docente Asignado Duoc UC',
+            sala: sec.sala || 'Sede Alameda',
+            horarioTexto: sec.horarioTexto || 'Horario coordinado',
+            bloques: sec.bloques || [],
+            clasesPortafolio: sec.clasesPortafolio,
+          });
+          (sec.bloques || []).forEach((b) => occupiedSlots.add(`${b.dia}-${b.bloqueId}`));
+          break;
+        }
+      }
+    }
+
+    // Si faltaron asignaturas para cumplir el objetivo regular, completar sin choque desde coursesToUse
+    if (selected.length < requiredRegularCount) {
+      for (const course of coursesToUse) {
+        if (selected.length >= requiredRegularCount) break;
+        if (selected.some((s) => s.sigla === course.sigla)) continue;
+
+        for (const sec of course.secciones || []) {
+          if (sec.sinCupos || !(sec.bloques || []).length) continue;
+          const hasConflict = (sec.bloques || []).some((b) =>
+            occupiedSlots.has(`${b.dia}-${b.bloqueId}`)
+          );
+          if (!hasConflict) {
+            selected.push({
+              sigla: course.sigla,
+              nombre: course.nombre,
+              creditos: course.creditos,
+              tipo: course.tipo || 'obligatorio',
+              seccion: sec.seccion,
+              profesor: sec.profesor || 'Docente Asignado Duoc UC',
+              sala: sec.sala || 'Sede Alameda',
+              horarioTexto: sec.horarioTexto || 'Horario coordinado',
+              bloques: sec.bloques || [],
+              clasesPortafolio: sec.clasesPortafolio,
+            });
+            (sec.bloques || []).forEach((b) => occupiedSlots.add(`${b.dia}-${b.bloqueId}`));
+            break;
+          }
+        }
+      }
+    }
+
+    // Agregar Práctica Laboral si la dificultad lo requiere
+    if (diffConfig.hasPracticaLaboral) {
+      selected.push({
+        sigla: PRACTICA_LABORAL_COURSE.sigla,
+        nombre: PRACTICA_LABORAL_COURSE.nombre,
+        creditos: PRACTICA_LABORAL_COURSE.creditos,
+        tipo: 'practica',
+        seccion: PRACTICA_LABORAL_COURSE.secciones[0].seccion,
+        profesor: PRACTICA_LABORAL_COURSE.secciones[0].profesor,
+        sala: PRACTICA_LABORAL_COURSE.secciones[0].sala,
+        horarioTexto: PRACTICA_LABORAL_COURSE.secciones[0].horarioTexto,
+        bloques: [],
+        detallePractica: PRACTICA_LABORAL_COURSE.secciones[0].detallePractica,
+      });
+    }
+
+    // Agregar Práctica Profesional si la dificultad lo requiere
+    if (diffConfig.hasPracticaProfesional) {
+      selected.push({
+        sigla: PRACTICA_PROFESIONAL_COURSE.sigla,
+        nombre: PRACTICA_PROFESIONAL_COURSE.nombre,
+        creditos: PRACTICA_PROFESIONAL_COURSE.creditos,
+        tipo: 'practica',
+        seccion: PRACTICA_PROFESIONAL_COURSE.secciones[0].seccion,
+        profesor: PRACTICA_PROFESIONAL_COURSE.secciones[0].profesor,
+        sala: PRACTICA_PROFESIONAL_COURSE.secciones[0].sala,
+        horarioTexto: PRACTICA_PROFESIONAL_COURSE.secciones[0].horarioTexto,
+        bloques: [],
+        detallePractica: PRACTICA_PROFESIONAL_COURSE.secciones[0].detallePractica,
+      });
+    }
+
+    return {
+      id: cfg.id,
+      name: cfg.name,
+      badge: `${cfg.badge} • ${diffConfig.name}`,
+      jornada: cfg.jornada,
+      color: cfg.color,
+      description: cfg.description,
+      difficulty: diffConfig.id,
+      targetCourses: selected,
+    };
+  });
 }
 

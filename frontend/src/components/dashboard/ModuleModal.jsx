@@ -131,7 +131,7 @@ export const ModuleModal = ({
         className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] my-auto animate-scale-in"
       >
         {/* Cabecera limpia y calmada */}
-        <header className="bg-white text-slate-900 px-6 sm:px-8 py-5 flex items-start justify-between border-b border-slate-200/80 shrink-0">
+        <header className="bg-white text-slate-900 px-6 sm:px-8 py-5 flex items-start justify-between border-b border-slate-100 shrink-0">
           <div className="pr-2">
             <span className="text-xs font-semibold text-[#002B49] block mb-1">
               {activeArticle
@@ -316,28 +316,50 @@ export const ModuleModal = ({
             </button>
 
             <article className="space-y-6">
-              {/* Simulador de Toma de Ramos si corresponde */}
+              {/* Simulador de Toma de Ramos & Acceso Oficial al Portal Real */}
               {activeTramite.id === 'inscripcion-asignaturas' && (
-                <div className="p-5 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <span className="text-xs font-semibold text-amber-900 block">
-                      Práctica interactiva guiada
-                    </span>
-                    <p className="text-xs sm:text-sm text-slate-700 mt-1 leading-relaxed">
-                      Practica cómo inscribir asignaturas, revisar horarios y confirmar secciones sin afectar tu carga real.
-                    </p>
+                <div className="p-5 bg-slate-50/80 border border-slate-200 rounded-2xl flex flex-col gap-4 shadow-xs">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-xs font-semibold text-[#002B49] uppercase tracking-wider block">
+                        Portal Oficial • Inscripción de Asignaturas (Toma de Ramos)
+                      </span>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed font-normal">
+                        Accede directamente al sistema oficial SICOL WebDynpro de Duoc UC para inscribir y confirmar tus asignaturas reales.
+                      </p>
+                    </div>
+                    <a
+                      href="https://portalinsc.duoc.cl/webdynpro/dispatcher/duoc.com.student/sicol/StudentSicol?inportal=xi#"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-medium text-xs sm:text-sm rounded-xl shrink-0 flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                    >
+                      <span>Ir a Toma de Ramos Oficial</span>
+                      <ExternalLink className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+                    </a>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSimulator(true);
-                      announce('Abriendo simulador de Toma de Ramos', 'polite');
-                    }}
-                    className="min-h-[42px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shrink-0 flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
-                  >
-                    <Package className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
-                    <span>Practicar en el simulador</span>
-                  </button>
+
+                  <div className="pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-800 block">
+                        ¿Deseas practicar antes? Entorno de Simulación Nexo360
+                      </span>
+                      <p className="text-xs text-slate-500 font-normal">
+                        Entrena la selección de horarios, combina paquetes y prueba sin riesgo de alterar tu matrícula real.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSimulator(true);
+                        announce('Abriendo simulador de Toma de Ramos', 'polite');
+                      }}
+                      className="min-h-[40px] px-4 py-2 bg-[#FFB81C] hover:bg-amber-400 text-slate-950 font-medium text-xs sm:text-sm rounded-xl shrink-0 flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
+                    >
+                      <Package className="w-4 h-4 text-slate-950" aria-hidden="true" />
+                      <span>Practicar en el simulador</span>
+                    </button>
+                  </div>
                 </div>
               )}
 

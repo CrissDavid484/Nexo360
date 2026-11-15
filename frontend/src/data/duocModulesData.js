@@ -80,6 +80,16 @@ export const INTENT_SHORTCUTS = [
     "colorTheme": "emerald"
   },
   {
+    "id": "intent-certificados-notas",
+    "question": "Certificados de Notas y Alumno Regular",
+    "subtitle": "Descarga de certificados oficiales con código QR y validación electrónica",
+    "badge": "Certificados Oficiales",
+    "categoryId": "vida-academica",
+    "submoduleId": "certificados-alumnos-notas",
+    "iconName": "FileText",
+    "colorTheme": "blue"
+  },
+  {
     "id": "intent-congelar-bienestar",
     "question": "Apoyo Psicológico, Congelar o Denuncias",
     "subtitle": "Salud mental gratuita, suspensión temporal de semestre y canal de apoyo",
@@ -867,9 +877,9 @@ export const DUOC_CATEGORIES = [
         "description": "Aquí encontrarás toda la información que necesitas sobre cómo inscribir tus asignaturas de manera fácil y rápida.",
         "intentGoal": "Inscribir mis asignaturas (Toma de Ramos), revisar mi ventana horaria o resolver ramos pendientes.",
         "helpCenterSectionUrl": "https://centroayuda.duoc.cl/hc/es-419/sections/30498564570381-Inscripci%C3%B3n-de-Asignaturas",
-        "link": "https://experienciavivo.duoc.cl/alumnos/horarios",
-        "actionLabel": "Ir a Toma de Ramos en Vivo Duoc",
-        "instructions": "1. Revisa tu fecha y tramo horario asignado para la Inscripción de Asignaturas.\n2. Practica previamente en el Simulador de Toma de Ramos de Nexo360.\n3. Ingresa a Experiencia Vivo y confirma tus secciones. Si te quedaron ramos sin inscribir, ingresa una solicitud académica en línea.",
+        "link": "https://portalinsc.duoc.cl/webdynpro/dispatcher/duoc.com.student/sicol/StudentSicol?inportal=xi#",
+        "actionLabel": "Ir al Portal Oficial de Toma de Ramos (SICOL WebDynpro)",
+        "instructions": "1. Revisa tu fecha y tramo horario asignado para la Inscripción de Asignaturas.\n2. Si deseas practicar antes de la fecha oficial, utiliza el Simulador de Toma de Ramos de Nexo360.\n3. Ingresa al Portal Oficial de Toma de Ramos (portalinsc.duoc.cl) con tu usuario institucional para seleccionar y confirmar tus secciones definitivas.",
         "paedisTip": "Los estudiantes adscritos a PAEDIS pueden gestionar apoyo en la toma de ramos cuando requieren horarios compatibles con terapias médicas o transporte accesible.",
         "intentTags": [
           "toma de ramos",
@@ -1067,6 +1077,56 @@ export const DUOC_CATEGORIES = [
         ]
       },
       {
+        "id": "certificados-alumnos-notas",
+        "zendeskSectionId": 32253089999999,
+        "title": "Certificados y Concentración de Notas",
+        "description": "Obtén en línea tus certificados oficiales de alumno regular, concentración de notas, matrícula y vigencia académica con firma electrónica avanzada.",
+        "intentGoal": "Descargar certificado de notas, concentración de notas o certificado de alumno regular en Experiencia Vivo Duoc.",
+        "helpCenterSectionUrl": "https://centroayuda.duoc.cl/hc/es-419/sections/certificados",
+        "link": "https://experienciavivo.duoc.cl/alumnos/certificados",
+        "actionLabel": "Obtener Certificado en Vivo Duoc",
+        "instructions": "1. Ingresa a Experiencia Vivo Duoc con tus credenciales de estudiante.\n2. Ve a la sección 'Certificados Alumnos en Línea'.\n3. Selecciona 'Certificado de Notas' o 'Concentración de Notas' y descárgalo con validación QR inmediata.",
+        "paedisTip": "Los certificados digitales cuentan con firma electrónica avanzada reconocida para trámites de pensión, beneficios estatales y credencial de discapacidad.",
+        "intentTags": [
+          "certificado de notas",
+          "certificados de notas",
+          "certificado de nota",
+          "certificados de nota",
+          "concentracion de notas",
+          "certificado",
+          "certificados",
+          "notas",
+          "alumno regular",
+          "certificado de alumno regular",
+          "historial de notas",
+          "boletin de notas",
+          "certificados academicos"
+        ],
+        "articlesCount": 2,
+        "articles": [
+          {
+            "id": 30535739959991,
+            "title": "¿Cómo descargar mi Certificado de Notas en línea?",
+            "url": "https://experienciavivo.duoc.cl/alumnos/certificados",
+            "summary": "Obtén tu Certificado de Notas oficial de forma inmediata y 100% gratuita a través del portal de Certificados en Línea de Experiencia Vivo Duoc.",
+            "body": "<p>Para descargar tu <strong>Certificado de Notas</strong> con firma electrónica avanzada y validación QR, ingresa directamente al portal oficial de <a href=\"https://experienciavivo.duoc.cl/alumnos/certificados\" target=\"_blank\" rel=\"noopener noreferrer\">Certificados Alumnos en Línea de Experiencia Vivo Duoc</a>.</p><p>El documento incluye tus calificaciones oficiales, promedio ponderado y código de verificación para presentar ante instituciones públicas y privadas.</p>",
+            "externalLinks": [
+              "https://experienciavivo.duoc.cl/alumnos/certificados"
+            ]
+          },
+          {
+            "id": 30535739959992,
+            "title": "Certificados académicos disponibles y validez electrónica",
+            "url": "https://experienciavivo.duoc.cl/alumnos/certificados",
+            "summary": "Revisa todos los certificados que puedes emitir: Concentración de Notas, Alumno Regular, Estado de Matrícula y Vigencia de Carrera.",
+            "body": "<p>A través del portal de alumnos <a href=\"https://experienciavivo.duoc.cl/alumnos/certificados\" target=\"_blank\" rel=\"noopener noreferrer\">Experiencia Vivo Duoc</a> puedes solicitar de forma ilimitada tus certificados con timbre digital institucional.</p>",
+            "externalLinks": [
+              "https://experienciavivo.duoc.cl/alumnos/certificados"
+            ]
+          }
+        ]
+      },
+      {
         "id": "notas-examenes",
         "zendeskSectionId": 32253086608525,
         "title": "Notas y Exámenes ✅",
@@ -1078,6 +1138,10 @@ export const DUOC_CATEGORIES = [
         "instructions": "1. Revisa tus notas parciales y promedio de presentación en Experiencia Vivo > Notas.\n2. Los docentes cuentan con el plazo reglamentario para publicar tus calificaciones en el sistema.\n3. Si por razones médicas graves no puedes terminar el semestre o rendir un examen en su fecha, solicita \"Nota Pendiente\" o una nueva fecha de examen con respaldo documentado.",
         "paedisTip": "En cada evaluación parcial y examen transversal tienes derecho a que se apliquen tus Ajustes Razonables PAEDIS (ej. tiempo adicional, lector de pantalla o adecuación de formato).",
         "intentTags": [
+          "certificado de notas",
+          "certificados de notas",
+          "certificado",
+          "certificados",
           "notas",
           "examenes",
           "nota pendiente",

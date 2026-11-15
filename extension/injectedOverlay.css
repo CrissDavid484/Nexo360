@@ -1,0 +1,289 @@
+/**
+ * Nexo360 • Estilos Inyectados para la Extensión de Chrome/Edge
+ * Diseñado con WCAG 2.2 AA / AAA, modo alto contraste y soporte de lectura asistida.
+ */
+
+/* Ocultar interfaz original cuando el overlay está activo */
+body.nexo360-active > *:not(#nexo360-overlay-root):not(#nexo360-floating-btn) {
+  display: none !important;
+}
+
+body.nexo360-active {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: auto !important;
+  background-color: #EEF2F6 !important;
+}
+
+/* Botón flotante siempre visible para alternar entre Nexo360 y Vivo Duoc nativo */
+#nexo360-floating-btn {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 2147483647 !important;
+  background: #002B49 !important;
+  color: #FFFFFF !important;
+  border: 2px solid #FFB81C !important;
+  border-radius: 9999px !important;
+  padding: 12px 20px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 43, 73, 0.4) !important;
+  transition: transform 0.2s, background 0.2s !important;
+}
+
+#nexo360-floating-btn:hover {
+  transform: translateY(-2px) !important;
+  background: #001D33 !important;
+}
+
+/* Contenedor Raíz del Overlay */
+#nexo360-overlay-root {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483646 !important;
+  background-color: #EEF2F6 !important;
+  color: #0F172A !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Barra Superior de Nexo360 */
+.nexo-topbar {
+  background: #FFFFFF;
+  border-bottom: 2px solid #CBD5E1;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.nexo-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nexo-logo-badge {
+  width: 40px;
+  height: 40px;
+  background: #002B49;
+  color: #FFB81C;
+  font-size: 20px;
+  font-weight: 900;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nexo-brand-text h1 {
+  font-size: 17px;
+  font-weight: 900;
+  color: #002B49;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.nexo-brand-text span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748B;
+}
+
+.nexo-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nexo-pill {
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nexo-switch-btn {
+  background: #002B49;
+  color: #FFFFFF;
+  border: 1px solid #FFB81C;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nexo-switch-btn:hover {
+  background: #001D33;
+}
+
+/* Área de Contenido Principal */
+.nexo-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+  width: 100%;
+}
+
+.nexo-hero-card {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
+}
+
+.nexo-hero-greeting {
+  font-size: 28px;
+  font-weight: 900;
+  color: #0F172A;
+  margin: 0 0 6px 0;
+}
+
+.nexo-hero-sub {
+  font-size: 14px;
+  color: #64748B;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+}
+
+/* Buscador por intencionalidad */
+.nexo-search-box {
+  display: flex;
+  align-items: center;
+  background: #F8FAFC;
+  border: 2px solid #CBD5E1;
+  border-radius: 16px;
+  padding: 10px 16px;
+  gap: 10px;
+}
+
+.nexo-search-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0F172A;
+  outline: none;
+}
+
+/* Grid de Módulos & Asistencias */
+.nexo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.nexo-card {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+
+.nexo-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #002B49;
+  margin: 0 0 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Tabla de Asistencias Limpia */
+.nexo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.nexo-table th {
+  text-align: left;
+  padding: 10px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #475569;
+  border-bottom: 2px solid #E2E8F0;
+  text-transform: uppercase;
+}
+
+.nexo-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1E293B;
+  font-weight: 600;
+}
+
+.nexo-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-block;
+}
+
+.nexo-badge-success { background: #DCFCE7; color: #15803D; }
+.nexo-badge-warning { background: #FEF3C7; color: #B45309; }
+.nexo-badge-danger { background: #FEE2E2; color: #B91C1C; }
+
+/* Semáforo Predictivo */
+.nexo-traffic-card {
+  background: #F0FDF4;
+  border: 2px solid #86EFAC;
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 14px;
+}
+
+.nexo-traffic-title {
+  font-size: 13px;
+  font-weight: 900;
+  color: #14532D;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Modo Alto Contraste */
+#nexo360-overlay-root.high-contrast {
+  background: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+#nexo360-overlay-root.high-contrast .nexo-card,
+#nexo360-overlay-root.high-contrast .nexo-hero-card,
+#nexo360-overlay-root.high-contrast .nexo-topbar {
+  background: #111111 !important;
+  border-color: #FFFF00 !important;
+  color: #FFFFFF !important;
+}
+
+#nexo360-overlay-root.high-contrast h1,
+#nexo360-overlay-root.high-contrast h2,
+#nexo360-overlay-root.high-contrast span {
+  color: #FFFF00 !important;
+}

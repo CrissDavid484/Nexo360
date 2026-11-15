@@ -52,7 +52,7 @@ export const ServiciosDigitalesTicketsView = () => {
 
         <div className="shrink-0">
           <a
-            href="https://centroayuda.duoc.cl/hc/es-419/requests/new?ticket_form_id=31306954742157"
+            href="https://centroayuda.duoc.cl/hc/es-419/requests/new?ticket_form_id="
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Abrir formulario oficial de tickets de Servicios Digitales en el Centro de Ayuda Duoc UC (nueva pestaña)"

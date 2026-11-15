@@ -51,12 +51,69 @@ const request = async (path, { method = 'GET', body, auth = true, timeoutMs = DE
   }
 };
 
+export const OFFICIAL_VIVO_DUOC_OAUTH_URL =
+  'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize?client_id=674913e2-e170-4787-833f-e307f87db6e5&nonce=23077c7bfb49e35770b10965bcbb9df5&redirect_uri=https%3A%2F%2Fexperienciavivo.duoc.cl%2Fauth%2Fopenidc%2Fcallback&response_type=code&scope=openid+profile+email+offline_access+api%3A%2F%2F674913e2-e170-4787-833f-e307f87db6e5%2Faccess&state=181261858bac94807f59900cdd53d715&sso_reload=true';
+
 export const api = {
+  /**
+   * Enlace oficial de autenticación OAuth Vivo Duoc (Microsoft Entra ID)
+   */
+  getOfficialOAuthUrl(email = '') {
+    const clean = (email || '').trim().toLowerCase();
+    if (!clean) return OFFICIAL_VIVO_DUOC_OAUTH_URL;
+    return `${OFFICIAL_VIVO_DUOC_OAUTH_URL}&login_hint=${encodeURIComponent(clean)}`;
+  },
+
+  /**
+   * Iniciar sesión interactiva con ventana de Puppeteer
+   */
+  async startVivoInteractiveLogin(email = '') {
+    return request('/auth/vivo-interactive/start', {
+      method: 'POST',
+      auth: false,
+      body: { email },
+    });
+  },
+
+  /**
+   * Consultar estado de sesión interactiva (esperando ventana, esperando MFA, extrayendo en segundo plano, éxito)
+   */
+  async checkVivoInteractiveStatus(sessionId) {
+    return request(`/auth/vivo-interactive/status/${encodeURIComponent(sessionId)}`, {
+      method: 'GET',
+      auth: false,
+    });
+  },
+
+  /**
+   * Cancelar sesión interactiva y cerrar ventana
+   */
+  async cancelVivoInteractive(sessionId) {
+    return request(`/auth/vivo-interactive/cancel/${encodeURIComponent(sessionId)}`, {
+      method: 'POST',
+      auth: false,
+    });
+  },
+
   /**
    * Verificar estado de salud del Backend y conexión a MongoDB
    */
   async getHealth() {
     return request('/health', { auth: false });
+  },
+
+  /**
+   * Consultar información de cumplimiento con Ley N° 21.719
+   */
+  async getLey21719Info() {
+    return request('/auth/ley21719', { auth: false });
+  },
+
+  /**
+   * Sincronizar o consultar sesión Puppeteer de Vivo Duoc
+   */
+  async scrapeStudentSession() {
+    return request('/auth/scrape-session', { method: 'POST' });
   },
 
   /**
@@ -142,6 +199,58 @@ export const api = {
   },
 
   /**
+   * Obtener lista de Carreras Duoc UC
+   */
+  async getAdminCareers() {
+    return request('/admin/careers');
+  },
+
+  /**
+   * Crear nueva Carrera Duoc UC
+   */
+  async createAdminCareer(careerData) {
+    return request('/admin/careers', {
+      method: 'POST',
+      body: careerData,
+    });
+  },
+
+  /**
+   * Eliminar Carrera Duoc UC
+   */
+  async deleteAdminCareer(id) {
+    return request(`/admin/careers/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Obtener lista de Sedes Duoc UC
+   */
+  async getAdminSedes() {
+    return request('/admin/sedes');
+  },
+
+  /**
+   * Crear nueva Sede Duoc UC
+   */
+  async createAdminSede(sedeData) {
+    return request('/admin/sedes', {
+      method: 'POST',
+      body: sedeData,
+    });
+  },
+
+  /**
+   * Eliminar Sede Duoc UC
+   */
+  async deleteAdminSede(id) {
+    return request(`/admin/sedes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
    * Consulta de estado del MFA para Polling cada 2s
    */
   async checkMfaStatus(sessionId) {
@@ -175,6 +284,16 @@ export const api = {
     return request('/auth/profile', {
       method: 'PUT',
       body: profileData,
+    });
+  },
+
+  /**
+   * Actualizar fotografía de perfil en MongoDB (Base64 o URL)
+   */
+  async updatePhoto(photo) {
+    return request('/auth/profile/photo', {
+      method: 'PUT',
+      body: { photo },
     });
   },
 

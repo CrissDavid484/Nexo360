@@ -759,6 +759,48 @@ export const CoursesAdminSection = () => {
     }
   };
 
+  // Lista dinámica de carreras disponibles para el filtro (obtenidas de BD y cursos reales)
+  const dynamicCareersForFilter = useMemo(() => {
+    const map = new Map();
+
+    if (Array.isArray(coursesSummary?.careers) && coursesSummary.careers.length > 0) {
+      coursesSummary.careers.forEach((c) => {
+        if (c.carrera) {
+          const key = c.carrera.toUpperCase().trim();
+          map.set(key, {
+            value: c.carrera,
+            label: `${c.carrera}${c.plan ? ` (${c.plan})` : ''}`,
+          });
+        }
+      });
+    }
+
+    if (Array.isArray(coursesList) && coursesList.length > 0) {
+      coursesList.forEach((c) => {
+        if (c.carrera) {
+          const key = c.carrera.toUpperCase().trim();
+          if (!map.has(key)) {
+            map.set(key, {
+              value: c.carrera,
+              label: `${c.carrera}${c.plan ? ` (${c.plan})` : ''}`,
+            });
+          }
+        }
+      });
+    }
+
+    if (map.size === 0) {
+      CARRERAS_DUOC.forEach((c) => {
+        map.set(c.nombre.toUpperCase().trim(), {
+          value: c.nombre,
+          label: `${c.nombreCorto} (${c.codigo})`,
+        });
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  }, [coursesSummary, coursesList]);
+
   // Filtrado reactivo de asignaturas para la tabla
   const filteredCourses = useMemo(() => {
     return coursesList.filter((course) => {
@@ -843,68 +885,68 @@ export const CoursesAdminSection = () => {
           Indicadores generales de oferta académica
         </h2>
 
-        <div className="p-4 bg-white rounded-2xl border border-slate-300 shadow-2xs">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
           <header className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Secciones en BD
             </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-100 text-[#002B49] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#002B49] flex items-center justify-center">
               <Layers className="w-4 h-4" aria-hidden="true" />
             </div>
           </header>
-          <p className="mt-2 text-2xl font-black text-slate-950">
+          <p className="mt-2 text-2xl font-bold text-slate-900">
             {coursesSummary?.totalSecciones || 0}
           </p>
-          <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
+          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
             Oferta horaria disponible
           </p>
         </div>
 
-        <div className="p-4 bg-white rounded-2xl border border-slate-300 shadow-2xs">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
           <header className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Asignaturas Únicas
             </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center">
               <BookOpen className="w-4 h-4" aria-hidden="true" />
             </div>
           </header>
-          <p className="mt-2 text-2xl font-black text-slate-950">
+          <p className="mt-2 text-2xl font-bold text-slate-900">
             {coursesSummary?.totalAsignaturas || 0}
           </p>
-          <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
+          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
             Ramos catalogados
           </p>
         </div>
 
-        <div className="p-4 bg-white rounded-2xl border border-slate-300 shadow-2xs">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
           <header className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Carreras Activas
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-900 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center">
               <Building2 className="w-4 h-4" aria-hidden="true" />
             </div>
           </header>
-          <p className="mt-2 text-2xl font-black text-slate-950">
+          <p className="mt-2 text-2xl font-bold text-slate-900">
             {coursesSummary?.totalCarreras || CARRERAS_DUOC.length}
           </p>
-          <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
+          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
             Planes de estudio configurados
           </p>
         </div>
 
-        <div className="p-4 bg-white rounded-2xl border border-slate-300 shadow-2xs">
+        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
           <header className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Período de Toma
             </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-900 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-800 flex items-center justify-center">
               <Calendar className="w-4 h-4" aria-hidden="true" />
             </div>
           </header>
-          <p className="mt-2 text-2xl font-black text-slate-950">2026 - 002</p>
-          <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
+          <p className="mt-2 text-2xl font-bold text-slate-900">2026 - 002</p>
+          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
             Sede Alameda • Segundo Semestre
           </p>
         </div>
@@ -1219,14 +1261,14 @@ export const CoursesAdminSection = () => {
       {/* 4. Explorador del Catálogo Almacenado en Base de Datos */}
       <section
         aria-labelledby="catalog-list-heading"
-        className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-300 shadow-2xs space-y-5"
+        className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xs space-y-5"
       >
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
-            <h2 id="catalog-list-heading" className="text-base sm:text-lg font-bold text-slate-950">
+            <h2 id="catalog-list-heading" className="text-base sm:text-lg font-bold text-slate-900">
               Asignaturas Almacenadas en Base de Datos
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 font-normal">
               Visualiza los ramos y secciones que los estudiantes verán en el simulador según su
               carrera.
             </p>
@@ -1236,10 +1278,10 @@ export const CoursesAdminSection = () => {
             type="button"
             onClick={loadCoursesData}
             aria-label="Refrescar lista de cursos desde el servidor"
-            className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 transition-colors self-start sm:self-auto focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 cursor-pointer border border-slate-300"
+            className="min-h-[42px] px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 transition-colors self-start sm:self-auto focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 cursor-pointer border border-slate-200/90"
           >
             <RefreshCw
-              className={`w-4 h-4 text-slate-700 ${isLoading ? 'animate-spin' : ''}`}
+              className={`w-4 h-4 text-slate-600 ${isLoading ? 'animate-spin' : ''}`}
               aria-hidden="true"
             />
             <span>Refrescar Lista</span>
@@ -1255,7 +1297,7 @@ export const CoursesAdminSection = () => {
               Buscar asignatura, sigla, sección o profesor
             </label>
             <Search
-              className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               aria-hidden="true"
             />
             <input
@@ -1264,12 +1306,12 @@ export const CoursesAdminSection = () => {
               placeholder="Buscar por sigla, asignatura, sección o profesor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full min-h-[44px] pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-950 placeholder:text-slate-500 focus:bg-white focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
+              className="w-full min-h-[44px] pl-9 pr-3 py-2 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition-all"
             />
           </div>
 
           <div className="md:col-span-6 flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
             <label htmlFor="career-filter-select" className="sr-only">
               Filtrar por Carrera
             </label>
@@ -1277,14 +1319,14 @@ export const CoursesAdminSection = () => {
               id="career-filter-select"
               value={selectedCareerFilter}
               onChange={(e) => setSelectedCareerFilter(e.target.value)}
-              className="w-full min-h-[44px] py-2 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
+              className="w-full min-h-[44px] py-2 px-3 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-xs sm:text-sm font-semibold text-slate-800 shadow-2xs transition-all"
             >
               <option value="TODAS">
-                Todas las Carreras ({coursesSummary?.careers?.length || CARRERAS_DUOC.length})
+                Todas las Carreras ({dynamicCareersForFilter.length})
               </option>
-              {CARRERAS_DUOC.map((c) => (
-                <option key={c.codigo} value={c.nombre}>
-                  {c.nombreCorto} ({c.codigo})
+              {dynamicCareersForFilter.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
                 </option>
               ))}
             </select>
@@ -1292,7 +1334,7 @@ export const CoursesAdminSection = () => {
         </fieldset>
 
         {/* Tabla Accesible de Asignaturas */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-300 shadow-2xs">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs">
           <table className="w-full text-left text-xs" role="table">
             <caption className="sr-only">
               Catálogo actual de asignaturas almacenadas en la base de datos de Nexo360

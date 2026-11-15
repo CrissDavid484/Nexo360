@@ -215,7 +215,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 <div
                   role="menu"
                   aria-label="Submenú de simulaciones e instrucciones"
-                  className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_20px_40px_-10px_rgba(0,43,73,0.18),0_4px_12px_rgba(0,0,0,0.08)] border border-slate-300 p-2 z-50 animate-fade-in space-y-1 ring-1 ring-slate-900/5"
+                  className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-fade-in space-y-1"
                 >
                   <div className="px-3 py-1.5 border-b border-slate-100">
                     <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
@@ -306,12 +306,20 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
               }`}
             >
-              <User
-                className={`w-4 h-4 shrink-0 transition-colors ${
-                  activeTab === 'perfil' ? 'text-[#FFB81C]' : 'text-slate-500'
-                }`}
-                aria-hidden="true"
-              />
+              {user?.photo ? (
+                <img
+                  src={user.photo}
+                  alt=""
+                  className="w-4 h-4 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <User
+                  className={`w-4 h-4 shrink-0 transition-colors ${
+                    activeTab === 'perfil' ? 'text-[#FFB81C]' : 'text-slate-500'
+                  }`}
+                  aria-hidden="true"
+                />
+              )}
               <span>Mi Perfil</span>
             </button>
 
@@ -346,6 +354,20 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               className="hidden sm:flex items-center gap-2.5 text-right pl-3 py-1 rounded-xl hover:bg-slate-50 transition-colors"
               title="Ver mi perfil institucional"
             >
+              {user?.photo ? (
+                <img
+                  src={user.photo}
+                  alt={`Foto de ${displayName}`}
+                  className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-2xs shrink-0"
+                />
+              ) : (
+                <div
+                  className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 text-[#002B49] flex items-center justify-center font-bold text-xs shrink-0"
+                  aria-hidden="true"
+                >
+                  <User className="w-4 h-4 text-slate-600" />
+                </div>
+              )}
               <div className="text-right">
                 <span className="text-xs sm:text-sm font-semibold text-slate-800 block leading-tight">
                   {displayName}
@@ -371,7 +393,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               id="mobile-menu-button"
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-300 transition-colors shadow-2xs active:scale-95"
+              className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200/90 transition-colors shadow-2xs active:scale-95"
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-nav-drawer"
               aria-label={isMobileMenuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
@@ -498,7 +520,15 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                     : 'bg-slate-50 text-slate-800 hover:bg-slate-100'
                 }`}
               >
-                <User className="w-4 h-4 shrink-0 text-[#FFB81C]" />
+                {user?.photo ? (
+                  <img
+                    src={user.photo}
+                    alt=""
+                    className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0"
+                  />
+                ) : (
+                  <User className="w-4 h-4 shrink-0 text-[#FFB81C]" />
+                )}
                 <span>Mi Perfil ({displayName})</span>
               </button>
 

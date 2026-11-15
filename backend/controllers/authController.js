@@ -81,7 +81,9 @@ exports.ssoLogin = async (req, res) => {
       status: 'COMPLETED',
       token: ssoResult.token,
       user: ssoResult.user,
+      isRegisteredInDb: ssoResult.isRegisteredInDb,
       officialLoginUrl: ssoResult.officialLoginUrl,
+      scrapedData: ssoResult.scrapedData,
       message: 'Sesión institucional iniciada exitosamente en Nexo360.',
     });
   } catch (error) {
@@ -135,6 +137,9 @@ exports.login = async (req, res) => {
       status: 'COMPLETED',
       token: result.token,
       user: result.user,
+      isRegisteredInDb: result.isRegisteredInDb,
+      officialLoginUrl: result.officialLoginUrl,
+      scrapedData: result.scrapedData,
       message: 'Inicio de sesión institucional exitoso en Nexo360.',
     });
   } catch (error) {
@@ -158,6 +163,15 @@ exports.login = async (req, res) => {
  */
 exports.recordSimulatorUsage = async (req, res) => {
   try {
+    if (req.user && req.user.isRegisteredInDb === false) {
+      return res.status(403).json({
+        success: false,
+        isRegisteredInDb: false,
+        message:
+          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
+        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
+      });
+    }
     await authScraperService.recordSimulatorUsage(req.user);
     return res.status(200).json({
       success: true,
@@ -257,11 +271,16 @@ exports.updateAccessibility = async (req, res) => {
       highContrast: Boolean(rawPrefs.highContrast),
       dyslexicFont: Boolean(rawPrefs.dyslexicFont),
       reducedMotion: Boolean(rawPrefs.reducedMotion),
+      readingGuide: Boolean(rawPrefs.readingGuide),
       screenReaderOptimized:
         typeof rawPrefs.screenReaderOptimized === 'boolean' ? rawPrefs.screenReaderOptimized : true,
     };
 
     const targetEmail = req.user.email;
+
+    if (authScraperService.updateUserAccessibilityPreferences) {
+      authScraperService.updateUserAccessibilityPreferences(targetEmail, sanitizedPreferences);
+    }
 
     if (mongoose.connection.readyState !== 1) {
       return res.status(200).json({
@@ -304,6 +323,7 @@ exports.updateProfile = async (req, res) => {
     const personalEmail = sanitizeString(body.personalEmail ?? body.emailPersonal, 120);
     const emergencyContact = sanitizeString(body.emergencyContact, 120);
     const emergencyPhone = sanitizeString(body.emergencyPhone, 30);
+    const photo = typeof body.photo === 'string' ? body.photo.trim() : undefined;
 
     const updateFields = {
       ...(phone !== undefined ? { phone } : {}),
@@ -311,6 +331,7 @@ exports.updateProfile = async (req, res) => {
       ...(personalEmail !== undefined ? { personalEmail: personalEmail.toLowerCase() } : {}),
       ...(emergencyContact !== undefined ? { emergencyContact } : {}),
       ...(emergencyPhone !== undefined ? { emergencyPhone } : {}),
+      ...(photo !== undefined ? { photo } : {}),
     };
 
     if (Object.keys(updateFields).length === 0) {
@@ -321,6 +342,10 @@ exports.updateProfile = async (req, res) => {
     }
 
     const targetEmail = req.user.email;
+
+    if (photo !== undefined && authScraperService.updateUserPhoto) {
+      authScraperService.updateUserPhoto(targetEmail, photo);
+    }
 
     if (mongoose.connection.readyState !== 1) {
       return res.status(200).json({
@@ -351,10 +376,71 @@ exports.updateProfile = async (req, res) => {
 };
 
 /**
+ * PUT /api/auth/profile/photo
+ * Actualiza y persiste la fotografía de perfil del estudiante en Base64 o URL
+ */
+exports.updatePhoto = async (req, res) => {
+  try {
+    const { photo } = req.body || {};
+    if (typeof photo !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Formato de fotografía inválido. Debe ser una cadena de texto o Base64.',
+      });
+    }
+
+    const cleanPhoto = photo.trim();
+    const targetEmail = req.user.email;
+
+    if (authScraperService.updateUserPhoto) {
+      authScraperService.updateUserPhoto(targetEmail, cleanPhoto);
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(200).json({
+        success: true,
+        message: 'Fotografía de perfil actualizada en sesión.',
+        photo: cleanPhoto,
+        user: authScraperService.formatUserResponse({ ...req.user, photo: cleanPhoto }),
+      });
+    }
+
+    const updatedUser = await UserProfile.findOneAndUpdate(
+      { email: targetEmail },
+      { $set: { photo: cleanPhoto } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Fotografía de perfil guardada exitosamente en MongoDB.',
+      photo: updatedUser ? updatedUser.photo : cleanPhoto,
+      user: authScraperService.formatUserResponse(updatedUser),
+    });
+  } catch (error) {
+    console.error('[AuthController] Error actualizando fotografía de perfil:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudo actualizar la fotografía de perfil.',
+    });
+  }
+};
+
+/**
  * GET /api/auth/toma-ramos
  */
 exports.getTomaRamos = async (req, res) => {
   try {
+    if (req.user && req.user.isRegisteredInDb === false) {
+      return res.status(403).json({
+        success: false,
+        isRegisteredInDb: false,
+        message:
+          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
+        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
+      });
+    }
+
     const user = await getOrCreateActiveUserProfile(req.user);
     return res.status(200).json({
       success: true,
@@ -374,6 +460,16 @@ exports.getTomaRamos = async (req, res) => {
  */
 exports.saveTomaRamos = async (req, res) => {
   try {
+    if (req.user && req.user.isRegisteredInDb === false) {
+      return res.status(403).json({
+        success: false,
+        isRegisteredInDb: false,
+        message:
+          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
+        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
+      });
+    }
+
     const { enrolledCourses } = req.body || {};
     if (!Array.isArray(enrolledCourses) || enrolledCourses.length > 20) {
       return res.status(400).json({
@@ -447,5 +543,113 @@ exports.saveTomaRamos = async (req, res) => {
       success: false,
       message: 'Error al guardar la carga académica en la base de datos.',
     });
+  }
+};
+
+/**
+ * POST /api/auth/scrape-session
+ * Ejecuta o consulta la sesión de scraping en segundo plano de Vivo Duoc
+ */
+exports.scrapeStudentSession = async (req, res) => {
+  try {
+    const email = req.user?.email;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Usuario no autenticado.' });
+    }
+    const scrapedData = await authScraperService.maintainVivoDuocSession(email, { user: req.user });
+    return res.status(200).json({
+      success: true,
+      scrapedData,
+    });
+  } catch (error) {
+    console.error('[AuthController] Error en scrapeStudentSession:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar o sincronizar datos de Vivo Duoc.',
+    });
+  }
+};
+
+/**
+ * GET /api/auth/ley21719
+ * Información de cumplimiento con la Ley N° 21.719 de Protección de Datos Personales
+ */
+exports.getLey21719Info = async (req, res) => {
+  return res.status(200).json({
+    success: true,
+    law: 'Ley N° 21.719 de Protección de Datos Personales de Chile',
+    compliance: {
+      zeroUnencryptedCredentials: true,
+      encryptionAlgorithm: 'bcryptjs (salt 10)',
+      explicitPurposeLimitation: [
+        'gestion_academica',
+        'apoyo_paedis_inclusion',
+        'simulador_toma_ramos',
+        'seguimiento_asistencia',
+      ],
+      consentMetadata: {
+        version: '1.0 - Ley 21.719',
+        consentGivenByDefault: true,
+        dataRetention: 'Periodo académico activo conforme a Ley N° 21.719',
+        rightsARCO: 'Acceso, Rectificación, Cancelación y Oposición garantizados',
+      },
+    },
+  });
+};
+
+/**
+ * POST /api/auth/vivo-interactive/start
+ * Abre la ventana real de Chromium con el portal oficial de Microsoft OAuth
+ */
+exports.startVivoInteractive = async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    const result = await authScraperService.startVivoInteractiveSession(email);
+    return res.status(200).json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AuthController] Error en startVivoInteractive:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudo iniciar la ventana interactiva de Microsoft.',
+    });
+  }
+};
+
+/**
+ * GET /api/auth/vivo-interactive/status/:sessionId
+ * Consulta el estado de la sesión interactiva y MFA
+ */
+exports.getVivoInteractiveStatus = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const status = authScraperService.getVivoInteractiveStatus(sessionId);
+    return res.status(200).json({
+      success: status.status !== 'error',
+      ...status,
+    });
+  } catch (error) {
+    console.error('[AuthController] Error en getVivoInteractiveStatus:', error.message);
+    return res.status(500).json({
+      success: false,
+      status: 'error',
+      message: 'Error al verificar estado de la sesión interactiva.',
+    });
+  }
+};
+
+/**
+ * POST /api/auth/vivo-interactive/cancel/:sessionId
+ * Cancela la sesión interactiva y cierra la ventana
+ */
+exports.cancelVivoInteractive = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await authScraperService.cancelVivoInteractiveSession(sessionId);
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(200).json({ success: true });
   }
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, RefreshCw, LogIn } from 'lucide-react';
+import { ShieldAlert, RefreshCw, LogIn, LayoutDashboard } from 'lucide-react';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,13 +15,29 @@ export class ErrorBoundary extends React.Component {
     console.error('Nexo360 ErrorBoundary capturó un error:', error, errorInfo);
   }
 
+  checkIsAuthenticated = () => {
+    try {
+      const token = localStorage.getItem('nexo360_token') || localStorage.getItem('nexo360_auth_token');
+      return !!token;
+    } catch {
+      return false;
+    }
+  };
+
   handleReset = () => {
+    const isAuth = this.checkIsAuthenticated();
     this.setState({ hasError: false, error: null });
-    window.location.href = '/login';
+    if (isAuth) {
+      window.location.href = '/dashboard';
+    } else {
+      window.location.href = '/login';
+    }
   };
 
   render() {
     if (this.state.hasError) {
+      const isAuth = this.checkIsAuthenticated();
+
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#EEF2F6] p-6 text-slate-900">
           <div className="max-w-md w-full bg-white rounded-3xl border-2 border-red-200 shadow-xl p-8 text-center space-y-6">
@@ -33,7 +49,7 @@ export class ErrorBoundary extends React.Component {
                 Ocurrió un problema en la vista
               </h1>
               <p className="text-sm text-slate-600 font-medium">
-                Nexo360 protegió la sesión. Puedes reiniciar y volver a la pantalla de inicio de sesión institucional.
+                Nexo360 protegió la sesión. Puedes volver de forma segura al portal institucional o recargar la vista.
               </p>
               {this.state.error?.message && (
                 <div className="mt-3 p-3 bg-slate-50 rounded-xl text-xs text-slate-700 font-mono text-left overflow-auto max-h-24 border border-slate-200">
@@ -47,8 +63,17 @@ export class ErrorBoundary extends React.Component {
                 onClick={this.handleReset}
                 className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold bg-[#002B49] text-white hover:bg-[#001f35] focus:outline-hidden focus:ring-4 focus:ring-amber-400 min-h-[44px]"
               >
-                <LogIn className="w-4 h-4 text-amber-400" aria-hidden="true" />
-                <span>Volver al Inicio de Sesión</span>
+                {isAuth ? (
+                  <>
+                    <LayoutDashboard className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                    <span>Volver al portal Nexo360</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                    <span>Volver al Inicio de Sesión</span>
+                  </>
+                )}
               </button>
               <button
                 type="button"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoginForm } from '../components/auth/LoginForm';
 import { MfaPrompt } from '../components/auth/MfaPrompt';
@@ -7,8 +7,14 @@ import { useAuth } from '../context/AuthContext';
 
 export const LoginPage = () => {
   const [mfaSession, setMfaSession] = useState(null);
-  const { setAuthData } = useAuth();
+  const { setAuthData, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleMfaRequired = ({ sessionId, mfaCode, email }) => {
     setMfaSession({ sessionId, initialMfaCode: mfaCode, email });
@@ -52,7 +58,7 @@ export const LoginPage = () => {
         </header>
 
         {/* Contenedor del flujo de autenticación */}
-        <div className="w-full max-w-lg">
+        <div className="w-full max-w-[420px]">
           {mfaSession ? (
             <MfaPrompt
               sessionInfo={mfaSession}

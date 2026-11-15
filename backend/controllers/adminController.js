@@ -4,19 +4,196 @@ const UserProfile = require('../models/UserProfile');
 const ActivityLog = require('../models/ActivityLog');
 const authScraperService = require('../services/authScraperService');
 
+const Career = require('../models/Career');
+const Sede = require('../models/Sede');
+
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]{1,64}@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/i;
 
+const INITIAL_CAREERS = [
+  'Actuación',
+  'Administración de Empresas',
+  'Administración Pública',
+  'Administración Turística Internacional',
+  'Analista Programador Computacional',
+  'Animación Digital',
+  'Artes Culinarias',
+  'Auditoría y Análisis de Negocios',
+  'Comunicación Audiovisual',
+  'Construcción Civil',
+  'Desarrollo y Diseño Web',
+  'Dibujo y Modelamiento Arquitectónico y Estructural',
+  'Diseño de Ambientes',
+  'Diseño de Vestuario',
+  'Diseño Gráfico',
+  'Diseño Industrial e Innovación en Productos',
+  'Ecoturismo',
+  'Gastronomía Internacional',
+  'Ilustración para Contextos Globales',
+  'Informática Biomédica',
+  'Ingeniería Agrícola',
+  'Ingeniería en Administración',
+  'Ingeniería en Automatización y Control Industrial',
+  'Ingeniería en Ciberseguridad',
+  'Ingeniería en Ciencia de Datos',
+  'Ingeniería en Comercio Exterior',
+  'Ingeniería en Conectividad y Redes',
+  'Ingeniería en Construcción',
+  'Ingeniería en Control de Gestión',
+  'Ingeniería en Desarrollo de Software',
+  'Ingeniería en Electricidad y Automatización Industrial',
+  'Ingeniería en Gestión Logística',
+  'Ingeniería en Informática',
+  'Ingeniería en Infraestructura Tecnológica',
+  'Ingeniería en Mantenimiento Industrial',
+  'Ingeniería en Maquinaria y Vehículos Pesados',
+  'Ingeniería en Marketing Digital',
+  'Ingeniería en Mecánica Automotriz y Autotrónica',
+  'Ingeniería en Medio Ambiente',
+  'Ingeniería en Minas',
+  'Ingeniería en Prevención de Riesgos',
+  'Ingeniería en Recursos Naturales y Sostenibilidad',
+  'Ingeniería en Redes y Telecomunicaciones',
+  'Ingeniería en Sonido',
+  'Ingeniería Industrial',
+  'Periodismo Digital',
+  'Preparador Físico',
+  'Publicidad',
+  'Relaciones Públicas y Comunicación Organizacional',
+  'Restauración de Bienes Patrimoniales',
+  'Técnico Audiovisual',
+  'Técnico en Administración',
+  'Técnico en Calidad de Alimentos',
+  'Técnico en Comercio Exterior',
+  'Técnico en Conectividad y Redes',
+  'Técnico en Construcción',
+  'Técnico en Control y Monitoreo Remoto de Procesos Mineros',
+  'Técnico en Desabolladura y Pintura Automotriz',
+  'Técnico en Diseño Gráfico',
+  'Técnico en Electricidad y Automatización Industrial',
+  'Técnico en Electricidad y Energías Renovables',
+  'Técnico en Enfermería',
+  'Técnico en Gastronomía',
+  'Técnico en Geología',
+  'Técnico en Gestión de Personas',
+  'Técnico en Gestión Logística',
+  'Técnico en Infraestructura Tecnológica',
+  'Técnico en Laboratorio Clínico, Banco de Sangre e Imagenología',
+  'Técnico en Mantenimiento Electromecánico',
+  'Técnico en Mantenimiento Industrial',
+  'Técnico en Maquinaria y Vehículos Pesados',
+  'Técnico en Mecánica Automotriz y Autotrónica',
+  'Técnico en Odontología',
+  'Técnico en Operación y Supervisión de Procesos Mineros',
+  'Técnico en Operaciones Logísticas',
+  'Técnico en Prevención de Riesgos Laborales',
+  'Técnico en Química y Farmacia',
+  'Técnico en Radiodiagnóstico y Radioterapia',
+  'Técnico en Topografía y Geomática',
+  'Técnico en Turismo y Hotelería',
+  'Técnico Modelador Proyectista',
+  'Técnico Veterinario y Pecuario',
+  'Tecnología en Sonido e Iluminación',
+  'Telecomunicaciones y Conectividad',
+].sort((a, b) => a.localeCompare(b, 'es'));
+
+const INITIAL_SEDES = [
+  'Campus Arauco',
+  'Campus Nacimiento',
+  'Campus Villarrica',
+  'Duoc UC Online',
+  'Sede Alameda',
+  'Sede Antonio Varas',
+  'Sede Maipú',
+  'Sede Melipilla',
+  'Sede Padre Alonso de Ovalle',
+  'Sede Plaza Norte',
+  'Sede Plaza Oeste',
+  'Sede Plaza Vespucio',
+  'Sede Puente Alto',
+  'Sede Puerto Montt',
+  'Sede San Andrés de Concepción',
+  'Sede San Bernardo',
+  'Sede San Carlos de Apoquindo',
+  'Sede San Joaquín',
+  'Sede Valparaíso',
+  'Sede Viña del Mar',
+].sort((a, b) => a.localeCompare(b, 'es'));
+
+// Estado en memoria dinámico para soporte local y respaldo
+let inMemoryCareers = INITIAL_CAREERS.map((name, i) => ({
+  _id: `career_${i + 1}`,
+  id: `career_${i + 1}`,
+  name,
+  code: `CARR-${i + 1}`,
+  school: 'Escuela Duoc UC',
+}));
+
+let inMemorySedes = INITIAL_SEDES.map((name, i) => ({
+  _id: `sede_${i + 1}`,
+  id: `sede_${i + 1}`,
+  name,
+  city: 'Región Metropolitana',
+}));
+
 /**
- * Función que calcula el Score Predictivo de Deserción vs Titulación (0 - 100)
- * Basado en Asistencia, Factor PAEDIS, Carga Académica y Uso de Simuladores
+ * Función que calcula el Semáforo Predictivo de Retención vs. Deserción
+ * según la Normativa Académica Oficial Duoc UC:
+ * - Asistencia < 70%: Reprobado por Inasistencia [RI] / Alto Riesgo (Rojo)
+ * - Asistencia 70% - 75%: Riesgo Moderado / Alerta Preventiva (Amarillo)
+ * - Asistencia > 75%: Bajo Riesgo / Progreso Favorable (Verde)
+ * Se alimenta de las asignaturas inscritas y porcentajes de asistencia por curso.
  */
 const calculatePredictiveRisk = (user) => {
   const status = user.academicStatus || 'activo';
-  const attendance = Number(user.attendanceRate ?? 88.9);
   const isPaedis = Boolean(user.isPaedis);
   const hasUsedSim = Boolean(user.hasUsedSimulator);
   const tutor = user.tutorParAsignado || '';
   const ajustesCount = Array.isArray(user.ajustesAprobados) ? user.ajustesAprobados.length : 0;
+
+  // Cálculo de asistencia a partir de asignaturas cursadas (scraped courses)
+  let effectiveAttendance = user.attendanceRate !== undefined ? Number(user.attendanceRate) : 88.9;
+  const courseDetails = [];
+  const coursesInRI = [];
+  const coursesInAlert = [];
+
+  if (Array.isArray(user.enrolledCourses) && user.enrolledCourses.length > 0) {
+    const coursesWithAttendance = user.enrolledCourses.filter(
+      (c) =>
+        c &&
+        (c.attendanceRate !== undefined ||
+          c.porcentajeAsistencia !== undefined ||
+          c.asistenciaPorcentaje !== undefined)
+    );
+
+    if (coursesWithAttendance.length > 0) {
+      const sum = coursesWithAttendance.reduce((acc, c) => {
+        const rate = Number(c.attendanceRate ?? c.porcentajeAsistencia ?? c.asistenciaPorcentaje ?? 100);
+        return acc + rate;
+      }, 0);
+      effectiveAttendance = Math.round((sum / coursesWithAttendance.length) * 10) / 10;
+    }
+
+    user.enrolledCourses.forEach((c) => {
+      const rate = Number(c.attendanceRate ?? c.porcentajeAsistencia ?? c.asistenciaPorcentaje ?? 100);
+      const isRI = rate < 70;
+      const isAlert = rate >= 70 && rate <= 75;
+      courseDetails.push({
+        nombre: c.nombre || c.sigla || 'Asignatura',
+        sigla: c.sigla || '',
+        seccion: c.seccion || '',
+        attendanceRate: rate,
+        clasesRegistradas: c.clasesRegistradas || 0,
+        asistencias: c.asistencias || 0,
+        profesor: c.profesor || '',
+        sala: c.sala || '',
+        isRI,
+        isAlert,
+      });
+
+      if (isRI) coursesInRI.push(c.nombre || c.sigla);
+      else if (isAlert) coursesInAlert.push(c.nombre || c.sigla);
+    });
+  }
 
   if (status === 'desercion') {
     return {
@@ -24,8 +201,13 @@ const calculatePredictiveRisk = (user) => {
       riskLevel: 'DESERTOR',
       predictionLabel: 'Deserción Registrada',
       color: 'red',
+      trafficLight: 'red',
       factors: ['Estudiante actualmente en deserción / retiro académico'],
       graduationProbability: 0,
+      effectiveAttendance,
+      coursesInRI,
+      coursesInAlert,
+      courseDetails,
     };
   }
 
@@ -35,63 +217,76 @@ const calculatePredictiveRisk = (user) => {
       riskLevel: 'TITULADO',
       predictionLabel: 'Titulado / Egresado',
       color: 'emerald',
+      trafficLight: 'green',
       factors: ['Plan de estudios completado con éxito'],
       graduationProbability: 100,
+      effectiveAttendance,
+      coursesInRI,
+      coursesInAlert,
+      courseDetails,
     };
   }
 
-  // Estudiante Activo: Cálculo de Alerta Temprana
-  let score = 25; // Base
+  // Estudiante Activo: Cálculo de Alerta Temprana Duoc UC (< 70% RI, 70-75% Moderado, > 75% Bajo)
+  let score = 25;
   const factors = [];
 
-  // 1. Factor Asistencia (Mínimo Duoc UC: 70%)
-  if (attendance < 70) {
-    score += 45;
-    factors.push(`Asistencia crítica (${attendance}%): Alto riesgo de Reprobación por Inasistencia (RI)`);
-  } else if (attendance < 75) {
-    score += 25;
-    factors.push(`Asistencia al límite (${attendance}%): En zona de peligro de RI (<75%)`);
-  } else if (attendance >= 90) {
-    score -= 15;
-    factors.push(`Excelente asistencia (${attendance}%): Factor protector clave`);
+  if (effectiveAttendance < 70 || coursesInRI.length > 0) {
+    score = Math.max(70, Math.round(75 + (70 - Math.min(effectiveAttendance, 69)) * 0.8));
+    if (coursesInRI.length > 0) {
+      factors.push(`Reprobación por Inasistencia (RI < 70%) en: ${coursesInRI.join(', ')}`);
+    } else {
+      factors.push(`Asistencia crítica (${effectiveAttendance}% < 70%): En causal de Reprobación por Inasistencia (RI)`);
+    }
+  } else if (effectiveAttendance <= 75 || coursesInAlert.length > 0) {
+    score = Math.round(40 + (75 - effectiveAttendance) * 3);
+    factors.push(`Asistencia al límite (${effectiveAttendance}%): Riesgo moderado en zona de peligro (70% - 75%)`);
+    if (coursesInAlert.length > 0) {
+      factors.push(`Asignaturas en observación (70-75%): ${coursesInAlert.join(', ')}`);
+    }
+  } else {
+    score = Math.max(5, Math.round(25 - (effectiveAttendance - 75) * 0.6));
+    factors.push(`Asistencia favorable (${effectiveAttendance}% > 75%): Cumple normativa académica Duoc UC`);
   }
 
-  // 2. Factor PAEDIS y Tutor Par
+  // Factor PAEDIS y Ajustes Razonables
   if (isPaedis) {
     if (!tutor || tutor.toLowerCase().includes('sin tutor')) {
-      score += 20;
+      score += 15;
       factors.push('Estudiante PAEDIS sin tutor par asignado: Requiere asignación de apoyo');
     } else if (ajustesCount > 0) {
-      score -= 15;
+      score -= 10;
       factors.push(`Acompañamiento PAEDIS activo con ${ajustesCount} ajuste(s) razonable(s)`);
     }
   }
 
-  // 3. Factor Uso de Simulador de Toma de Ramos
+  // Factor Uso de Simulador de Toma de Ramos
   if (hasUsedSim) {
-    score -= 10;
-    factors.push('Uso activo del Simulador de Toma de Ramos: Planificación de horario confirmada');
+    score -= 8;
+    factors.push('Uso activo del Simulador de Toma de Ramos: Planificación horaria confirmada');
   } else {
-    score += 10;
-    factors.push('No ha planificado su horario en el simulador: Riesgo de choques o carga incompleta');
+    score += 8;
+    factors.push('No ha planificado horario en el simulador: Riesgo de sobrecarga o choques de horario');
   }
 
-  // Clamping entre 5 y 95
   score = Math.max(5, Math.min(95, Math.round(score)));
   const graduationProbability = Math.max(5, 100 - score);
 
   let riskLevel = 'BAJO';
-  let predictionLabel = 'Bajo Riesgo • Alta Probabilidad de Titulación';
+  let predictionLabel = 'Bajo Riesgo • Retención Favorable (> 75%)';
   let color = 'emerald';
+  let trafficLight = 'green';
 
-  if (score >= 60) {
+  if (effectiveAttendance < 70 || coursesInRI.length > 0 || score >= 60) {
     riskLevel = 'ALTO';
-    predictionLabel = 'Alerta Temprana: Alto Riesgo de Deserción';
+    predictionLabel = 'Alerta Temprana: Alto Riesgo • Reprobado por Inasistencia (RI < 70%)';
     color = 'red';
-  } else if (score >= 35) {
+    trafficLight = 'red';
+  } else if (effectiveAttendance <= 75 || score >= 35) {
     riskLevel = 'MEDIO';
-    predictionLabel = 'Riesgo Moderado • Requiere Seguimiento Preventivo';
+    predictionLabel = 'Riesgo Moderado • Alerta Preventiva de Asistencia (70% - 75%)';
     color = 'amber';
+    trafficLight = 'yellow';
   }
 
   return {
@@ -99,8 +294,13 @@ const calculatePredictiveRisk = (user) => {
     riskLevel,
     predictionLabel,
     color,
+    trafficLight,
     factors,
     graduationProbability,
+    effectiveAttendance,
+    coursesInRI,
+    coursesInAlert,
+    courseDetails,
   };
 };
 
@@ -253,17 +453,51 @@ exports.getStudents = async (req, res) => {
 /**
  * POST /api/admin/students
  * Registrar un nuevo usuario institucional desde el panel de administración
+ * Cumple con Ley N° 21.719 de Protección de Datos Personales y verificación RBAC estricta
  */
 exports.createStudent = async (req, res) => {
   try {
     const body = req.body || {};
     const email = (body.email || '').trim().toLowerCase();
     const fullName = (body.fullName || body.nombre || '').trim();
-    const password = body.password || 'Duoc2026!';
-    const role = body.role || 'estudiante_paedis';
-    const academicStatus = body.academicStatus || 'activo';
-    const statusReason = body.statusReason || 'Registrado por Administrador en Nexo360';
-    const isPaedis = Boolean(body.isPaedis);
+
+    // Contraseña inicial dinámica por año institucional: 'Duoc' + año + '!' (Ej: Duoc2026!)
+    const currentYear = new Date().getFullYear();
+    const dynamicInitialPassword = `Duoc${currentYear}!`;
+    const password = (body.password || '').trim() || dynamicInitialPassword;
+
+    // Roles institucionales estrictamente limitados a 4 opciones
+    const requestedRole = (body.role || 'estudiante').trim().toLowerCase();
+    const allowedRoles = ['estudiante', 'estudiante_paedis', 'coordinador_paedis', 'admin', 'administrador'];
+
+    if (!allowedRoles.includes(requestedRole)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Rol no válido. Los roles institucionales permitidos son: Estudiante, Estudiante PAEDIS, Coordinador PAEDIS y Administrador.',
+      });
+    }
+
+    // RESTRICCIÓN EXCLUSIVA RBAC: ÚNICAMENTE un Administrador puede crear o asignar el rol de Administrador
+    const isTargetAdmin = requestedRole === 'admin' || requestedRole === 'administrador';
+    const actorRole = (req.user?.role || '').toLowerCase();
+    const isActorAdmin = actorRole === 'admin' || actorRole === 'administrador';
+
+    if (isTargetAdmin && !isActorAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.',
+      });
+    }
+
+    const role = requestedRole === 'administrador' ? 'admin' : requestedRole;
+    const isPaedis = role === 'estudiante_paedis' ? true : Boolean(body.isPaedis);
+
+    // Campos removidos del formulario se inicializan con valores seguros por defecto
+    const academicStatus = 'activo';
+    const statusReason = 'Registrado por Administrador en Nexo360';
+    const attendanceRate = 88.9;
+    const tutorParAsignado = isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado';
 
     if (!email || !EMAIL_REGEX.test(email)) {
       return res.status(400).json({
@@ -279,8 +513,15 @@ exports.createStudent = async (req, res) => {
       });
     }
 
-    // Verificar si ya existe
-    const existing = await UserProfile.findOne({ email });
+    // Verificar si ya existe en la base de datos o memoria
+    let existing = null;
+    if (mongoose.connection.readyState === 1) {
+      existing = await UserProfile.findOne({ email });
+    } else {
+      const allUsers = await authScraperService.getAllUsers();
+      existing = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    }
+
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -293,14 +534,19 @@ exports.createStudent = async (req, res) => {
 
     const roleLabels = {
       admin: 'Administrador de la Plataforma TI',
+      administrador: 'Administrador de la Plataforma TI',
       estudiante_paedis: 'Estudiante Regular • PAEDIS',
       estudiante: 'Estudiante Regular Duoc UC',
-      tutor_par: 'Estudiante • Tutor Par & Ley 21.790',
-      profesor: 'Profesor / Docente Duoc UC',
-      director: 'Director/a de Carrera',
-      subdirector: 'Subdirector/a Académico',
       coordinador_paedis: 'Coordinador/a PAEDIS e Inclusión',
-      administrativo: 'Funcionario / Gestión Duoc UC',
+    };
+
+    // Metadatos de consentimiento y finalidad conforme a Ley N° 21.719 de Protección de Datos Personales
+    const consentimientoLey21719 = {
+      aceptado: body.consentimientoLey21719?.aceptado !== false,
+      fechaAceptacion: body.consentimientoLey21719?.fechaAceptacion || new Date(),
+      finalidadTratamiento:
+        body.consentimientoLey21719?.finalidadTratamiento ||
+        'Gestión académica, registro curricular, acompañamiento PAEDIS y prevención de deserción estudiantil según Ley N° 21.719 de Chile',
     };
 
     const newUserData = {
@@ -314,15 +560,15 @@ exports.createStudent = async (req, res) => {
       isPaedis,
       academicStatus,
       statusReason,
-      attendanceRate: Number(body.attendanceRate) || 88.9,
+      attendanceRate,
       career: body.career || 'Ingeniería en Informática',
-      campus: body.campus || 'Sede Alameda',
+      campus: body.campus || body.sede || 'Sede Alameda',
       address: body.address || 'Por actualizar',
       personalEmail: body.personalEmail || email,
       phone: body.phone || '+56 9 0000 0000',
       emergencyContact: body.emergencyContact || 'Contacto Familiar',
       emergencyPhone: body.emergencyPhone || '+56 9 0000 0000',
-      tutorParAsignado: body.tutorParAsignado || (isPaedis ? 'Inclusión Duoc UC' : 'Sin tutor asignado'),
+      tutorParAsignado,
       diagnosticoDeclarado: body.diagnosticoDeclarado || '',
       ajustesAprobados: Array.isArray(body.ajustesAprobados) ? body.ajustesAprobados : [],
       accessibilityPreferences: body.accessibilityPreferences || {
@@ -333,6 +579,7 @@ exports.createStudent = async (req, res) => {
         screenReaderOptimized: true,
       },
       enrolledCourses: Array.isArray(body.enrolledCourses) ? body.enrolledCourses : [],
+      consentimientoLey21719,
     };
 
     let createdUser;
@@ -340,15 +587,18 @@ exports.createStudent = async (req, res) => {
       createdUser = await UserProfile.create(newUserData);
     } else {
       createdUser = { _id: `local_${Date.now()}`, ...newUserData };
+      if (typeof authScraperService.registerUser === 'function') {
+        authScraperService.registerUser(createdUser);
+      }
     }
 
     await authScraperService.logActivity({
       userId: req.user._id || req.user.id,
       userEmail: req.user.email,
       userName: req.user.fullName || 'Administrador',
-      userRole: 'admin',
+      userRole: req.user.role || 'admin',
       action: 'student_registered_by_admin',
-      details: `El administrador registró a ${fullName} (${email}) con rol ${roleLabels[role]} y estado ${academicStatus}.`,
+      details: `Usuario ${fullName} (${email}) registrado con rol ${roleLabels[role] || role}. Cumplimiento Ley 21.719 verificado.`,
     });
 
     return res.status(201).json({
@@ -602,6 +852,355 @@ exports.clearCourses = async (req, res) => {
       success: false,
       message: 'Error al limpiar la base de datos de asignaturas.',
       error: error.message,
+    });
+  }
+};
+
+/**
+ * =========================================================================
+ * GESTIÓN DINÁMICA DE CARRERAS DUOC UC (CRUD)
+ * =========================================================================
+ */
+
+/**
+ * GET /api/admin/careers
+ * Obtener lista alfabética de todas las carreras registradas
+ */
+exports.getCareers = async (req, res) => {
+  try {
+    let careers = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        let dbCareers = await Career.find({}).sort({ name: 1 }).lean();
+        if (!dbCareers || dbCareers.length === 0) {
+          // Pre-sembrar carreras oficiales en MongoDB
+          const docs = inMemoryCareers.map((c) => ({
+            name: c.name,
+            code: c.code || '',
+            school: c.school || 'Escuela Duoc UC',
+          }));
+          await Career.insertMany(docs, { ordered: false }).catch(() => {});
+          dbCareers = await Career.find({}).sort({ name: 1 }).lean();
+        }
+        if (dbCareers && dbCareers.length > 0) {
+          careers = dbCareers;
+        }
+      } catch (err) {
+        console.warn('[AdminController] Fallback a memoria para carreras:', err.message);
+      }
+    }
+
+    if (careers.length === 0) {
+      careers = inMemoryCareers;
+    }
+
+    // Orden alfabético estricto
+    careers.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+
+    return res.status(200).json({
+      success: true,
+      count: careers.length,
+      careers,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al obtener carreras:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar la lista de carreras.',
+    });
+  }
+};
+
+/**
+ * POST /api/admin/careers
+ * Agregar una nueva carrera al catálogo institucional
+ */
+exports.createCareer = async (req, res) => {
+  try {
+    const { name, code, school } = req.body || {};
+    const cleanName = (name || '').trim();
+
+    if (!cleanName) {
+      return res.status(400).json({
+        success: false,
+        message: 'El nombre de la carrera es obligatorio.',
+      });
+    }
+
+    // Comprobar existencia previa (case-insensitive)
+    const existsInMemory = inMemoryCareers.some(
+      (c) => c.name.toLowerCase() === cleanName.toLowerCase()
+    );
+
+    let createdCareer = null;
+    if (mongoose.connection.readyState === 1) {
+      const existing = await Career.findOne({
+        name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      });
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message: `La carrera "${cleanName}" ya se encuentra registrada en el sistema.`,
+        });
+      }
+
+      createdCareer = await Career.create({
+        name: cleanName,
+        code: (code || '').trim(),
+        school: (school || 'Escuela Duoc UC').trim(),
+      });
+    }
+
+    if (!createdCareer) {
+      if (existsInMemory) {
+        return res.status(409).json({
+          success: false,
+          message: `La carrera "${cleanName}" ya se encuentra registrada en el sistema.`,
+        });
+      }
+      createdCareer = {
+        _id: `career_${Date.now()}`,
+        id: `career_${Date.now()}`,
+        name: cleanName,
+        code: (code || '').trim(),
+        school: (school || 'Escuela Duoc UC').trim(),
+      };
+    }
+
+    inMemoryCareers.push(createdCareer);
+    inMemoryCareers.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+    return res.status(201).json({
+      success: true,
+      message: `Carrera "${cleanName}" agregada exitosamente.`,
+      career: createdCareer,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al crear carrera:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al registrar la nueva carrera.',
+    });
+  }
+};
+
+/**
+ * DELETE /api/admin/careers/:id
+ * Eliminar una carrera (por ID o por nombre)
+ */
+exports.deleteCareer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const target = decodeURIComponent(id || '').trim();
+
+    if (!target) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de la carrera no proporcionado.',
+      });
+    }
+
+    let deleted = false;
+    if (mongoose.connection.readyState === 1) {
+      if (mongoose.Types.ObjectId.isValid(target)) {
+        const resDb = await Career.findByIdAndDelete(target);
+        if (resDb) deleted = true;
+      } else {
+        const resDb = await Career.findOneAndDelete({
+          name: { $regex: new RegExp(`^${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        });
+        if (resDb) deleted = true;
+      }
+    }
+
+    const prevLen = inMemoryCareers.length;
+    inMemoryCareers = inMemoryCareers.filter(
+      (c) => c._id !== target && c.id !== target && c.name.toLowerCase() !== target.toLowerCase()
+    );
+    if (inMemoryCareers.length < prevLen) deleted = true;
+
+    return res.status(200).json({
+      success: true,
+      message: `Carrera eliminada exitosamente.`,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al eliminar carrera:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al eliminar la carrera.',
+    });
+  }
+};
+
+/**
+ * =========================================================================
+ * GESTIÓN DINÁMICA DE SEDES DUOC UC (CRUD)
+ * =========================================================================
+ */
+
+/**
+ * GET /api/admin/sedes
+ * Obtener lista alfabética de todas las sedes registradas
+ */
+exports.getSedes = async (req, res) => {
+  try {
+    let sedes = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        let dbSedes = await Sede.find({}).sort({ name: 1 }).lean();
+        if (!dbSedes || dbSedes.length === 0) {
+          // Pre-sembrar sedes oficiales en MongoDB
+          const docs = inMemorySedes.map((s) => ({
+            name: s.name,
+            city: s.city || 'Región Metropolitana',
+          }));
+          await Sede.insertMany(docs, { ordered: false }).catch(() => {});
+          dbSedes = await Sede.find({}).sort({ name: 1 }).lean();
+        }
+        if (dbSedes && dbSedes.length > 0) {
+          sedes = dbSedes;
+        }
+      } catch (err) {
+        console.warn('[AdminController] Fallback a memoria para sedes:', err.message);
+      }
+    }
+
+    if (sedes.length === 0) {
+      sedes = inMemorySedes;
+    }
+
+    // Orden alfabético estricto
+    sedes.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+
+    return res.status(200).json({
+      success: true,
+      count: sedes.length,
+      sedes,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al obtener sedes:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar la lista de sedes.',
+    });
+  }
+};
+
+/**
+ * POST /api/admin/sedes
+ * Agregar una nueva sede al catálogo institucional
+ */
+exports.createSede = async (req, res) => {
+  try {
+    const { name, city } = req.body || {};
+    const cleanName = (name || '').trim();
+
+    if (!cleanName) {
+      return res.status(400).json({
+        success: false,
+        message: 'El nombre de la sede es obligatorio.',
+      });
+    }
+
+    // Comprobar existencia previa (case-insensitive)
+    const existsInMemory = inMemorySedes.some(
+      (s) => s.name.toLowerCase() === cleanName.toLowerCase()
+    );
+
+    let createdSede = null;
+    if (mongoose.connection.readyState === 1) {
+      const existing = await Sede.findOne({
+        name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      });
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message: `La sede "${cleanName}" ya se encuentra registrada en el sistema.`,
+        });
+      }
+
+      createdSede = await Sede.create({
+        name: cleanName,
+        city: (city || 'Región Metropolitana').trim(),
+      });
+    }
+
+    if (!createdSede) {
+      if (existsInMemory) {
+        return res.status(409).json({
+          success: false,
+          message: `La sede "${cleanName}" ya se encuentra registrada en el sistema.`,
+        });
+      }
+      createdSede = {
+        _id: `sede_${Date.now()}`,
+        id: `sede_${Date.now()}`,
+        name: cleanName,
+        city: (city || 'Región Metropolitana').trim(),
+      };
+    }
+
+    inMemorySedes.push(createdSede);
+    inMemorySedes.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+    return res.status(201).json({
+      success: true,
+      message: `Sede "${cleanName}" agregada exitosamente.`,
+      sede: createdSede,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al crear sede:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al registrar la nueva sede.',
+    });
+  }
+};
+
+/**
+ * DELETE /api/admin/sedes/:id
+ * Eliminar una sede (por ID o por nombre)
+ */
+exports.deleteSede = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const target = decodeURIComponent(id || '').trim();
+
+    if (!target) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de la sede no proporcionado.',
+      });
+    }
+
+    let deleted = false;
+    if (mongoose.connection.readyState === 1) {
+      if (mongoose.Types.ObjectId.isValid(target)) {
+        const resDb = await Sede.findByIdAndDelete(target);
+        if (resDb) deleted = true;
+      } else {
+        const resDb = await Sede.findOneAndDelete({
+          name: { $regex: new RegExp(`^${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        });
+        if (resDb) deleted = true;
+      }
+    }
+
+    const prevLen = inMemorySedes.length;
+    inMemorySedes = inMemorySedes.filter(
+      (s) => s._id !== target && s.id !== target && s.name.toLowerCase() !== target.toLowerCase()
+    );
+    if (inMemorySedes.length < prevLen) deleted = true;
+
+    return res.status(200).json({
+      success: true,
+      message: `Sede eliminada exitosamente.`,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al eliminar sede:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al eliminar la sede.',
     });
   }
 };

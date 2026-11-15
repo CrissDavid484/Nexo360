@@ -205,19 +205,19 @@ export const VivoDuocSummaryView = () => {
 
       {/* 2. Manual Interactivo de Botones y Servicios (Visible primero, prioritario) */}
       <section aria-labelledby="manual-servicios-heading" className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-300 pb-3">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div>
             <h3
               id="manual-servicios-heading"
-              className="text-lg sm:text-xl font-black text-[#002B49] tracking-tight"
+              className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight"
             >
               Manual de Botones: ¿Qué hace cada opción?
             </h3>
-            <p className="text-xs text-slate-700 font-medium mt-0.5">
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
               Selecciona cualquiera de los 9 botones para ver su función detallada, ubicación en el menú y requisitos.
             </p>
           </div>
-          <span className="text-xs font-black text-slate-700 bg-slate-200 px-2.5 py-1 rounded-md">
+          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/60">
             9 Servicios Oficiales
           </span>
         </div>
@@ -240,10 +240,10 @@ export const VivoDuocSummaryView = () => {
                       announce(`Mostrando manual para ${srv.title}`, 'polite');
                     }}
                     aria-pressed={isSelected}
-                    className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
+                    className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
                       isSelected
-                        ? 'bg-[#002B49] text-white border-[#002B49] shadow-md scale-[1.01]'
-                        : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 hover:border-slate-400'
+                        ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
+                        : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/90 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -256,12 +256,12 @@ export const VivoDuocSummaryView = () => {
                         <IconComponent className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-xs sm:text-sm font-black block leading-tight">
+                        <span className="text-xs sm:text-sm font-bold block leading-tight">
                           {srv.title}
                         </span>
                         <span
-                          className={`text-[11px] font-semibold block mt-0.5 ${
-                            isSelected ? 'text-amber-300' : 'text-slate-600'
+                          className={`text-[11px] font-medium block mt-0.5 ${
+                            isSelected ? 'text-amber-300' : 'text-slate-500'
                           }`}
                         >
                           {srv.badge}
@@ -282,17 +282,17 @@ export const VivoDuocSummaryView = () => {
           </div>
 
           {/* Panel de Detalle Explicativo (col-span-7) */}
-          <article className="lg:col-span-7 bg-white rounded-2xl border-2 border-slate-300 p-6 sm:p-8 space-y-6 shadow-xs">
-            <header className="border-b border-slate-200 pb-4">
+          <article className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-6 shadow-xs">
+            <header className="border-b border-slate-100 pb-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-black uppercase text-amber-800 tracking-wide">
+                <span className="text-xs font-semibold uppercase text-amber-800 tracking-wide">
                   Ficha Técnica Institucional
                 </span>
-                <span className="px-2.5 py-0.5 bg-slate-100 text-slate-800 border border-slate-300 rounded font-bold text-xs">
+                <span className="px-2.5 py-0.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-full font-semibold text-xs">
                   {activeService.badge}
                 </span>
               </div>
-              <h4 className="text-xl sm:text-2xl font-black text-[#002B49] mt-1">
+              <h4 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
                 {activeService.title}
               </h4>
             </header>

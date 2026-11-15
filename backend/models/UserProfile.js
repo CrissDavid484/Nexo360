@@ -22,6 +22,14 @@ const EnrolledCourseSchema = new mongoose.Schema(
     sala: { type: String, trim: true, maxlength: 100, default: '' },
     profesor: { type: String, trim: true, maxlength: 100, default: '' },
     bloques: { type: [ScheduleBlockSchema], default: [] },
+    curso: { type: String, trim: true, maxlength: 120 },
+    attendanceRate: { type: Number, min: 0, max: 100, default: 100 },
+    porcentajeAsistencia: { type: Number, min: 0, max: 100, default: 100 },
+    porcentajeAsistenciaActual: { type: String, trim: true, maxlength: 20, default: '100%' },
+    asistenciaPorcentaje: { type: Number, min: 0, max: 100, default: 100 },
+    clasesRegistradas: { type: Number, min: 0, default: 0 },
+    asistencia: { type: Number, min: 0, default: 0 },
+    asistencias: { type: Number, min: 0, default: 0 },
   },
   { _id: false }
 );
@@ -210,6 +218,10 @@ const UserProfileSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
+      readingGuide: {
+        type: Boolean,
+        default: false,
+      },
       screenReaderOptimized: {
         type: Boolean,
         default: true,
@@ -222,6 +234,50 @@ const UserProfileSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
       default: Date.now,
+    },
+    consentimientoLey21719: {
+      aceptado: { type: Boolean, default: false },
+      fechaAceptacion: { type: Date, default: null },
+      finalidadTratamiento: {
+        type: String,
+        default: 'Tratamiento de datos para fines académicos, registro curricular y acompañamiento institucional conforme a la Ley N° 21.719',
+      },
+    },
+    isRegisteredInDb: {
+      type: Boolean,
+      default: true,
+    },
+    purposeLimitation: {
+      type: [String],
+      default: [
+        'gestion_academica',
+        'apoyo_paedis_inclusion',
+        'simulador_toma_ramos',
+        'seguimiento_asistencia',
+      ],
+    },
+    consentMetadata: {
+      consentGiven: { type: Boolean, default: true },
+      consentDate: { type: Date, default: Date.now },
+      consentVersion: { type: String, default: '1.0 - Ley N° 21.719' },
+      law: { type: String, default: 'Ley N° 21.719 de Protección de Datos Personales de Chile' },
+      purpose: {
+        type: [String],
+        default: [
+          'gestion_academica',
+          'apoyo_paedis_inclusion',
+          'simulador_toma_ramos',
+          'seguimiento_asistencia',
+        ],
+      },
+      dataRetentionPolicy: {
+        type: String,
+        default: 'Conservación durante el periodo académico activo conforme al Art. 12 de la Ley N° 21.719',
+      },
+      arcoRightsNotice: {
+        type: String,
+        default: 'Derechos ARCO (Acceso, Rectificación, Cancelación y Oposición) garantizados por Duoc UC',
+      },
     },
   },
   {
@@ -249,5 +305,27 @@ UserProfileSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password || !candidatePassword) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// Métodos de transformación para cumplir con la Ley N° 21.719 (Cero almacenamiento o exposición de contraseñas)
+UserProfileSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    delete ret.password;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+UserProfileSchema.set('toObject', {
+  transform: (doc, ret) => {
+    delete ret.password;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+// Índices de alto rendimiento para búsquedas y filtros en Admin Panel y Auth
+UserProfileSchema.index({ rut: 1 });
+UserProfileSchema.index({ role: 1, academicStatus: 1 });
+UserProfileSchema.index({ carrera: 1, sede: 1 });
 
 module.exports = mongoose.model('UserProfile', UserProfileSchema);
