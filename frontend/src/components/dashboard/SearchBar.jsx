@@ -70,7 +70,7 @@ export const SearchBar = ({
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Busca un trámite o tema (ej. inasistencia, TNE, gratuidad, congelar...)"
-          className="w-full min-h-[54px] pl-12 pr-12 py-3.5 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-2xl text-slate-900 text-sm sm:text-base font-medium placeholder:text-slate-400 shadow-xs focus:shadow-md transition-all duration-200 [&::-webkit-search-cancel-button]:hidden"
+          className="w-full min-h-[54px] pl-12 pr-12 py-3.5 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-2xl text-slate-900 text-sm sm:text-base font-medium placeholder:text-slate-400 shadow-xs focus:shadow-md transition-all duration-200 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
         />
 
         {searchTerm && (

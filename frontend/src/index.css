@@ -22,14 +22,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Desactivar botón nativo de cancelar en inputs de búsqueda para evitar dobles 'X' */
+/* Desactivar botón nativo de cancelar y limpiar en inputs de búsqueda (Edge, Chrome, Safari) para evitar dobles 'X' */
+input::-ms-clear,
+input::-ms-reveal {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-decoration,
 input[type="search"]::-webkit-search-results-button,
-input[type="search"]::-webkit-search-results-decoration {
-  -webkit-appearance: none;
-  appearance: none;
+input[type="search"]::-webkit-search-results-decoration,
+input::-webkit-search-cancel-button,
+input::-webkit-search-decoration {
+  -webkit-appearance: none !important;
+  appearance: none !important;
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Transición global coordinada y fluida para cambio de tema claro / oscuro (60/120 FPS) */

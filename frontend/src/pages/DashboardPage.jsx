@@ -401,12 +401,30 @@ export const DashboardPage = () => {
     matchedSubmodules.sort((a, b) => b.score - a.score);
     matchedArticles.sort((a, b) => b.score - a.score);
 
-    const filteredCategories = DUOC_CATEGORIES.filter((c) => matchedCategoryIds.has(c.id));
+    // Filtrar ruido: si hay coincidencias de alta intencionalidad o score alto, priorizar sólo trámites y artículos relevantes
+    const topSubScore = matchedSubmodules[0]?.score || 0;
+    const meaningfulSubmodules =
+      topSubScore >= 25
+        ? matchedSubmodules.filter((m) => m.score >= Math.max(15, topSubScore * 0.35))
+        : matchedSubmodules;
+
+    const topArtScore = matchedArticles[0]?.score || 0;
+    const meaningfulArticles =
+      topArtScore >= 20
+        ? matchedArticles.filter((a) => a.score >= Math.max(10, topArtScore * 0.35))
+        : matchedArticles;
+
+    const meaningfulCategoryIds = new Set([
+      ...meaningfulSubmodules.map((m) => m.category.id),
+      ...meaningfulArticles.map((a) => a.category.id),
+    ]);
+
+    const filteredCategories = DUOC_CATEGORIES.filter((c) => meaningfulCategoryIds.has(c.id));
 
     return {
       categories: filteredCategories,
-      matchedSubmodules,
-      matchedArticles,
+      matchedSubmodules: meaningfulSubmodules,
+      matchedArticles: meaningfulArticles,
       isCertificadoNotasIntent,
       isTomaRamosIntent,
     };
