@@ -322,10 +322,10 @@ export const ModuleModal = ({
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                       <span className="text-xs font-semibold text-[#002B49] uppercase tracking-wider block">
-                        Portal Oficial • Inscripción de Asignaturas (Toma de Ramos)
+                        Portal Oficial • Toma de Ramos y Modificación de Asignaturas
                       </span>
                       <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed font-normal">
-                        Accede directamente al sistema oficial SICOL WebDynpro de Duoc UC para inscribir y confirmar tus asignaturas reales.
+                        Accede directamente al portal oficial SICOL WebDynpro de Duoc UC para realizar tu inscripción o modificación real de asignaturas.
                       </p>
                     </div>
                     <a
@@ -342,17 +342,17 @@ export const ModuleModal = ({
                   <div className="pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
                       <span className="text-xs font-semibold text-slate-800 block">
-                        ¿Deseas practicar antes? Entorno de Simulación Nexo360
+                        ¿Deseas practicar antes? Simulador de Toma de Ramos y Modificación
                       </span>
                       <p className="text-xs text-slate-500 font-normal">
-                        Entrena la selección de horarios, combina paquetes y prueba sin riesgo de alterar tu matrícula real.
+                        Entrena la Toma de Ramos desde cero o la Modificación de Asignaturas (eliminar/cambiar secciones) con la interfaz fiel de SICOL y tu Boletín de Carga Académica.
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
                         setShowSimulator(true);
-                        announce('Abriendo simulador de Toma de Ramos', 'polite');
+                        announce('Abriendo simulador de Toma de Ramos y Modificación de Asignaturas', 'polite');
                       }}
                       className="min-h-[40px] px-4 py-2 bg-[#FFB81C] hover:bg-amber-400 text-slate-950 font-medium text-xs sm:text-sm rounded-xl shrink-0 flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
                     >

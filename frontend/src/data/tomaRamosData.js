@@ -2,55 +2,64 @@
  * Datos estructurados para el Simulador Oficial de Toma de Ramos Duoc UC (SAP WebDynpro SICOL)
  * Fiel a las pantallas de inscripción de asignaturas:
  * https://portalinsc.duoc.cl/webdynpro/dispatcher/duoc.com.student/sicol/StudentSicol?inportal=xi
- * y al video tutorial oficial de Duoc UC (https://www.youtube.com/watch?v=aEBcCl6RFz8).
+ * y a los videos tutoriales oficiales de Duoc UC:
+ * - Toma de Ramos: https://www.youtube.com/watch?v=2vwT2RCj3FA
+ * - Modificación de Asignaturas: https://www.youtube.com/watch?v=TjOySUq7F3w&t=13s
  */
 
 export const PORTAL_INSC_URL =
   'https://portalinsc.duoc.cl/webdynpro/dispatcher/duoc.com.student/sicol/StudentSicol?inportal=xi';
 
 export const TOMA_RAMOS_TUTORIAL_VIDEO = {
-  videoId: 'aEBcCl6RFz8',
-  url: 'https://www.youtube.com/watch?v=aEBcCl6RFz8',
-  embedUrl: 'https://www.youtube-nocookie.com/embed/aEBcCl6RFz8?rel=0',
+  videoId: '2vwT2RCj3FA',
+  url: 'https://www.youtube.com/watch?v=2vwT2RCj3FA',
+  embedUrl: 'https://www.youtube-nocookie.com/embed/2vwT2RCj3FA?rel=0',
   title: 'Inscripción de Asignaturas (Toma de Ramos Oficial Duoc UC)',
-  duracion: '2:20 min',
+  duracion: '3:49 min',
   canal: 'Duoc UC Institucional',
+  modificacionVideo: {
+    videoId: 'TjOySUq7F3w',
+    url: 'https://www.youtube.com/watch?v=TjOySUq7F3w&t=13s',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/TjOySUq7F3w?start=13&rel=0',
+    title: 'Modificación de Asignaturas Duoc UC',
+    duracion: '1:50 min',
+  },
   pasosClave: [
     {
-      paso: '1. Verificación de requisitos',
-      tiempo: '0:10',
-      descripcion:
-        'Asegúrate de no tener cuotas pendientes de matrícula o aranceles, y que tu matrícula o beneficio (Gratuidad/CAE) esté al día sin bloqueos académicos.',
-    },
-    {
-      paso: '2. Tramo horario asignado',
+      paso: '1. Ingreso y "Haz Click Para Continuar >>"',
       tiempo: '0:25',
       descripcion:
-        'La plataforma se habilita por tramos horarios según tu carrera, año y rendimiento. Respeta tu bloque para asegurar las vacantes.',
+        'Inicia sesión con tu usuario y clave institucional en portalinsc.duoc.cl, verifica tu nombre, RUT, carrera y créditos, y pulsa "Haz Click Para Continuar >>".',
     },
     {
-      paso: '3. Selección con iconito mano/cubo (🖐️📦)',
-      tiempo: '0:45',
+      paso: '2. Seleccionar Asignatura ("Selecciona Opción")',
+      tiempo: '0:50',
       descripcion:
-        'En la lista izquierda de asignaturas disponibles, haz clic en el icono de la mano con el cubito para abrir las secciones con cupos.',
+        'En la tabla izquierda, haz clic en el ícono de la primera columna (cubo con mano) de la asignatura que deseas inscribir o modificar.',
     },
     {
-      paso: '4. Elección de sección y profesor',
-      tiempo: '1:05',
+      paso: '3. Elegir Sección y Verificar Cupos',
+      tiempo: '1:15',
       descripcion:
-        'Revisa las vacantes disponibles, sala en Sede Alameda y el nombre del docente antes de seleccionar la sección.',
+        'Revisa las secciones disponibles, cupos, sala, profesor y horario. Haz clic en el ícono de la primera columna ("Agregar sección a Cursos seleccionados") verificando que no tengas tope horario.',
     },
     {
-      paso: '5. Verificación de cuadrícula sin topes',
-      tiempo: '1:30',
+      paso: '4. Revisar Horario y Cursos Seleccionados',
+      tiempo: '1:40',
       descripcion:
-        'Comprueba que las clases seleccionadas se ubiquen en bloques sin cruzarse con otras asignaturas en el horario semanal.',
+        'Comprueba el mensaje verde "Se ha seleccionado la sección \'...\' para inscribir" y verifica que el ramo aparezca en la grilla Horario y en Cursos seleccionados (en modo Modificación puedes eliminar un ramo inscrito con el ícono de documento con X roja en la segunda columna).',
     },
     {
-      paso: '6. Grabar y respaldar tu Boletín Oficial',
-      tiempo: '1:55',
+      paso: '5. Avanzar con "Siguiente ▶" a la Malla Alumno',
+      tiempo: '2:00',
       descripcion:
-        'Haz clic en "Siguiente" y luego en "Grabar". Finalmente pulsa "Ver Horario" para visualizar y descargar tu Boletín de Carga Académica en PDF.',
+        'Una vez elegidos todos tus ramos, presiona "Siguiente ▶" para revisar el resumen en tu Malla Alumno (con tus ramos inscritos resaltados en amarillo) junto a tu horario proyectado.',
+    },
+    {
+      paso: '6. Presionar "Inscribir", "Aceptar" y "Ver Horario"',
+      tiempo: '2:16',
+      descripcion:
+        'Haz clic en "Inscribir", pulsa "Aceptar" en la ventana emergente de Información, y cuando aparezca "Se ha realizado la Inscripción de asignaturas.", presiona "Ver Horario" para imprimir o descargar tu Boletín Oficial.',
     },
   ],
 };
@@ -1564,4 +1573,104 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
     };
   });
 }
+
+/**
+ * Malla curricular de referencia (Semestres 1 al 9) fiel a las capturas de SAP SICOL "Malla Alumno"
+ */
+export const MALLA_CURRICULAR_BASE = [
+  {
+    semestre: 'Semestre 1',
+    asignaturas: [
+      { sigla: 'IPF1501', defaultStatus: 'aprobado' },
+      { sigla: 'SPD1501', defaultStatus: 'aprobado' },
+      { sigla: 'THS1501', defaultStatus: 'aprobado' },
+      { sigla: 'LMT1501', defaultStatus: 'convalidado' },
+      { sigla: 'FET001', defaultStatus: 'aprobado' },
+      { sigla: 'MAT100', defaultStatus: 'aprobado' },
+    ],
+  },
+  {
+    semestre: 'Semestre 2',
+    asignaturas: [
+      { sigla: 'OIN1446101', defaultStatus: 'aprobado' },
+      { sigla: 'MAT200', defaultStatus: 'aprobado' },
+      { sigla: 'PEF2501', defaultStatus: 'aprobado' },
+      { sigla: 'MDD2501', defaultStatus: 'aprobado' },
+      { sigla: 'LDP2501', defaultStatus: 'aprobado' },
+      { sigla: 'FET102', defaultStatus: 'convalidado' },
+    ],
+  },
+  {
+    semestre: 'Semestre 3',
+    asignaturas: [
+      { sigla: 'OPR1446101', defaultStatus: 'aprobado' },
+      { sigla: 'MAT330', defaultStatus: 'reprobado' },
+      { sigla: 'INU111', defaultStatus: 'aprobado' },
+      { sigla: 'LDP3501', defaultStatus: 'aprobado' },
+      { sigla: 'TAP3501', defaultStatus: 'aprobado' },
+      { sigla: 'PBD3501', defaultStatus: 'aprobado' },
+    ],
+  },
+  {
+    semestre: 'Semestre 4',
+    asignaturas: [
+      { sigla: 'FDR1501', defaultStatus: 'aprobado' },
+      { sigla: 'DAI4501', defaultStatus: 'aprobado' },
+      { sigla: 'INU211', defaultStatus: 'pendiente' },
+      { sigla: 'FET003', defaultStatus: 'aprobado' },
+      { sigla: 'SOR4501', defaultStatus: 'aprobado' },
+      { sigla: 'EMP110', defaultStatus: 'aprobado' },
+    ],
+  },
+  {
+    semestre: 'Semestre 5',
+    asignaturas: [
+      { sigla: 'FET212', defaultStatus: 'aprobado' },
+      { sigla: 'PLF5503', defaultStatus: 'aprobado' },
+      { sigla: 'ASF5501', defaultStatus: 'aprobado' },
+      { sigla: 'ABD5501', defaultStatus: 'aprobado' },
+      { sigla: 'MPN5501', defaultStatus: 'aprobado' },
+      { sigla: 'INU311', defaultStatus: 'aprobado' },
+      { sigla: 'ISF5501', defaultStatus: 'sin-inscribir' },
+    ],
+  },
+  {
+    semestre: 'Semestre 6',
+    asignaturas: [
+      { sigla: 'CPI6501', defaultStatus: 'sin-inscribir' },
+      { sigla: 'ADF4501', defaultStatus: 'sin-inscribir' },
+      { sigla: 'INU411', defaultStatus: 'sin-inscribir' },
+      { sigla: 'GBI6501', defaultStatus: 'sin-inscribir' },
+    ],
+  },
+  {
+    semestre: 'Semestre 7',
+    asignaturas: [
+      { sigla: 'EMP120', defaultStatus: 'sin-inscribir' },
+      { sigla: 'SCF6501', defaultStatus: 'sin-inscribir' },
+      { sigla: 'SSC7501', defaultStatus: 'sin-inscribir' },
+      { sigla: 'TSF7502', defaultStatus: 'sin-inscribir' },
+      { sigla: 'EDP7201', defaultStatus: 'sin-inscribir' },
+    ],
+  },
+  {
+    semestre: 'Semestre 8',
+    asignaturas: [
+      { sigla: 'ARF8502', defaultStatus: 'sin-inscribir' },
+      { sigla: 'DSF7501', defaultStatus: 'sin-inscribir' },
+      { sigla: 'AHF8502', defaultStatus: 'sin-inscribir' },
+      { sigla: 'TAL011', defaultStatus: 'sin-inscribir' },
+      { sigla: 'PTF8502', defaultStatus: 'sin-inscribir' },
+      { sigla: 'PPF8502', defaultStatus: 'sin-inscribir' },
+    ],
+  },
+  {
+    semestre: 'Semestre 9',
+    asignaturas: [
+      { sigla: '-', isInfoPlaceholder: true, defaultStatus: 'sin-inscribir' },
+    ],
+  },
+];
+
+export const MALLA_CURRICULAR_SEMANAL = MALLA_CURRICULAR_BASE;
 
