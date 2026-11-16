@@ -2694,7 +2694,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       </div>
 
                       <div className="bg-[#FFB81C] text-slate-950 px-4 py-1.5 grid grid-cols-12 font-black text-xs border-b border-black">
-                        <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">Sigla:</div>
+                        <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">Sección:</div>
                         <div className="col-span-5 sm:col-span-6 px-2">Nom. Asignatura:</div>
                         <div className="col-span-4 sm:col-span-4 text-right">Horario y Sala</div>
                       </div>

@@ -5,58 +5,10 @@ const jwt = require('jsonwebtoken');
 const app = require('../server');
 const UserProfile = require('../models/UserProfile');
 const { getJwtSecret } = require('../middleware/authMiddleware');
+const { request, setBaseUrl } = require('./testHelper');
 
 let server;
 let baseUrl;
-
-// Helper ligero para peticiones HTTP de prueba sin dependencias externas
-function request(path, { method = 'GET', headers = {}, body = null } = {}) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(path, baseUrl);
-    const payload = body !== null ? (typeof body === 'string' ? body : JSON.stringify(body)) : null;
-
-    const reqHeaders = { ...headers };
-    if (payload && !reqHeaders['Content-Type']) {
-      reqHeaders['Content-Type'] = 'application/json';
-    }
-    if (payload) {
-      reqHeaders['Content-Length'] = Buffer.byteLength(payload);
-    }
-
-    const req = http.request(
-      url,
-      {
-        method,
-        headers: reqHeaders,
-      },
-      (res) => {
-        let raw = '';
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => {
-          raw += chunk;
-        });
-        res.on('end', () => {
-          let json = null;
-          try {
-            json = JSON.parse(raw);
-          } catch {
-            // Respuesta no JSON
-          }
-          resolve({
-            status: res.statusCode,
-            headers: res.headers,
-            body: json,
-            raw,
-          });
-        });
-      }
-    );
-
-    req.on('error', reject);
-    if (payload) req.write(payload);
-    req.end();
-  });
-}
 
 describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () => {
   before(async () => {
@@ -64,6 +16,7 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
       server = app.listen(0, '127.0.0.1', () => {
         const { port } = server.address();
         baseUrl = `http://127.0.0.1:${port}`;
+        setBaseUrl(baseUrl);
         resolve();
       });
     });

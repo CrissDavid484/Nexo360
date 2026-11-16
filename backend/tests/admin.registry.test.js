@@ -4,58 +4,10 @@ const http = require('node:http');
 const jwt = require('jsonwebtoken');
 const app = require('../server');
 const { getJwtSecret } = require('../middleware/authMiddleware');
+const { request, setBaseUrl } = require('./testHelper');
 
 let server;
 let baseUrl;
-
-function request(path, { method = 'GET', headers = {}, body = null } = {}) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(path, baseUrl);
-    const payload = body !== null ? (typeof body === 'string' ? body : JSON.stringify(body)) : null;
-
-    const reqHeaders = { ...headers };
-    if (payload && !reqHeaders['Content-Type']) {
-      reqHeaders['Content-Type'] = 'application/json';
-    }
-    if (payload) {
-      reqHeaders['Content-Length'] = Buffer.byteLength(payload);
-    }
-
-    const req = http.request(
-      url,
-      {
-        method,
-        headers: reqHeaders,
-      },
-      (res) => {
-        let raw = '';
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => {
-          raw += chunk;
-        });
-        res.on('end', () => {
-          let parsed;
-          try {
-            parsed = JSON.parse(raw);
-          } catch {
-            parsed = raw;
-          }
-          resolve({
-            status: res.statusCode,
-            headers: res.headers,
-            body: parsed,
-          });
-        });
-      }
-    );
-
-    req.on('error', reject);
-    if (payload) {
-      req.write(payload);
-    }
-    req.end();
-  });
-}
 
 describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carreras/Sedes & Semáforo Predictivo', () => {
   before(async () => {
@@ -63,6 +15,7 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
       server = http.createServer(app);
       server.listen(0, () => {
         baseUrl = `http://127.0.0.1:${server.address().port}`;
+        setBaseUrl(baseUrl);
         resolve();
       });
     });
