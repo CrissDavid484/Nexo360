@@ -35,6 +35,15 @@ const FALLBACK_USERS = [
     badge: 'Admin & PAEDIS',
   },
   {
+    email: 'an.ordenesd@duocuc.cl',
+    fullName: 'Angelo Órdenes',
+    role: 'estudiante',
+    roleLabel: 'Estudiante Regular Duoc UC',
+    isPaedis: false,
+    academicStatus: 'activo',
+    badge: 'Analista Programador',
+  },
+  {
     email: 'd.rojas@duocuc.cl',
     fullName: 'Daniela Rojas',
     role: 'estudiante_paedis',

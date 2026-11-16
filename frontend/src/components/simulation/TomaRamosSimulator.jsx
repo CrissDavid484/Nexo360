@@ -54,6 +54,7 @@ import {
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { getStudentDisplayName, getStudentRut } from '../../utils/studentUtils';
 
 /**
  * Construye la carga académica inicial cuando el usuario elige "Modificación de Asignaturas".
@@ -161,16 +162,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
     user?.vivoStudentProfile?.carrera ||
     'Ingeniería en Informática';
 
-  const studentFullName =
-    user?.name ||
-    user?.nombre ||
-    user?.fullName ||
-    user?.vivoStudentProfile?.nombre ||
-    TOMA_RAMOS_ESTUDIANTE.nombre;
-
-  const studentRutFormatted =
-    user?.rut || user?.vivoStudentProfile?.rut || TOMA_RAMOS_ESTUDIANTE.rutFormateado;
-  const studentRutRaw = String(studentRutFormatted).replace(/[.-]/g, '').toUpperCase() || TOMA_RAMOS_ESTUDIANTE.rut;
+  const studentFullName = getStudentDisplayName(user);
+  const studentRutFormatted = getStudentRut(user);
+  const studentRutRaw = String(studentRutFormatted).replace(/[.-]/g, '').toUpperCase() || '219876543';
 
   const matchedInitialCarrera =
     CARRERAS_DUOC.find(
@@ -988,7 +982,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
         {/* Capa Principal del Simulador (se desenfoca únicamente cuando isPreFlowActive es true) */}
         <div
           className={`flex-1 flex flex-col transition-all duration-300 ${
-            isPreFlowActive ? 'filter blur-xs pointer-events-none select-none opacity-65' : 'filter blur-0'
+            isPreFlowActive ? 'filter blur-md pointer-events-none select-none opacity-65' : 'filter blur-0'
           }`}
         >
           {/* Barra compacta superior de herramientas del simulador (Carrera, Modo, Reloj) */}

@@ -306,7 +306,7 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(dirLogin.body?.user?.nombre, 'Patricia Valenzuela');
     assert.equal(dirLogin.body?.user?.rol, 'director');
 
-    // 3. Login SSO con un correo institucional no registrado en los 10: usa su correo como nombre
+    // 3. Login SSO con un correo institucional no registrado: deriva un nombre humano y no expone datos de Cristian
     const customEmail = 'alumno.nuevo2026@duocuc.cl';
     const customLogin = await request('/api/auth/sso-login', {
       method: 'POST',
@@ -314,8 +314,9 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     });
     assert.equal(customLogin.status, 200);
     assert.equal(customLogin.body?.success, true);
-    assert.equal(customLogin.body?.user?.nombre, customEmail);
-    assert.equal(customLogin.body?.user?.fullName, customEmail);
+    assert.ok(customLogin.body?.user?.nombre);
+    assert.equal(customLogin.body?.user?.nombre, 'Alumno Nuevo2026');
+    assert.notEqual(customLogin.body?.user?.rut, '19.276.735-0');
   });
 
   test('11. [Admin Panel & Motor Predictivo] Control de acceso RBAC, Métricas KPI, Predicción de Deserción y CRUD de Estados', async () => {

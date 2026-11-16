@@ -35,6 +35,101 @@ const activePuppeteerSessions = new Map();
 const interactiveVivoSessions = new Map();
 
 /**
+ * Cálculo del Dígito Verificador de un RUT chileno (Algoritmo Módulo 11)
+ */
+function calculateRutDv(rutNumber) {
+  let sum = 0;
+  let multiplier = 2;
+  let num = Math.floor(rutNumber);
+  while (num > 0) {
+    sum += (num % 10) * multiplier;
+    num = Math.floor(num / 10);
+    multiplier = multiplier === 7 ? 2 : multiplier + 1;
+  }
+  const remainder = 11 - (sum % 11);
+  if (remainder === 11) return '0';
+  if (remainder === 10) return 'K';
+  return remainder.toString();
+}
+
+/**
+ * Generador de RUT estudiantil chileno simulado y determinista (rango 20.xxx.xxx a 22.xxx.xxx)
+ */
+function generateSimulatedRut(email = '') {
+  let hash = 0;
+  const str = (email || '').toLowerCase().trim();
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const positiveHash = Math.abs(hash);
+  const minNumber = 20000000;
+  const maxNumber = 22500000;
+  const rutNum = minNumber + (positiveHash % (maxNumber - minNumber));
+  const dv = calculateRutDv(rutNum);
+  const numStr = rutNum.toString();
+  return `${numStr.slice(0, 2)}.${numStr.slice(2, 5)}.${numStr.slice(5, 8)}-${dv}`;
+}
+
+/**
+ * Formateo humano de nombres a partir de correos institucionales Duoc UC
+ * Ej: an.ordenesd@duocuc.cl -> Andrés Órdenes D.
+ */
+function parseNameFromEmail(email = '') {
+  const clean = (email || '').toLowerCase().trim();
+  if (!clean || !clean.includes('@')) return 'Estudiante Duoc UC';
+  const local = clean.split('@')[0];
+  if (local === 'c.guzman' || local === 'cri.guzmang') return 'Cristian Guzmán';
+  if (local === 'an.ordenesd') return 'Angelo Órdenes';
+
+  const parts = local.split('.');
+  if (parts.length >= 2) {
+    let firstName = parts[0];
+    let lastName = parts.slice(1).join(' ');
+
+    const mapFirst = {
+      an: 'Andrés',
+      cr: 'Cristian',
+      cri: 'Cristian',
+      da: 'Daniela',
+      ma: 'Matías',
+      matias: 'Matías',
+      va: 'Valentina',
+      fe: 'Felipe',
+      ju: 'Juan',
+      ca: 'Carlos',
+      ro: 'Roberto',
+      pa: 'Patricia',
+      c: 'Carlos',
+      m: 'Manuel',
+      d: 'David',
+      f: 'Francisco',
+      j: 'José',
+      p: 'Pedro',
+      v: 'Vicente',
+    };
+
+    if (mapFirst[firstName]) {
+      firstName = mapFirst[firstName];
+    } else {
+      firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    }
+
+    if (lastName.length > 3 && /[a-z]$/i.test(lastName)) {
+      const baseLastName = lastName.slice(0, -1);
+      const secondInitial = lastName.slice(-1).toUpperCase();
+      const capBase = baseLastName.charAt(0).toUpperCase() + baseLastName.slice(1);
+      return `${firstName} ${capBase} ${secondInitial}.`;
+    }
+
+    const capLast = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+    return `${firstName} ${capLast}`;
+  }
+
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
+/**
  * Generador de asignaturas con asistencia parseada conforme al formato oficial:
  * 'Curso', 'N° de Clases Registradas', 'Asistencia', 'Porcentaje de Asistencia Actual'
  * (ej. Capstone, 27 clases, 24 asistencias, 88.9%).
@@ -976,19 +1071,23 @@ class AuthScraperService {
         const role = isAdmin ? 'administrador' : isProf ? 'profesor' : 'estudiante';
         const roleLabel = isAdmin ? 'Administrador del Sistema' : isProf ? 'Docente Duoc UC' : 'Estudiante Regular Duoc UC';
 
-        const defaultName = cleanEmail.includes('guzman') ? 'Cristian Guzmán' : cleanEmail;
+        const defaultName = cleanEmail.includes('guzman') ? 'Cristian Guzmán' : parseNameFromEmail(cleanEmail);
+        const defaultRut = cleanEmail.includes('guzman') ? '19.276.735-0' : generateSimulatedRut(cleanEmail);
 
         user = await UserProfile.create({
           email: cleanEmail,
           fullName: defaultName,
           nombre: defaultName,
+          rut: defaultRut,
           role,
           roleLabel,
           password: hashedPassword,
-          sede: 'ALAMEDA',
+          sede: 'Sede Alameda',
           campus: 'Sede Alameda',
-          carrera: isProf ? 'DOCENCIA GENERAL' : 'INGENIERÍA EN INFORMÁTICA',
-          career: isProf ? 'DOCENCIA GENERAL' : 'Ingeniería en Informática',
+          carrera: isProf ? 'Docencia General' : 'Ingeniería en Informática',
+          career: isProf ? 'Docencia General' : 'Ingeniería en Informática',
+          address: 'Por actualizar',
+          phone: '+56 9 0000 0000',
           isPaedis: false,
           isRegisteredInDb: false, // NO registrado previamente en la base de datos oficial
           academicStatus: 'activo',
@@ -1010,11 +1109,15 @@ class AuthScraperService {
       return mem;
     }
 
+    const derivedMemName = cleanEmail.includes('guzman') ? 'Cristian Guzmán' : parseNameFromEmail(cleanEmail);
+    const derivedMemRut = cleanEmail.includes('guzman') ? '19.276.735-0' : generateSimulatedRut(cleanEmail);
+
     const newMem = {
       _id: `user_${cleanEmail.replace(/[@.]/g, '_')}`,
       email: cleanEmail,
-      fullName: cleanEmail,
-      nombre: cleanEmail,
+      fullName: derivedMemName,
+      nombre: derivedMemName,
+      rut: derivedMemRut,
       role: 'estudiante',
       roleLabel: 'Estudiante Regular Duoc UC',
       isPaedis: false,
@@ -1027,6 +1130,8 @@ class AuthScraperService {
       carrera: 'Ingeniería en Informática',
       campus: 'Sede Alameda',
       sede: 'Sede Alameda',
+      address: 'Por actualizar',
+      phone: '+56 9 0000 0000',
     };
     inMemoryUsers.set(cleanEmail, newMem);
     return newMem;
@@ -1050,9 +1155,29 @@ class AuthScraperService {
       } else if (email.includes('guzman')) {
         fullName = 'Cristian Guzmán';
       } else {
-        fullName = email;
+        fullName = parseNameFromEmail(email);
       }
     }
+
+    const isCristian = email.includes('guzman');
+
+    let rut = userProfile.rut;
+    if (!rut || (!isCristian && rut === '19.276.735-0')) {
+      rut = seedMatch ? seedMatch.rut : generateSimulatedRut(email);
+    }
+
+    let address = userProfile.address;
+    if (!address || (!isCristian && address === 'Las Moreras 12196')) {
+      address = seedMatch ? seedMatch.address : 'Por actualizar';
+    }
+
+    let phone = userProfile.phone;
+    if (!phone || (!isCristian && phone === '+56 9 3016 6745')) {
+      phone = seedMatch ? seedMatch.phone : '+56 9 0000 0000';
+    }
+
+    const career = userProfile.career || userProfile.carrera || (seedMatch ? seedMatch.career : 'Ingeniería en Informática');
+    const campus = userProfile.campus || userProfile.sede || (seedMatch ? seedMatch.campus : 'Sede Alameda');
 
     const role = userProfile.role || (seedMatch ? seedMatch.role : 'estudiante');
     const roleLabel =
@@ -1113,17 +1238,17 @@ class AuthScraperService {
       hasUsedSimulator,
       simulatorUsageCount,
       lastSimulatorUsage: userProfile.lastSimulatorUsage || null,
-      rut: userProfile.rut || (seedMatch ? seedMatch.rut : '19.276.735-0'),
-      career: userProfile.career || (seedMatch ? seedMatch.career : 'Ingeniería en Informática'),
-      carrera: userProfile.career || (seedMatch ? seedMatch.career : 'Ingeniería en Informática'),
-      campus: userProfile.campus || (seedMatch ? seedMatch.campus : 'Sede Alameda'),
-      sede: userProfile.campus || (seedMatch ? seedMatch.campus : 'Sede Alameda'),
-      address: userProfile.address || (seedMatch ? seedMatch.address : 'Las Moreras 12196'),
-      direccion: userProfile.address || (seedMatch ? seedMatch.address : 'Las Moreras 12196'),
+      rut,
+      career,
+      carrera: career,
+      campus,
+      sede: campus,
+      address,
+      direccion: address,
       personalEmail: userProfile.personalEmail || (seedMatch ? seedMatch.personalEmail : ''),
       emailPersonal: userProfile.personalEmail || (seedMatch ? seedMatch.personalEmail : ''),
-      phone: userProfile.phone || (seedMatch ? seedMatch.phone : '+56 9 3016 6745'),
-      telefonoPersonal: userProfile.phone || (seedMatch ? seedMatch.phone : '+56 9 3016 6745'),
+      phone,
+      telefonoPersonal: phone,
       emergencyContact: userProfile.emergencyContact || (seedMatch ? seedMatch.emergencyContact : 'Contacto Familiar'),
       emergencyPhone: userProfile.emergencyPhone || (seedMatch ? seedMatch.emergencyPhone : '+56 9 1234 5678'),
       tutorParAsignado: userProfile.tutorParAsignado || (seedMatch ? seedMatch.tutorParAsignado : 'Inclusión y Bienestar Duoc UC'),

@@ -318,6 +318,13 @@ exports.updateAccessibility = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const body = req.body || {};
+    const fullName = sanitizeString(body.fullName ?? body.nombre, 120);
+    const nombre = sanitizeString(body.nombre ?? body.fullName, 120);
+    const rut = sanitizeString(body.rut, 20);
+    const career = sanitizeString(body.career ?? body.carrera, 120);
+    const carrera = sanitizeString(body.carrera ?? body.career, 120);
+    const campus = sanitizeString(body.campus ?? body.sede, 80);
+    const sede = sanitizeString(body.sede ?? body.campus, 80);
     const phone = sanitizeString(body.phone ?? body.telefonoPersonal, 30);
     const address = sanitizeString(body.address ?? body.direccion, 200);
     const personalEmail = sanitizeString(body.personalEmail ?? body.emailPersonal, 120);
@@ -326,6 +333,10 @@ exports.updateProfile = async (req, res) => {
     const photo = typeof body.photo === 'string' ? body.photo.trim() : undefined;
 
     const updateFields = {
+      ...(fullName !== undefined ? { fullName, nombre: fullName } : {}),
+      ...(rut !== undefined ? { rut } : {}),
+      ...(career !== undefined ? { career, carrera: career } : {}),
+      ...(campus !== undefined ? { campus, sede: campus } : {}),
       ...(phone !== undefined ? { phone } : {}),
       ...(address !== undefined ? { address } : {}),
       ...(personalEmail !== undefined ? { personalEmail: personalEmail.toLowerCase() } : {}),

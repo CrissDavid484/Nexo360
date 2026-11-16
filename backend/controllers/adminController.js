@@ -314,12 +314,18 @@ exports.getMetrics = async (req, res) => {
 
     const totalUsers = allUsers.length;
     const students = allUsers.filter(
-      (u) => u.role.startsWith('estudiante') || u.role === 'tutor_par'
+      (u) =>
+        u.role.startsWith('estudiante') ||
+        u.role === 'tutor_par' ||
+        u.email === 'c.guzman@duocuc.cl'
     );
     const totalStudents = students.length || 1;
 
-    // Métricas PAEDIS
-    const paedisCount = students.filter((s) => s.isPaedis).length;
+    // Métricas PAEDIS: contabiliza todos los estudiantes registrados con condición PAEDIS en la BD
+    const paedisStudents = students.filter(
+      (s) => s.isPaedis === true || s.role === 'estudiante_paedis'
+    );
+    const paedisCount = paedisStudents.length;
     const paedisPercentage = Math.round((paedisCount / totalStudents) * 100);
 
     // Métricas de Simuladores
@@ -424,7 +430,7 @@ exports.getStudents = async (req, res) => {
     }
 
     if (isPaedis === 'true') {
-      users = users.filter((u) => u.isPaedis === true);
+      users = users.filter((u) => u.isPaedis === true || u.role === 'estudiante_paedis');
     }
 
     // Enriquecer cada estudiante con su cálculo predictivo
@@ -553,6 +559,7 @@ exports.createStudent = async (req, res) => {
       email,
       password: hashedPassword,
       fullName,
+      nombre: fullName,
       photo: body.photo || '',
       rut: body.rut || 'Sin RUT',
       role,
@@ -562,7 +569,9 @@ exports.createStudent = async (req, res) => {
       statusReason,
       attendanceRate,
       career: body.career || 'Ingeniería en Informática',
+      carrera: body.career || 'Ingeniería en Informática',
       campus: body.campus || body.sede || 'Sede Alameda',
+      sede: body.campus || body.sede || 'Sede Alameda',
       address: body.address || 'Por actualizar',
       personalEmail: body.personalEmail || email,
       phone: body.phone || '+56 9 0000 0000',

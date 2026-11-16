@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getStudentDisplayName } from '../../utils/studentUtils';
 import logo03 from '../../assets/logo03.png';
 import {
   HelpCircle,
@@ -99,7 +100,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
     setIsMobileMenuOpen(false);
   };
 
-  const displayName = user?.nombre || user?.fullName || user?.email || 'Cristian Guzmán';
+  const displayName = getStudentDisplayName(user);
   const displayCampus = user?.campus || user?.sede || 'Sede Alameda';
 
   return (

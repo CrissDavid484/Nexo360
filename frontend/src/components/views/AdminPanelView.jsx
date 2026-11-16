@@ -103,6 +103,8 @@ export const AdminPanelView = () => {
   const [statusForm, setStatusForm] = useState({ academicStatus: 'activo', statusReason: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState(null);
+  const [consentAccepted, setConsentAccepted] = useState(true);
+  const [modalError, setModalError] = useState('');
 
   // Formulario de registro - Contraseña dinámica por año ('Duoc' + año + '!')
   const currentYear = new Date().getFullYear();
@@ -213,7 +215,7 @@ export const AdminPanelView = () => {
 
       if (!matchesSearch) return false;
 
-      if (filterStatus === 'paedis') return s.isPaedis === true;
+      if (filterStatus === 'paedis') return Boolean(s.isPaedis) || s.role === 'estudiante_paedis';
       if (filterStatus !== 'all') return s.academicStatus === filterStatus;
 
       return true;
@@ -273,46 +275,64 @@ export const AdminPanelView = () => {
   // Manejo de creación de nuevo usuario con Ley N° 21.719
   const handleCreateUser = async (e) => {
     e.preventDefault();
+    setModalError('');
 
     if (!consentAccepted) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Debe aceptar la declaración de consentimiento y tratamiento de datos personales conforme a la Ley N° 21.719.',
-      });
+      const errText = 'Debe aceptar la declaración de consentimiento y tratamiento de datos personales conforme a la Ley N° 21.719.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
+      return;
+    }
+
+    if (!newUserForm.fullName.trim()) {
+      const errText = 'Por favor, ingresa el nombre completo.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
+      return;
+    }
+
+    if (!newUserForm.email.trim() || !newUserForm.email.includes('@')) {
+      const errText = 'Debe ingresar un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
+      return;
+    }
+
+    if (!newUserForm.rut.trim()) {
+      const errText = 'Por favor, ingresa el RUT del estudiante.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
       return;
     }
 
     // Validaciones de campos requeridos
     if (!newUserForm.role) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Por favor, selecciona un rol institucional.',
-      });
+      const errText = 'Por favor, selecciona un rol institucional.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
       return;
     }
 
-    if (!newUserForm.career.trim()) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Por favor, selecciona una carrera.',
-      });
+    const effectiveCareer = (newUserForm.career || careerQuery || '').trim();
+    if (!effectiveCareer) {
+      const errText = 'Por favor, selecciona o escribe una carrera.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
       return;
     }
 
     if (!newUserForm.campus.trim()) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Por favor, selecciona una sede.',
-      });
+      const errText = 'Por favor, selecciona una sede.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
       return;
     }
 
     // Validación de restricción exclusiva para rol Administrador
     if ((newUserForm.role === 'admin' || newUserForm.role === 'administrador') && !isAdmin) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.',
-      });
+      const errText = 'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
       return;
     }
 
@@ -324,7 +344,7 @@ export const AdminPanelView = () => {
         password: newUserForm.password.trim() || dynamicInitialPassword,
         rut: newUserForm.rut.trim(),
         role: newUserForm.role,
-        career: newUserForm.career.trim(),
+        career: effectiveCareer,
         campus: newUserForm.campus.trim(),
         isPaedis: newUserForm.role === 'estudiante_paedis',
         consentimientoLey21719: {
@@ -356,12 +376,18 @@ export const AdminPanelView = () => {
           campus: '',
         });
         setCareerQuery('');
-        loadAdminData();
+        setModalError('');
+        setConsentAccepted(true);
+        await loadAdminData();
       } else {
-        setFeedbackMessage({ type: 'error', text: res?.message || 'Error al registrar usuario.' });
+        const errText = res?.message || 'Error al registrar usuario.';
+        setModalError(errText);
+        setFeedbackMessage({ type: 'error', text: errText });
       }
     } catch (err) {
-      setFeedbackMessage({ type: 'error', text: 'Error de conexión al registrar usuario.' });
+      const errText = err.message || 'Error de conexión al registrar usuario.';
+      setModalError(errText);
+      setFeedbackMessage({ type: 'error', text: errText });
     } finally {
       setIsSubmitting(false);
     }
@@ -534,6 +560,8 @@ export const AdminPanelView = () => {
                   return;
                 }
                 setIsCreateModalOpen(true);
+                setModalError('');
+                setConsentAccepted(true);
               }}
               disabled={!canManageAdmin}
               aria-disabled={!canManageAdmin}
@@ -876,13 +904,13 @@ export const AdminPanelView = () => {
               <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between">
                 <div className="space-y-1">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    Simulador de Ramos
+                    Uso del Simulador
                   </span>
                   <span className="text-3xl font-black text-slate-950 block tracking-tight">
                     {metrics?.simulatorUsersCount ?? '...'}
                   </span>
                   <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md inline-block">
-                    {metrics?.simulatorUsagePercentage ?? 0}% planificó horario
+                    {metrics?.totalSimulatorInteractions ? `${metrics.totalSimulatorInteractions} sesiones registradas` : `${metrics?.simulatorUsersCount ?? 0} estudiantes activos`}
                   </span>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center shrink-0">
@@ -1223,25 +1251,16 @@ export const AdminPanelView = () => {
                       {isExpanded && (
                         <div className="bg-white rounded-b-2xl border-x-2 border-b-2 border-[#002B49] p-5 sm:p-7 shadow-xl space-y-5 animate-fade-in">
                           {/* Cabecera del Detalle desplegado */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                            <div>
-                              <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mb-1">
-                                Ficha Integral del Estudiante • Nexo360
-                              </span>
-                              <h3 className="text-lg sm:text-xl font-black text-slate-900">
-                                {student.fullName}
-                              </h3>
-                              <span className="text-xs font-bold text-slate-500 block">
-                                {studentSede} • {student.email} • RUT: {student.rut || 'Sin RUT'}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedStudentForDetail(null)}
-                              className="self-start sm:self-center text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
-                            >
-                              ✕ Contraer ficha
-                            </button>
+                          <div className="border-b border-slate-100 pb-3">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mb-1">
+                              Ficha Integral del Estudiante • Nexo360
+                            </span>
+                            <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                              {student.fullName}
+                            </h3>
+                            <span className="text-xs font-bold text-slate-500 block">
+                              {studentSede} • {student.email} • RUT: {student.rut || 'Sin RUT'}
+                            </span>
                           </div>
 
                           {/* Ficha: Carrera, Estado Académico y PAEDIS */}
@@ -1875,13 +1894,30 @@ export const AdminPanelView = () => {
                 <p className="text-[11px] text-slate-600 font-normal leading-relaxed">
                   En cumplimiento de la <strong>Ley N° 21.719 sobre Protección de Datos Personales</strong>, los datos recopilados en Nexo360 tienen como finalidad exclusiva la gestión académica, la asignación de ajustes de accesibilidad PAEDIS y el seguimiento de retención estudiantil. Los datos no se cederán a terceros no autorizados.
                 </p>
-                <div className="flex items-center gap-2 pt-1 text-xs font-medium text-slate-800">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
+                <label className="flex items-start gap-2.5 pt-1 text-xs font-medium text-slate-800 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={consentAccepted}
+                    onChange={(e) => setConsentAccepted(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-[#002B49] rounded border-slate-300 focus:ring-[#002B49] shrink-0"
+                  />
                   <span>
                     Al registrar el usuario, se formaliza la aceptación expresa e informada del tratamiento institucional de sus datos según la Ley N° 21.719.
                   </span>
-                </div>
+                </label>
               </div>
+
+              {/* Mensaje de Error en el Modal */}
+              {modalError && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="p-3.5 bg-red-50 border border-red-300 text-red-900 text-xs font-bold rounded-2xl flex items-center gap-2.5 animate-fade-in"
+                >
+                  <AlertTriangle className="w-4 h-4 text-red-700 shrink-0" aria-hidden="true" />
+                  <span>{modalError}</span>
+                </div>
+              )}
 
               {/* Botones de Acción */}
               <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">

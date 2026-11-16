@@ -72,6 +72,12 @@ const UserProfileSchema = new mongoose.Schema(
       maxlength: 120,
       default: 'Estudiante Duoc UC',
     },
+    nombre: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: '',
+    },
     photo: {
       type: String,
       default: '',
@@ -139,7 +145,7 @@ const UserProfileSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 20,
-      default: '19.276.735-0',
+      default: '',
     },
     career: {
       type: String,
@@ -147,17 +153,29 @@ const UserProfileSchema = new mongoose.Schema(
       maxlength: 120,
       default: 'Ingeniería en Informática',
     },
+    carrera: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: '',
+    },
     campus: {
       type: String,
       trim: true,
       maxlength: 80,
       default: 'Sede Alameda',
     },
+    sede: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: '',
+    },
     address: {
       type: String,
       trim: true,
       maxlength: 200,
-      default: 'Las Moreras 12196',
+      default: 'Por actualizar',
     },
     personalEmail: {
       type: String,
@@ -170,7 +188,7 @@ const UserProfileSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 30,
-      default: '+56 9 3016 6745',
+      default: '+56 9 0000 0000',
     },
     emergencyContact: {
       type: String,

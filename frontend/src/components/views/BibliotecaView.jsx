@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { splitStudentName, getStudentRut } from '../../utils/studentUtils';
 
 const BIBLIOTECA_RESERVA_URL = 'https://bibliotecas.duoc.cl/reserva-sala';
 const BIBLIOTECA_ALAMEDA_URL = 'https://agenda-bibliotecas.duoc.cl/reserve/spaces/alameda';
@@ -46,13 +47,9 @@ export const BibliotecaView = () => {
   const { announce } = useAccessibility();
 
   // Datos coordinados con la sesión real y base de datos
-  const studentEmail = user?.email || user?.vivoStudentProfile?.correo || 'cri.guzmang@duocuc.cl';
-  const studentFullName =
-    user?.vivoStudentProfile?.nombre || user?.nombre || user?.fullName || 'Cristian Guzmán';
-  const nameParts = studentFullName.trim().split(/\s+/);
-  const initialFirstName = nameParts[0] || 'Cristian';
-  const initialLastName = nameParts.slice(1).join(' ') || 'Guzmán';
-  const studentRut = user?.rut || user?.vivoStudentProfile?.rut || '21.987.654-3';
+  const studentEmail = user?.email || user?.vivoStudentProfile?.correo || 'estudiante@duocuc.cl';
+  const { firstName: initialFirstName, lastName: initialLastName } = splitStudentName(user);
+  const studentRut = getStudentRut(user);
 
   // Estados de navegación del simulador (SIN CHECKOUT)
   const [activeTab, setActiveTab] = useState('reserva'); // 'reserva' | 'checkin'
@@ -85,14 +82,13 @@ export const BibliotecaView = () => {
 
   useEffect(() => {
     if (user) {
-      const email = user.email || user.vivoStudentProfile?.correo || 'cri.guzmang@duocuc.cl';
-      const fName = user.vivoStudentProfile?.nombre || user.nombre || user.fullName || 'Cristian Guzmán';
-      const parts = fName.trim().split(/\s+/);
+      const email = user.email || user.vivoStudentProfile?.correo || 'estudiante@duocuc.cl';
+      const { firstName, lastName } = splitStudentName(user);
       setFormData({
-        nombre: parts[0] || 'Cristian',
-        apellido: parts.slice(1).join(' ') || 'Guzmán',
+        nombre: firstName,
+        apellido: lastName,
         email,
-        rut: user.rut || user.vivoStudentProfile?.rut || '21.987.654-3',
+        rut: getStudentRut(user),
       });
     }
   }, [user]);

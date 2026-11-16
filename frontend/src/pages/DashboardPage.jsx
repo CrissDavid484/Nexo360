@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { DUOC_CATEGORIES, INTENT_SHORTCUTS } from '../data/duocModulesData';
 import { VIVO_STUDENT_PROFILE } from '../data/vivoDuocData';
+import { getStudentDisplayName } from '../utils/studentUtils';
 import { ModuleCard } from '../components/dashboard/ModuleCard';
 import { ModuleModal } from '../components/dashboard/ModuleModal';
 import { SearchBar } from '../components/dashboard/SearchBar';
@@ -54,6 +55,7 @@ import {
   FileText,
   Layers,
   Package,
+  X,
 } from 'lucide-react';
 
 const INTENT_ICON_MAP = {
@@ -87,7 +89,7 @@ const PURPOSE_GROUPS = [
 ];
 
 export const DashboardPage = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { announce } = useAccessibility();
   const [activeTab, setActiveTab] = useState('centro-ayuda');
 
@@ -430,13 +432,10 @@ export const DashboardPage = () => {
     };
   }, [searchTerm, purposeFilter]);
 
-  const userName =
-    user?.vivoStudentProfile?.nombre ||
-    user?.nombre ||
-    (user?.fullName && user.fullName !== 'Estudiante Duoc UC' ? user.fullName : null) ||
-    VIVO_STUDENT_PROFILE.nombre;
-  const userCareer = user?.career || user?.carrera || user?.vivoStudentProfile?.carrera || 'Ingeniería en Informática';
-  const userCampus = user?.campus || user?.sede || user?.vivoStudentProfile?.sede || 'Sede Alameda';
+  const isCristian = (user?.email || '').toLowerCase().includes('guzman');
+  const userName = user?.fullName || user?.nombre || getStudentDisplayName(user);
+  const userCareer = user?.career || user?.carrera || (isCristian ? VIVO_STUDENT_PROFILE.carrera : 'Ingeniería en Informática');
+  const userCampus = user?.campus || user?.sede || (isCristian ? VIVO_STUDENT_PROFILE.sede : 'Sede Alameda');
 
   return (
     <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900 transition-colors">
@@ -460,9 +459,9 @@ export const DashboardPage = () => {
             >
               <div className="max-w-3xl">
                 <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 mb-2">
-                  <span>{userCareer}</span>
+                  <span className="font-semibold text-slate-700">{userCareer}</span>
                   <span aria-hidden="true">•</span>
-                  <span>{userCampus}</span>
+                  <span className="font-semibold text-slate-700">{userCampus}</span>
                 </div>
 
                 <h1

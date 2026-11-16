@@ -1,9 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { VIVO_STUDENT_PROFILE } from '../../data/vivoDuocData';
-import { Camera, ShieldCheck, CheckCircle2, X, AlertCircle, HeartHandshake, Pencil } from 'lucide-react';
+import {
+  Camera,
+  ShieldCheck,
+  CheckCircle2,
+  X,
+  AlertCircle,
+  HeartHandshake,
+  Pencil,
+  GraduationCap,
+  MapPin,
+  IdCard,
+} from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import {
+  SEDES_DUOC,
+  CARRERAS_DUOC_LIST,
+  getStudentDisplayName,
+  getStudentRut,
+} from '../../utils/studentUtils';
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -12,24 +29,49 @@ export const PerfilView = () => {
   const { announce } = useAccessibility();
   const { user, updateUser } = useAuth();
 
-  const [profile, setProfile] = useState(() => ({
-    ...VIVO_STUDENT_PROFILE,
-    ...(user || {}),
-    nombre: user?.nombre || user?.fullName || VIVO_STUDENT_PROFILE.nombre,
-    emailDuoc: user?.email || user?.emailDuoc || VIVO_STUDENT_PROFILE.emailDuoc,
-    direccion: user?.direccion || user?.address || VIVO_STUDENT_PROFILE.direccion,
-    telefonoPersonal: user?.telefonoPersonal || user?.phone || VIVO_STUDENT_PROFILE.telefonoPersonal,
-    emailPersonal: user?.emailPersonal || user?.personalEmail || VIVO_STUDENT_PROFILE.emailPersonal,
-    photo: user?.photo || VIVO_STUDENT_PROFILE.photo || '',
-  }));
+  const isCristian = (user?.email || '').toLowerCase().includes('guzman');
+
+  const [profile, setProfile] = useState(() => {
+    const sName = getStudentDisplayName(user);
+    const sRut = getStudentRut(user);
+    const sCareer = user?.career || user?.carrera || (isCristian ? VIVO_STUDENT_PROFILE.carrera : 'Ingeniería en Informática');
+    const sCampus = user?.campus || user?.sede || (isCristian ? VIVO_STUDENT_PROFILE.sede : 'Sede Alameda');
+    const sAddress = user?.direccion || user?.address || (isCristian ? VIVO_STUDENT_PROFILE.direccion : 'Por actualizar');
+    const sPhone = user?.telefonoPersonal || user?.phone || (isCristian ? VIVO_STUDENT_PROFILE.telefonoPersonal : '+56 9 0000 0000');
+    const sPersonalEmail = user?.emailPersonal || user?.personalEmail || (isCristian ? VIVO_STUDENT_PROFILE.emailPersonal : '');
+
+    return {
+      ...(isCristian ? VIVO_STUDENT_PROFILE : {}),
+      ...(user || {}),
+      nombre: sName,
+      fullName: sName,
+      rut: sRut,
+      carrera: sCareer,
+      career: sCareer,
+      sede: sCampus,
+      campus: sCampus,
+      emailDuoc: user?.email || user?.emailDuoc || (isCristian ? VIVO_STUDENT_PROFILE.emailDuoc : 'estudiante@duocuc.cl'),
+      direccion: sAddress,
+      address: sAddress,
+      telefonoPersonal: sPhone,
+      phone: sPhone,
+      emailPersonal: sPersonalEmail,
+      personalEmail: sPersonalEmail,
+      photo: user?.photo || (isCristian ? VIVO_STUDENT_PROFILE.photo : '') || '',
+    };
+  });
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const [editForm, setEditForm] = useState({
-    direccion: profile.direccion,
-    telefonoPersonal: profile.telefonoPersonal,
-    emailPersonal: profile.emailPersonal,
+    fullName: profile.nombre || profile.fullName,
+    rut: profile.rut,
+    career: profile.career || profile.carrera,
+    campus: profile.campus || profile.sede,
+    direccion: profile.direccion || profile.address,
+    telefonoPersonal: profile.telefonoPersonal || profile.phone,
+    emailPersonal: profile.emailPersonal || profile.personalEmail,
   });
   const [saveAlert, setSaveAlert] = useState(false);
   const [photoSuccessAlert, setPhotoSuccessAlert] = useState(false);
@@ -42,28 +84,46 @@ export const PerfilView = () => {
 
   useEffect(() => {
     if (user) {
-      const nextDireccion = user.direccion || user.address || VIVO_STUDENT_PROFILE.direccion;
-      const nextTelefono = user.telefonoPersonal || user.phone || VIVO_STUDENT_PROFILE.telefonoPersonal;
-      const nextEmailPersonal = user.emailPersonal || user.personalEmail || VIVO_STUDENT_PROFILE.emailPersonal;
-      const nextPhoto = user.photo !== undefined ? user.photo : VIVO_STUDENT_PROFILE.photo || '';
+      const sName = getStudentDisplayName(user);
+      const sRut = getStudentRut(user);
+      const sCareer = user.career || user.carrera || (isCristian ? VIVO_STUDENT_PROFILE.carrera : 'Ingeniería en Informática');
+      const sCampus = user.campus || user.sede || (isCristian ? VIVO_STUDENT_PROFILE.sede : 'Sede Alameda');
+      const nextDireccion = user.direccion || user.address || (isCristian ? VIVO_STUDENT_PROFILE.direccion : 'Por actualizar');
+      const nextTelefono = user.telefonoPersonal || user.phone || (isCristian ? VIVO_STUDENT_PROFILE.telefonoPersonal : '+56 9 0000 0000');
+      const nextEmailPersonal = user.emailPersonal || user.personalEmail || (isCristian ? VIVO_STUDENT_PROFILE.emailPersonal : '');
+      const nextPhoto = user.photo !== undefined ? user.photo : (isCristian ? VIVO_STUDENT_PROFILE.photo : '') || '';
 
       setProfile((prev) => ({
         ...prev,
         ...user,
-        nombre: user.nombre || user.fullName || prev.nombre,
+        nombre: sName,
+        fullName: sName,
+        rut: sRut,
+        career: sCareer,
+        carrera: sCareer,
+        campus: sCampus,
+        sede: sCampus,
         emailDuoc: user.email || user.emailDuoc || prev.emailDuoc,
         direccion: nextDireccion,
+        address: nextDireccion,
         telefonoPersonal: nextTelefono,
+        phone: nextTelefono,
         emailPersonal: nextEmailPersonal,
+        personalEmail: nextEmailPersonal,
         photo: nextPhoto || prev.photo,
       }));
+
       setEditForm({
+        fullName: sName,
+        rut: sRut,
+        career: sCareer,
+        campus: sCampus,
         direccion: nextDireccion,
         telefonoPersonal: nextTelefono,
         emailPersonal: nextEmailPersonal,
       });
     }
-  }, [user]);
+  }, [user, isCristian]);
 
   useEffect(() => {
     return () => {
@@ -122,11 +182,18 @@ export const PerfilView = () => {
     setIsSaving(true);
 
     const updatedData = {
+      fullName: editForm.fullName.trim(),
+      nombre: editForm.fullName.trim(),
+      rut: editForm.rut.trim(),
+      career: editForm.career.trim(),
+      carrera: editForm.career.trim(),
+      campus: editForm.campus.trim(),
+      sede: editForm.campus.trim(),
       direccion: editForm.direccion.trim(),
-      telefonoPersonal: editForm.telefonoPersonal.trim(),
-      emailPersonal: editForm.emailPersonal.trim(),
-      phone: editForm.telefonoPersonal.trim(),
       address: editForm.direccion.trim(),
+      telefonoPersonal: editForm.telefonoPersonal.trim(),
+      phone: editForm.telefonoPersonal.trim(),
+      emailPersonal: editForm.emailPersonal.trim(),
       personalEmail: editForm.emailPersonal.trim(),
     };
 
@@ -147,7 +214,7 @@ export const PerfilView = () => {
       setIsSaving(false);
       setIsEditing(false);
       setSaveAlert(true);
-      announce('Datos de contacto actualizados exitosamente.', 'polite');
+      announce('Perfil y datos institucionales actualizados exitosamente.', 'polite');
       editButtonRef.current?.focus();
       setTimeout(() => setSaveAlert(false), 4000);
     }
@@ -279,29 +346,50 @@ export const PerfilView = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100 text-xs sm:text-sm">
               <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
                 <span className="text-slate-500 font-medium block text-xs">Correo institucional</span>
+                <span className="text-slate-900 font-semibold text-sm block mt-0.5 truncate">
+                  {profile.emailDuoc || profile.email}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+                <span className="text-slate-500 font-medium block text-xs">RUT institucional</span>
                 <span className="text-slate-900 font-semibold text-sm block mt-0.5">
-                  {profile.emailDuoc}
+                  {profile.rut}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+                <span className="text-slate-500 font-medium block text-xs">Carrera</span>
+                <span className="text-slate-900 font-semibold text-sm block mt-0.5 truncate">
+                  {profile.career || profile.carrera}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+                <span className="text-slate-500 font-medium block text-xs">Sede institucional</span>
+                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                  {profile.campus || profile.sede}
                 </span>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
                 <span className="text-slate-500 font-medium block text-xs">Dirección particular</span>
                 <span className="text-slate-900 font-semibold text-sm block mt-0.5">
-                  {profile.direccion}
+                  {profile.direccion || profile.address}
                 </span>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
                 <span className="text-slate-500 font-medium block text-xs">Teléfono personal</span>
                 <span className="text-slate-900 font-semibold text-sm block mt-0.5">
-                  {profile.telefonoPersonal}
+                  {profile.telefonoPersonal || profile.phone}
                 </span>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60">
+              <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60 sm:col-span-2">
                 <span className="text-slate-500 font-medium block text-xs">Correo personal</span>
                 <span className="text-slate-900 font-semibold text-sm block mt-0.5">
-                  {profile.emailPersonal}
+                  {profile.emailPersonal || profile.personalEmail || 'Por actualizar'}
                 </span>
               </div>
             </div>
@@ -315,7 +403,7 @@ export const PerfilView = () => {
                 className="min-h-[42px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98]"
               >
                 <Pencil className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
-                <span>Editar datos de contacto</span>
+                <span>Editar datos del perfil, carrera y sede</span>
               </button>
             </div>
           </div>
@@ -431,7 +519,7 @@ export const PerfilView = () => {
         </article>
       )}
 
-      {/* MODAL PARA EDITAR DATOS DE CONTACTO */}
+      {/* MODAL PARA EDITAR DATOS DE PERFIL, CARRERA Y SEDE */}
       {isEditing && (
         <div
           role="dialog"
@@ -444,12 +532,17 @@ export const PerfilView = () => {
         >
           <div
             ref={modalRef}
-            className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-200 animate-scale-in"
+            className="bg-white w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-200 animate-scale-in max-h-[90vh] flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-              <h3 id="modal-edit-profile-title" className="text-lg font-bold text-slate-900">
-                Editar datos de contacto
-              </h3>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4 shrink-0">
+              <div>
+                <h3 id="modal-edit-profile-title" className="text-lg font-bold text-slate-900">
+                  Editar perfil, carrera y sede
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Actualiza tus datos para personalizar las simulaciones académicas.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleCloseModal}
@@ -460,13 +553,77 @@ export const PerfilView = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4">
+            <form onSubmit={handleSave} className="space-y-4 overflow-y-auto pr-1">
+              <div>
+                <label htmlFor="edit-fullname" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Nombre completo
+                </label>
+                <input
+                  ref={firstInputRef}
+                  id="edit-fullname"
+                  type="text"
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="edit-rut" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  RUT del estudiante (ej. 21.987.654-3)
+                </label>
+                <input
+                  id="edit-rut"
+                  type="text"
+                  value={editForm.rut}
+                  onChange={(e) => setEditForm({ ...editForm, rut: e.target.value })}
+                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="edit-career" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Carrera
+                  </label>
+                  <select
+                    id="edit-career"
+                    value={editForm.career}
+                    onChange={(e) => setEditForm({ ...editForm, career: e.target.value })}
+                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                    required
+                  >
+                    {CARRERAS_DUOC_LIST.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="edit-campus" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Sede
+                  </label>
+                  <select
+                    id="edit-campus"
+                    value={editForm.campus}
+                    onChange={(e) => setEditForm({ ...editForm, campus: e.target.value })}
+                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                    required
+                  >
+                    {SEDES_DUOC.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="edit-direccion" className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Dirección particular
                 </label>
                 <input
-                  ref={firstInputRef}
                   id="edit-direccion"
                   type="text"
                   value={editForm.direccion}
@@ -476,32 +633,34 @@ export const PerfilView = () => {
                 />
               </div>
 
-              <div>
-                <label htmlFor="edit-telefono" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Teléfono personal
-                </label>
-                <input
-                  id="edit-telefono"
-                  type="tel"
-                  value={editForm.telefonoPersonal}
-                  onChange={(e) => setEditForm({ ...editForm, telefonoPersonal: e.target.value })}
-                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                  required
-                />
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="edit-telefono" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Teléfono personal
+                  </label>
+                  <input
+                    id="edit-telefono"
+                    type="tel"
+                    value={editForm.telefonoPersonal}
+                    onChange={(e) => setEditForm({ ...editForm, telefonoPersonal: e.target.value })}
+                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label htmlFor="edit-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Correo personal
-                </label>
-                <input
-                  id="edit-email"
-                  type="email"
-                  value={editForm.emailPersonal}
-                  onChange={(e) => setEditForm({ ...editForm, emailPersonal: e.target.value })}
-                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                  required
-                />
+                <div>
+                  <label htmlFor="edit-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Correo personal
+                  </label>
+                  <input
+                    id="edit-email"
+                    type="email"
+                    value={editForm.emailPersonal}
+                    onChange={(e) => setEditForm({ ...editForm, emailPersonal: e.target.value })}
+                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="pt-4 flex justify-end gap-2.5 border-t border-slate-100">
