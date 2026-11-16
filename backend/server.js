@@ -34,16 +34,20 @@ app.use((req, res, next) => {
 // Configuración CORS estricta para desarrollo local y contenedores Docker
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  process.env.FRONTEND_CONTAINER_URL,
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'http://frontend:5173',
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Permitir peticiones same-origin o herramientas internas sin cabecera Origin
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        (process.env.NODE_ENV !== 'production' && origin.endsWith(':5173'))
+      ) {
         return callback(null, true);
       }
       const corsError = new Error('Origen no permitido por la política CORS de Nexo360');
@@ -121,7 +125,9 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  connectDB();
+  connectDB().catch((err) => {
+    console.error('[MongoDB Error] Fallo al conectar en inicio:', err.message);
+  });
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`=========================================================`);
     console.log(`🚀 Nexo360 Backend corriendo en http://0.0.0.0:${PORT}`);

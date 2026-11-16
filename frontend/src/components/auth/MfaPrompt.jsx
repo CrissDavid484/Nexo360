@@ -74,8 +74,10 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
       }
     };
 
-    checkStatus();
-    pollIntervalRef.current = setInterval(checkStatus, 2000);
+    void checkStatus();
+    pollIntervalRef.current = setInterval(() => {
+      void checkStatus();
+    }, 2000);
 
     return () => {
       isMounted = false;

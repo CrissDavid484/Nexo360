@@ -329,7 +329,11 @@ export const PerfilView = () => {
               <span className="text-xs font-semibold text-[#002B49] bg-slate-100 px-3 py-1 rounded-full inline-block mb-2">
                 {profile.isPaedis
                   ? profile.roleLabel || 'Estudiante Regular'
-                  : (profile.roleLabel || 'Estudiante Regular').replace(/\s*•\s*PAEDIS/gi, '')}
+                  : (profile.roleLabel || 'Estudiante Regular')
+                      .replace(' • PAEDIS', '')
+                      .replace('• PAEDIS', '')
+                      .replace('PAEDIS', '')
+                      .trim()}
               </span>
               <h2 id="perfil-view-heading" className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 {profile.nombre}

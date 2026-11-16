@@ -249,11 +249,17 @@ exports.updateAccessibility = async (req, res) => {
         typeof rawPrefs.screenReaderOptimized === 'boolean' ? rawPrefs.screenReaderOptimized : true,
     };
 
-    const targetEmail = req.user.email;
+    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
+    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o correo institucional inválido.',
+      });
+    }
 
     if (mongoose.connection.readyState === 1) {
       const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: targetEmail },
+        { email: { $eq: targetEmail } },
         { $set: { accessibilityPreferences: sanitizedPreferences } },
         { new: true, upsert: true, runValidators: true }
       );
@@ -319,11 +325,17 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    const targetEmail = req.user.email;
+    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
+    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o correo institucional inválido.',
+      });
+    }
 
     if (mongoose.connection.readyState === 1) {
       const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: targetEmail },
+        { email: { $eq: targetEmail } },
         { $set: updateFields },
         { new: true, upsert: true, runValidators: true }
       );
@@ -364,11 +376,17 @@ exports.updatePhoto = async (req, res) => {
     }
 
     const cleanPhoto = photo.trim();
-    const targetEmail = req.user.email;
+    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
+    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o correo institucional inválido.',
+      });
+    }
 
     if (mongoose.connection.readyState === 1) {
       const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: targetEmail },
+        { email: { $eq: targetEmail } },
         { $set: { photo: cleanPhoto } },
         { new: true, upsert: true, runValidators: true }
       );
@@ -471,11 +489,17 @@ exports.saveTomaRamos = async (req, res) => {
           : [],
       }));
 
-    const targetEmail = req.user.email;
+    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
+    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o correo institucional inválido.',
+      });
+    }
 
     if (mongoose.connection.readyState === 1) {
       const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: targetEmail },
+        { email: { $eq: targetEmail } },
         {
           $set: {
             enrolledCourses: sanitizedCourses,

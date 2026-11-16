@@ -173,7 +173,7 @@ export const AccessibilityProvider = ({ children }) => {
           return next;
         });
       });
-      transition.finished.finally(() => {
+      void transition.finished.finally(() => {
         setIsCurtainAnimating(false);
       });
     } else {

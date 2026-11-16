@@ -1166,9 +1166,10 @@ export const CoursesAdminSection = () => {
                   onChange={(e) => canManageCourses && setReplaceCatalog(e.target.checked)}
                   disabled={!canManageCourses}
                   aria-disabled={!canManageCourses}
+                  aria-label="Sobreescribir catálogo anterior (eliminar datos del año previo)"
                   className="w-5 h-5 rounded border-2 border-slate-400 text-[#002B49] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 cursor-pointer"
                 />
-                <div className="text-xs">
+                <span className="text-xs block">
                   <span className="font-black text-slate-900 block">
                     Sobreescribir catálogo anterior (eliminar datos del año previo)
                   </span>
@@ -1176,7 +1177,7 @@ export const CoursesAdminSection = () => {
                     Limpia registros previos en la base de datos para evitar ramos duplicados u
                     obsoletos.
                   </span>
-                </div>
+                </span>
               </label>
 
               <button

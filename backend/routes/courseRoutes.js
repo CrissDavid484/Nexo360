@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
       periodo: periodo || '2026 - 002',
       jornada,
       random: random === 'true' || random === '1',
-      limit: limit ? parseInt(limit, 10) : 8,
+      limit: limit ? Number.parseInt(limit, 10) : 8,
     });
 
     if (format === 'md' || format === 'markdown') {

@@ -24,7 +24,14 @@ async function run() {
   console.log(' [Nexo360] Parseador y Reconstructor Oficial: Alameda 2026-002');
   console.log('===============================================================');
 
-  const targetPath = process.argv[2] || (fs.existsSync(DEFAULT_MD_PATH) ? DEFAULT_MD_PATH : FALLBACK_MD_PATH);
+  let targetPath;
+  if (process.argv[2]) {
+    const rawInput = String(process.argv[2]).trim();
+    const normalized = path.normalize(rawInput).replace(/^(\.\.[\/\\])+/, '');
+    targetPath = path.resolve(normalized);
+  } else {
+    targetPath = fs.existsSync(DEFAULT_MD_PATH) ? DEFAULT_MD_PATH : FALLBACK_MD_PATH;
+  }
 
   if (!fs.existsSync(targetPath)) {
     console.error(`[ERROR] No se encontró el archivo de origen en: ${targetPath}`);

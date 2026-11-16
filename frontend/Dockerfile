@@ -7,11 +7,13 @@ WORKDIR /app
 # Copiar manifiestos de dependencias para caché de capas de Docker
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm install && npm cache clean --force
+# Instalar dependencias con versiones bloqueadas y sin scripts arbitrarios
+RUN npm ci --ignore-scripts && npm cache clean --force
 
-# Copiar código fuente del frontend con permisos para el usuario no-root
-COPY --chown=node:node . .
+# Copiar de forma explícita los archivos y directorios fuente requeridos
+COPY --chown=node:node index.html vite.config.js ./
+COPY --chown=node:node public ./public
+COPY --chown=node:node src ./src
 
 # Asegurar permisos sobre el directorio de caché de Vite para el usuario no-root
 RUN mkdir -p /app/node_modules/.vite && chown -R node:node /app/node_modules

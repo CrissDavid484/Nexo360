@@ -51,8 +51,23 @@ const request = async (path, { method = 'GET', body, auth = true, timeoutMs = DE
   }
 };
 
-export const OFFICIAL_VIVO_DUOC_OAUTH_URL =
-  'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize?client_id=674913e2-e170-4787-833f-e307f87db6e5&nonce=23077c7bfb49e35770b10965bcbb9df5&redirect_uri=https%3A%2F%2Fexperienciavivo.duoc.cl%2Fauth%2Fopenidc%2Fcallback&response_type=code&scope=openid+profile+email+offline_access+api%3A%2F%2F674913e2-e170-4787-833f-e307f87db6e5%2Faccess&state=181261858bac94807f59900cdd53d715&sso_reload=true';
+function buildOfficialVivoDuocAuthUrl() {
+  const envUrl = import.meta.env?.VITE_VIVO_DUOC_OAUTH_URL;
+  if (envUrl) return envUrl;
+  const baseUrl = 'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize';
+  const params = new URLSearchParams({
+    client_id: '674913e2-e170-4787-833f-e307f87db6e5',
+    nonce: '23077c7bfb49e35770b10965bcbb9df5',
+    redirect_uri: 'https://experienciavivo.duoc.cl/auth/openidc/callback',
+    response_type: 'code',
+    scope: 'openid profile email offline_access api://674913e2-e170-4787-833f-e307f87db6e5/access',
+    state: '181261858bac94807f59900cdd53d715',
+    sso_reload: 'true',
+  });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+export const OFFICIAL_VIVO_DUOC_OAUTH_URL = buildOfficialVivoDuocAuthUrl();
 
 export const api = {
   /**

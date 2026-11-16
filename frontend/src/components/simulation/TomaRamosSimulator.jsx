@@ -270,7 +270,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
         };
       setSelectedCarrera(match.nombre);
       setCarreraInfo(match);
-      refreshRandomCourses(match.nombre, selectedDifficulty);
+      void refreshRandomCourses(match.nombre, selectedDifficulty);
     }
   }, [studentCareer]);
 
@@ -324,7 +324,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
   const handleSelectDifficulty = (diffId) => {
     setSelectedDifficulty(diffId);
-    refreshRandomCourses(selectedCarrera, diffId);
+    void refreshRandomCourses(selectedCarrera, diffId);
   };
 
   const handleSelectCarrera = (newCarreraName) => {
@@ -333,7 +333,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
     setCarreraInfo(info);
     setCursosSeleccionados([]);
     setCursosInscritos([]);
-    refreshRandomCourses(newCarreraName);
+    void refreshRandomCourses(newCarreraName);
   };
 
   const diasGrilla = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -364,7 +364,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
   const [personalRecordSeconds, setPersonalRecordSeconds] = useState(() => {
     const saved = localStorage.getItem('nexo360_toma_ramos_record_seconds');
-    return saved ? parseInt(saved, 10) : null;
+    return saved ? Number.parseInt(saved, 10) : null;
   });
   const [isNewRecordBeaten, setIsNewRecordBeaten] = useState(false);
 
@@ -637,7 +637,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
     setIsNewRecordBeaten(false);
 
     if (newRandom) {
-      refreshRandomCourses(selectedCarrera, selectedDifficulty);
+      void refreshRandomCourses(selectedCarrera, selectedDifficulty);
     }
 
     api.saveTomaRamos([]).catch(() => {});

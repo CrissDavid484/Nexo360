@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const CourseOffering = require('../models/CourseOffering');
 const excelParserService = require('./excelParserService');
 
+const escapeRegex = (str) => {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 100);
+};
+
 let alamedaSeedData = null;
 try {
   alamedaSeedData = require('../data/alameda2026Seed.json');
@@ -878,13 +883,16 @@ const courseService = {
    */
   async getCoursesForSimulation({ carrera, periodo = '2026 - 002', jornada, random = false, limit = 8 }) {
     let items = inMemoryCourses;
+    const safeCarrera = typeof carrera === 'string' ? escapeRegex(carrera.trim()) : '';
+    const safePeriodo = typeof periodo === 'string' ? periodo.trim().slice(0, 50) : '2026 - 002';
+    const safeJornada = typeof jornada === 'string' ? escapeRegex(jornada.trim()) : '';
 
     if (mongoose.connection.readyState === 1) {
       try {
         const query = {};
-        if (carrera) query.carrera = new RegExp(carrera.trim(), 'i');
-        if (periodo) query.periodo = periodo;
-        if (jornada) query.jornada = new RegExp(jornada.trim(), 'i');
+        if (safeCarrera) query.carrera = { $regex: safeCarrera, $options: 'i' };
+        if (safePeriodo) query.periodo = { $eq: safePeriodo };
+        if (safeJornada) query.jornada = { $regex: safeJornada, $options: 'i' };
         items = await CourseOffering.find(query).lean();
       } catch (e) {
         // fallback
@@ -1009,11 +1017,12 @@ const courseService = {
       inMemoryCourses = [...inMemoryCourses, ...normalized];
     }
 
+    const safePeriodo = typeof periodo === 'string' ? periodo.trim().slice(0, 50) : '2026 - 002';
     if (mongoose.connection.readyState === 1) {
       try {
         if (replace) {
           // Limpia asignaturas del período (o todo) para evitar duplicados entre años
-          await CourseOffering.deleteMany({ periodo });
+          await CourseOffering.deleteMany({ periodo: { $eq: safePeriodo } });
         }
         for (let i = 0; i < normalized.length; i += 1000) {
           const chunk = normalized.slice(i, i + 1000);
@@ -1034,7 +1043,7 @@ const courseService = {
       seccionesImportadas: normalized.length,
       asignaturasUnicas: uniqueSiglas.size,
       carrerasDetectadas: Array.from(uniqueCarreras),
-      periodo,
+      periodo: safePeriodo,
       reemplazado: replace,
     };
   },
@@ -1044,11 +1053,14 @@ const courseService = {
    */
   async exportToMarkdown({ carrera, periodo = '2026 - 002' } = {}) {
     let items = inMemoryCourses;
+    const safeCarrera = typeof carrera === 'string' ? escapeRegex(carrera.trim()) : '';
+    const safePeriodo = typeof periodo === 'string' ? periodo.trim().slice(0, 50) : '2026 - 002';
+
     if (mongoose.connection.readyState === 1) {
       try {
         const q = {};
-        if (carrera) q.carrera = new RegExp(carrera.trim(), 'i');
-        if (periodo) q.periodo = periodo;
+        if (safeCarrera) q.carrera = { $regex: safeCarrera, $options: 'i' };
+        if (safePeriodo) q.periodo = { $eq: safePeriodo };
         items = await CourseOffering.find(q).lean();
       } catch (e) {}
     }

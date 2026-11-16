@@ -4,18 +4,22 @@ FROM node:20-alpine
 # Directorio de trabajo de la aplicación
 WORKDIR /app
 
-# Evitar descarga innecesaria de Chromium pesado durante el build en contenedor
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_SKIP_DOWNLOAD=true
-
 # Copiar manifiestos de dependencias primero para aprovechar caché de capas de Docker
 COPY package*.json ./
 
-# Instalar dependencias de producción de forma limpia
-RUN npm install --omit=dev && npm cache clean --force
+# Instalar dependencias de producción bloqueando versiones y previniendo ejecución de scripts
+RUN npm ci --ignore-scripts --omit=dev && npm cache clean --force
 
-# Copiar código fuente del backend y asignar permisos al usuario sin privilegios (node)
-COPY --chown=node:node . .
+# Copiar de forma explícita los directorios y archivos necesarios para evitar filtrado de archivos sensibles
+COPY --chown=node:node server.js ./
+COPY --chown=node:node config ./config
+COPY --chown=node:node controllers ./controllers
+COPY --chown=node:node data ./data
+COPY --chown=node:node middleware ./middleware
+COPY --chown=node:node models ./models
+COPY --chown=node:node routes ./routes
+COPY --chown=node:node scripts ./scripts
+COPY --chown=node:node services ./services
 
 # Seguridad: Ejecutar el contenedor con usuario no-root
 USER node

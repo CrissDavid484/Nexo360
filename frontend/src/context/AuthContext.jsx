@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    verifyExistingAuth();
+    void verifyExistingAuth();
     return () => {
       isMounted = false;
     };

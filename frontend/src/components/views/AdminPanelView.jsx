@@ -171,7 +171,7 @@ export const AdminPanelView = () => {
   };
 
   useEffect(() => {
-    loadAdminData();
+    void loadAdminData();
   }, []);
 
   // Carreras y Sedes ordenadas alfabéticamente
@@ -282,7 +282,7 @@ export const AdminPanelView = () => {
           });
         }
 
-        loadAdminData();
+        await loadAdminData();
       } else {
         setFeedbackMessage({ type: 'error', text: res?.message || 'Error al actualizar estado.' });
       }
@@ -434,7 +434,7 @@ export const AdminPanelView = () => {
         if (selectedStudentForDetail && (selectedStudentForDetail._id === student._id || selectedStudentForDetail.id === student.id)) {
           setSelectedStudentForDetail(null);
         }
-        loadAdminData();
+        await loadAdminData();
       } else {
         setFeedbackMessage({
           type: 'error',

@@ -491,8 +491,16 @@ function parseStandardMarkdown(lines, defaultPeriodo) {
  */
 async function wipePeriodData(periodo) {
   if (mongoose.connection.readyState === 1) {
-    const result = await CourseOffering.deleteMany({ periodo });
-    console.log(`[excelParserService] Eliminadas ${result.deletedCount} asignaturas del período "${periodo}"`);
+    const safePeriodo =
+      typeof periodo === 'string'
+        ? periodo.trim().replace(/[\r\n\x00-\x1F]/g, '').slice(0, 50)
+        : '2026 - 002';
+    const result = await CourseOffering.deleteMany({ periodo: { $eq: safePeriodo } });
+    console.log(
+      `[excelParserService] Eliminadas ${result.deletedCount} asignaturas del período "${encodeURIComponent(
+        safePeriodo
+      )}"`
+    );
     return result;
   }
   return { deletedCount: 0, inMemoryOnly: true };

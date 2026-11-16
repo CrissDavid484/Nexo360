@@ -142,7 +142,7 @@ export function generateSimulatedRut(email = '') {
   const str = (email || '').toLowerCase().trim();
   for (let i = 0; i < str.length; i++) {
     hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
+    hash = Math.trunc(hash);
   }
   const positiveHash = Math.abs(hash);
   const minNumber = 20000000;

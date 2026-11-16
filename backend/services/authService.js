@@ -8,8 +8,24 @@ const { SEED_USERS, DEFAULT_SEED_PASSWORD } = require('../data/seedUsers');
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]{1,64}@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/i;
 
-const OFFICIAL_VIVO_DUOC_OAUTH_URL =
-  'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize?client_id=674913e2-e170-4787-833f-e307f87db6e5&nonce=23077c7bfb49e35770b10965bcbb9df5&redirect_uri=https%3A%2F%2Fexperienciavivo.duoc.cl%2Fauth%2Fopenidc%2Fcallback&response_type=code&scope=openid+profile+email+offline_access+api%3A%2F%2F674913e2-e170-4787-833f-e307f87db6e5%2Faccess&state=181261858bac94807f59900cdd53d715&sso_reload=true';
+function buildOfficialVivoDuocAuthUrl() {
+  if (process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL) {
+    return process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL;
+  }
+  const baseUrl = 'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize';
+  const params = new URLSearchParams({
+    client_id: process.env.VIVO_DUOC_CLIENT_ID || '674913e2-e170-4787-833f-e307f87db6e5',
+    nonce: '23077c7bfb49e35770b10965bcbb9df5',
+    redirect_uri: 'https://experienciavivo.duoc.cl/auth/openidc/callback',
+    response_type: 'code',
+    scope: 'openid profile email offline_access api://674913e2-e170-4787-833f-e307f87db6e5/access',
+    state: '181261858bac94807f59900cdd53d715',
+    sso_reload: 'true',
+  });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+const OFFICIAL_VIVO_DUOC_OAUTH_URL = buildOfficialVivoDuocAuthUrl();
 
 // Respaldo en memoria exclusivo si MongoDB no estuviese disponible
 const inMemoryUsers = new Map();
@@ -48,7 +64,7 @@ function generateSimulatedRut(email = '') {
   const str = (email || '').toLowerCase().trim();
   for (let i = 0; i < str.length; i++) {
     hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
+    hash = Math.trunc(hash);
   }
   const positiveHash = Math.abs(hash);
   const minNumber = 20000000;
