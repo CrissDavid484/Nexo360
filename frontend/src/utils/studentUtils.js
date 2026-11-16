@@ -211,24 +211,16 @@ export function parseDuocEmailToName(email = '') {
 }
 
 /**
- * Obtiene el nombre completo del estudiante evitando mostrar correos en crudo
+ * Obtiene el nombre completo del estudiante directamente desde la base de datos
  */
 export function getStudentDisplayName(user = {}) {
   if (!user) return 'Estudiante Duoc UC';
   const email = (user.email || user.emailDuoc || '').toLowerCase();
-  const rawName = user.fullName || user.nombre || user.vivoStudentProfile?.nombre;
+  const rawName = user.fullName || user.nombre;
 
-  // Prioridad 1: Si el usuario tiene su nombre guardado en la BD (distinto a email), usarlo directamente
+  // Si el usuario tiene su nombre guardado en la BD (distinto a email o default), usarlo directamente
   if (rawName && !rawName.includes('@') && rawName !== 'Estudiante Duoc UC') {
     return rawName;
-  }
-
-  if (email.includes('guzman')) {
-    return 'Cristian Guzmán';
-  }
-
-  if (email.includes('ordenes')) {
-    return 'Angelo Órdenes';
   }
 
   if (email) {
@@ -259,23 +251,13 @@ export function splitStudentName(user = {}) {
 }
 
 /**
- * Obtiene el RUT del estudiante evitando sobreescribir con el RUT personal de Cristian
+ * Obtiene el RUT del estudiante directamente desde la base de datos
  */
 export function getStudentRut(user = {}) {
+  if (user?.rut && typeof user.rut === 'string' && user.rut.trim()) {
+    return user.rut.trim();
+  }
+
   const email = (user?.email || user?.emailDuoc || '').toLowerCase();
-  const isCristian = email.includes('guzman');
-
-  if (user?.rut && (isCristian || user.rut !== '19.276.735-0')) {
-    return user.rut;
-  }
-
-  if (user?.vivoStudentProfile?.rut && (isCristian || user.vivoStudentProfile.rut !== '19.276.735-0')) {
-    return user.vivoStudentProfile.rut;
-  }
-
-  if (isCristian) {
-    return '19.276.735-0';
-  }
-
   return email ? generateSimulatedRut(email) : '21.987.654-3';
 }

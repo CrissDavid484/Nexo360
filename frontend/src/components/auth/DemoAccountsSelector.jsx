@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  UserCheck,
   ChevronDown,
   ChevronUp,
   Sparkles,
   Shield,
-  User,
   GraduationCap,
   Laptop,
-  Database,
   Check,
-  KeyRound,
   Users,
 } from 'lucide-react';
 import { api } from '../../services/api';
@@ -20,8 +16,7 @@ import { api } from '../../services/api';
  * MÓDULO DE PERFILES Y ESTUDIANTES DE PRUEBA DE LA BASE DE DATOS (NEXO360)
  * =========================================================================
  * Conectado en tiempo real a MongoDB (/api/auth/users).
- * Permite autocompletar credenciales institucionales de prueba (correo y clave)
- * para evaluar diferentes roles, perfiles PAEDIS, alertas de retención y docencia.
+ * Diseño minimalista, pulcro y ligero para autocompletar credenciales de prueba.
  */
 
 const FALLBACK_USERS = [
@@ -41,7 +36,7 @@ const FALLBACK_USERS = [
     roleLabel: 'Estudiante Regular Duoc UC',
     isPaedis: false,
     academicStatus: 'activo',
-    badge: 'Analista Programador',
+    badge: 'Estudiante',
   },
   {
     email: 'd.rojas@duocuc.cl',
@@ -77,7 +72,7 @@ const FALLBACK_USERS = [
     roleLabel: 'Egresado Titulado',
     isPaedis: false,
     academicStatus: 'titulado',
-    badge: 'Titulado 2026',
+    badge: 'Titulado',
   },
   {
     email: 'j.perez@duocuc.cl',
@@ -99,7 +94,7 @@ const FALLBACK_USERS = [
   },
   {
     email: 'cri.guzmang@duocuc.cl',
-    fullName: 'Cristian Guzmán',
+    fullName: 'Cristian Guzmán G.',
     role: 'estudiante_paedis',
     roleLabel: 'Estudiante PAEDIS',
     isPaedis: true,
@@ -149,7 +144,7 @@ const FALLBACK_USERS = [
     roleLabel: 'Coordinadora PAEDIS',
     isPaedis: true,
     academicStatus: 'activo',
-    badge: 'Coordinación PAEDIS',
+    badge: 'Coord. PAEDIS',
   },
   {
     email: 'c.herrera@duoc.cl',
@@ -173,8 +168,8 @@ const FALLBACK_USERS = [
 
 export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) => {
   const [dbUsers, setDbUsers] = useState(FALLBACK_USERS);
-  const [activeFilter, setActiveFilter] = useState('estudiantes'); // 'estudiantes' | 'todos' | 'personal'
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('estudiantes'); // 'estudiantes' | 'personal' | 'todos'
+  const [isExpanded, setIsExpanded] = useState(false);
   const [fromDatabase, setFromDatabase] = useState(false);
 
   useEffect(() => {
@@ -184,11 +179,10 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
       .then((res) => {
         if (!isMounted) return;
         if (res?.success && Array.isArray(res.users) && res.users.length > 0) {
-          // Normalizar usuarios de la BD
           const formatted = res.users.map((u) => {
             const role = u.role || 'estudiante';
             let badge = 'Estudiante';
-            if (u.isPaedis) badge = 'PAEDIS Activa';
+            if (u.isPaedis) badge = 'PAEDIS';
             else if (role === 'admin') badge = 'Admin';
             else if (role === 'profesor') badge = 'Docente';
             else if (role === 'tutor_par') badge = 'Tutor Par';
@@ -220,25 +214,39 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
   }, []);
 
   const filteredUsers = useMemo(() => {
+    let list = dbUsers;
     if (activeFilter === 'estudiantes') {
-      return dbUsers.filter(
+      list = dbUsers.filter(
         (u) =>
           u.role.includes('estudiante') ||
           u.role.includes('tutor') ||
           u.isPaedis ||
-          u.email.includes('guzman') ||
           !['profesor', 'director', 'subdirector', 'administrativo'].includes(u.role)
       );
-    }
-    if (activeFilter === 'personal') {
-      return dbUsers.filter((u) =>
+    } else if (activeFilter === 'personal') {
+      list = dbUsers.filter((u) =>
         ['admin', 'profesor', 'director', 'subdirector', 'coordinador_paedis', 'administrativo'].includes(
           u.role
         )
       );
     }
-    return dbUsers;
+    // Orden alfabético estricto de A a Z
+    return [...list].sort((a, b) => {
+      const nameA = (a.fullName || a.nombre || a.email || '').trim();
+      const nameB = (b.fullName || b.nombre || b.email || '').trim();
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+    });
   }, [dbUsers, activeFilter]);
+
+  const studentCount = useMemo(() => {
+    return dbUsers.filter(
+      (u) =>
+        u.role.includes('estudiante') ||
+        u.role.includes('tutor') ||
+        u.isPaedis ||
+        !['profesor', 'director', 'subdirector', 'administrativo'].includes(u.role)
+    ).length;
+  }, [dbUsers]);
 
   const handleSelectUser = (user) => {
     onSelectAccount({
@@ -251,67 +259,55 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
     if (isPaedis) return <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
     if (role === 'admin') return <Shield className="w-3.5 h-3.5 text-blue-600 shrink-0" />;
     if (role === 'profesor') return <Laptop className="w-3.5 h-3.5 text-emerald-600 shrink-0" />;
-    return <GraduationCap className="w-3.5 h-3.5 text-slate-600 shrink-0" />;
+    return <GraduationCap className="w-3.5 h-3.5 text-slate-500 shrink-0" />;
   };
-
-  const studentCount = useMemo(() => {
-    return dbUsers.filter(
-      (u) =>
-        u.role.includes('estudiante') ||
-        u.role.includes('tutor') ||
-        u.isPaedis ||
-        u.email.includes('guzman')
-    ).length;
-  }, [dbUsers]);
 
   return (
     <div
       role="region"
-      aria-label="Cuentas de prueba institucionales de la base de datos"
-      className="mt-4 pt-3 border-t border-slate-200"
+      aria-label="Cuentas de prueba institucionales"
+      className="mt-3 pt-3 border-t border-slate-200/80"
     >
-      {/* Encabezado colapsable */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <button
-          type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 text-left group cursor-pointer"
-          aria-expanded={isExpanded}
-        >
-          <div className="w-5 h-5 rounded-md bg-[#002B49] text-[#FFB81C] flex items-center justify-center">
-            <Users className="w-3 h-3" />
-          </div>
-          <span className="text-xs font-bold text-slate-800 group-hover:text-[#002B49] transition-colors">
-            Estudiantes y Cuentas de Prueba
+      {/* Botón trigger minimalista y elegante */}
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors text-xs font-medium cursor-pointer border border-slate-200/70"
+        aria-expanded={isExpanded}
+      >
+        <div className="flex items-center gap-2">
+          <Users className="w-3.5 h-3.5 text-[#002B49]" />
+          <span className="font-semibold text-slate-800">
+            Cuentas de prueba institucionales
           </span>
-          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200">
-            {fromDatabase ? 'Base de Datos' : 'Institucional'} ({dbUsers.length})
+          <span className="text-[10px] font-semibold text-slate-500 bg-white px-1.5 py-0.2 rounded-full border border-slate-200">
+            {fromDatabase ? 'BD' : 'Demo'} ({dbUsers.length})
           </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+          <span>Duoc2026!</span>
           {isExpanded ? (
-            <ChevronUp className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
+            <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
           )}
-        </button>
+        </div>
+      </button>
 
-        <span className="text-[10px] font-medium text-slate-400">
-          Clave: <strong className="text-slate-600">Duoc2026!</strong>
-        </span>
-      </div>
-
+      {/* Lista minimalista desplegable */}
       {isExpanded && (
-        <div className="space-y-2 animate-fade-in">
-          {/* Píldoras de filtro */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1" role="tablist">
+        <div className="mt-2 space-y-2 animate-fade-in">
+          {/* Filtros sutiles en texto */}
+          <div className="flex items-center gap-1 pb-1 border-b border-slate-100" role="tablist">
             <button
               type="button"
               role="tab"
               aria-selected={activeFilter === 'estudiantes'}
               onClick={() => setActiveFilter('estudiantes')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors whitespace-nowrap cursor-pointer ${
+              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                 activeFilter === 'estudiantes'
-                  ? 'bg-[#002B49] text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  ? 'bg-[#002B49] text-white'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               Estudiantes ({studentCount})
@@ -319,60 +315,36 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
             <button
               type="button"
               role="tab"
-              aria-selected={activeFilter === 'todos'}
-              onClick={() => setActiveFilter('todos')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors whitespace-nowrap cursor-pointer ${
-                activeFilter === 'todos'
-                  ? 'bg-[#002B49] text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }`}
-            >
-              Todos ({dbUsers.length})
-            </button>
-            <button
-              type="button"
-              role="tab"
               aria-selected={activeFilter === 'personal'}
               onClick={() => setActiveFilter('personal')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors whitespace-nowrap cursor-pointer ${
+              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                 activeFilter === 'personal'
-                  ? 'bg-[#002B49] text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  ? 'bg-[#002B49] text-white'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               Docentes / Admin ({dbUsers.length - studentCount})
             </button>
-          </div>
-
-          {/* Selector desplegable rápido para accesibilidad / teclado */}
-          <div className="relative">
-            <select
-              id="demo-user-selector"
-              value={selectedEmail}
-              onChange={(e) => {
-                const found = dbUsers.find((u) => u.email === e.target.value);
-                if (found) handleSelectUser(found);
-              }}
-              aria-label="Seleccionar cuenta de prueba para autocompletar"
-              className="w-full min-h-[34px] pl-2.5 pr-7 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#002B49] cursor-pointer appearance-none"
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeFilter === 'todos'}
+              onClick={() => setActiveFilter('todos')}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                activeFilter === 'todos'
+                  ? 'bg-[#002B49] text-white'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+              }`}
             >
-              <option value="">-- Elige un usuario para autocompletar --</option>
-              {filteredUsers.map((u) => (
-                <option key={u.email} value={u.email}>
-                  {u.fullName} — {u.badge || u.roleLabel} ({u.email})
-                </option>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400">
-              <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
-            </div>
+              Todos ({dbUsers.length})
+            </button>
           </div>
 
-          {/* Rejilla de tarjetas clickeables con los estudiantes de la Base de Datos */}
+          {/* Lista minimalista de fila única */}
           <div
             role="list"
-            aria-label="Lista de estudiantes y perfiles de prueba"
-            className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[190px] overflow-y-auto pr-1"
+            aria-label="Lista de cuentas de prueba institucionales"
+            className="max-h-[195px] overflow-y-auto space-y-1 pr-0.5 divide-y divide-slate-100/80"
           >
             {filteredUsers.map((u) => {
               const isSelected = selectedEmail.toLowerCase() === u.email.toLowerCase();
@@ -382,50 +354,60 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
                   type="button"
                   onClick={() => handleSelectUser(u)}
                   aria-pressed={isSelected}
-                  className={`p-2 rounded-xl border text-left transition-all flex items-start gap-2 cursor-pointer ${
+                  className={`w-full pt-1.5 pb-1 px-2 rounded-lg text-left transition-colors flex items-center justify-between gap-2 cursor-pointer ${
                     isSelected
-                      ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs ring-2 ring-amber-400'
-                      : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-300'
+                      ? 'bg-amber-50/80 text-slate-900 ring-1 ring-amber-300'
+                      : 'hover:bg-slate-50 text-slate-700'
                   }`}
                 >
-                  <div className="mt-0.5">{getRoleIcon(u.role, u.isPaedis)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-bold truncate block">
-                        {u.fullName}
-                      </span>
-                      {isSelected && (
-                        <Check className="w-3.5 h-3.5 text-[#FFB81C] shrink-0" aria-hidden="true" />
-                      )}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="shrink-0">
+                      {getRoleIcon(u.role, u.isPaedis)}
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md truncate ${
-                          isSelected
-                            ? 'bg-white/20 text-[#FFB81C]'
-                            : u.isPaedis
-                            ? 'bg-amber-100 text-amber-900'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {u.badge || u.roleLabel}
-                      </span>
-                      <span
-                        className={`text-[10px] truncate ${
-                          isSelected ? 'text-slate-300' : 'text-slate-400'
-                        }`}
-                      >
-                        {u.email.split('@')[0]}
-                      </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-slate-800 truncate">
+                          {u.fullName}
+                        </span>
+                        <span
+                          className={`text-[9px] font-medium px-1.5 py-0.2 rounded shrink-0 ${
+                            u.isPaedis
+                              ? 'bg-amber-100 text-amber-900'
+                              : u.role === 'admin'
+                              ? 'bg-blue-100 text-blue-800'
+                              : u.role === 'profesor'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {u.badge || u.roleLabel}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-mono truncate">
+                        {u.email}
+                      </p>
                     </div>
+                  </div>
+
+                  <div className="shrink-0">
+                    {isSelected ? (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 bg-amber-100/90 px-1.5 py-0.2 rounded">
+                        <Check className="w-3 h-3 text-amber-700" />
+                        <span>Listo</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 hover:text-slate-600">
+                        Usar
+                      </span>
+                    )}
                   </div>
                 </button>
               );
             })}
           </div>
 
-          <p className="text-[10px] text-slate-500 font-medium text-center pt-0.5">
-            Haz clic en cualquier estudiante o cuenta para rellenar correo y contraseña automáticamente.
+          <p className="text-[10px] text-slate-400 text-center pt-0.5">
+            Selecciona una cuenta para autocompletar correo y contraseña.
           </p>
         </div>
       )}

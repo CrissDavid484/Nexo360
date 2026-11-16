@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Eye,
   EyeOff,
@@ -6,15 +6,9 @@ import {
   AlertCircle,
   KeyRound,
   Mail,
-  ExternalLink,
   ShieldCheck,
-  Smartphone,
-  CheckCircle2,
-  X,
-  Bot,
-  RotateCcw,
 } from 'lucide-react';
-import { api, OFFICIAL_VIVO_DUOC_OAUTH_URL } from '../../services/api';
+import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { DemoAccountsSelector } from './DemoAccountsSelector';
 
@@ -28,32 +22,13 @@ const MicrosoftLogo = () => (
 );
 
 export const LoginForm = ({ onDirectSuccess }) => {
-  const [email, setEmail] = useState('c.guzman@duocuc.cl');
-  const [password, setPassword] = useState('Duoc2026!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSsoLoading, setIsSsoLoading] = useState(false);
-  const [interactiveSession, setInteractiveSession] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
-  const authWindowRef = useRef(null);
   const { announce } = useAccessibility();
-
-  const officialOAuthUrl = api.getOfficialOAuthUrl(email);
-
-  // Monitoreo del estado de la ventana abierta de Vivo Duoc
-  useEffect(() => {
-    if (!interactiveSession || interactiveSession.phase !== 'waiting_login') return;
-
-    const intervalId = setInterval(() => {
-      // Si el usuario finalizó el login y la ventana fue cerrada por Microsoft o por él
-      if (authWindowRef.current && authWindowRef.current.closed) {
-        clearInterval(intervalId);
-        handleConfirmAndRunScraper(interactiveSession.cleanEmail);
-      }
-    }, 1200);
-
-    return () => clearInterval(intervalId);
-  }, [interactiveSession?.phase, interactiveSession?.cleanEmail]);
 
   const handleQuickSelect = (user) => {
     setEmail(user.email);
@@ -65,122 +40,17 @@ export const LoginForm = ({ onDirectSuccess }) => {
   };
 
   /**
-   * 1. ABRE REALMENTE VIVO DUOC EN EL NAVEGADOR (OAuth Microsoft)
-   * La ventana permanece abierta hasta que el usuario confirme su login o apruebe MFA
+   * Inicio de sesión institucional instantáneo mediante Microsoft SSO contra MongoDB
    */
-  const handleMicrosoftSso = () => {
+  const handleMicrosoftSso = async () => {
     setErrorMessage('');
     const cleanEmail = email.trim().toLowerCase() || 'c.guzman@duocuc.cl';
 
-    announce('Abriendo ventana oficial de Microsoft Vivo Duoc...', 'polite');
-
-    // Abre la ventana de login oficial de forma síncrona en el navegador del usuario
-    try {
-      const authWin = window.open(
-        officialOAuthUrl,
-        'VivoDuocOAuthWindow',
-        'width=680,height=780,left=300,top=60,resizable=yes,scrollbars=yes,status=yes'
-      );
-      authWindowRef.current = authWin;
-    } catch (openErr) {
-      console.warn('Aviso abriendo ventana emergente:', openErr);
-    }
-
-    setInteractiveSession({
-      phase: 'waiting_login',
-      stepDescription:
-        'Ventana oficial de Vivo Duoc abierta. Inicia sesión con tus credenciales y aprueba tu autenticación multifactor (MFA).',
-      activeBotStep: 1,
-      officialUrl: officialOAuthUrl,
-      cleanEmail,
-    });
-  };
-
-  /**
-   * 2. CIERRA LA VENTANA Y EJECUTA EL BOT EN SEGUNDO PLANO
-   * El robot captura nombre, apellidos, ramos y % de asistencia, persistiendo en MongoDB
-   */
-  const handleConfirmAndRunScraper = async (userEmail) => {
-    const cleanEmail = (userEmail || email || 'c.guzman@duocuc.cl').trim().toLowerCase();
-
-    // Cierra la ventana emergente de Vivo Duoc
-    if (authWindowRef.current && !authWindowRef.current.closed) {
-      try {
-        authWindowRef.current.close();
-      } catch {}
-    }
-    authWindowRef.current = null;
-
-    // Pasa inmediatamente a modo robot en segundo plano
-    setInteractiveSession({
-      phase: 'scraping_background',
-      stepDescription: 'Ventana cerrada. Robot Puppeteer ejecutándose en segundo plano...',
-      activeBotStep: 1,
-      cleanEmail,
-    });
     setIsSsoLoading(true);
-    announce(
-      'Ventana cerrada. Bot Puppeteer capturando nombre y asistencias en segundo plano...',
-      'polite'
-    );
-
-    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    announce('Iniciando sesión institucional con cuenta Microsoft Duoc UC...', 'polite');
 
     try {
-      // Paso 1: Conexión con Vivo Duoc autenticado
-      await delay(400);
-      setInteractiveSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              activeBotStep: 2,
-              stepDescription: 'Capturando perfil de usuario y nombre en segundo plano...',
-            }
-          : prev
-      );
-
-      // Paso 2: Perfil y nombre
-      await delay(600);
-      setInteractiveSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              activeBotStep: 3,
-              stepDescription: 'Navegando a https://experienciavivo.duoc.cl/alumnos/asistencias...',
-            }
-          : prev
-      );
-
-      // Paso 3 & 4: Navegación a asistencias y extracción de cursos y %
-      await delay(600);
-      setInteractiveSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              activeBotStep: 4,
-              stepDescription:
-                'Extrayendo asignaturas y asistencias (Capstone: 27 clases, 24 asistidas, 88.9%)...',
-            }
-          : prev
-      );
-
-      // Llamada real a Nexo360 backend (MongoDB persistence & attendance rates)
       const res = await api.ssoLogin(cleanEmail);
-
-      // Paso 5: Persistencia en MongoDB y cálculo predictivo
-      await delay(500);
-      setInteractiveSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              activeBotStep: 5,
-              stepDescription:
-                'Guardando en base de datos MongoDB y evaluando semáforo predictivo de deserción...',
-            }
-          : prev
-      );
-
-      await delay(400);
 
       if (res?.success && res.token && res.user) {
         announce(
@@ -189,42 +59,18 @@ export const LoginForm = ({ onDirectSuccess }) => {
         );
         onDirectSuccess(res.token, res.user);
       } else {
-        throw new Error(res?.message || 'Error al iniciar sesión tras scraping.');
+        throw new Error(res?.message || 'Error al iniciar sesión institucional.');
       }
     } catch (err) {
-      console.error('Error en extracción en segundo plano:', err);
-      setErrorMessage(err.message || 'Error al sincronizar datos con Vivo Duoc.');
-      setInteractiveSession(null);
+      console.error('Error en SSO Microsoft:', err);
+      setErrorMessage(err.message || 'Error al conectar con la base de datos institucional.');
       setIsSsoLoading(false);
     }
   };
 
-  const handleCancelInteractive = () => {
-    if (authWindowRef.current && !authWindowRef.current.closed) {
-      try {
-        authWindowRef.current.close();
-      } catch {}
-    }
-    authWindowRef.current = null;
-    setInteractiveSession(null);
-    setIsSsoLoading(false);
-    announce('Sesión interactiva cancelada', 'polite');
-  };
-
-  const handleReopenWindow = () => {
-    try {
-      const authWin = window.open(
-        officialOAuthUrl,
-        'VivoDuocOAuthWindow',
-        'width=680,height=780,left=300,top=60,resizable=yes,scrollbars=yes,status=yes'
-      );
-      authWindowRef.current = authWin;
-      announce('Ventana oficial reabierta', 'polite');
-    } catch (e) {
-      console.warn('Error reabriendo ventana:', e);
-    }
-  };
-
+  /**
+   * Inicio de sesión institucional nativo con correo y contraseña cifrada (bcrypt)
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -276,71 +122,28 @@ export const LoginForm = ({ onDirectSuccess }) => {
           </p>
         </div>
 
-        {/* Panel Interactivo Puppeteer (solo activo cuando se usa SSO) */}
-        {interactiveSession && (
-          <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl text-xs space-y-2.5 animate-fade-in">
-            {interactiveSession.phase === 'waiting_login' ? (
+        {/* Botón Acceso Vivo Duoc (Microsoft) */}
+        <div>
+          <button
+            type="button"
+            onClick={handleMicrosoftSso}
+            disabled={isSsoLoading || isLoading}
+            aria-busy={isSsoLoading}
+            className="w-full min-h-[46px] px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 transition-colors shadow-2xs flex items-center justify-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer disabled:opacity-60"
+          >
+            {isSsoLoading ? (
               <>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-amber-900 flex items-center gap-1.5 text-xs">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                    Ventana oficial abierta
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleCancelInteractive}
-                    className="text-slate-400 hover:text-slate-700 text-xs font-semibold cursor-pointer"
-                  >
-                    ✕ Cancelar
-                  </button>
-                </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Inicia sesión y aprueba MFA en la ventana de Microsoft. Al terminar, presiona confirmar:
-                </p>
-                <button
-                  type="button"
-                  onClick={() => handleConfirmAndRunScraper(interactiveSession.cleanEmail)}
-                  className="w-full py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-bold rounded-lg text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-amber-400" />
-                  <span>Confirmar y Sincronizar Asistencias</span>
-                </button>
+                <Loader2 className="w-4 h-4 animate-spin text-[#002B49]" />
+                <span>Accediendo a cuenta institucional...</span>
               </>
             ) : (
-              <div className="flex items-center gap-2.5 py-1 text-slate-700">
-                <Loader2 className="w-4 h-4 animate-spin text-[#002B49] shrink-0" />
-                <span className="font-medium text-[11px]">
-                  Sincronizando asistencias en segundo plano...
-                </span>
-              </div>
+              <>
+                <MicrosoftLogo />
+                <span>Acceder con Vivo Duoc</span>
+              </>
             )}
-          </div>
-        )}
-
-        {/* Botón Acceso Vivo Duoc (Microsoft) */}
-        {!interactiveSession && (
-          <div>
-            <button
-              type="button"
-              onClick={handleMicrosoftSso}
-              disabled={isSsoLoading || isLoading}
-              aria-busy={isSsoLoading}
-              className="w-full min-h-[46px] px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 transition-colors shadow-2xs flex items-center justify-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer disabled:opacity-60"
-            >
-              {isSsoLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[#002B49]" />
-                  <span>Conectando con Vivo Duoc...</span>
-                </>
-              ) : (
-                <>
-                  <MicrosoftLogo />
-                  <span>Acceder con Vivo Duoc</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          </button>
+        </div>
 
         {/* Separador Sobrio */}
         <div className="relative flex items-center justify-center my-3" aria-hidden="true">

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { VIVO_STUDENT_PROFILE } from '../../data/vivoDuocData';
 import {
   Camera,
   ShieldCheck,
@@ -29,19 +28,16 @@ export const PerfilView = () => {
   const { announce } = useAccessibility();
   const { user, updateUser } = useAuth();
 
-  const isCristian = (user?.email || '').toLowerCase().includes('guzman');
-
   const [profile, setProfile] = useState(() => {
-    const sName = getStudentDisplayName(user);
-    const sRut = getStudentRut(user);
-    const sCareer = user?.career || user?.carrera || (isCristian ? VIVO_STUDENT_PROFILE.carrera : 'Ingeniería en Informática');
-    const sCampus = user?.campus || user?.sede || (isCristian ? VIVO_STUDENT_PROFILE.sede : 'Sede Alameda');
-    const sAddress = user?.direccion || user?.address || (isCristian ? VIVO_STUDENT_PROFILE.direccion : 'Por actualizar');
-    const sPhone = user?.telefonoPersonal || user?.phone || (isCristian ? VIVO_STUDENT_PROFILE.telefonoPersonal : '+56 9 0000 0000');
-    const sPersonalEmail = user?.emailPersonal || user?.personalEmail || (isCristian ? VIVO_STUDENT_PROFILE.emailPersonal : '');
+    const sName = user?.fullName || user?.nombre || getStudentDisplayName(user);
+    const sRut = user?.rut || getStudentRut(user);
+    const sCareer = user?.career || user?.carrera || 'Ingeniería en Informática';
+    const sCampus = user?.campus || user?.sede || 'Sede Alameda';
+    const sAddress = user?.address || user?.direccion || 'Por actualizar';
+    const sPhone = user?.phone || user?.telefonoPersonal || '+56 9 0000 0000';
+    const sPersonalEmail = user?.personalEmail || user?.emailPersonal || '';
 
     return {
-      ...(isCristian ? VIVO_STUDENT_PROFILE : {}),
       ...(user || {}),
       nombre: sName,
       fullName: sName,
@@ -50,14 +46,14 @@ export const PerfilView = () => {
       career: sCareer,
       sede: sCampus,
       campus: sCampus,
-      emailDuoc: user?.email || user?.emailDuoc || (isCristian ? VIVO_STUDENT_PROFILE.emailDuoc : 'estudiante@duocuc.cl'),
+      emailDuoc: user?.email || user?.emailDuoc || 'estudiante@duocuc.cl',
       direccion: sAddress,
       address: sAddress,
       telefonoPersonal: sPhone,
       phone: sPhone,
       emailPersonal: sPersonalEmail,
       personalEmail: sPersonalEmail,
-      photo: user?.photo || (isCristian ? VIVO_STUDENT_PROFILE.photo : '') || '',
+      photo: user?.photo || '',
     };
   });
 
@@ -84,14 +80,14 @@ export const PerfilView = () => {
 
   useEffect(() => {
     if (user) {
-      const sName = getStudentDisplayName(user);
-      const sRut = getStudentRut(user);
-      const sCareer = user.career || user.carrera || (isCristian ? VIVO_STUDENT_PROFILE.carrera : 'Ingeniería en Informática');
-      const sCampus = user.campus || user.sede || (isCristian ? VIVO_STUDENT_PROFILE.sede : 'Sede Alameda');
-      const nextDireccion = user.direccion || user.address || (isCristian ? VIVO_STUDENT_PROFILE.direccion : 'Por actualizar');
-      const nextTelefono = user.telefonoPersonal || user.phone || (isCristian ? VIVO_STUDENT_PROFILE.telefonoPersonal : '+56 9 0000 0000');
-      const nextEmailPersonal = user.emailPersonal || user.personalEmail || (isCristian ? VIVO_STUDENT_PROFILE.emailPersonal : '');
-      const nextPhoto = user.photo !== undefined ? user.photo : (isCristian ? VIVO_STUDENT_PROFILE.photo : '') || '';
+      const sName = user.fullName || user.nombre || getStudentDisplayName(user);
+      const sRut = user.rut || getStudentRut(user);
+      const sCareer = user.career || user.carrera || 'Ingeniería en Informática';
+      const sCampus = user.campus || user.sede || 'Sede Alameda';
+      const nextDireccion = user.address || user.direccion || 'Por actualizar';
+      const nextTelefono = user.phone || user.telefonoPersonal || '+56 9 0000 0000';
+      const nextEmailPersonal = user.personalEmail || user.emailPersonal || '';
+      const nextPhoto = user.photo !== undefined ? user.photo : '';
 
       setProfile((prev) => ({
         ...prev,
@@ -123,7 +119,7 @@ export const PerfilView = () => {
         emailPersonal: nextEmailPersonal,
       });
     }
-  }, [user, isCristian]);
+  }, [user]);
 
   useEffect(() => {
     return () => {

@@ -203,15 +203,27 @@ export const AdminPanelView = () => {
     return sortedSedes.filter((s) => (s.name || '').toLowerCase().includes(q));
   }, [sortedSedes, sedeSearch]);
 
-  // Filtrado de estudiantes en el directorio
+  // Filtrado y ordenamiento alfabético de estudiantes en el directorio
   const filteredStudents = useMemo(() => {
-    return students.filter((s) => {
-      const q = searchTerm.toLowerCase().trim();
+    const q = searchTerm.toLowerCase().trim();
+    const cleanQ = q.replace(/[^0-9kK]/g, '');
+
+    const filtered = students.filter((s) => {
+      const studentName = s.fullName || s.nombre || '';
       const studentSede = s.campus || s.sede || '';
+      const studentRut = s.rut || '';
+      const cleanRut = studentRut.replace(/[^0-9kK]/g, '').toLowerCase();
+
+      // Búsqueda flexible por RUT (directa o dígitos limpios sin puntos ni guion)
+      const matchesRut =
+        (studentRut && studentRut.toLowerCase().includes(q)) ||
+        (cleanQ.length > 0 && cleanRut.includes(cleanQ));
+
       const matchesSearch =
         !q ||
-        s.fullName?.toLowerCase().includes(q) ||
-        studentSede.toLowerCase().includes(q);
+        studentName.toLowerCase().includes(q) ||
+        studentSede.toLowerCase().includes(q) ||
+        matchesRut;
 
       if (!matchesSearch) return false;
 
@@ -219,6 +231,15 @@ export const AdminPanelView = () => {
       if (filterStatus !== 'all') return s.academicStatus === filterStatus;
 
       return true;
+    });
+
+    // Orden alfabético estricto de A a Z por nombre completo
+    return filtered.sort((a, b) => {
+      const nameA = (a.fullName || a.nombre || a.email || '').trim();
+      const nameB = (b.fullName || b.nombre || b.email || '').trim();
+      const cmp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      if (cmp !== 0) return cmp;
+      return (a.rut || '').localeCompare(b.rut || '');
     });
   }, [students, searchTerm, filterStatus]);
 
@@ -1181,7 +1202,8 @@ export const AdminPanelView = () => {
                 type="search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar estudiante por nombre o sede..."
+                placeholder="Buscar estudiante por nombre, RUT o sede..."
+                aria-label="Buscar estudiante por nombre, RUT o sede"
                 className="w-full min-h-[44px] pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
               />
             </div>
@@ -1198,6 +1220,16 @@ export const AdminPanelView = () => {
                   const isExpanded =
                     selectedStudentForDetail &&
                     (selectedStudentForDetail._id === student._id || selectedStudentForDetail.id === student.id);
+                  const isRutSearchMatch = Boolean(
+                    searchTerm &&
+                      student.rut &&
+                      (student.rut.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+                        (searchTerm.replace(/[^0-9kK]/g, '').length >= 2 &&
+                          student.rut
+                            .replace(/[^0-9kK]/g, '')
+                            .toLowerCase()
+                            .includes(searchTerm.replace(/[^0-9kK]/g, '').toLowerCase())))
+                  );
 
                   return (
                     <div
@@ -1233,6 +1265,7 @@ export const AdminPanelView = () => {
                             }`}
                           >
                             {studentSede}
+                            {isRutSearchMatch ? ` • RUT: ${student.rut}` : ''}
                           </span>
                         </div>
 

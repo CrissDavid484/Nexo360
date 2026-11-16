@@ -1,13 +1,8 @@
-const mongoose = require('mongoose');
-const ScrapedDataCache = require('../models/ScrapedDataCache');
-
 /**
- * SERVICIO DE SCRAPING Y GESTIÓN DE CACHÉ DE MÓDULOS INSTITUCIONALES DUOC UC
- * Implementa la lógica de caché con TTL y escritura por lotes (bulkWrite) para evitar scraping redundante.
+ * Catálogo Oficial de Módulos Institucionales Duoc UC para PAEDIS 2026
+ * Arquitectura de información estructurada para el Centro de Ayuda de Nexo360
  */
-
-// Datos base institucionales Duoc UC para PAEDIS 2026
-const DEFAULT_INSTITUTIONAL_MODULES = [
+const INSTITUTIONAL_MODULES = [
   {
     categoryKey: 'admision-matricula',
     categoryTitle: 'Admisión y Matrícula',
@@ -209,74 +204,6 @@ const DEFAULT_INSTITUTIONAL_MODULES = [
   },
 ];
 
-class DataScraperService {
-  /**
-   * Obtiene todos los módulos, consultando primero el caché de MongoDB y validando su TTL
-   */
-  async getAllModules() {
-    if (mongoose.connection.readyState !== 1) {
-      return DEFAULT_INSTITUTIONAL_MODULES;
-    }
-
-    try {
-      const cached = await ScrapedDataCache.find({});
-      const hasValidCache =
-        cached &&
-        cached.length >= DEFAULT_INSTITUTIONAL_MODULES.length &&
-        cached.every((doc) => !doc.isExpired());
-
-      if (hasValidCache) {
-        return cached;
-      }
-
-      // Si no están todos en caché o expiraron, poblar/actualizar en lote
-      await this.seedDefaultData();
-      return DEFAULT_INSTITUTIONAL_MODULES;
-    } catch (err) {
-      console.warn('[DataScraperService] BD no disponible, usando datos base en memoria:', err.message);
-      return DEFAULT_INSTITUTIONAL_MODULES;
-    }
-  }
-
-  /**
-   * Obtiene una categoría específica por su clave única
-   */
-  async getCategoryByKey(categoryKey) {
-    if (mongoose.connection.readyState === 1) {
-      try {
-        const cached = await ScrapedDataCache.findOne({ categoryKey });
-        if (cached && !cached.isExpired()) {
-          return cached;
-        }
-      } catch (err) {
-        console.warn('[DataScraperService] Error consultando caché de MongoDB:', err.message);
-      }
-    }
-
-    // Fallback directo a datos en memoria
-    return DEFAULT_INSTITUTIONAL_MODULES.find((m) => m.categoryKey === categoryKey) || null;
-  }
-
-  /**
-   * Siembra la base de datos de MongoDB en una sola operación bulkWrite (evita problema N+1)
-   */
-  async seedDefaultData() {
-    try {
-      const now = new Date();
-      const operations = DEFAULT_INSTITUTIONAL_MODULES.map((mod) => ({
-        updateOne: {
-          filter: { categoryKey: mod.categoryKey },
-          update: { $set: { ...mod, last_updated: now } },
-          upsert: true,
-        },
-      }));
-
-      await ScrapedDataCache.bulkWrite(operations, { ordered: false });
-      console.log('[DataScraperService] Datos institucionales cacheados con éxito en MongoDB (bulkWrite).');
-    } catch (err) {
-      console.warn('[DataScraperService] No se pudo guardar caché inicial en MongoDB:', err.message);
-    }
-  }
-}
-
-module.exports = new DataScraperService();
+module.exports = {
+  INSTITUTIONAL_MODULES,
+};

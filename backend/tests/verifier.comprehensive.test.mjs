@@ -101,7 +101,7 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
 
   await t.test('5. [LEY 21.719 COMPLIANCE] Protección de Datos Personales, No contraseñas planas y Metadatos de Consentimiento', async () => {
     const UserProfile = (await import('../models/UserProfile.js')).default;
-    const authScraperService = (await import('../services/authScraperService.js')).default;
+    const authService = (await import('../services/authService.js')).default;
 
     // Verificar modelo UserProfile: toJSON y toObject eliminan campos sensibles de contraseña
     const testDoc = new UserProfile({
@@ -125,8 +125,8 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     assert.ok(Array.isArray(testDoc.purposeLimitation), 'purposeLimitation debe ser un array');
     assert.ok(testDoc.purposeLimitation.includes('gestion_academica'), 'Debe incluir finalidad academica');
 
-    // Verificar formato de respuesta en authScraperService
-    const formatted = authScraperService.formatUserResponse(testDoc);
+    // Verificar formato de respuesta en authService
+    const formatted = authService.formatUserResponse(testDoc);
     assert.strictEqual(formatted.password, undefined, 'formatUserResponse jamás debe retornar contraseña');
     assert.ok(formatted.consentMetadata, 'formatUserResponse debe incluir consentMetadata');
     assert.ok(
@@ -135,10 +135,10 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     );
   });
 
-  await t.test('6. [VIVO DUOC LOGIN & SCRAPING DATA STRUCTURE] URL oficial y scraping de asistencia con fallback', async () => {
-    const authScraperService = (await import('../services/authScraperService.js')).default;
+  await t.test('6. [VIVO DUOC LOGIN & NATIVE DB USER PROFILE] URL oficial y estructura nativa de estudiante', async () => {
+    const authService = (await import('../services/authService.js')).default;
 
-    const loginUrl = authScraperService.getOfficialLoginUrl();
+    const loginUrl = authService.getOfficialLoginUrl();
     assert.ok(
       loginUrl.includes('client_id=674913e2-e170-4787-833f-e307f87db6e5'),
       'Debe contener client_id oficial'
@@ -158,20 +158,18 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
       'Debe redirigir a callback oficial de experienciavivo'
     );
 
-    // Verificar scraping/fallback data structure
-    const sessionData = await authScraperService.maintainVivoDuocSession('c.guzman@duocuc.cl', {
-      user: { fullName: 'Cristian Guzmán', career: 'Ingeniería en Informática', attendanceRate: 88.9 },
+    // Verificar formato y perfil nativo en BD
+    const sessionData = authService.formatUserResponse({
+      email: 'c.guzman@duocuc.cl',
+      fullName: 'Cristian Guzmán',
+      career: 'Ingeniería en Informática',
+      campus: 'Sede Alameda',
+      attendanceRate: 88.9,
     });
     assert.ok(sessionData, 'Debe devolver datos del estudiante');
-    assert.ok(Array.isArray(sessionData.enrolledCourses), 'Debe tener enrolledCourses');
-    assert.ok(sessionData.enrolledCourses.length > 0, 'Debe contener ramos parseados');
-
-    const capstone = sessionData.enrolledCourses.find(c => (c.nombre || '').includes('CAPSTONE') || (c.curso || '').includes('CAPSTONE'));
-    assert.ok(capstone, 'Debe contener la asignatura PROYECTO CAPSTONE');
-    assert.strictEqual(capstone.clasesRegistradas, 27, 'Debe tener 27 clases registradas');
-    assert.strictEqual(capstone.asistencia, 24, 'Debe registrar 24 asistencias');
-    assert.strictEqual(capstone.porcentajeAsistencia, 88.9, 'Porcentaje debe ser exactamente 88.9%');
-    assert.strictEqual(capstone.porcentajeAsistenciaActual, '88.9%');
+    assert.strictEqual(sessionData.email, 'c.guzman@duocuc.cl');
+    assert.strictEqual(sessionData.career, 'Ingeniería en Informática');
+    assert.strictEqual(sessionData.attendanceRate, 88.9);
   });
 
   await t.test('7. [REGISTRATION FORM, DYNAMIC PASSWORD, RUT & 4 ROLES] Admin-only creation of administrators', async () => {

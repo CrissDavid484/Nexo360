@@ -1,17 +1,16 @@
-const dataScraperService = require('../services/dataScraperService');
+const { INSTITUTIONAL_MODULES } = require('../data/institutionalModules');
 
 /**
- * CONTROLADOR DE MÓDULOS Y CATEGORÍAS DUOC UC
- * Sirve la arquitectura de información desde MongoDB (con caché inteligente y fallback en memoria)
+ * CONTROLADOR DE MÓDULOS Y CATEGORÍAS INSTITUCIONALES DUOC UC
+ * Servidos directamente para la navegación del Centro de Ayuda de Nexo360
  */
 exports.getModules = async (req, res) => {
   try {
     const { q } = req.query;
-    const allModules = await dataScraperService.getAllModules();
 
     if (q && q.trim() !== '') {
       const searchLower = q.toLowerCase().trim();
-      const filtered = allModules.filter((cat) => {
+      const filtered = INSTITUTIONAL_MODULES.filter((cat) => {
         const matchTitle = (cat.categoryTitle || '').toLowerCase().includes(searchLower);
         const matchSub = (cat.submodules || []).some(
           (sub) =>
@@ -36,9 +35,9 @@ exports.getModules = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      count: allModules.length,
-      totalCategories: allModules.length,
-      data: allModules,
+      count: INSTITUTIONAL_MODULES.length,
+      totalCategories: INSTITUTIONAL_MODULES.length,
+      data: INSTITUTIONAL_MODULES,
     });
   } catch (error) {
     console.error('[ModuleController] Error obteniendo módulos:', error.message);
@@ -52,7 +51,7 @@ exports.getModules = async (req, res) => {
 exports.getModuleByKey = async (req, res) => {
   try {
     const { key } = req.params;
-    const category = await dataScraperService.getCategoryByKey(key);
+    const category = INSTITUTIONAL_MODULES.find((m) => m.categoryKey === key);
 
     if (!category) {
       return res.status(404).json({
@@ -70,25 +69,6 @@ exports.getModuleByKey = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error interno al consultar el módulo solicitado',
-    });
-  }
-};
-
-exports.syncOfficialHelpCenter = async (req, res) => {
-  try {
-    const result = await dataScraperService.syncFromOfficialHelpCenter();
-    return res.status(200).json({
-      success: true,
-      message: 'Sincronización con Centro de Ayuda Oficial Duoc UC completada',
-      categoriesCount: result.categoriesCount,
-      sectionsCount: result.sectionsCount,
-      articlesCount: result.articlesCount,
-    });
-  } catch (error) {
-    console.error('[ModuleController] Error sincronizando Centro de Ayuda:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'No se pudo sincronizar con centroayuda.duoc.cl',
     });
   }
 };

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const UserProfile = require('../models/UserProfile');
 const ActivityLog = require('../models/ActivityLog');
-const authScraperService = require('../services/authScraperService');
+const authService = require('../services/authService');
 
 const Career = require('../models/Career');
 const Sede = require('../models/Sede');
@@ -310,7 +310,7 @@ const calculatePredictiveRisk = (user) => {
  */
 exports.getMetrics = async (req, res) => {
   try {
-    const allUsers = await authScraperService.getAllUsers();
+    const allUsers = await authService.getAllUsers();
 
     const totalUsers = allUsers.length;
     const students = allUsers.filter(
@@ -368,7 +368,7 @@ exports.getMetrics = async (req, res) => {
       recentActivity = await ActivityLog.find({}).sort({ createdAt: -1 }).limit(10).lean();
     }
     if (!recentActivity || recentActivity.length === 0) {
-      recentActivity = authScraperService.getRecentLogs(10);
+      recentActivity = authService.getRecentLogs(10);
     }
 
     return res.status(200).json({
@@ -408,17 +408,29 @@ exports.getMetrics = async (req, res) => {
 exports.getStudents = async (req, res) => {
   try {
     const { search, status, role, isPaedis } = req.query || {};
-    let users = await authScraperService.getAllUsers();
+    let users = await authService.getAllUsers();
 
     if (search && typeof search === 'string') {
       const q = search.toLowerCase().trim();
-      users = users.filter(
-        (u) =>
-          u.fullName.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q) ||
-          (u.rut || '').toLowerCase().includes(q) ||
-          (u.career || '').toLowerCase().includes(q)
-      );
+      const cleanQ = q.replace(/[^0-9kK]/g, '');
+      users = users.filter((u) => {
+        const studentRut = u.rut || '';
+        const cleanRut = studentRut.replace(/[^0-9kK]/g, '').toLowerCase();
+        const matchesRut =
+          (studentRut && studentRut.toLowerCase().includes(q)) ||
+          (cleanQ.length > 0 && cleanRut.includes(cleanQ));
+
+        return (
+          (u.fullName || '').toLowerCase().includes(q) ||
+          (u.nombre || '').toLowerCase().includes(q) ||
+          (u.email || '').toLowerCase().includes(q) ||
+          matchesRut ||
+          (u.career || '').toLowerCase().includes(q) ||
+          (u.carrera || '').toLowerCase().includes(q) ||
+          (u.campus || '').toLowerCase().includes(q) ||
+          (u.sede || '').toLowerCase().includes(q)
+        );
+      });
     }
 
     if (status && status !== 'all') {
@@ -432,6 +444,15 @@ exports.getStudents = async (req, res) => {
     if (isPaedis === 'true') {
       users = users.filter((u) => u.isPaedis === true || u.role === 'estudiante_paedis');
     }
+
+    // Orden alfabético estricto de A a Z por nombre completo
+    users.sort((a, b) => {
+      const nameA = (a.fullName || a.nombre || a.email || '').trim();
+      const nameB = (b.fullName || b.nombre || b.email || '').trim();
+      const cmp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      if (cmp !== 0) return cmp;
+      return (a.rut || '').localeCompare(b.rut || '');
+    });
 
     // Enriquecer cada estudiante con su cálculo predictivo
     const enriched = users.map((u) => {
@@ -524,7 +545,7 @@ exports.createStudent = async (req, res) => {
     if (mongoose.connection.readyState === 1) {
       existing = await UserProfile.findOne({ email });
     } else {
-      const allUsers = await authScraperService.getAllUsers();
+      const allUsers = await authService.getAllUsers();
       existing = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
     }
 
@@ -596,12 +617,12 @@ exports.createStudent = async (req, res) => {
       createdUser = await UserProfile.create(newUserData);
     } else {
       createdUser = { _id: `local_${Date.now()}`, ...newUserData };
-      if (typeof authScraperService.registerUser === 'function') {
-        authScraperService.registerUser(createdUser);
+      if (typeof authService.registerUser === 'function') {
+        authService.registerUser(createdUser);
       }
     }
 
-    await authScraperService.logActivity({
+    await authService.logActivity({
       userId: req.user._id || req.user.id,
       userEmail: req.user.email,
       userName: req.user.fullName || 'Administrador',
@@ -613,7 +634,7 @@ exports.createStudent = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: `Usuario ${fullName} registrado exitosamente en la base de datos de Nexo360.`,
-      user: authScraperService.formatUserResponse(createdUser),
+      user: authService.formatUserResponse(createdUser),
     });
   } catch (error) {
     console.error('[AdminController] Error al crear usuario:', error.message);
@@ -655,7 +676,7 @@ exports.updateStudentStatus = async (req, res) => {
       );
     }
 
-    await authScraperService.logActivity({
+    await authService.logActivity({
       userId: req.user._id || req.user.id,
       userEmail: req.user.email,
       userName: req.user.fullName || 'Administrador',
@@ -667,7 +688,7 @@ exports.updateStudentStatus = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: `Estado académico actualizado a "${academicStatus.toUpperCase()}" correctamente.`,
-      user: updatedUser ? authScraperService.formatUserResponse(updatedUser) : null,
+      user: updatedUser ? authService.formatUserResponse(updatedUser) : null,
     });
   } catch (error) {
     console.error('[AdminController] Error al actualizar estado:', error.message);
@@ -763,7 +784,7 @@ exports.importCourses = async (req, res) => {
       periodo: periodo || '2026 - 002',
     });
 
-    await authScraperService.logActivity({
+    await authService.logActivity({
       userId: req.user?._id || req.user?.id || 'admin',
       userEmail: req.user?.email || 'admin@duocuc.cl',
       userName: req.user?.fullName || req.user?.nombre || 'Administrador',
@@ -802,7 +823,7 @@ exports.seedCourses = async (req, res) => {
   try {
     const result = await courseService.seedInitialCourses({ force: true });
 
-    await authScraperService.logActivity({
+    await authService.logActivity({
       userId: req.user?._id || req.user?.id || 'admin',
       userEmail: req.user?.email || 'admin@duocuc.cl',
       userName: req.user?.fullName || req.user?.nombre || 'Administrador',
@@ -839,7 +860,7 @@ exports.clearCourses = async (req, res) => {
   try {
     await courseService.clearAll();
 
-    await authScraperService.logActivity({
+    await authService.logActivity({
       userId: req.user?._id || req.user?.id || 'admin',
       userEmail: req.user?.email || 'admin@duocuc.cl',
       userName: req.user?.fullName || req.user?.nombre || 'Administrador',

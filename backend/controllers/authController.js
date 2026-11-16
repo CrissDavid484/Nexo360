@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const UserProfile = require('../models/UserProfile');
-const authScraperService = require('../services/authScraperService');
+const authService = require('../services/authService');
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]{1,64}@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/i;
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,21 +16,21 @@ const getOrCreateActiveUserProfile = async (reqUser) => {
   if (!reqUser || !reqUser.email) {
     throw new Error('Usuario no autenticado');
   }
-  const user = await authScraperService.findOrCreateUserProfile(reqUser.email);
-  return authScraperService.formatUserResponse(user);
+  const user = await authService.findOrCreateUserProfile(reqUser.email);
+  return authService.formatUserResponse(user);
 };
 
 /**
  * GET /api/auth/users
- * Obtiene el catálogo de los 10 usuarios institucionales de la Base de Datos Nexo360 (y cualquier correo nuevo registrado)
+ * Obtiene el catálogo de usuarios institucionales de la Base de Datos Nexo360
  */
 exports.getInstitutionalUsers = async (req, res) => {
   try {
-    const users = await authScraperService.getAllUsers();
+    const users = await authService.getAllUsers();
     return res.status(200).json({
       success: true,
       totalUsers: users.length,
-      officialLoginUrl: authScraperService.getOfficialLoginUrl(),
+      officialLoginUrl: authService.getOfficialLoginUrl(),
       users,
     });
   } catch (error) {
@@ -44,9 +44,7 @@ exports.getInstitutionalUsers = async (req, res) => {
 
 /**
  * POST /api/auth/sso-login
- * Inicia sesión en Nexo360 tras pasar por el botón de redirección al Login Oficial Microsoft de Duoc UC.
- * - Si el correo pertenece a uno de los 10 usuarios de nuestra BD, carga su nombre completo, rol y ficha.
- * - Si es cualquier otro correo institucional, captura el correo y lo asigna como su nombre.
+ * Inicio de sesión institucional instantáneo vía Microsoft SSO contra MongoDB
  */
 exports.ssoLogin = async (req, res) => {
   try {
@@ -74,7 +72,7 @@ exports.ssoLogin = async (req, res) => {
       });
     }
 
-    const ssoResult = await authScraperService.completeSsoLogin(cleanEmail);
+    const ssoResult = await authService.completeSsoLogin(cleanEmail);
 
     return res.status(200).json({
       success: true,
@@ -83,7 +81,6 @@ exports.ssoLogin = async (req, res) => {
       user: ssoResult.user,
       isRegisteredInDb: ssoResult.isRegisteredInDb,
       officialLoginUrl: ssoResult.officialLoginUrl,
-      scrapedData: ssoResult.scrapedData,
       message: 'Sesión institucional iniciada exitosamente en Nexo360.',
     });
   } catch (error) {
@@ -97,7 +94,7 @@ exports.ssoLogin = async (req, res) => {
 
 /**
  * POST /api/auth/login
- * Inicio de sesión nativo contra la Base de Datos Nexo360 (con hash bcrypt)
+ * Inicio de sesión institucional nativo contra MongoDB con contraseñas cifradas (bcrypt)
  */
 exports.login = async (req, res) => {
   try {
@@ -130,7 +127,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const result = await authScraperService.loginWithPassword(cleanEmail, password);
+    const result = await authService.loginWithPassword(cleanEmail, password);
 
     return res.status(200).json({
       success: true,
@@ -139,7 +136,6 @@ exports.login = async (req, res) => {
       user: result.user,
       isRegisteredInDb: result.isRegisteredInDb,
       officialLoginUrl: result.officialLoginUrl,
-      scrapedData: result.scrapedData,
       message: 'Inicio de sesión institucional exitoso en Nexo360.',
     });
   } catch (error) {
@@ -158,31 +154,6 @@ exports.login = async (req, res) => {
 };
 
 /**
- * POST /api/auth/simulator-log
- * Registra que un estudiante interactuó con el Simulador de Toma de Ramos
- */
-exports.recordSimulatorUsage = async (req, res) => {
-  try {
-    if (req.user && req.user.isRegisteredInDb === false) {
-      return res.status(403).json({
-        success: false,
-        isRegisteredInDb: false,
-        message:
-          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
-        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
-      });
-    }
-    await authScraperService.recordSimulatorUsage(req.user);
-    return res.status(200).json({
-      success: true,
-      message: 'Uso del simulador registrado en la base de datos.',
-    });
-  } catch (error) {
-    return res.status(200).json({ success: true });
-  }
-};
-
-/**
  * GET /api/auth/mfa-status/:sessionId
  */
 exports.getMfaStatus = async (req, res) => {
@@ -196,37 +167,12 @@ exports.getMfaStatus = async (req, res) => {
       });
     }
 
-    const session = authScraperService.getSessionStatus(sessionId);
-
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        status: 'FAILED',
-        errorMessage: 'La sesión de autenticación no existe o ha expirado.',
-      });
-    }
-
-    if (session.status === 'COMPLETED') {
-      authScraperService.clearSession(sessionId);
-      return res.status(200).json({
-        success: true,
-        status: 'COMPLETED',
-        token: session.token,
-        user: session.user,
-        mfaCode: session.mfaCode,
-        message: 'Autenticación completada exitosamente.',
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      status: session.status,
-      mfaCode: session.mfaCode,
-      mfaNumber: session.mfaCode,
-      errorMessage: session.errorMessage,
+    return res.status(404).json({
+      success: false,
+      status: 'FAILED',
+      errorMessage: 'La sesión de autenticación no existe o ha expirado.',
     });
   } catch (error) {
-    console.error('[AuthController] Error consultando estado MFA:', error.message);
     return res.status(500).json({
       success: false,
       status: 'FAILED',
@@ -236,7 +182,33 @@ exports.getMfaStatus = async (req, res) => {
 };
 
 /**
+ * POST /api/auth/simulator-log
+ * Registra interacción con el Simulador de Toma de Ramos en MongoDB
+ */
+exports.recordSimulatorUsage = async (req, res) => {
+  try {
+    if (req.user && req.user.isRegisteredInDb === false) {
+      return res.status(403).json({
+        success: false,
+        isRegisteredInDb: false,
+        message:
+          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
+        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
+      });
+    }
+    await authService.recordSimulatorUsage(req.user);
+    return res.status(200).json({
+      success: true,
+      message: 'Uso del simulador registrado en la base de datos.',
+    });
+  } catch (error) {
+    return res.status(200).json({ success: true });
+  }
+};
+
+/**
  * GET /api/auth/me
+ * Obtiene el perfil del usuario autenticado
  */
 exports.getProfile = async (req, res) => {
   try {
@@ -248,13 +220,14 @@ exports.getProfile = async (req, res) => {
   } catch (error) {
     return res.status(200).json({
       success: true,
-      user: authScraperService.formatUserResponse(req.user || {}),
+      user: authService.formatUserResponse(req.user || {}),
     });
   }
 };
 
 /**
  * PUT /api/auth/accessibility
+ * Guarda preferencias de accesibilidad en MongoDB
  */
 exports.updateAccessibility = async (req, res) => {
   try {
@@ -278,30 +251,26 @@ exports.updateAccessibility = async (req, res) => {
 
     const targetEmail = req.user.email;
 
-    if (authScraperService.updateUserAccessibilityPreferences) {
-      authScraperService.updateUserAccessibilityPreferences(targetEmail, sanitizedPreferences);
-    }
+    if (mongoose.connection.readyState === 1) {
+      const updatedUser = await UserProfile.findOneAndUpdate(
+        { email: targetEmail },
+        { $set: { accessibilityPreferences: sanitizedPreferences } },
+        { new: true, upsert: true, runValidators: true }
+      );
 
-    if (mongoose.connection.readyState !== 1) {
       return res.status(200).json({
         success: true,
-        message: 'Preferencias de accesibilidad aplicadas en sesión (modo sin conexión a BD).',
-        accessibilityPreferences: sanitizedPreferences,
+        message: 'Preferencias de accesibilidad guardadas en MongoDB.',
+        accessibilityPreferences: updatedUser
+          ? updatedUser.accessibilityPreferences
+          : sanitizedPreferences,
       });
     }
 
-    const updatedUser = await UserProfile.findOneAndUpdate(
-      { email: targetEmail },
-      { $set: { accessibilityPreferences: sanitizedPreferences } },
-      { new: true, upsert: true, runValidators: true }
-    );
-
     return res.status(200).json({
       success: true,
-      message: 'Preferencias de accesibilidad guardadas en MongoDB.',
-      accessibilityPreferences: updatedUser
-        ? updatedUser.accessibilityPreferences
-        : sanitizedPreferences,
+      message: 'Preferencias de accesibilidad aplicadas en sesión.',
+      accessibilityPreferences: sanitizedPreferences,
     });
   } catch (error) {
     return res.status(200).json({
@@ -314,17 +283,15 @@ exports.updateAccessibility = async (req, res) => {
 
 /**
  * PUT /api/auth/profile
+ * Actualiza los datos de perfil y contacto en MongoDB
  */
 exports.updateProfile = async (req, res) => {
   try {
     const body = req.body || {};
     const fullName = sanitizeString(body.fullName ?? body.nombre, 120);
-    const nombre = sanitizeString(body.nombre ?? body.fullName, 120);
     const rut = sanitizeString(body.rut, 20);
     const career = sanitizeString(body.career ?? body.carrera, 120);
-    const carrera = sanitizeString(body.carrera ?? body.career, 120);
     const campus = sanitizeString(body.campus ?? body.sede, 80);
-    const sede = sanitizeString(body.sede ?? body.campus, 80);
     const phone = sanitizeString(body.phone ?? body.telefonoPersonal, 30);
     const address = sanitizeString(body.address ?? body.direccion, 200);
     const personalEmail = sanitizeString(body.personalEmail ?? body.emailPersonal, 120);
@@ -354,28 +321,24 @@ exports.updateProfile = async (req, res) => {
 
     const targetEmail = req.user.email;
 
-    if (photo !== undefined && authScraperService.updateUserPhoto) {
-      authScraperService.updateUserPhoto(targetEmail, photo);
-    }
+    if (mongoose.connection.readyState === 1) {
+      const updatedUser = await UserProfile.findOneAndUpdate(
+        { email: targetEmail },
+        { $set: updateFields },
+        { new: true, upsert: true, runValidators: true }
+      );
 
-    if (mongoose.connection.readyState !== 1) {
       return res.status(200).json({
         success: true,
-        message: 'Datos de contacto actualizados en sesión.',
-        user: authScraperService.formatUserResponse({ ...req.user, ...updateFields }),
+        message: 'Datos de contacto actualizados en MongoDB.',
+        user: authService.formatUserResponse(updatedUser),
       });
     }
 
-    const updatedUser = await UserProfile.findOneAndUpdate(
-      { email: targetEmail },
-      { $set: updateFields },
-      { new: true, upsert: true, runValidators: true }
-    );
-
     return res.status(200).json({
       success: true,
-      message: 'Datos de contacto actualizados en MongoDB.',
-      user: authScraperService.formatUserResponse(updatedUser),
+      message: 'Datos de contacto actualizados en sesión.',
+      user: authService.formatUserResponse({ ...req.user, ...updateFields }),
     });
   } catch (error) {
     console.error('[AuthController] Error actualizando perfil:', error.message);
@@ -388,7 +351,7 @@ exports.updateProfile = async (req, res) => {
 
 /**
  * PUT /api/auth/profile/photo
- * Actualiza y persiste la fotografía de perfil del estudiante en Base64 o URL
+ * Actualiza la fotografía de perfil del estudiante en MongoDB
  */
 exports.updatePhoto = async (req, res) => {
   try {
@@ -403,30 +366,26 @@ exports.updatePhoto = async (req, res) => {
     const cleanPhoto = photo.trim();
     const targetEmail = req.user.email;
 
-    if (authScraperService.updateUserPhoto) {
-      authScraperService.updateUserPhoto(targetEmail, cleanPhoto);
-    }
+    if (mongoose.connection.readyState === 1) {
+      const updatedUser = await UserProfile.findOneAndUpdate(
+        { email: targetEmail },
+        { $set: { photo: cleanPhoto } },
+        { new: true, upsert: true, runValidators: true }
+      );
 
-    if (mongoose.connection.readyState !== 1) {
       return res.status(200).json({
         success: true,
-        message: 'Fotografía de perfil actualizada en sesión.',
-        photo: cleanPhoto,
-        user: authScraperService.formatUserResponse({ ...req.user, photo: cleanPhoto }),
+        message: 'Fotografía de perfil guardada exitosamente en MongoDB.',
+        photo: updatedUser ? updatedUser.photo : cleanPhoto,
+        user: authService.formatUserResponse(updatedUser),
       });
     }
 
-    const updatedUser = await UserProfile.findOneAndUpdate(
-      { email: targetEmail },
-      { $set: { photo: cleanPhoto } },
-      { new: true, upsert: true, runValidators: true }
-    );
-
     return res.status(200).json({
       success: true,
-      message: 'Fotografía de perfil guardada exitosamente en MongoDB.',
-      photo: updatedUser ? updatedUser.photo : cleanPhoto,
-      user: authScraperService.formatUserResponse(updatedUser),
+      message: 'Fotografía de perfil actualizada en sesión.',
+      photo: cleanPhoto,
+      user: authService.formatUserResponse({ ...req.user, photo: cleanPhoto }),
     });
   } catch (error) {
     console.error('[AuthController] Error actualizando fotografía de perfil:', error.message);
@@ -439,6 +398,7 @@ exports.updatePhoto = async (req, res) => {
 
 /**
  * GET /api/auth/toma-ramos
+ * Obtiene las asignaturas inscritas del estudiante en MongoDB
  */
 exports.getTomaRamos = async (req, res) => {
   try {
@@ -468,6 +428,7 @@ exports.getTomaRamos = async (req, res) => {
 
 /**
  * POST /api/auth/toma-ramos
+ * Guarda las asignaturas inscritas en el perfil del estudiante en MongoDB
  */
 exports.saveTomaRamos = async (req, res) => {
   try {
@@ -512,71 +473,46 @@ exports.saveTomaRamos = async (req, res) => {
 
     const targetEmail = req.user.email;
 
-    if (mongoose.connection.readyState !== 1) {
+    if (mongoose.connection.readyState === 1) {
+      const updatedUser = await UserProfile.findOneAndUpdate(
+        { email: targetEmail },
+        {
+          $set: {
+            enrolledCourses: sanitizedCourses,
+            hasUsedSimulator: true,
+            lastSimulatorUsage: new Date(),
+          },
+          $inc: { simulatorUsageCount: 1 },
+        },
+        { new: true, upsert: true, runValidators: true }
+      );
+
+      await authService.logActivity({
+        userId: req.user._id || req.user.id,
+        userEmail: req.user.email,
+        userName: req.user.fullName || req.user.nombre || req.user.email,
+        userRole: req.user.role || 'estudiante',
+        action: 'saved_toma_ramos',
+        details: `El estudiante guardó ${sanitizedCourses.length} asignaturas en el Simulador de Toma de Ramos.`,
+      });
+
       return res.status(200).json({
         success: true,
-        message: 'Carga académica grabada en sesión.',
-        enrolledCourses: sanitizedCourses,
+        message: 'Carga académica grabada y respaldada en MongoDB correctamente.',
+        enrolledCourses: updatedUser ? updatedUser.enrolledCourses : sanitizedCourses,
       });
     }
 
-    const updatedUser = await UserProfile.findOneAndUpdate(
-      { email: targetEmail },
-      {
-        $set: {
-          enrolledCourses: sanitizedCourses,
-          hasUsedSimulator: true,
-          lastSimulatorUsage: new Date(),
-        },
-        $inc: { simulatorUsageCount: 1 },
-      },
-      { new: true, upsert: true, runValidators: true }
-    );
-
-    // Registrar en ActivityLog
-    await authScraperService.logActivity({
-      userId: req.user._id || req.user.id,
-      userEmail: req.user.email,
-      userName: req.user.fullName || req.user.nombre || req.user.email,
-      userRole: req.user.role || 'estudiante',
-      action: 'saved_toma_ramos',
-      details: `El estudiante guardó ${sanitizedCourses.length} asignaturas en el Simulador de Toma de Ramos.`,
-    });
-
     return res.status(200).json({
       success: true,
-      message: 'Carga académica grabada y respaldada en MongoDB correctamente.',
-      enrolledCourses: updatedUser ? updatedUser.enrolledCourses : sanitizedCourses,
+      message: 'Carga académica grabada en sesión.',
+      enrolledCourses: sanitizedCourses,
     });
   } catch (error) {
     console.error('[AuthController] Error guardando toma de ramos:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error al guardar la carga académica en la base de datos.',
-    });
-  }
-};
-
-/**
- * POST /api/auth/scrape-session
- * Ejecuta o consulta la sesión de scraping en segundo plano de Vivo Duoc
- */
-exports.scrapeStudentSession = async (req, res) => {
-  try {
-    const email = req.user?.email;
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Usuario no autenticado.' });
-    }
-    const scrapedData = await authScraperService.maintainVivoDuocSession(email, { user: req.user });
-    return res.status(200).json({
-      success: true,
-      scrapedData,
-    });
-  } catch (error) {
-    console.error('[AuthController] Error en scrapeStudentSession:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Error al consultar o sincronizar datos de Vivo Duoc.',
     });
   }
 };
@@ -606,61 +542,4 @@ exports.getLey21719Info = async (req, res) => {
       },
     },
   });
-};
-
-/**
- * POST /api/auth/vivo-interactive/start
- * Abre la ventana real de Chromium con el portal oficial de Microsoft OAuth
- */
-exports.startVivoInteractive = async (req, res) => {
-  try {
-    const { email } = req.body || {};
-    const result = await authScraperService.startVivoInteractiveSession(email);
-    return res.status(200).json({
-      success: true,
-      ...result,
-    });
-  } catch (error) {
-    console.error('[AuthController] Error en startVivoInteractive:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'No se pudo iniciar la ventana interactiva de Microsoft.',
-    });
-  }
-};
-
-/**
- * GET /api/auth/vivo-interactive/status/:sessionId
- * Consulta el estado de la sesión interactiva y MFA
- */
-exports.getVivoInteractiveStatus = async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const status = authScraperService.getVivoInteractiveStatus(sessionId);
-    return res.status(200).json({
-      success: status.status !== 'error',
-      ...status,
-    });
-  } catch (error) {
-    console.error('[AuthController] Error en getVivoInteractiveStatus:', error.message);
-    return res.status(500).json({
-      success: false,
-      status: 'error',
-      message: 'Error al verificar estado de la sesión interactiva.',
-    });
-  }
-};
-
-/**
- * POST /api/auth/vivo-interactive/cancel/:sessionId
- * Cancela la sesión interactiva y cierra la ventana
- */
-exports.cancelVivoInteractive = async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const result = await authScraperService.cancelVivoInteractiveSession(sessionId);
-    return res.status(200).json(result);
-  } catch (error) {
-    return res.status(200).json({ success: true });
-  }
 };

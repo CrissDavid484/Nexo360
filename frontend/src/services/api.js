@@ -65,37 +65,6 @@ export const api = {
   },
 
   /**
-   * Iniciar sesión interactiva con ventana de Puppeteer
-   */
-  async startVivoInteractiveLogin(email = '') {
-    return request('/auth/vivo-interactive/start', {
-      method: 'POST',
-      auth: false,
-      body: { email },
-    });
-  },
-
-  /**
-   * Consultar estado de sesión interactiva (esperando ventana, esperando MFA, extrayendo en segundo plano, éxito)
-   */
-  async checkVivoInteractiveStatus(sessionId) {
-    return request(`/auth/vivo-interactive/status/${encodeURIComponent(sessionId)}`, {
-      method: 'GET',
-      auth: false,
-    });
-  },
-
-  /**
-   * Cancelar sesión interactiva y cerrar ventana
-   */
-  async cancelVivoInteractive(sessionId) {
-    return request(`/auth/vivo-interactive/cancel/${encodeURIComponent(sessionId)}`, {
-      method: 'POST',
-      auth: false,
-    });
-  },
-
-  /**
    * Verificar estado de salud del Backend y conexión a MongoDB
    */
   async getHealth() {
@@ -107,13 +76,6 @@ export const api = {
    */
   async getLey21719Info() {
     return request('/auth/ley21719', { auth: false });
-  },
-
-  /**
-   * Sincronizar o consultar sesión Puppeteer de Vivo Duoc
-   */
-  async scrapeStudentSession() {
-    return request('/auth/scrape-session', { method: 'POST' });
   },
 
   /**

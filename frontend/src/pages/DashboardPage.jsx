@@ -3,7 +3,6 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { DUOC_CATEGORIES, INTENT_SHORTCUTS } from '../data/duocModulesData';
-import { VIVO_STUDENT_PROFILE } from '../data/vivoDuocData';
 import { getStudentDisplayName } from '../utils/studentUtils';
 import { ModuleCard } from '../components/dashboard/ModuleCard';
 import { ModuleModal } from '../components/dashboard/ModuleModal';
@@ -432,10 +431,9 @@ export const DashboardPage = () => {
     };
   }, [searchTerm, purposeFilter]);
 
-  const isCristian = (user?.email || '').toLowerCase().includes('guzman');
   const userName = user?.fullName || user?.nombre || getStudentDisplayName(user);
-  const userCareer = user?.career || user?.carrera || (isCristian ? VIVO_STUDENT_PROFILE.carrera : 'Ingeniería en Informática');
-  const userCampus = user?.campus || user?.sede || (isCristian ? VIVO_STUDENT_PROFILE.sede : 'Sede Alameda');
+  const userCareer = user?.career || user?.carrera || 'Ingeniería en Informática';
+  const userCampus = user?.campus || user?.sede || 'Sede Alameda';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900 transition-colors">

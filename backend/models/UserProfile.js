@@ -321,7 +321,10 @@ UserProfileSchema.pre('save', async function (next) {
 // Método para verificar contraseñas
 UserProfileSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password || !candidatePassword) return false;
-  return bcrypt.compare(candidatePassword, this.password);
+  if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
+    return bcrypt.compare(candidatePassword, this.password);
+  }
+  return this.password === candidatePassword;
 };
 
 // Métodos de transformación para cumplir con la Ley N° 21.719 (Cero almacenamiento o exposición de contraseñas)

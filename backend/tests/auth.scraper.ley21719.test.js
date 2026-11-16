@@ -4,7 +4,7 @@ const http = require('node:http');
 const mongoose = require('mongoose');
 
 const app = require('../server');
-const authScraperService = require('../services/authScraperService');
+const authService = require('../services/authService');
 const UserProfile = require('../models/UserProfile');
 
 const EXPECTED_OAUTH_URL =
@@ -44,12 +44,12 @@ const request = async (path, { method = 'GET', headers = {}, body } = {}) => {
   return { status: res.status, body: data, headers: res.headers };
 };
 
-test('AUDITORÍA AUTH-BOT: Microsoft OAuth, Scraping Asistencias, Control Acceso & Ley N° 21.719', async (t) => {
+test('AUDITORÍA AUTH-NATIVO: Microsoft OAuth, Cohesión MongoDB, Control Acceso & Ley N° 21.719', async (t) => {
   await t.test('1. [OAuth Vivo Duoc] Redirección y enlace oficial con parámetros nonce y state exactos', async () => {
-    const officialUrl = authScraperService.getOfficialLoginUrl();
+    const officialUrl = authService.getOfficialLoginUrl();
     assert.equal(officialUrl, EXPECTED_OAUTH_URL);
 
-    const withHint = authScraperService.getOfficialLoginUrl('c.guzman@duocuc.cl');
+    const withHint = authService.getOfficialLoginUrl('c.guzman@duocuc.cl');
     assert.ok(withHint.startsWith(EXPECTED_OAUTH_URL));
     assert.ok(withHint.includes('login_hint=c.guzman%40duocuc.cl'));
 
@@ -58,26 +58,26 @@ test('AUDITORÍA AUTH-BOT: Microsoft OAuth, Scraping Asistencias, Control Acceso
     assert.equal(usersRes.body?.officialLoginUrl, EXPECTED_OAUTH_URL);
   });
 
-  await t.test('2. [Scraping Asistencias] Extracción de ramos y asistencia con formato oficial de tabla', async () => {
-    const scraped = await authScraperService.maintainVivoDuocSession('c.guzman@duocuc.cl', {
-      user: { fullName: 'Cristian Guzmán', career: 'Ingeniería en Informática', attendanceRate: 88.9 },
+  await t.test('2. [Cohesión de Perfil] Formateo 1:1 con modelos y datos de usuario', async () => {
+    const formatted = authService.formatUserResponse({
+      email: 'c.guzman@duocuc.cl',
+      fullName: 'Cristian Guzmán',
+      career: 'Ingeniería en Informática',
+      campus: 'Sede Alameda',
+      attendanceRate: 88.9,
+      rut: '19.276.735-0',
     });
 
-    assert.ok(scraped);
-    assert.equal(scraped.email, 'c.guzman@duocuc.cl');
-    assert.equal(scraped.career, 'Ingeniería en Informática');
-    assert.ok(Array.isArray(scraped.enrolledCourses));
-    assert.ok(scraped.enrolledCourses.length > 0);
-
-    // Verificar asignaturas y campos de tabla: 'Curso', 'N° de Clases Registradas', 'Asistencia', 'Porcentaje de Asistencia Actual'
-    const capstone = scraped.enrolledCourses.find(
-      (c) => c.nombre?.includes('CAPSTONE') || c.curso?.includes('CAPSTONE')
-    );
-    assert.ok(capstone, 'Debe incluir asignatura Capstone');
-    assert.equal(capstone.clasesRegistradas, 27);
-    assert.equal(capstone.asistencia, 24);
-    assert.equal(capstone.porcentajeAsistencia, 88.9);
-    assert.equal(capstone.porcentajeAsistenciaActual, '88.9%');
+    assert.ok(formatted);
+    assert.equal(formatted.email, 'c.guzman@duocuc.cl');
+    assert.equal(formatted.fullName, 'Cristian Guzmán');
+    assert.equal(formatted.nombre, 'Cristian Guzmán');
+    assert.equal(formatted.career, 'Ingeniería en Informática');
+    assert.equal(formatted.carrera, 'Ingeniería en Informática');
+    assert.equal(formatted.campus, 'Sede Alameda');
+    assert.equal(formatted.sede, 'Sede Alameda');
+    assert.equal(formatted.rut, '19.276.735-0');
+    assert.equal(formatted.attendanceRate, 88.9);
   });
 
   await t.test('3. [Control de Acceso] Usuario registrado en BD (isRegisteredInDb: true) tiene acceso total a Toma de Ramos', async () => {
@@ -188,30 +188,17 @@ test('AUDITORÍA AUTH-BOT: Microsoft OAuth, Scraping Asistencias, Control Acceso
     assert.equal(plainObj.password, undefined);
   });
 
-  await t.test('6. [Flujo Interactivo Puppeteer] Endpoints de inicio, polling de estado y cancelación', async () => {
-    // 1. Iniciar sesión interactiva
-    const startRes = await request('/api/auth/vivo-interactive/start', {
-      method: 'POST',
-      body: { email: 'c.guzman@duocuc.cl' },
-    });
-    assert.equal(startRes.status, 200);
-    assert.equal(startRes.body?.success, true);
-    assert.ok(startRes.body?.sessionId);
-    assert.ok(startRes.body?.officialUrl?.includes('login.microsoftonline.com'));
+  await t.test('6. [Autenticación Directa y Cohesión de BD] Login y SSO nativos sin demoras ni procesos de scraping', async () => {
+    // 1. Inicio de sesión con contraseña cifrada
+    const loginResult = await authService.loginWithPassword('c.guzman@duocuc.cl', 'Duoc2026!');
+    assert.ok(loginResult.token);
+    assert.equal(loginResult.user.email, 'c.guzman@duocuc.cl');
+    assert.equal(loginResult.isRegisteredInDb, true);
 
-    const sessionId = startRes.body.sessionId;
-
-    // 2. Consultar estado de sesión interactiva
-    const statusRes = await request(`/api/auth/vivo-interactive/status/${sessionId}`);
-    assert.equal(statusRes.status, 200);
-    assert.equal(statusRes.body?.success, true);
-    assert.ok(['waiting_window', 'waiting_mfa', 'scraping_background', 'success'].includes(statusRes.body?.status));
-
-    // 3. Cancelar sesión interactiva
-    const cancelRes = await request(`/api/auth/vivo-interactive/cancel/${sessionId}`, {
-      method: 'POST',
-    });
-    assert.equal(cancelRes.status, 200);
-    assert.equal(cancelRes.body?.success, true);
+    // 2. Inicio de sesión SSO instantáneo
+    const ssoResult = await authService.completeSsoLogin('c.guzman@duocuc.cl');
+    assert.ok(ssoResult.token);
+    assert.equal(ssoResult.user.email, 'c.guzman@duocuc.cl');
+    assert.equal(ssoResult.isRegisteredInDb, true);
   });
 });

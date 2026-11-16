@@ -5,7 +5,7 @@ const path = require('node:path');
 const jwt = require('jsonwebtoken');
 const { getJwtSecret } = require('../middleware/authMiddleware');
 const UserProfile = require('../models/UserProfile');
-const authScraperService = require('../services/authScraperService');
+const authService = require('../services/authService');
 
 test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y y Overlay Z-Index', async (t) => {
   const secret = getJwtSecret();
@@ -19,9 +19,7 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y y Overlay Z-Index
 
   await t.test('1. Persistencia de Foto de Perfil en UserProfile y formato de respuesta', async () => {
     const sampleBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-    authScraperService.updateUserPhoto(testUser.email, sampleBase64);
-
-    const formatted = authScraperService.formatUserResponse({
+    const formatted = authService.formatUserResponse({
       email: testUser.email,
       fullName: testUser.fullName,
       photo: sampleBase64,
@@ -40,9 +38,7 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y y Overlay Z-Index
       screenReaderOptimized: true,
     };
 
-    authScraperService.updateUserAccessibilityPreferences(testUser.email, preferences);
-
-    const formatted = authScraperService.formatUserResponse({
+    const formatted = authService.formatUserResponse({
       email: testUser.email,
       fullName: testUser.fullName,
       accessibilityPreferences: preferences,

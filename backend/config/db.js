@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const dataScraperService = require('../services/dataScraperService');
-const authScraperService = require('../services/authScraperService');
+const authService = require('../services/authService');
 
 /**
  * Conexión segura a MongoDB con reintento automático y sembrado inicial (Seeding)
@@ -14,9 +13,9 @@ const connectDB = async () => {
     });
     console.log(`[MongoDB] Conectado exitosamente: ${conn.connection.host}`);
 
-    // Sembrar los 10 perfiles institucionales de la BD (Admin, PAEDIS, Estudiante, Profesor, Director, Subdirector, etc.) y módulos en MongoDB
-    await authScraperService.seedInstitutionalUsers();
-    await dataScraperService.seedDefaultData();
+    // Sembrar los perfiles institucionales iniciales directamente en UserProfile de MongoDB
+    await authService.seedInstitutionalUsers();
+
     try {
       const courseService = require('../services/courseService');
       await courseService.seedInitialCourses();
