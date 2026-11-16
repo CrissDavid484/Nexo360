@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import logo03 from '../../assets/logo03.png';
 import {
   HelpCircle,
   BookMarked,
@@ -105,35 +106,25 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
     <header className="bg-white/95 backdrop-blur-md text-slate-900 sticky top-0 z-40 border-b border-slate-200 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.06)] transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="min-h-[68px] py-2.5 flex items-center justify-between gap-4">
-          {/* 1. Marca Institucional Limpia */}
+          {/* 1. Marca Institucional Oficial (Logo 03: Nexo360 Duoc UC | Ícono N 360 - Responsive tipo SVG) */}
           <button
             type="button"
             onClick={() => {
               onTabChange('centro-ayuda');
               setIsMobileMenuOpen(false);
             }}
-            className="min-h-[44px] flex items-center gap-3 group text-left rounded-xl pr-2 transition-transform duration-150 active:scale-[0.98]"
+            className="min-h-[44px] flex items-center group text-left rounded-xl p-1 transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
             aria-label="Ir al inicio de Nexo360 Centro de Ayuda"
           >
-            <div
-              className="w-10 h-10 rounded-xl bg-[#002B49] text-[#FFB81C] font-bold text-lg flex items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105"
-              aria-hidden="true"
-            >
-              N
-            </div>
-            <div>
-              <div className="flex items-center gap-2 leading-none">
-                <span className="text-lg sm:text-xl font-bold tracking-tight text-[#002B49]">
-                  Nexo<span className="text-amber-600">360</span>
-                </span>
-                <span className="hidden sm:inline-block text-[11px] font-semibold text-slate-500 border-l border-slate-200 pl-2">
-                  Duoc UC
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Centro de Ayuda y Servicios
-              </p>
-            </div>
+            <img
+              src={logo03}
+              alt="Nexo360 Duoc UC"
+              className="nexo-logo-official w-auto object-contain transition-all duration-200 group-hover:opacity-95 select-none"
+              style={{
+                height: 'clamp(30px, 2.5vw + 16px, 44px)',
+                aspectRatio: '1024 / 307'
+              }}
+            />
           </button>
 
           {/* 2. Navegación Central en Escritorio (>= lg) */}

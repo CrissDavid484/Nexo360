@@ -4,6 +4,7 @@ import { LoginForm } from '../components/auth/LoginForm';
 import { MfaPrompt } from '../components/auth/MfaPrompt';
 import { AccessibilityBar } from '../components/common/AccessibilityBar';
 import { useAuth } from '../context/AuthContext';
+import logo03 from '../assets/logo03.png';
 
 export const LoginPage = () => {
   const [mfaSession, setMfaSession] = useState(null);
@@ -37,28 +38,26 @@ export const LoginPage = () => {
         id="main-content"
         className="flex-1 flex flex-col items-center justify-center py-10 px-4 animate-fade-in-up"
       >
-        {/* Marca institucional limpia */}
+        {/* Marca institucional oficial (Logo 03: Nexo360 Duoc UC | Ícono N 360 - Responsive tipo SVG) */}
         <header className="mb-7 text-center">
-          <div className="inline-flex items-center gap-3">
-            <div
-              className="w-11 h-11 bg-[#002B49] rounded-xl flex items-center justify-center shadow-xs"
-              aria-hidden="true"
-            >
-              <span className="text-[#FFB81C] font-bold text-xl leading-none">N</span>
-            </div>
-            <div className="text-left">
-              <p className="text-xl font-bold text-[#002B49] leading-tight">
-                Nexo<span className="text-amber-600">360</span>
-              </p>
-              <p className="text-xs text-slate-500 font-medium">
-                Centro de Ayuda y Servicios • Duoc UC
-              </p>
-            </div>
+          <div className="inline-flex flex-col items-center justify-center">
+            <img
+              src={logo03}
+              alt="Nexo360 Duoc UC"
+              className="nexo-logo-official w-auto object-contain transition-all duration-200 select-none drop-shadow-xs"
+              style={{
+                height: 'clamp(44px, 4vw + 20px, 64px)',
+                aspectRatio: '1024 / 307'
+              }}
+            />
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-2.5">
+              Centro de Ayuda y Servicios
+            </p>
           </div>
         </header>
 
         {/* Contenedor del flujo de autenticación */}
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-[460px]">
           {mfaSession ? (
             <MfaPrompt
               sessionInfo={mfaSession}

@@ -346,6 +346,15 @@ html.high-contrast .a11y-switch-thumb {
   background-color: #0F172A !important;
 }
 
+/* Logo oficial institucional en modo Alto Contraste */
+html.high-contrast .nexo-logo-official,
+html.high-contrast img[src*="logo03"] {
+  background-color: #FFFFFF !important;
+  padding: 3px 8px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px #475569 !important;
+}
+
 /* ==========================================================================
    6. THEME SWITCH SOL / LUNA / NUBES / ESTRELLAS (Optimizado para 60/120 FPS)
    ========================================================================== */

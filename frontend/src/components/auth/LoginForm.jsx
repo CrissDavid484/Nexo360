@@ -57,9 +57,11 @@ export const LoginForm = ({ onDirectSuccess }) => {
 
   const handleQuickSelect = (user) => {
     setEmail(user.email);
-    setPassword(user.password);
+    setPassword(user.password || 'Duoc2026!');
     setErrorMessage('');
-    announce(`Perfil de prueba seleccionado: ${user.label} (${user.roleTag})`, 'polite');
+    const name = user.fullName || user.nombre || user.label || user.email;
+    const role = user.roleLabel || user.roleTag || user.role || 'Estudiante';
+    announce(`Perfil de prueba seleccionado: ${name} (${role})`, 'polite');
   };
 
   /**
@@ -440,8 +442,11 @@ export const LoginForm = ({ onDirectSuccess }) => {
           </button>
         </form>
 
-        {/* Contraseñas de prueba (Selector sobrio de Cuentas Demo) */}
-        <DemoAccountsSelector onSelectAccount={handleQuickSelect} />
+        {/* Contraseñas de prueba (Selector de Estudiantes y Cuentas Demo de la BD) */}
+        <DemoAccountsSelector
+          onSelectAccount={handleQuickSelect}
+          selectedEmail={email}
+        />
       </div>
     </section>
   );
