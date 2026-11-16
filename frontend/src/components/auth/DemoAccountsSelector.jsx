@@ -20,151 +20,41 @@ import { api } from '../../services/api';
  */
 
 const FALLBACK_USERS = [
-  {
-    email: 'c.guzman@duocuc.cl',
-    fullName: 'Cristian Guzmán',
-    role: 'admin',
-    roleLabel: 'Administrador General • PAEDIS',
-    isPaedis: true,
-    academicStatus: 'activo',
-    badge: 'Admin & PAEDIS',
-  },
-  {
-    email: 'an.ordenesd@duocuc.cl',
-    fullName: 'Angelo Órdenes',
-    role: 'estudiante',
-    roleLabel: 'Estudiante Regular Duoc UC',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Estudiante',
-  },
-  {
-    email: 'd.rojas@duocuc.cl',
-    fullName: 'Daniela Rojas',
-    role: 'estudiante_paedis',
-    roleLabel: 'Estudiante Regular • PAEDIS',
-    isPaedis: true,
-    academicStatus: 'activo',
-    badge: 'PAEDIS Activa',
-  },
-  {
-    email: 'm.contreras@duocuc.cl',
-    fullName: 'Matías Contreras',
-    role: 'estudiante',
-    roleLabel: 'Estudiante Regular (Alerta RI < 70%)',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Riesgo Deserción',
-  },
-  {
-    email: 'v.soto@duocuc.cl',
-    fullName: 'Valentina Soto',
-    role: 'tutor_par',
-    roleLabel: 'Tutora Par & Cuidadora Ley 21.790',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Tutora Par',
-  },
-  {
-    email: 'f.morales@duocuc.cl',
-    fullName: 'Felipe Morales',
-    role: 'estudiante',
-    roleLabel: 'Egresado Titulado',
-    isPaedis: false,
-    academicStatus: 'titulado',
-    badge: 'Titulado',
-  },
-  {
-    email: 'j.perez@duocuc.cl',
-    fullName: 'Juan Pérez Silva',
-    role: 'estudiante',
-    roleLabel: 'Estudiante en Riesgo',
-    isPaedis: false,
-    academicStatus: 'desercion',
-    badge: 'Riesgo Académico',
-  },
-  {
-    email: 'matias.wapo@duocuc.cl',
-    fullName: 'Matías Sáez',
-    role: 'estudiante',
-    roleLabel: 'Estudiante Regular',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Estudiante',
-  },
-  {
-    email: 'cri.guzmang@duocuc.cl',
-    fullName: 'Cristian Guzmán G.',
-    role: 'estudiante_paedis',
-    roleLabel: 'Estudiante PAEDIS',
-    isPaedis: true,
-    academicStatus: 'activo',
-    badge: 'PAEDIS',
-  },
-  {
-    email: 'd.diaz@duocuc.cl',
-    fullName: 'Daniela Díaz',
-    role: 'admin',
-    roleLabel: 'Administradora de Sistema',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Admin General',
-  },
-  {
-    email: 'm.gomez@profesor.duoc.cl',
-    fullName: 'Mauricio Gómez Arratia',
-    role: 'profesor',
-    roleLabel: 'Docente Titular Capstone',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Docente Titular',
-  },
-  {
-    email: 'p.valenzuela@duoc.cl',
-    fullName: 'Patricia Valenzuela',
-    role: 'director',
-    roleLabel: 'Directora de Carrera',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Directora',
-  },
-  {
-    email: 'r.mendez@duoc.cl',
-    fullName: 'Roberto Méndez',
-    role: 'subdirector',
-    roleLabel: 'Subdirector Académico',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Subdirector',
-  },
-  {
-    email: 't.montes@duoc.cl',
-    fullName: 'Tania Montes',
-    role: 'coordinador_paedis',
-    roleLabel: 'Coordinadora PAEDIS',
-    isPaedis: true,
-    academicStatus: 'activo',
-    badge: 'Coord. PAEDIS',
-  },
-  {
-    email: 'c.herrera@duoc.cl',
-    fullName: 'Camila Herrera',
-    role: 'administrativo',
-    roleLabel: 'Gestión Biblioteca y Financiamiento',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Administrativo',
-  },
-  {
-    email: 'admin.nexo360@duoc.cl',
-    fullName: 'Administrador Nexo360',
-    role: 'admin',
-    roleLabel: 'Administrador General',
-    isPaedis: false,
-    academicStatus: 'activo',
-    badge: 'Admin',
-  },
-];
+  ['c.guzman@duocuc.cl', 'Cristian Guzmán', 'admin', 'Administrador General • PAEDIS', true, 'Admin & PAEDIS'],
+  ['an.ordenesd@duocuc.cl', 'Angelo Órdenes', 'estudiante', 'Estudiante Regular Duoc UC', false, 'Estudiante'],
+  ['d.rojas@duocuc.cl', 'Daniela Rojas', 'estudiante_paedis', 'Estudiante Regular • PAEDIS', true, 'PAEDIS Activa'],
+  ['m.contreras@duocuc.cl', 'Matías Contreras', 'estudiante', 'Estudiante Regular (Alerta RI < 70%)', false, 'Riesgo Deserción'],
+  ['v.soto@duocuc.cl', 'Valentina Soto', 'tutor_par', 'Tutora Par & Cuidadora Ley 21.790', false, 'Tutora Par'],
+  ['f.morales@duocuc.cl', 'Felipe Morales', 'estudiante', 'Egresado Titulado', false, 'Titulado', 'titulado'],
+  ['j.perez@duocuc.cl', 'Juan Pérez Silva', 'estudiante', 'Estudiante en Riesgo', false, 'Riesgo Académico', 'desercion'],
+  ['matias.wapo@duocuc.cl', 'Matías Sáez', 'estudiante', 'Estudiante Regular', false, 'Estudiante'],
+  ['cri.guzmang@duocuc.cl', 'Cristian Guzmán G.', 'estudiante_paedis', 'Estudiante PAEDIS', true, 'PAEDIS'],
+  ['d.diaz@duocuc.cl', 'Daniela Díaz', 'admin', 'Administradora de Sistema', false, 'Admin General'],
+  ['m.gomez@profesor.duoc.cl', 'Mauricio Gómez Arratia', 'profesor', 'Docente Titular Capstone', false, 'Docente Titular'],
+  ['p.valenzuela@duoc.cl', 'Patricia Valenzuela', 'director', 'Directora de Carrera', false, 'Directora'],
+  ['r.mendez@duoc.cl', 'Roberto Méndez', 'subdirector', 'Subdirector Académico', false, 'Subdirector'],
+  ['t.montes@duoc.cl', 'Tania Montes', 'coordinador_paedis', 'Coordinadora PAEDIS', true, 'Coord. PAEDIS'],
+  ['c.herrera@duoc.cl', 'Camila Herrera', 'administrativo', 'Gestión Biblioteca y Financiamiento', false, 'Administrativo'],
+  ['admin.nexo360@duoc.cl', 'Administrador Nexo360', 'admin', 'Administrador General', false, 'Admin'],
+].map(([email, fullName, role, roleLabel, isPaedis, badge, status]) => ({
+  email,
+  fullName,
+  role,
+  roleLabel,
+  isPaedis,
+  academicStatus: status || 'activo',
+  badge,
+}));
+
+const isStudentAccount = (user) => {
+  const r = user?.role || '';
+  return (
+    r.includes('estudiante') ||
+    r.includes('tutor') ||
+    Boolean(user?.isPaedis) ||
+    !['profesor', 'director', 'subdirector', 'administrativo'].includes(r)
+  );
+};
 
 export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) => {
   const [dbUsers, setDbUsers] = useState(FALLBACK_USERS);
@@ -216,19 +106,9 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
   const filteredUsers = useMemo(() => {
     let list = dbUsers;
     if (activeFilter === 'estudiantes') {
-      list = dbUsers.filter(
-        (u) =>
-          u.role.includes('estudiante') ||
-          u.role.includes('tutor') ||
-          u.isPaedis ||
-          !['profesor', 'director', 'subdirector', 'administrativo'].includes(u.role)
-      );
+      list = dbUsers.filter(isStudentAccount);
     } else if (activeFilter === 'personal') {
-      list = dbUsers.filter((u) =>
-        ['admin', 'profesor', 'director', 'subdirector', 'coordinador_paedis', 'administrativo'].includes(
-          u.role
-        )
-      );
+      list = dbUsers.filter((u) => !isStudentAccount(u));
     }
     // Orden alfabético estricto de A a Z
     return [...list].sort((a, b) => {
@@ -239,13 +119,7 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
   }, [dbUsers, activeFilter]);
 
   const studentCount = useMemo(() => {
-    return dbUsers.filter(
-      (u) =>
-        u.role.includes('estudiante') ||
-        u.role.includes('tutor') ||
-        u.isPaedis ||
-        !['profesor', 'director', 'subdirector', 'administrativo'].includes(u.role)
-    ).length;
+    return dbUsers.filter(isStudentAccount).length;
   }, [dbUsers]);
 
   const handleSelectUser = (user) => {

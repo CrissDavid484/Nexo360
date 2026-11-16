@@ -39,98 +39,46 @@ for (const seedUser of SEED_USERS) {
 }
 
 /**
- * Cálculo del Dígito Verificador de un RUT chileno (Algoritmo Módulo 11)
+ * Algoritmo compacto Módulo 11 para cálculo de dígito verificador chileno
  */
-function calculateRutDv(rutNumber) {
-  let sum = 0;
-  let multiplier = 2;
-  let num = Math.floor(rutNumber);
-  while (num > 0) {
-    sum += (num % 10) * multiplier;
-    num = Math.floor(num / 10);
-    multiplier = multiplier === 7 ? 2 : multiplier + 1;
-  }
-  const remainder = 11 - (sum % 11);
-  if (remainder === 11) return '0';
-  if (remainder === 10) return 'K';
-  return remainder.toString();
-}
+const computeModulo11Dv = (rutDigits) => {
+  const digits = String(rutDigits).replace(/\D/g, '').split('').reverse();
+  const total = digits.reduce((sum, char, idx) => sum + Number(char) * ((idx % 6) + 2), 0);
+  const rem = 11 - (total % 11);
+  if (rem === 11) return '0';
+  if (rem === 10) return 'K';
+  return String(rem);
+};
 
 /**
- * Generador de RUT determinista para usuarios no registrados previamente
+ * Generador determinista de RUT estudiantil mediante hashing de correo
  */
-function generateSimulatedRut(email = '') {
-  let hash = 0;
-  const str = (email || '').toLowerCase().trim();
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash = Math.trunc(hash);
+const createDeterministicRut = (email = '') => {
+  const clean = String(email || '').trim().toLowerCase();
+  let seed = 0;
+  for (let i = 0; i < clean.length; i++) {
+    seed = Math.trunc(((seed << 5) - seed) + clean.charCodeAt(i));
   }
-  const positiveHash = Math.abs(hash);
-  const minNumber = 20000000;
-  const maxNumber = 22500000;
-  const rutNum = minNumber + (positiveHash % (maxNumber - minNumber));
-  const dv = calculateRutDv(rutNum);
-  const numStr = rutNum.toString();
-  return `${numStr.slice(0, 2)}.${numStr.slice(2, 5)}.${numStr.slice(5, 8)}-${dv}`;
-}
+  const baseNum = 20000000 + (Math.abs(seed) % 2500000);
+  const dv = computeModulo11Dv(baseNum);
+  const s = String(baseNum);
+  return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}-${dv}`;
+};
 
 /**
- * Conversión de correo institucional a nombre formal
+ * Derivación de nombre legible a partir del correo institucional Duoc UC
  */
-function parseNameFromEmail(email = '') {
-  const clean = (email || '').toLowerCase().trim();
-  if (!clean || !clean.includes('@')) return 'Estudiante Duoc UC';
-  const local = clean.split('@')[0];
-  if (local === 'c.guzman' || local === 'cri.guzmang') return 'Cristian Guzmán';
-  if (local === 'an.ordenesd') return 'Angelo Órdenes';
+const resolveNameFromEmail = (email = '') => {
+  const [localPart] = String(email || '').trim().toLowerCase().split('@');
+  if (!localPart) return 'Estudiante Duoc UC';
+  if (localPart === 'c.guzman' || localPart === 'cri.guzmang') return 'Cristian Guzmán';
+  if (localPart === 'an.ordenesd') return 'Angelo Órdenes';
 
-  const parts = local.split('.');
-  if (parts.length >= 2) {
-    let firstName = parts[0];
-    let lastName = parts.slice(1).join(' ');
-
-    const mapFirst = {
-      an: 'Andrés',
-      cr: 'Cristian',
-      cri: 'Cristian',
-      da: 'Daniela',
-      ma: 'Matías',
-      matias: 'Matías',
-      va: 'Valentina',
-      fe: 'Felipe',
-      ju: 'Juan',
-      ca: 'Carlos',
-      ro: 'Roberto',
-      pa: 'Patricia',
-      c: 'Carlos',
-      m: 'Manuel',
-      d: 'David',
-      f: 'Francisco',
-      j: 'José',
-      p: 'Pedro',
-      v: 'Vicente',
-    };
-
-    if (mapFirst[firstName]) {
-      firstName = mapFirst[firstName];
-    } else {
-      firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-    }
-
-    if (lastName.length > 3 && /[a-z]$/i.test(lastName)) {
-      const baseLastName = lastName.slice(0, -1);
-      const secondInitial = lastName.slice(-1).toUpperCase();
-      const capBase = baseLastName.charAt(0).toUpperCase() + baseLastName.slice(1);
-      return `${firstName} ${capBase} ${secondInitial}.`;
-    }
-
-    const capLast = lastName.charAt(0).toUpperCase() + lastName.slice(1);
-    return `${firstName} ${capLast}`;
-  }
-
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
+  const segments = localPart.split(/[._-]/).filter(Boolean);
+  return segments
+    .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
+    .join(' ');
+};
 
 class AuthService {
   getOfficialLoginUrl(email = '') {
@@ -196,7 +144,7 @@ class AuthService {
           salt
         );
 
-        const derivedName = parseNameFromEmail(cleanEmail);
+        const derivedName = resolveNameFromEmail(cleanEmail);
         const newUserData = seedMatch
           ? {
               ...seedMatch,
@@ -212,7 +160,7 @@ class AuthService {
               password: hashedPassword,
               fullName: derivedName,
               nombre: derivedName,
-              rut: generateSimulatedRut(cleanEmail),
+              rut: createDeterministicRut(cleanEmail),
               role: 'estudiante',
               roleLabel: 'Estudiante Regular Duoc UC',
               isPaedis: false,
@@ -238,13 +186,13 @@ class AuthService {
     // Fallback de memoria si MongoDB no está conectado
     let mem = inMemoryUsers.get(cleanEmail);
     if (!mem) {
-      const derivedName = parseNameFromEmail(cleanEmail);
+      const derivedName = resolveNameFromEmail(cleanEmail);
       mem = {
         _id: `temp_${Date.now()}`,
         email: cleanEmail,
         fullName: derivedName,
         nombre: derivedName,
-        rut: generateSimulatedRut(cleanEmail),
+        rut: createDeterministicRut(cleanEmail),
         role: 'estudiante',
         roleLabel: 'Estudiante Regular Duoc UC',
         isPaedis: false,
@@ -469,7 +417,7 @@ class AuthService {
     const id = raw._id ? String(raw._id) : raw.id || `user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const fullName = raw.fullName || raw.nombre || email || 'Estudiante Duoc UC';
     const nombre = fullName;
-    const rut = raw.rut || generateSimulatedRut(email);
+    const rut = raw.rut || createDeterministicRut(email);
     const role = raw.role || 'estudiante';
     const rol = role;
     const roleLabel = raw.roleLabel || 'Estudiante Regular Duoc UC';
