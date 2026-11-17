@@ -35,6 +35,23 @@ import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { CoursesAdminSection } from '../admin/CoursesAdminSection';
+import { AdministrativeStaffSection } from '../admin/AdministrativeStaffSection';
+
+/**
+ * Discriminador estricto para separar personal administrativo y de coordinación del alumnado
+ */
+const isStaffOrAdministrativeRole = (role) => {
+  const r = (role || '').toLowerCase();
+  return (
+    r === 'coordinador_paedis' ||
+    r === 'admin' ||
+    r === 'administrador' ||
+    r === 'administrativo' ||
+    r === 'profesor' ||
+    r === 'director' ||
+    r === 'subdirector'
+  );
+};
 
 const DEFAULT_CAREERS = [
   'Ingeniería en Informática',
@@ -203,12 +220,21 @@ export const AdminPanelView = () => {
     return sortedSedes.filter((s) => (s.name || '').toLowerCase().includes(q));
   }, [sortedSedes, sedeSearch]);
 
+  // Separación estricta entre Alumnado y Apartado Administrativo PAEDIS
+  const studentUsers = useMemo(() => {
+    return students.filter((s) => !isStaffOrAdministrativeRole(s.role));
+  }, [students]);
+
+  const administrativeUsers = useMemo(() => {
+    return students.filter((s) => isStaffOrAdministrativeRole(s.role));
+  }, [students]);
+
   // Filtrado y ordenamiento alfabético de estudiantes en el directorio
   const filteredStudents = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     const cleanQ = q.replace(/[^0-9kK]/g, '');
 
-    const filtered = students.filter((s) => {
+    const filtered = studentUsers.filter((s) => {
       const studentName = s.fullName || s.nombre || '';
       const studentSede = s.campus || s.sede || '';
       const studentRut = s.rut || '';
@@ -241,7 +267,7 @@ export const AdminPanelView = () => {
       if (cmp !== 0) return cmp;
       return (a.rut || '').localeCompare(b.rut || '');
     });
-  }, [students, searchTerm, filterStatus]);
+  }, [studentUsers, searchTerm, filterStatus]);
 
   // Manejo de cambio de estado académico
   const handleOpenStatusModal = (student) => {
@@ -613,7 +639,7 @@ export const AdminPanelView = () => {
           type="button"
           onClick={() => {
             setAdminSubTab('estudiantes');
-            announce('Pestaña de Gestión de Estudiantes seleccionada.', 'polite');
+            announce('Pestaña de Alumnado y Retención Estudiantil seleccionada.', 'polite');
           }}
           className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
             adminSubTab === 'estudiantes'
@@ -622,7 +648,29 @@ export const AdminPanelView = () => {
           }`}
         >
           <Users className="w-4 h-4 text-amber-400" />
-          <span>Gestión de Estudiantes & Retención</span>
+          <span>Alumnado & Estudiantes PAEDIS</span>
+          <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-[#002B49]">
+            {studentUsers.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAdminSubTab('administrativos');
+            announce('Pestaña de Apartado Administrativo PAEDIS seleccionada.', 'polite');
+          }}
+          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            adminSubTab === 'administrativos'
+              ? 'bg-[#002B49] text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Shield className="w-4 h-4 text-purple-400" />
+          <span>Apartado Administrativo PAEDIS</span>
+          <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200">
+            {administrativeUsers.length}
+          </span>
         </button>
 
         <button
@@ -870,6 +918,26 @@ export const AdminPanelView = () => {
             </div>
           </div>
         </section>
+      ) : adminSubTab === 'administrativos' ? (
+        /* APARTADO ADMINISTRATIVO PAEDIS */
+        <AdministrativeStaffSection
+          staffUsers={administrativeUsers}
+          onOpenCreateModal={() => {
+            setNewUserForm({
+              fullName: '',
+              email: '',
+              password: dynamicInitialPassword,
+              rut: '',
+              role: 'coordinador_paedis',
+              career: 'Programa PAEDIS',
+              campus: 'Sede Alameda',
+            });
+            setIsCreateModalOpen(true);
+          }}
+          isAdmin={isAdmin}
+          isCoordinator={isCoordinator}
+          announce={announce}
+        />
       ) : (
         /* PESTAÑA PRINCIPAL: GESTIÓN DE ESTUDIANTES & MODELO PREDICTIVO */
         <>
@@ -1150,15 +1218,33 @@ export const AdminPanelView = () => {
             aria-labelledby="students-directory-title"
             className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm space-y-5"
           >
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-[#002B49] bg-amber-100">
+                    <Users className="w-3 h-3 text-amber-700" aria-hidden="true" />
+                    Cuerpo Estudiantil • PAEDIS y Regular
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminSubTab('administrativos');
+                      announce('Navegando al Apartado Administrativo PAEDIS.', 'polite');
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors cursor-pointer"
+                    title="Ver personal docente, directivo y de coordinación PAEDIS"
+                  >
+                    <Shield className="w-3 h-3 text-purple-600" aria-hidden="true" />
+                    <span>Ver Apartado Administrativo ({administrativeUsers.length}) →</span>
+                  </button>
+                </div>
                 <h2
                   id="students-directory-title"
                   className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight"
                 >
                   Directorio de Estudiantes Registrados ({filteredStudents.length})
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                <p className="text-xs sm:text-sm text-slate-500 font-medium">
                   Haz clic en cualquier estudiante para abrir su ficha completa con asistencia detallada por asignatura y semáforo predictivo.
                 </p>
               </div>
@@ -1819,16 +1905,20 @@ export const AdminPanelView = () => {
                   className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                 >
                   <option value="" disabled>Selecciona un rol...</option>
-                  <option value="estudiante">Estudiante</option>
-                  <option value="estudiante_paedis">Estudiante PAEDIS</option>
-                  <option value="coordinador_paedis">Coordinador PAEDIS</option>
-                  {isAdmin ? (
-                    <option value="admin">Administrador</option>
-                  ) : (
-                    <option value="" disabled>
-                      Administrador (Restringido: Solo Administrador puede asignar este rol)
-                    </option>
-                  )}
+                  <optgroup label="Alumnado Duoc UC">
+                    <option value="estudiante">Estudiante</option>
+                    <option value="estudiante_paedis">Estudiante PAEDIS</option>
+                  </optgroup>
+                  <optgroup label="Apartado Administrativo & PAEDIS">
+                    <option value="coordinador_paedis">Coordinador PAEDIS</option>
+                    {isAdmin ? (
+                      <option value="admin">Administrador</option>
+                    ) : (
+                      <option value="" disabled>
+                        Administrador (Restringido: Solo Administrador puede asignar este rol)
+                      </option>
+                    )}
+                  </optgroup>
                 </select>
                 {!isAdmin && (
                   <span className="text-[11px] text-slate-500 font-medium block">
