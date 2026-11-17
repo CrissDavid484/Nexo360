@@ -86,72 +86,54 @@ export const TOMA_RAMOS_ESTUDIANTE = {
   creditosAprobadosOptativos: 28,
 };
 
-export const CARRERAS_DUOC = [
+const BASE_CAREER_DEFAULTS = {
+  escuela: 'Escuela de Informática y Telecomunicaciones',
+  sede: 'ALAMEDA',
+  jornada: 'Diurno',
+  periodo: '2026 - 002',
+  creditosTotalesCurriculum: 418,
+  creditosTotalesOptativos: 28,
+  creditosAprobadosOptativos: 28,
+  creditosAprobadosOptativosInterdisciplinarios: 4,
+  creditosAprobadosOptativosFormacionCristiana: 0,
+  creditosAprobadosOptativosProfundizacion: 0,
+};
+
+const CAREER_DEFINITIONS = [
   {
     codigo: '1446815',
     nombre: 'INGENIER. EN INFRAESTRUCTURA TECNOLÓGICA',
     nombreCorto: 'Ing. en Infraestructura Tecnológica',
-    escuela: 'Escuela de Informática y Telecomunicaciones',
-    sede: 'ALAMEDA',
-    jornada: 'Diurno',
-    periodo: '2026 - 002',
-    creditosTotalesCurriculum: 418,
     creditosInscritosAprobados: 350,
-    creditosTotalesOptativos: 28,
-    creditosAprobadosOptativos: 28,
-    creditosAprobadosOptativosInterdisciplinarios: 4,
-    creditosAprobadosOptativosFormacionCristiana: 0,
-    creditosAprobadosOptativosProfundizacion: 0,
   },
   {
     codigo: '1446814',
     nombre: 'ING. EN INFRAEST. Y PLATAFORMAS TECN.',
     nombreCorto: 'Ing. en Infraest. y Plataformas Tecn.',
-    escuela: 'Escuela de Informática y Telecomunicaciones',
-    sede: 'ALAMEDA',
-    jornada: 'Diurno',
-    periodo: '2026 - 002',
-    creditosTotalesCurriculum: 418,
     creditosInscritosAprobados: 340,
-    creditosTotalesOptativos: 28,
-    creditosAprobadosOptativos: 28,
-    creditosAprobadosOptativosInterdisciplinarios: 4,
-    creditosAprobadosOptativosFormacionCristiana: 0,
-    creditosAprobadosOptativosProfundizacion: 0,
   },
   {
     codigo: '1446114',
     nombre: 'INGENIERÍA EN INFORMÁTICA',
     nombreCorto: 'Ingeniería en Informática',
-    escuela: 'Escuela de Informática y Telecomunicaciones',
-    sede: 'ALAMEDA',
-    jornada: 'Diurno',
-    periodo: '2026 - 002',
-    creditosTotalesCurriculum: 418,
     creditosInscritosAprobados: 378,
-    creditosTotalesOptativos: 28,
-    creditosAprobadosOptativos: 28,
-    creditosAprobadosOptativosInterdisciplinarios: 4,
-    creditosAprobadosOptativosFormacionCristiana: 0,
-    creditosAprobadosOptativosProfundizacion: 0,
   },
   {
     codigo: '1446112',
     nombre: 'ANALISTA PROGRAMADOR COMPUTACIONAL',
     nombreCorto: 'Analista Programador',
-    escuela: 'Escuela de Informática y Telecomunicaciones',
-    sede: 'ALAMEDA',
-    jornada: 'Diurno',
-    periodo: '2026 - 002',
     creditosTotalesCurriculum: 250,
     creditosInscritosAprobados: 190,
     creditosTotalesOptativos: 16,
     creditosAprobadosOptativos: 16,
     creditosAprobadosOptativosInterdisciplinarios: 0,
-    creditosAprobadosOptativosFormacionCristiana: 0,
-    creditosAprobadosOptativosProfundizacion: 0,
   },
 ];
+
+export const CARRERAS_DUOC = CAREER_DEFINITIONS.map((def) => ({
+  ...BASE_CAREER_DEFAULTS,
+  ...def,
+}));
 
 export const BLOQUES_HORARIOS_TOMA = [
   { id: 'b1', hora: '08:31 - 09:10', labelPdf: '08:31 A 09:10' },
@@ -172,6 +154,36 @@ export const BLOQUES_HORARIOS_TOMA = [
   { id: 'b16', hora: '20:31 - 21:10', labelPdf: '20:31 A 21:10' },
   { id: 'b17', hora: '21:11 - 21:50', labelPdf: '21:11 A 21:50' },
 ];
+
+const createOptativoSport = (
+  sigla,
+  nombre,
+  cuposTotales,
+  cuposDisponibles,
+  sala,
+  profesor,
+  horarioTexto,
+  bloques = [],
+  sinCupos = false
+) => ({
+  sigla,
+  siglaEq: '',
+  nombre,
+  creditos: 0,
+  tipo: 'optativo',
+  secciones: [
+    {
+      seccion: '001D',
+      cuposTotales,
+      cuposDisponibles,
+      sala,
+      profesor,
+      horarioTexto,
+      bloques,
+      ...(sinCupos ? { sinCupos: true } : {}),
+    },
+  ],
+});
 
 export const ASIGNATURAS_DISPONIBLES = [
   {
@@ -467,108 +479,66 @@ export const ASIGNATURAS_DISPONIBLES = [
       },
     ],
   },
-  {
-    sigla: 'FITW',
-    siglaEq: '',
-    nombre: 'FITNESS MIERCOLES',
-    creditos: 0,
-    tipo: 'optativo',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 25,
-        cuposDisponibles: 8,
-        sala: 'Gimnasio Alameda',
-        profesor: 'Valeria Soto M.',
-        horarioTexto: 'Miércoles 11:31 - 12:50',
-        bloques: [
-          { dia: 'Miércoles', bloqueId: 'b5', salaCorta: 'GIM-ALM' },
-          { dia: 'Miércoles', bloqueId: 'b6', salaCorta: 'GIM-ALM' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'BASDW',
-    siglaEq: '',
-    nombre: 'BASQUETBOL DAMA MIERCOLES',
-    creditos: 0,
-    tipo: 'optativo',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 20,
-        cuposDisponibles: 6,
-        sala: 'Multicancha Alameda',
-        profesor: 'Patricia Fuentes',
-        horarioTexto: 'Miércoles 13:01 - 14:30',
-        bloques: [
-          { dia: 'Miércoles', bloqueId: 'b7', salaCorta: 'CANCHA-1' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'DEFPL',
-    siglaEq: '',
-    nombre: 'DEFENSA PERSONAL LUNES',
-    creditos: 0,
-    tipo: 'optativo',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 25,
-        cuposDisponibles: 10,
-        sala: 'Sala Multiuso Alameda',
-        profesor: 'Rodrigo Morales',
-        horarioTexto: 'Lunes 10:01 - 11:20',
-        bloques: [
-          { dia: 'Lunes', bloqueId: 'b3', salaCorta: 'MULTIUSO' },
-          { dia: 'Lunes', bloqueId: 'b4', salaCorta: 'MULTIUSO' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'FUTVJ',
-    siglaEq: '',
-    nombre: 'FUTBOL VARON JUEVES',
-    creditos: 0,
-    tipo: 'optativo',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 22,
-        cuposDisponibles: 5,
-        sala: 'Cancha Central Alameda',
-        profesor: 'Esteban Paredes Q.',
-        horarioTexto: 'Jueves 11:31 - 12:50',
-        bloques: [
-          { dia: 'Jueves', bloqueId: 'b5', salaCorta: 'CANCHA-C' },
-          { dia: 'Jueves', bloqueId: 'b6', salaCorta: 'CANCHA-C' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'KARAS',
-    siglaEq: '',
-    nombre: 'KARATE SABADO',
-    creditos: 0,
-    tipo: 'optativo',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 20,
-        cuposDisponibles: 0,
-        sala: 'Dojo Alameda',
-        profesor: 'Takeshi Miyagi',
-        horarioTexto: 'Sábado 11:31 - 13:40',
-        bloques: [],
-        sinCupos: true,
-      },
-    ],
-  },
+  createOptativoSport(
+    'FITW',
+    'FITNESS MIERCOLES',
+    25,
+    8,
+    'Gimnasio Alameda',
+    'Valeria Soto M.',
+    'Miércoles 11:31 - 12:50',
+    [
+      { dia: 'Miércoles', bloqueId: 'b5', salaCorta: 'GIM-ALM' },
+      { dia: 'Miércoles', bloqueId: 'b6', salaCorta: 'GIM-ALM' },
+    ]
+  ),
+  createOptativoSport(
+    'BASDW',
+    'BASQUETBOL DAMA MIERCOLES',
+    20,
+    6,
+    'Multicancha Alameda',
+    'Patricia Fuentes',
+    'Miércoles 13:01 - 14:30',
+    [{ dia: 'Miércoles', bloqueId: 'b7', salaCorta: 'CANCHA-1' }]
+  ),
+  createOptativoSport(
+    'DEFPL',
+    'DEFENSA PERSONAL LUNES',
+    25,
+    10,
+    'Sala Multiuso Alameda',
+    'Rodrigo Morales',
+    'Lunes 10:01 - 11:20',
+    [
+      { dia: 'Lunes', bloqueId: 'b3', salaCorta: 'MULTIUSO' },
+      { dia: 'Lunes', bloqueId: 'b4', salaCorta: 'MULTIUSO' },
+    ]
+  ),
+  createOptativoSport(
+    'FUTVJ',
+    'FUTBOL VARON JUEVES',
+    22,
+    5,
+    'Cancha Central Alameda',
+    'Esteban Paredes Q.',
+    'Jueves 11:31 - 12:50',
+    [
+      { dia: 'Jueves', bloqueId: 'b5', salaCorta: 'CANCHA-C' },
+      { dia: 'Jueves', bloqueId: 'b6', salaCorta: 'CANCHA-C' },
+    ]
+  ),
+  createOptativoSport(
+    'KARAS',
+    'KARATE SABADO',
+    20,
+    0,
+    'Dojo Alameda',
+    'Takeshi Miyagi',
+    'Sábado 11:31 - 13:40',
+    [],
+    true
+  ),
 ];
 
 /**
@@ -644,59 +614,75 @@ export const CATALOGO_INFRAESTRUCTURA_TECNOLOGICA = infrastructureCatalog;
 /**
  * Plantillas Institucionales para Prácticas y Portafolio Duoc UC
  */
-export const PRACTICA_LABORAL_COURSE = {
-  sigla: 'PRL3100',
+const createPracticaCourse = ({
+  sigla,
+  nombre,
+  subtipo,
+  cuposDisponibles,
+  sala,
+  profesor,
+  horarioTexto,
+  tipoDetalle,
+  centroPractica,
+  supervisor,
+  horas,
+  periodo,
+}) => ({
+  sigla,
   siglaEq: '',
-  nombre: 'PRÁCTICA LABORAL',
+  nombre,
   creditos: 0,
   tipo: 'practica',
-  subtipo: 'laboral',
+  subtipo,
   secciones: [
     {
       seccion: '001D',
       cuposTotales: 60,
-      cuposDisponibles: 35,
-      sala: 'CENTRO DE PRÁCTICA',
-      profesor: 'COORDINACIÓN DE PRÁCTICAS DUOC UC',
-      horarioTexto: 'Supervisión en terreno (360 hrs)',
+      cuposDisponibles,
+      sala,
+      profesor,
+      horarioTexto,
       bloques: [],
       detallePractica: {
-        tipo: 'Práctica Laboral',
-        centroPractica: 'Empresa TI en Convenio • Sede Alameda',
-        supervisor: 'Coordinador de Prácticas Laborales Escuela Informática',
-        horas: '360 horas cronológicas',
-        periodo: 'Primer y Segundo Semestre 2026',
+        tipo: tipoDetalle,
+        centroPractica,
+        supervisor,
+        horas,
+        periodo,
       },
     },
   ],
-};
+});
 
-export const PRACTICA_PROFESIONAL_COURSE = {
+export const PRACTICA_LABORAL_COURSE = createPracticaCourse({
+  sigla: 'PRL3100',
+  nombre: 'PRÁCTICA LABORAL',
+  subtipo: 'laboral',
+  cuposDisponibles: 35,
+  sala: 'CENTRO DE PRÁCTICA',
+  profesor: 'COORDINACIÓN DE PRÁCTICAS DUOC UC',
+  horarioTexto: 'Supervisión en terreno (360 hrs)',
+  tipoDetalle: 'Práctica Laboral',
+  centroPractica: 'Empresa TI en Convenio • Sede Alameda',
+  supervisor: 'Coordinador de Prácticas Laborales Escuela Informática',
+  horas: '360 horas cronológicas',
+  periodo: 'Primer y Segundo Semestre 2026',
+});
+
+export const PRACTICA_PROFESIONAL_COURSE = createPracticaCourse({
   sigla: 'PPR4100',
-  siglaEq: '',
   nombre: 'PRÁCTICA PROFESIONAL',
-  creditos: 0,
-  tipo: 'practica',
   subtipo: 'profesional',
-  secciones: [
-    {
-      seccion: '001D',
-      cuposTotales: 60,
-      cuposDisponibles: 40,
-      sala: 'EMPRESA / EN TERRENO',
-      profesor: 'DIRECCIÓN DE CARRERA Y EMPRESA',
-      horarioTexto: 'Supervisión profesional (480 hrs)',
-      bloques: [],
-      detallePractica: {
-        tipo: 'Práctica Profesional',
-        centroPractica: 'Entidad Empleadora TI / En Terreno',
-        supervisor: 'Comité de Titulación y Supervisor Institucional',
-        horas: '480 horas cronológicas',
-        periodo: 'Semestre de Egreso 2026',
-      },
-    },
-  ],
-};
+  cuposDisponibles: 40,
+  sala: 'EMPRESA / EN TERRENO',
+  profesor: 'DIRECCIÓN DE CARRERA Y EMPRESA',
+  horarioTexto: 'Supervisión profesional (480 hrs)',
+  tipoDetalle: 'Práctica Profesional',
+  centroPractica: 'Entidad Empleadora TI / En Terreno',
+  supervisor: 'Comité de Titulación y Supervisor Institucional',
+  horas: '480 horas cronológicas',
+  periodo: 'Semestre de Egreso 2026',
+});
 
 export const PORTAFOLIO_TITULO_COURSE = {
   sigla: 'PTF6101',
@@ -873,6 +859,41 @@ export function getRandomCoursesForCareer(carreraNombre, limit = 7, difficulty =
 }
 
 /**
+ * Helpers para la construcción de cursos seleccionados en paquetes objetivo
+ */
+const addCourseSectionToPackage = (selected, occupiedSlots, course, sec) => {
+  selected.push({
+    sigla: course.sigla,
+    nombre: course.nombre,
+    creditos: course.creditos,
+    tipo: course.tipo || 'obligatorio',
+    seccion: sec.seccion,
+    profesor: sec.profesor || 'Docente Asignado Duoc UC',
+    sala: sec.sala || 'Sede Alameda',
+    horarioTexto: sec.horarioTexto || 'Horario coordinado',
+    bloques: sec.bloques || [],
+    clasesPortafolio: sec.clasesPortafolio,
+  });
+  (sec.bloques || []).forEach((b) => occupiedSlots.add(`${b.dia}-${b.bloqueId}`));
+};
+
+const addPracticaToPackage = (selected, practicaCourse) => {
+  const sec = practicaCourse.secciones[0] || {};
+  selected.push({
+    sigla: practicaCourse.sigla,
+    nombre: practicaCourse.nombre,
+    creditos: practicaCourse.creditos,
+    tipo: 'practica',
+    seccion: sec.seccion,
+    profesor: sec.profesor,
+    sala: sec.sala,
+    horarioTexto: sec.horarioTexto,
+    bloques: [],
+    detallePractica: sec.detallePractica,
+  });
+};
+
+/**
  * Genera los paquetes objetivos predefinidos (Mañana, Media Tarde, Tarde y Vespertino)
  * soportando los 4 niveles de dificultad (Fácil, Intermedio, Difícil, Muy Difícil).
  */
@@ -971,19 +992,7 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
         );
 
         if (!hasConflict) {
-          selected.push({
-            sigla: course.sigla,
-            nombre: course.nombre,
-            creditos: course.creditos,
-            tipo: course.tipo || 'obligatorio',
-            seccion: sec.seccion,
-            profesor: sec.profesor || 'Docente Asignado Duoc UC',
-            sala: sec.sala || 'Sede Alameda',
-            horarioTexto: sec.horarioTexto || 'Horario coordinado',
-            bloques: sec.bloques || [],
-            clasesPortafolio: sec.clasesPortafolio,
-          });
-          (sec.bloques || []).forEach((b) => occupiedSlots.add(`${b.dia}-${b.bloqueId}`));
+          addCourseSectionToPackage(selected, occupiedSlots, course, sec);
           break;
         }
       }
@@ -1001,19 +1010,7 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
             occupiedSlots.has(`${b.dia}-${b.bloqueId}`)
           );
           if (!hasConflict) {
-            selected.push({
-              sigla: course.sigla,
-              nombre: course.nombre,
-              creditos: course.creditos,
-              tipo: course.tipo || 'obligatorio',
-              seccion: sec.seccion,
-              profesor: sec.profesor || 'Docente Asignado Duoc UC',
-              sala: sec.sala || 'Sede Alameda',
-              horarioTexto: sec.horarioTexto || 'Horario coordinado',
-              bloques: sec.bloques || [],
-              clasesPortafolio: sec.clasesPortafolio,
-            });
-            (sec.bloques || []).forEach((b) => occupiedSlots.add(`${b.dia}-${b.bloqueId}`));
+            addCourseSectionToPackage(selected, occupiedSlots, course, sec);
             break;
           }
         }
@@ -1022,34 +1019,12 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
 
     // Agregar Práctica Laboral si la dificultad lo requiere
     if (diffConfig.hasPracticaLaboral) {
-      selected.push({
-        sigla: PRACTICA_LABORAL_COURSE.sigla,
-        nombre: PRACTICA_LABORAL_COURSE.nombre,
-        creditos: PRACTICA_LABORAL_COURSE.creditos,
-        tipo: 'practica',
-        seccion: PRACTICA_LABORAL_COURSE.secciones[0].seccion,
-        profesor: PRACTICA_LABORAL_COURSE.secciones[0].profesor,
-        sala: PRACTICA_LABORAL_COURSE.secciones[0].sala,
-        horarioTexto: PRACTICA_LABORAL_COURSE.secciones[0].horarioTexto,
-        bloques: [],
-        detallePractica: PRACTICA_LABORAL_COURSE.secciones[0].detallePractica,
-      });
+      addPracticaToPackage(selected, PRACTICA_LABORAL_COURSE);
     }
 
     // Agregar Práctica Profesional si la dificultad lo requiere
     if (diffConfig.hasPracticaProfesional) {
-      selected.push({
-        sigla: PRACTICA_PROFESIONAL_COURSE.sigla,
-        nombre: PRACTICA_PROFESIONAL_COURSE.nombre,
-        creditos: PRACTICA_PROFESIONAL_COURSE.creditos,
-        tipo: 'practica',
-        seccion: PRACTICA_PROFESIONAL_COURSE.secciones[0].seccion,
-        profesor: PRACTICA_PROFESIONAL_COURSE.secciones[0].profesor,
-        sala: PRACTICA_PROFESIONAL_COURSE.secciones[0].sala,
-        horarioTexto: PRACTICA_PROFESIONAL_COURSE.secciones[0].horarioTexto,
-        bloques: [],
-        detallePractica: PRACTICA_PROFESIONAL_COURSE.secciones[0].detallePractica,
-      });
+      addPracticaToPackage(selected, PRACTICA_PROFESIONAL_COURSE);
     }
 
     return {

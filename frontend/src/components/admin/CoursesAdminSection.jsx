@@ -51,6 +51,139 @@ const generateCleanMarkdown = (rows, metadata = {}) => {
   return md;
 };
 
+/**
+ * Calcula estadísticas agregadas a partir de las filas de cursos analizadas
+ */
+const computeScheduleStats = (mappedRows) => {
+  const distinctCarreras = Array.from(new Set(mappedRows.map((r) => r.carrera)));
+  const distinctSiglas = Array.from(new Set(mappedRows.map((r) => r.sigla)));
+  const distinctSecciones = Array.from(new Set(mappedRows.map((r) => r.seccion)));
+  const distinctDocentes = Array.from(
+    new Set(mappedRows.map((r) => r.docente).filter((d) => d && d !== 'DOCENTE ASIGNADO'))
+  );
+
+  return {
+    totalFilas: mappedRows.length,
+    asignaturasUnicas: distinctSiglas.length,
+    seccionesUnicas: distinctSecciones.length,
+    carreras: distinctCarreras,
+    docentesUnicos: distinctDocentes.length,
+  };
+};
+
+/**
+ * Factory para generar filas de muestra de plantilla Excel sin duplicar claves
+ */
+const createTemplateRow = (
+  carrera,
+  plan,
+  sigla,
+  nombre,
+  nivel,
+  seccion,
+  horario,
+  docente,
+  modalidad = 'ONLINE SINCRONA'
+) => ({
+  Sede: 'ALAMEDA',
+  Carrera: carrera,
+  Plan: plan,
+  Jornada: 'Diurno',
+  'Sigla Asignatura': sigla,
+  'Nombre Asignatura': nombre,
+  Nivel: nivel,
+  Sección: seccion,
+  Horario: horario,
+  Docente: docente,
+  'ASIGNATURA VIRTUAL SINCRONICA': modalidad,
+});
+
+/**
+ * Botón de acción modular para visualización y descarga de archivos
+ */
+const AdminActionButton = ({
+  onClick,
+  title,
+  icon: Icon,
+  iconColor = 'text-slate-700',
+  label,
+  textClass = 'text-slate-800',
+  borderClass = 'border-slate-300',
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-slate-100 ${textClass} border ${borderClass} shadow-2xs inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 cursor-pointer`}
+    title={title}
+  >
+    <Icon className={`w-4 h-4 ${iconColor}`} aria-hidden="true" />
+    <span>{label}</span>
+  </button>
+);
+
+/**
+ * Componente modular para tarjetas de indicadores KPI principales
+ */
+const AdminKpiCard = ({ label, value, subtitle, icon: Icon, iconBg, iconColor }) => (
+  <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
+    <header className="flex items-center justify-between">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+        {label}
+      </span>
+      <div className={`w-8 h-8 rounded-lg ${iconBg} ${iconColor} flex items-center justify-center`}>
+        <Icon className="w-4 h-4" aria-hidden="true" />
+      </div>
+    </header>
+    <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+    <p className="text-[11px] text-slate-500 mt-0.5 font-normal">{subtitle}</p>
+  </div>
+);
+
+/**
+ * Componente para badges de resumen en la vista previa del archivo
+ */
+const PreviewStatCard = ({ label, value }) => (
+  <div className="p-3 bg-white rounded-xl border border-amber-200">
+    <span className="text-[10px] uppercase font-bold text-slate-500 block">{label}</span>
+    <span className="text-xl font-black text-slate-900">{value}</span>
+  </div>
+);
+
+const KPI_CONFIGS = [
+  {
+    label: 'Secciones en BD',
+    getValue: (summary) => summary?.totalSecciones || 0,
+    subtitle: 'Oferta horaria disponible',
+    icon: Layers,
+    iconBg: 'bg-blue-50',
+    iconColor: 'text-[#002B49]',
+  },
+  {
+    label: 'Asignaturas Únicas',
+    getValue: (summary) => summary?.totalAsignaturas || 0,
+    subtitle: 'Ramos catalogados',
+    icon: BookOpen,
+    iconBg: 'bg-amber-50',
+    iconColor: 'text-amber-800',
+  },
+  {
+    label: 'Carreras Activas',
+    getValue: (summary) => summary?.totalCarreras || CARRERAS_DUOC.length,
+    subtitle: 'Planes de estudio configurados',
+    icon: Building2,
+    iconBg: 'bg-emerald-50',
+    iconColor: 'text-emerald-800',
+  },
+  {
+    label: 'Período de Toma',
+    getValue: () => '2026 - 002',
+    subtitle: 'Sede Alameda • Segundo Semestre',
+    icon: Calendar,
+    iconBg: 'bg-purple-50',
+    iconColor: 'text-purple-800',
+  },
+];
+
 export const CoursesAdminSection = () => {
   const { user } = useAuth();
   const { announce } = useAccessibility();
@@ -136,6 +269,27 @@ export const CoursesAdminSection = () => {
     loadCoursesData();
   }, [loadCoursesData]);
 
+  // Actualizar estados reactivos con los datos del archivo analizado
+  const applyScheduleParsingResult = (mappedRows, fileName, formatType) => {
+    const stats = computeScheduleStats(mappedRows);
+    setParsedRows(mappedRows);
+    setPreviewStats(stats);
+
+    const cleanMd = generateCleanMarkdown(mappedRows, {
+      periodo: '2026 - 002',
+      sede: mappedRows[0]?.sede || 'ALAMEDA',
+    });
+    setCleanMarkdownContent(cleanMd);
+
+    const isExcel = formatType === 'Excel';
+    const successMsg = `Archivo ${formatType} "${fileName}" leído: ${mappedRows.length} registros, ${stats.asignaturasUnicas} asignaturas únicas y ${stats.carreras.length} carreras detectadas.${isExcel ? ' Representación Markdown limpia generada.' : ''}`;
+    setFeedback({
+      type: 'success',
+      text: successMsg,
+    });
+    announce(successMsg, 'polite');
+  };
+
   // Procesador unificado de archivos (.xlsx, .xls, .csv, .md)
   const processSelectedFile = (file) => {
     if (!file) return;
@@ -161,34 +315,7 @@ export const CoursesAdminSection = () => {
             return;
           }
 
-          const distinctCarreras = Array.from(new Set(mappedRows.map((r) => r.carrera)));
-          const distinctSiglas = Array.from(new Set(mappedRows.map((r) => r.sigla)));
-          const distinctSecciones = Array.from(new Set(mappedRows.map((r) => r.seccion)));
-          const distinctDocentes = Array.from(
-            new Set(mappedRows.map((r) => r.docente).filter((d) => d && d !== 'DOCENTE ASIGNADO'))
-          );
-
-          setParsedRows(mappedRows);
-          setPreviewStats({
-            totalFilas: mappedRows.length,
-            asignaturasUnicas: distinctSiglas.length,
-            seccionesUnicas: distinctSecciones.length,
-            carreras: distinctCarreras,
-            docentesUnicos: distinctDocentes.length,
-          });
-
-          const cleanMd = generateCleanMarkdown(mappedRows, {
-            periodo: '2026 - 002',
-            sede: mappedRows[0]?.sede || 'ALAMEDA',
-          });
-          setCleanMarkdownContent(cleanMd);
-
-          const successMsg = `Archivo Markdown "${file.name}" leído: ${mappedRows.length} registros, ${distinctSiglas.length} asignaturas únicas y ${distinctCarreras.length} carreras detectadas.`;
-          setFeedback({
-            type: 'success',
-            text: successMsg,
-          });
-          announce(successMsg, 'polite');
+          applyScheduleParsingResult(mappedRows, file.name, 'Markdown');
         } catch (err) {
           console.error('Error parseando archivo Markdown:', err);
           setFeedback({
@@ -276,35 +403,7 @@ export const CoursesAdminSection = () => {
             return;
           }
 
-          const distinctCarreras = Array.from(new Set(mappedRows.map((r) => r.carrera)));
-          const distinctSiglas = Array.from(new Set(mappedRows.map((r) => r.sigla)));
-          const distinctSecciones = Array.from(new Set(mappedRows.map((r) => r.seccion)));
-          const distinctDocentes = Array.from(
-            new Set(mappedRows.map((r) => r.docente).filter((d) => d && d !== 'DOCENTE ASIGNADO'))
-          );
-
-          setParsedRows(mappedRows);
-          setPreviewStats({
-            totalFilas: mappedRows.length,
-            asignaturasUnicas: distinctSiglas.length,
-            seccionesUnicas: distinctSecciones.length,
-            carreras: distinctCarreras,
-            docentesUnicos: distinctDocentes.length,
-          });
-
-          // Generación de representación limpia en Markdown
-          const cleanMd = generateCleanMarkdown(mappedRows, {
-            periodo: '2026 - 002',
-            sede: mappedRows[0]?.sede || 'ALAMEDA',
-          });
-          setCleanMarkdownContent(cleanMd);
-
-          const successMsg = `Archivo Excel "${file.name}" leído: ${mappedRows.length} registros, ${distinctSiglas.length} asignaturas únicas y ${distinctCarreras.length} carreras detectadas. Representación Markdown limpia generada.`;
-          setFeedback({
-            type: 'success',
-            text: successMsg,
-          });
-          announce(successMsg, 'polite');
+          applyScheduleParsingResult(mappedRows, file.name, 'Excel');
         } catch (err) {
           console.error('Error parseando archivo Excel:', err);
           setFeedback({
@@ -314,7 +413,7 @@ export const CoursesAdminSection = () => {
           announce('Error procesando archivo Excel.', 'assertive');
         }
       };
-      binaryReader.readAsArrayBuffer(file);
+      textReader.readAsText(file, 'utf-8');
     }
   };
 
@@ -402,59 +501,49 @@ export const CoursesAdminSection = () => {
   // Descargar Plantilla Excel Oficial preformateada
   const handleDownloadTemplate = () => {
     try {
+      const INFRA_CARRERA = 'INGENIER. EN INFRAESTRUCTURA TECNOLÓGICA';
       const sampleData = [
-        {
-          Sede: 'ALAMEDA',
-          Carrera: 'INGENIER. EN INFRAESTRUCTURA TECNOLÓGICA',
-          Plan: '1446815',
-          Jornada: 'Diurno',
-          'Sigla Asignatura': 'OCY1104',
-          'Nombre Asignatura': 'CIBERSEGURIDAD OFENSIVA',
-          Nivel: 'Optativos',
-          Sección: 'OCY1104-001D',
-          Horario: 'Lu 8:31:00 - 9:50:00',
-          Docente: 'JOSE ERASMO MATUS',
-          'ASIGNATURA VIRTUAL SINCRONICA': 'ONLINE SINCRONA',
-        },
-        {
-          Sede: 'ALAMEDA',
-          Carrera: 'INGENIER. EN INFRAESTRUCTURA TECNOLÓGICA',
-          Plan: '1446815',
-          Jornada: 'Diurno',
-          'Sigla Asignatura': 'OCY1104',
-          'Nombre Asignatura': 'CIBERSEGURIDAD OFENSIVA',
-          Nivel: 'Optativos',
-          Sección: 'OCY1104-001D',
-          Horario: 'Lu 10:01:00 - 11:20:00',
-          Docente: 'JOSE ERASMO MATUS',
-          'ASIGNATURA VIRTUAL SINCRONICA': 'ONLINE SINCRONA',
-        },
-        {
-          Sede: 'ALAMEDA',
-          Carrera: 'INGENIER. EN INFRAESTRUCTURA TECNOLÓGICA',
-          Plan: '1446815',
-          Jornada: 'Diurno',
-          'Sigla Asignatura': 'DOY0101',
-          'Nombre Asignatura': 'INGENIERÍA DEVOPS',
-          Nivel: 'Optativos',
-          Sección: 'DOY0101-001D',
-          Horario: 'Ma 16:01:00 - 17:20:00',
-          Docente: 'CRISTIAN ANDRES BUGUEÑO',
-          'ASIGNATURA VIRTUAL SINCRONICA': 'ONLINE SINCRONA',
-        },
-        {
-          Sede: 'ALAMEDA',
-          Carrera: 'INGENIERÍA EN INFORMÁTICA',
-          Plan: '1446114',
-          Jornada: 'Diurno',
-          'Sigla Asignatura': 'PTY4614',
-          'Nombre Asignatura': 'PROYECTO CAPSTONE',
-          Nivel: 'Semestre 8',
-          Sección: 'PTY4614-001D',
-          Horario: 'Mi 8:31:00 - 9:50:00',
-          Docente: 'MAURICIO GÓMEZ ARRATIA',
-          'ASIGNATURA VIRTUAL SINCRONICA': 'PRESENCIAL',
-        },
+        createTemplateRow(
+          INFRA_CARRERA,
+          '1446815',
+          'OCY1104',
+          'CIBERSEGURIDAD OFENSIVA',
+          'Optativos',
+          'OCY1104-001D',
+          'Lu 8:31:00 - 9:50:00',
+          'JOSE ERASMO MATUS'
+        ),
+        createTemplateRow(
+          INFRA_CARRERA,
+          '1446815',
+          'OCY1104',
+          'CIBERSEGURIDAD OFENSIVA',
+          'Optativos',
+          'OCY1104-001D',
+          'Lu 10:01:00 - 11:20:00',
+          'JOSE ERASMO MATUS'
+        ),
+        createTemplateRow(
+          INFRA_CARRERA,
+          '1446815',
+          'DOY0101',
+          'INGENIERÍA DEVOPS',
+          'Optativos',
+          'DOY0101-001D',
+          'Ma 16:01:00 - 17:20:00',
+          'CRISTIAN ANDRES BUGUEÑO'
+        ),
+        createTemplateRow(
+          'INGENIERÍA EN INFORMÁTICA',
+          '1446114',
+          'PTY4614',
+          'PROYECTO CAPSTONE',
+          'Semestre 8',
+          'PTY4614-001D',
+          'Mi 8:31:00 - 9:50:00',
+          'MAURICIO GÓMEZ ARRATIA',
+          'PRESENCIAL'
+        ),
       ];
 
       const headers = [
@@ -695,71 +784,17 @@ export const CoursesAdminSection = () => {
           Indicadores generales de oferta académica
         </h2>
 
-        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
-          <header className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Secciones en BD
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#002B49] flex items-center justify-center">
-              <Layers className="w-4 h-4" aria-hidden="true" />
-            </div>
-          </header>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {coursesSummary?.totalSecciones || 0}
-          </p>
-          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
-            Oferta horaria disponible
-          </p>
-        </div>
-
-        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
-          <header className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Asignaturas Únicas
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center">
-              <BookOpen className="w-4 h-4" aria-hidden="true" />
-            </div>
-          </header>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {coursesSummary?.totalAsignaturas || 0}
-          </p>
-          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
-            Ramos catalogados
-          </p>
-        </div>
-
-        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
-          <header className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Carreras Activas
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center">
-              <Building2 className="w-4 h-4" aria-hidden="true" />
-            </div>
-          </header>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {coursesSummary?.totalCarreras || CARRERAS_DUOC.length}
-          </p>
-          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
-            Planes de estudio configurados
-          </p>
-        </div>
-
-        <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
-          <header className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Período de Toma
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-800 flex items-center justify-center">
-              <Calendar className="w-4 h-4" aria-hidden="true" />
-            </div>
-          </header>
-          <p className="mt-2 text-2xl font-bold text-slate-900">2026 - 002</p>
-          <p className="text-[11px] text-slate-500 mt-0.5 font-normal">
-            Sede Alameda • Segundo Semestre
-          </p>
-        </div>
+        {KPI_CONFIGS.map((kpi) => (
+          <AdminKpiCard
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.getValue(coursesSummary)}
+            subtitle={kpi.subtitle}
+            icon={kpi.icon}
+            iconBg={kpi.iconBg}
+            iconColor={kpi.iconColor}
+          />
+        ))}
       </section>
 
       {/* 3. Panel de Carga de Archivos (.xlsx y .md) */}
@@ -885,62 +920,43 @@ export const CoursesAdminSection = () => {
 
               {/* Botones de Visualización y Descarga del Markdown Limpio */}
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
+                <AdminActionButton
                   onClick={() => setIsMdModalOpen(true)}
-                  className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-slate-100 text-[#002B49] border border-blue-300 shadow-2xs inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 cursor-pointer"
                   title="Ver la representación limpia en formato Markdown (.md)"
-                >
-                  <Eye className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
-                  <span>Ver Markdown Limpio (.md)</span>
-                </button>
-
-                <button
-                  type="button"
+                  icon={Eye}
+                  iconColor="text-[#002B49]"
+                  label="Ver Markdown Limpio (.md)"
+                  textClass="text-[#002B49]"
+                  borderClass="border-blue-300"
+                />
+                <AdminActionButton
                   onClick={handleDownloadCleanMarkdown}
-                  className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 shadow-2xs inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 cursor-pointer"
                   title="Descargar la representación limpia en archivo .md"
-                >
-                  <Download className="w-4 h-4 text-slate-700" aria-hidden="true" />
-                  <span>Descargar .md</span>
-                </button>
+                  icon={Download}
+                  iconColor="text-slate-700"
+                  label="Descargar .md"
+                />
               </div>
             </header>
 
             {/* Estadísticas de Vista Previa (KPIs) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 bg-white rounded-xl border border-amber-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                  Total Registros / Filas
-                </span>
-                <span className="text-xl font-black text-slate-900">
-                  {previewStats.totalFilas.toLocaleString('es-CL')}
-                </span>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-amber-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                  Asignaturas Únicas
-                </span>
-                <span className="text-xl font-black text-slate-900">
-                  {previewStats.asignaturasUnicas}
-                </span>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-amber-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                  Secciones Únicas
-                </span>
-                <span className="text-xl font-black text-slate-900">
-                  {previewStats.seccionesUnicas}
-                </span>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-amber-200">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                  Carreras Detectadas
-                </span>
-                <span className="text-xl font-black text-slate-900">
-                  {previewStats.carreras.length}
-                </span>
-              </div>
+              <PreviewStatCard
+                label="Total Registros / Filas"
+                value={previewStats.totalFilas.toLocaleString('es-CL')}
+              />
+              <PreviewStatCard
+                label="Asignaturas Únicas"
+                value={previewStats.asignaturasUnicas}
+              />
+              <PreviewStatCard
+                label="Secciones Únicas"
+                value={previewStats.seccionesUnicas}
+              />
+              <PreviewStatCard
+                label="Carreras Detectadas"
+                value={previewStats.carreras.length}
+              />
             </div>
 
             {/* Listado de Carreras detectadas */}
