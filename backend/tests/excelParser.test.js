@@ -2,7 +2,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('xlsx');
+const nodeXlsx = require('node-xlsx');
 const excelParser = require('../services/excelParserService');
 
 describe('Excel & Markdown Parser Service (excelParserService)', () => {
@@ -39,12 +39,17 @@ describe('Excel & Markdown Parser Service (excelParserService)', () => {
   });
 
   test('3. Conversión de XLSX a Markdown (xlsxToMarkdown)', () => {
-    const ws = XLSX.utils.json_to_sheet([
-      { Sede: 'ALAMEDA', Carrera: 'INGENIERÍA EN INFORMÁTICA', Sigla: 'ASY4131', Nombre: 'ARQUITECTURA DE SISTEMAS', Seccion: 'ASY4131-001D', Horario: 'Lu 8:31:00 - 9:50:00', Docente: 'PROFESOR DUOC' }
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Horarios');
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const headers = ['Sede', 'Carrera', 'Sigla', 'Nombre', 'Seccion', 'Horario', 'Docente'];
+    const row = [
+      'ALAMEDA',
+      'INGENIERÍA EN INFORMÁTICA',
+      'ASY4131',
+      'ARQUITECTURA DE SISTEMAS',
+      'ASY4131-001D',
+      'Lu 8:31:00 - 9:50:00',
+      'PROFESOR DUOC',
+    ];
+    const buffer = nodeXlsx.build([{ name: 'Horarios', data: [headers, row] }]);
 
     const md = excelParser.xlsxToMarkdown(buffer);
     assert.ok(typeof md === 'string', 'Debe retornar un string');
@@ -53,13 +58,26 @@ describe('Excel & Markdown Parser Service (excelParserService)', () => {
   });
 
   test('4. Parseo directo de XLSX Buffer (parseXlsxBuffer)', () => {
-    const ws = XLSX.utils.json_to_sheet([
-      { Sede: 'ALAMEDA', Carrera: 'INGENIERÍA EN INFORMÁTICA', Sigla: 'ASY4131', Nombre: 'ARQUITECTURA DE SISTEMAS', Seccion: 'ASY4131-001D', Horario: 'Lu 8:31:00 - 9:50:00', Docente: 'PROFESOR DUOC' },
-      { Sede: 'ALAMEDA', Carrera: 'INGENIERÍA EN INFORMÁTICA', Sigla: 'ASY4131', Nombre: 'ARQUITECTURA DE SISTEMAS', Seccion: 'ASY4131-001D', Horario: 'Ju 8:31:00 - 9:50:00', Docente: 'PROFESOR DUOC' }
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Test');
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const headers = ['Sede', 'Carrera', 'Sigla', 'Nombre', 'Seccion', 'Horario', 'Docente'];
+    const row1 = [
+      'ALAMEDA',
+      'INGENIERÍA EN INFORMÁTICA',
+      'ASY4131',
+      'ARQUITECTURA DE SISTEMAS',
+      'ASY4131-001D',
+      'Lu 8:31:00 - 9:50:00',
+      'PROFESOR DUOC',
+    ];
+    const row2 = [
+      'ALAMEDA',
+      'INGENIERÍA EN INFORMÁTICA',
+      'ASY4131',
+      'ARQUITECTURA DE SISTEMAS',
+      'ASY4131-001D',
+      'Ju 8:31:00 - 9:50:00',
+      'PROFESOR DUOC',
+    ];
+    const buffer = nodeXlsx.build([{ name: 'Test', data: [headers, row1, row2] }]);
 
     const result = excelParser.parseXlsxBuffer(buffer);
     assert.strictEqual(result.totalRows, 2, 'Debe contener 2 filas de oferta');

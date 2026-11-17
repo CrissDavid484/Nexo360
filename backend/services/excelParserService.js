@@ -3,7 +3,7 @@
  * Soporta archivos .xlsx, .xls y .md con tablas estándar o segmentadas horizontalmente.
  */
 
-const XLSX = require('xlsx');
+const nodeXlsx = require('node-xlsx');
 const mongoose = require('mongoose');
 const CourseOffering = require('../models/CourseOffering');
 const {
@@ -53,30 +53,27 @@ function consolidateSections(offerings) {
  * Convierte un libro de Excel (.xlsx / .xls) o Buffer a una tabla Markdown
  */
 function xlsxToMarkdown(bufferOrPath, options = {}) {
-  let workbook;
-  if (Buffer.isBuffer(bufferOrPath)) {
-    workbook = XLSX.read(bufferOrPath, { type: 'buffer' });
-  } else {
-    workbook = XLSX.readFile(bufferOrPath);
-  }
+  const sheets = nodeXlsx.parse(bufferOrPath);
+  if (!sheets || sheets.length === 0) return '';
 
-  const sheetName = options.sheet || workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  if (!worksheet) {
+  const sheetName = options.sheet || sheets[0].name;
+  const worksheet = options.sheet
+    ? sheets.find((s) => s.name === options.sheet)
+    : sheets[0];
+
+  if (!worksheet || !worksheet.data || worksheet.data.length === 0) {
     throw new Error(`Hoja "${sheetName}" no encontrada en el libro Excel.`);
   }
 
-  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-  if (!data || data.length === 0) return '';
-
-  const headers = data[0].map((h) => String(h || '').trim());
+  const data = worksheet.data;
+  const headers = (data[0] || []).map((h) => String(h || '').trim());
   const headerLine = `| ${headers.join(' | ')} |`;
   const separatorLine = `| ${headers.map(() => ':-:').join(' | ')} |`;
 
   const rows = [];
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (row.every((cell) => cell === '' || cell === null || cell === undefined)) continue;
+    if (!row || row.every((cell) => cell === '' || cell === null || cell === undefined)) continue;
     const formatted = headers.map((_, colIdx) => String(row[colIdx] || '').replace(/\|/g, '\\|').trim());
     rows.push(`| ${formatted.join(' | ')} |`);
   }
@@ -88,14 +85,41 @@ function xlsxToMarkdown(bufferOrPath, options = {}) {
  * Parsea un buffer o archivo Excel directamente a filas normalizadas
  */
 function parseXlsxBuffer(buffer, options = {}) {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = options.sheet || workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
+  const sheets = nodeXlsx.parse(buffer);
+  if (!sheets || sheets.length === 0) {
+    throw new Error('El archivo Excel no contiene hojas de datos.');
+  }
+
+  const sheetName = options.sheet || sheets[0].name;
+  const worksheet = options.sheet
+    ? sheets.find((s) => s.name === options.sheet)
+    : sheets[0];
+
   if (!worksheet) {
     throw new Error(`Hoja "${sheetName}" no encontrada.`);
   }
 
-  const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+  const data = worksheet.data || [];
+  if (data.length === 0) {
+    return {
+      sheetName,
+      totalRows: 0,
+      offerings: [],
+      consolidated: [],
+    };
+  }
+
+  const [headerRow = [], ...dataRows] = data;
+  const headers = headerRow.map((h) => String(h || '').trim());
+
+  const rawRows = dataRows.map((row) => {
+    const obj = {};
+    headers.forEach((h, idx) => {
+      if (h) obj[h] = row[idx] !== undefined && row[idx] !== null ? row[idx] : '';
+    });
+    return obj;
+  });
+
   const normalized = rawRows
     .map((r) => normalizeRow(r, options.periodo || '2026 - 002'))
     .filter((r) => r.sigla && r.nombre);

@@ -15,8 +15,14 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
-    "uuid": "^11.0.5",
-    "xlsx": "^0.18.5"
+    "mongoose": "^8.24.10",
+    "node-xlsx": "^0.25.0",
+    "uuid": "^11.0.5"
+  },
+  "overrides": {
+    "sift": "^17.1.4",
+    "qs": "^6.17.0",
+    "picomatch": "^4.0.7",
+    "braces": "^3.0.3"
   }
 }

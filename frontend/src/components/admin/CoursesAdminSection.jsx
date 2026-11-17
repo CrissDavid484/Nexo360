@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import * as XLSX from 'xlsx';
 import {
   FileSpreadsheet,
   UploadCloud,
@@ -201,25 +200,30 @@ export const CoursesAdminSection = () => {
       };
       textReader.readAsText(file, 'utf-8');
     } else {
-      // Lectura como binario de Excel (.xlsx / .xls / .csv)
-      const binaryReader = new FileReader();
-      binaryReader.onload = (event) => {
+      // Lectura de CSV / TSV / texto plano
+      const textReader = new FileReader();
+      textReader.onload = (event) => {
         try {
-          const data = new Uint8Array(event.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-
-          const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-          if (!rawJson || rawJson.length === 0) {
+          const content = event.target.result;
+          const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
+          if (lines.length < 2) {
             setFeedback({
               type: 'error',
-              text: 'El archivo Excel seleccionado está vacío o no contiene filas legibles.',
+              text: 'El archivo seleccionado está vacío o no contiene filas legibles.',
             });
-            announce('Error: archivo Excel vacío.', 'assertive');
+            announce('Error: archivo vacío.', 'assertive');
             return;
           }
+          const delimiter = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
+          const headers = lines[0].split(delimiter).map((h) => h.replace(/^["']|["']$/g, '').trim());
+          const rawJson = lines.slice(1).map((line) => {
+            const values = line.split(delimiter).map((v) => v.replace(/^["']|["']$/g, '').trim());
+            const obj = {};
+            headers.forEach((h, idx) => {
+              if (h) obj[h] = values[idx] !== undefined ? values[idx] : '';
+            });
+            return obj;
+          });
 
           const mappedRows = rawJson
             .map((row) => {
@@ -453,12 +457,38 @@ export const CoursesAdminSection = () => {
         },
       ];
 
-      const ws = XLSX.utils.json_to_sheet(sampleData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Oferta_2026_002');
-      XLSX.writeFile(wb, 'Plantilla_DuocUC_Toma_Ramos_2026.xlsx');
+      const headers = [
+        'Sede',
+        'Carrera',
+        'Plan',
+        'Jornada',
+        'Sigla Asignatura',
+        'Nombre Asignatura',
+        'Nivel',
+        'Sección',
+        'Horario',
+        'Docente',
+        'ASIGNATURA VIRTUAL SINCRONICA',
+      ];
+      const csv =
+        '\uFEFF' +
+        [
+          headers.join(','),
+          ...sampleData.map((r) =>
+            headers.map((h) => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(',')
+          ),
+        ].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Plantilla_DuocUC_Toma_Ramos_2026.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
-      const msg = 'Plantilla oficial de Excel descargada ("Plantilla_DuocUC_Toma_Ramos_2026.xlsx").';
+      const msg = 'Plantilla oficial descargada ("Plantilla_DuocUC_Toma_Ramos_2026.csv").';
       setFeedback({ type: 'success', text: msg });
       announce(msg, 'polite');
     } catch (err) {
