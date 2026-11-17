@@ -287,7 +287,7 @@ function parseStandardMarkdown(lines, defaultPeriodo) {
 
     if (!headers) {
       // Primera fila es el encabezado
-      headers = parts.map(normalizeHeaderKey);
+      headers = parts.map((part) => normalizeHeaderKey(part));
       continue;
     }
 

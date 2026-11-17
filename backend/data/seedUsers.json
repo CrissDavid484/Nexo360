@@ -1,7 +1,6 @@
 [
   {
     "email": "an.ordenesd@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Angelo Órdenes",
     "role": "estudiante",
     "roleLabel": "Estudiante Regular Duoc UC",
@@ -33,7 +32,6 @@
   },
   {
     "email": "c.guzman@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Cristian Guzmán",
     "role": "admin",
     "roleLabel": "Administrador del Sistema Nexo360",
@@ -115,7 +113,6 @@
   },
   {
     "email": "d.diaz@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Daniela Díaz",
     "role": "admin",
     "roleLabel": "Administradora del Sistema Nexo360",
@@ -184,7 +181,6 @@
   },
   {
     "email": "d.rojas@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Daniela Rojas",
     "role": "estudiante_paedis",
     "roleLabel": "Estudiante Regular • PAEDIS",
@@ -262,7 +258,6 @@
   },
   {
     "email": "m.contreras@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Matías Contreras",
     "role": "estudiante",
     "roleLabel": "Estudiante Regular",
@@ -331,7 +326,6 @@
   },
   {
     "email": "v.soto@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Valentina Soto",
     "role": "tutor_par",
     "roleLabel": "Estudiante • Tutora Par & Ley 21.790",
@@ -405,7 +399,6 @@
   },
   {
     "email": "f.morales@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Felipe Morales",
     "role": "estudiante",
     "roleLabel": "Egresado Titulado",
@@ -474,7 +467,6 @@
   },
   {
     "email": "j.perez@duocuc.cl",
-    "password": "Duoc2026!",
     "fullName": "Juan Pérez Silva",
     "role": "estudiante",
     "roleLabel": "Estudiante en Deserción",
@@ -531,7 +523,6 @@
   },
   {
     "email": "m.gomez@profesor.duoc.cl",
-    "password": "Duoc2026!",
     "fullName": "Mauricio Gómez Arratia",
     "role": "profesor",
     "roleLabel": "Profesor / Docente Titular",
@@ -600,7 +591,6 @@
   },
   {
     "email": "p.valenzuela@duoc.cl",
-    "password": "Duoc2026!",
     "fullName": "Patricia Valenzuela",
     "role": "director",
     "roleLabel": "Directora de Carrera",
@@ -669,7 +659,6 @@
   },
   {
     "email": "r.mendez@duoc.cl",
-    "password": "Duoc2026!",
     "fullName": "Roberto Méndez",
     "role": "subdirector",
     "roleLabel": "Subdirector Académico",
@@ -738,7 +727,6 @@
   },
   {
     "email": "t.montes@duoc.cl",
-    "password": "Duoc2026!",
     "fullName": "Tania Montes",
     "role": "coordinador_paedis",
     "roleLabel": "Coordinadora PAEDIS e Inclusión",
@@ -807,7 +795,6 @@
   },
   {
     "email": "c.herrera@duoc.cl",
-    "password": "Duoc2026!",
     "fullName": "Camila Herrera",
     "role": "administrativo",
     "roleLabel": "Jefa de Biblioteca y Financiamiento",
@@ -876,7 +863,6 @@
   },
   {
     "email": "admin.nexo360@duoc.cl",
-    "password": "Duoc2026!",
     "fullName": "Administrador Nexo360",
     "role": "admin",
     "roleLabel": "Administrador de la Plataforma TI",

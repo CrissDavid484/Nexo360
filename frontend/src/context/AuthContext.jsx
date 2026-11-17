@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    void verifyExistingAuth();
+    verifyExistingAuth().catch((error) => console.error('Error al inicializar sesión:', error));
     return () => {
       isMounted = false;
     };

@@ -6,7 +6,12 @@
  */
 
 const DEFAULT_SEED_PASSWORD = 'Duoc2026!';
-const SEED_USERS = require('./seedUsers.json');
+const rawSeedUsers = require('./seedUsers.json');
+
+const SEED_USERS = rawSeedUsers.map((user) => ({
+  ...user,
+  password: user.password || DEFAULT_SEED_PASSWORD,
+}));
 
 module.exports = {
   DEFAULT_SEED_PASSWORD,

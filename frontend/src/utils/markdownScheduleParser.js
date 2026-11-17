@@ -1,6 +1,6 @@
 /**
  * Utilidades para parseo de horarios académicos en formato Markdown (.md)
- * Extraído de CoursesAdminSection para modularidad y reutilización.
+ * Extraído de CoursesAdminSection para modularidad, reutilización y cero duplicación.
  */
 
 /**
@@ -9,6 +9,23 @@
 export const cleanMdCell = (cell) => {
   if (!cell) return '';
   return String(cell).replace(/^\*\*|\*\*$/g, '').trim();
+};
+
+/**
+ * Helper reutilizable para extraer filas limpias de cualquier sección de tabla Markdown
+ */
+export const extractRowCells = (lines, startIdx, endIdx) => {
+  const result = [];
+  for (let j = startIdx; j < endIdx; j++) {
+    const l = lines[j];
+    if (l && l.startsWith('|') && !l.includes(':-') && !l.includes('**') && !l.includes('![')) {
+      const cells = l.split('|').slice(1, -1).map(cleanMdCell);
+      if (cells.length > 0) {
+        result.push(cells);
+      }
+    }
+  }
+  return result;
 };
 
 /**
@@ -32,17 +49,11 @@ export const parseMarkdownSchedule = (mdText) => {
     );
     if (tableLines.length < 2) return [];
 
-    const headerCells = tableLines[0]
-      .split('|')
-      .slice(1, -1)
-      .map(cleanMdCell);
+    const headerCells = tableLines[0].split('|').slice(1, -1).map(cleanMdCell);
 
     const rows = [];
     for (let i = 1; i < tableLines.length; i++) {
-      const cells = tableLines[i]
-        .split('|')
-        .slice(1, -1)
-        .map(cleanMdCell);
+      const cells = tableLines[i].split('|').slice(1, -1).map(cleanMdCell);
       if (cells.length < 2) continue;
 
       const getVal = (possibleNames) => {
@@ -106,58 +117,26 @@ export const parseMarkdownSchedule = (mdText) => {
       const h3 = headerIndices[p + 2];
 
       if (h2 && h2.type === 'c2' && h3 && h3.type === 'c3') {
-        const c1Rows = [];
-        for (let j = h1.idx + 1; j < h2.idx; j++) {
-          const l = lines[j];
-          if (l.startsWith('|') && !l.includes(':-') && !l.includes('**')) {
-            const cells = l.split('|').slice(1, -1).map(cleanMdCell);
-            if (cells.length >= 5) {
-              c1Rows.push({
-                sede: cells[0] || 'ALAMEDA',
-                carrera: cells[1] || 'INGENIERÍA DUOC UC',
-                plan: cells[2] || '',
-                jornada: cells[3] || 'Diurno',
-                sigla: cells[4] || '',
-              });
-            }
-          }
-        }
+        const c1Rows = extractRowCells(lines, h1.idx + 1, h2.idx).map((cells) => ({
+          sede: cells[0] || 'ALAMEDA',
+          carrera: cells[1] || 'INGENIERÍA DUOC UC',
+          plan: cells[2] || '',
+          jornada: cells[3] || 'Diurno',
+          sigla: cells[4] || '',
+        }));
 
-        const c2Rows = [];
-        for (let j = h2.idx + 1; j < h3.idx; j++) {
-          const l = lines[j];
-          if (l.startsWith('|') && !l.includes(':-') && !l.includes('**')) {
-            const cells = l.split('|').slice(1, -1).map(cleanMdCell);
-            if (cells.length >= 3) {
-              c2Rows.push({
-                nombre: cells[0] || '',
-                nivel: cells[1] || 'Optativos',
-                seccion: cells[2] || '',
-              });
-            }
-          }
-        }
+        const c2Rows = extractRowCells(lines, h2.idx + 1, h3.idx).map((cells) => ({
+          nombre: cells[0] || '',
+          nivel: cells[1] || 'Optativos',
+          seccion: cells[2] || '',
+        }));
 
         const endIdx = p + 3 < headerIndices.length ? headerIndices[p + 3].idx : lines.length;
-        const c3Rows = [];
-        for (let j = h3.idx + 1; j < endIdx; j++) {
-          const l = lines[j];
-          if (
-            l.startsWith('|') &&
-            !l.includes(':-') &&
-            !l.includes('**') &&
-            !l.includes('![')
-          ) {
-            const cells = l.split('|').slice(1, -1).map(cleanMdCell);
-            if (cells.length >= 2) {
-              c3Rows.push({
-                horario: cells[0] || '',
-                docente: cells[1] || 'DOCENTE ASIGNADO',
-                modalidad: cells[2] || 'ONLINE SINCRONA',
-              });
-            }
-          }
-        }
+        const c3Rows = extractRowCells(lines, h3.idx + 1, endIdx).map((cells) => ({
+          horario: cells[0] || '',
+          docente: cells[1] || 'DOCENTE ASIGNADO',
+          modalidad: cells[2] || 'ONLINE SINCRONA',
+        }));
 
         const minLen = Math.min(c1Rows.length, c2Rows.length, c3Rows.length);
         for (let k = 0; k < minLen; k++) {
@@ -172,41 +151,23 @@ export const parseMarkdownSchedule = (mdText) => {
         p += 3;
         continue;
       } else if (h2 && h2.type === 'c23') {
-        const c1Rows = [];
-        for (let j = h1.idx + 1; j < h2.idx; j++) {
-          const l = lines[j];
-          if (l.startsWith('|') && !l.includes(':-') && !l.includes('**')) {
-            const cells = l.split('|').slice(1, -1).map(cleanMdCell);
-            if (cells.length >= 5) {
-              c1Rows.push({
-                sede: cells[0] || 'ALAMEDA',
-                carrera: cells[1] || 'INGENIERÍA DUOC UC',
-                plan: cells[2] || '',
-                jornada: cells[3] || 'Diurno',
-                sigla: cells[4] || '',
-              });
-            }
-          }
-        }
+        const c1Rows = extractRowCells(lines, h1.idx + 1, h2.idx).map((cells) => ({
+          sede: cells[0] || 'ALAMEDA',
+          carrera: cells[1] || 'INGENIERÍA DUOC UC',
+          plan: cells[2] || '',
+          jornada: cells[3] || 'Diurno',
+          sigla: cells[4] || '',
+        }));
 
         const endIdx = p + 2 < headerIndices.length ? headerIndices[p + 2].idx : lines.length;
-        const c23Rows = [];
-        for (let j = h2.idx + 1; j < endIdx; j++) {
-          const l = lines[j];
-          if (l.startsWith('|') && !l.includes(':-') && !l.includes('**')) {
-            const cells = l.split('|').slice(1, -1).map(cleanMdCell);
-            if (cells.length >= 3) {
-              c23Rows.push({
-                seccion: cells[0] || '',
-                horario: cells[1] || '',
-                docente: cells[2] || 'DOCENTE ASIGNADO',
-                nombre: cells[0] || '',
-                nivel: 'Optativo',
-                modalidad: 'PRESENCIAL',
-              });
-            }
-          }
-        }
+        const c23Rows = extractRowCells(lines, h2.idx + 1, endIdx).map((cells) => ({
+          seccion: cells[0] || '',
+          horario: cells[1] || '',
+          docente: cells[2] || 'DOCENTE ASIGNADO',
+          nombre: cells[0] || '',
+          nivel: 'Optativo',
+          modalidad: 'PRESENCIAL',
+        }));
 
         const minLen = Math.min(c1Rows.length, c23Rows.length);
         for (let k = 0; k < minLen; k++) {

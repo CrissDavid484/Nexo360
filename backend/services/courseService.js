@@ -88,7 +88,7 @@ const courseService = {
     try {
       const seedItems = Array.isArray(alamedaSeedData) && alamedaSeedData.length > 0
         ? alamedaSeedData
-        : SEED_ROWS_RAW.map(normalizeRowToOffering);
+        : SEED_ROWS_RAW.map((row) => normalizeRowToOffering(row));
 
       inMemoryCourses = [...seedItems];
 

@@ -173,9 +173,11 @@ export const AccessibilityProvider = ({ children }) => {
           return next;
         });
       });
-      void transition.finished.finally(() => {
-        setIsCurtainAnimating(false);
-      });
+      transition.finished
+        .catch((error) => console.error('Error en transición de accesibilidad:', error))
+        .finally(() => {
+          setIsCurtainAnimating(false);
+        });
     } else {
       setIsCurtainAnimating(true);
       setTimeout(() => {
