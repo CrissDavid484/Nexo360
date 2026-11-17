@@ -1396,12 +1396,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         {leftPanelView === 'lista' && (
                           <div className="space-y-2">
                             <div className="bg-white border border-[#91B1CC]">
-                              <div
-                                tabIndex={0}
-                                role="region"
-                                aria-label="Tabla de asignaturas disponibles, use las flechas del teclado para desplazarse"
-                                className="overflow-x-auto max-h-[390px] focus:outline-2 focus:outline-[#002B49]"
-                              >
+                              <div className="overflow-x-auto max-h-[390px]">
                                 <table className="w-full text-left border-collapse">
                                   <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold sticky top-0 z-10 text-[10px]">
                                     <tr>
@@ -1568,12 +1563,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             )}
 
                             {/* Tabla de Secciones Disponibles */}
-                            <div
-                              tabIndex={0}
-                              role="region"
-                              aria-label="Tabla de secciones disponibles para la asignatura"
-                              className="border border-[#A8C2D8] overflow-x-auto focus:outline-2 focus:outline-[#002B49]"
-                            >
+                            <div className="border border-[#A8C2D8] overflow-x-auto">
                               <table className="w-full text-left border-collapse">
                                 <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px]">
                                   <tr>
@@ -1660,12 +1650,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             <span>Horario</span>
                           </div>
 
-                          <div
-                            tabIndex={0}
-                            role="region"
-                            aria-label="Grilla de horario semanal de clases"
-                            className="bg-white border border-[#90AFC9] overflow-x-auto max-h-[245px] focus:outline-2 focus:outline-[#002B49]"
-                          >
+                          <div className="bg-white border border-[#90AFC9] overflow-x-auto max-h-[245px]">
                             <table className="w-full text-center text-[10px] border-collapse">
                               <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold sticky top-0 z-10">
                                 <tr>
@@ -1727,12 +1712,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             <span>Cursos seleccionados</span>
                           </div>
 
-                          <div
-                            tabIndex={0}
-                            role="region"
-                            aria-label="Tabla de cursos seleccionados por el estudiante"
-                            className="bg-white border border-[#90AFC9] overflow-x-auto min-h-[140px] max-h-[180px] focus:outline-2 focus:outline-[#002B49]"
-                          >
+                          <div className="bg-white border border-[#90AFC9] overflow-x-auto min-h-[140px] max-h-[180px]">
                             <table className="w-full text-left border-collapse">
                               <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px] sticky top-0 z-10">
                                 <tr>
