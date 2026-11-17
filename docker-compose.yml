@@ -13,7 +13,7 @@ services:
     networks:
       - nexo360-net
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,7 +40,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-    command: ["node", "server.js"]
+    command: [ "node", "server.js" ]
     depends_on:
       mongodb:
         condition: service_healthy
@@ -61,11 +61,8 @@ services:
     environment:
       - VITE_API_PROXY_TARGET=http://backend:5000
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - ./frontend/index.html:/app/index.html
-      - ./frontend/tailwind.config.js:/app/tailwind.config.js
-      - ./frontend/vite.config.js:/app/vite.config.js
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       backend:
         condition: service_healthy
@@ -80,4 +77,3 @@ networks:
   nexo360-net:
     name: nexo360-net
     driver: bridge
-
