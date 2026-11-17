@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAccessibility } from '../../context/AccessibilityContext';
 import { getStudentDisplayName } from '../../utils/studentUtils';
 import logo03 from '../../assets/logo03.png';
 import {
@@ -17,6 +18,8 @@ import {
   Sparkles,
   Check,
   ShieldAlert,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 /**
@@ -26,6 +29,7 @@ import {
  */
 export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
   const { user, logout } = useAuth();
+  const { highContrast, toggleHighContrast } = useAccessibility();
   const [isSimMenuOpen, setIsSimMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -338,8 +342,34 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
             )}
           </nav>
 
-          {/* 3. Acciones Derecha: Perfil, Salir y Botón Menú Móvil */}
+          {/* 3. Acciones Derecha: Alto Contraste, Perfil, Salir y Botón Menú Móvil */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Botón Accesible Directo: Alto Contraste (WCAG 1.4.3 / 1.4.6) */}
+            <button
+              type="button"
+              onClick={toggleHighContrast}
+              className={`min-h-[40px] px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 active:scale-95 ${
+                highContrast
+                  ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs'
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              aria-pressed={highContrast}
+              aria-label={highContrast ? 'Desactivar modo alto contraste' : 'Activar modo alto contraste'}
+              title={highContrast ? 'Desactivar alto contraste' : 'Activar alto contraste'}
+            >
+              {highContrast ? (
+                <>
+                  <Moon className="w-4 h-4 text-slate-950" aria-hidden="true" />
+                  <span className="hidden md:inline">Alto Contraste</span>
+                </>
+              ) : (
+                <>
+                  <Sun className="w-4 h-4 text-amber-500" aria-hidden="true" />
+                  <span className="hidden md:inline">Contraste</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => onTabChange('perfil')}
@@ -543,11 +573,32 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               )}
             </div>
 
-            {/* Salir en móvil */}
+            {/* Salir y accesibilidad en móvil */}
             <div className="pt-2 border-t border-slate-200 flex items-center justify-between px-1">
-              <div className="text-xs text-slate-500 font-medium">
-                <span>{displayCampus}</span>
-              </div>
+              <button
+                type="button"
+                onClick={toggleHighContrast}
+                className={`min-h-[40px] px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 active:scale-95 ${
+                  highContrast
+                    ? 'bg-amber-400 text-slate-950 border-amber-300'
+                    : 'bg-white text-slate-700 border-slate-200'
+                }`}
+                aria-pressed={highContrast}
+                aria-label={highContrast ? 'Desactivar modo alto contraste' : 'Activar modo alto contraste'}
+              >
+                {highContrast ? (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-slate-950" aria-hidden="true" />
+                    <span>Alto Contraste</span>
+                  </>
+                ) : (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-500" aria-hidden="true" />
+                    <span>Contraste</span>
+                  </>
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={logout}

@@ -28,9 +28,9 @@ const ProtectedRoute = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12">
+      <div className="flex-1 flex items-center justify-center p-12" role="status" aria-live="polite">
         <div className="text-center">
-          <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
+          <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3" aria-hidden="true"></div>
           <p className="text-slate-600 font-semibold text-sm">Verificando credenciales Duoc UC...</p>
         </div>
       </div>
@@ -50,9 +50,9 @@ const RootRoute = () => {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-12">
+      <div className="flex-1 flex items-center justify-center p-12" role="status" aria-live="polite">
         <div className="text-center">
-          <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
+          <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3" aria-hidden="true"></div>
           <p className="text-slate-600 font-semibold text-sm">Iniciando Nexo360...</p>
         </div>
       </div>
@@ -80,10 +80,10 @@ export const App = () => {
       {/* 3. Contenido Principal Rutas */}
       <Suspense
         fallback={
-          <div className="flex-1 flex items-center justify-center p-12">
+          <div className="flex-1 flex items-center justify-center p-12" role="status" aria-live="polite">
             <div className="text-center">
-              <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3"></div>
-              <p className="text-slate-600 font-semibold text-sm">Cargando Nexo360...</p>
+              <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3" aria-hidden="true"></div>
+              <p className="text-slate-600 font-semibold text-sm">Cargando módulo de Nexo360...</p>
             </div>
           </div>
         }

@@ -138,6 +138,18 @@ function normalizeHeaderKey(key) {
 }
 
 /**
+ * Sanitiza celdas de Excel para prevenir CSV / Formula Injection y XSS
+ */
+function sanitizeCell(val, maxLen = 250) {
+  if (val === undefined || val === null) return '';
+  let str = String(val).trim();
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = str.replace(/^[=+\-@\t\r]+/, '');
+  }
+  return str.replace(/[<>]/g, '').slice(0, maxLen).trim();
+}
+
+/**
  * Normaliza un objeto fila crudo en el esquema CourseOffering
  */
 function normalizeRowToOffering(rawRow, defaultPeriodo = '2026 - 002') {
@@ -146,10 +158,11 @@ function normalizeRowToOffering(rawRow, defaultPeriodo = '2026 - 002') {
   const row = {};
   for (const [k, v] of Object.entries(rawRow)) {
     const canonicalKey = normalizeHeaderKey(k);
+    const sanitizedVal = sanitizeCell(v);
     if (canonicalKey) {
-      row[canonicalKey] = v !== undefined && v !== null ? String(v).trim() : '';
+      row[canonicalKey] = sanitizedVal;
     } else {
-      row[k] = v !== undefined && v !== null ? String(v).trim() : '';
+      row[k] = sanitizedVal;
     }
   }
 
@@ -208,6 +221,7 @@ module.exports = {
   toMinutes,
   parseDuocSchedule,
   normalizeHeaderKey,
+  sanitizeCell,
   normalizeRowToOffering,
   normalizeRow: normalizeRowToOffering,
 };
