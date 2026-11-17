@@ -24,6 +24,23 @@ import {
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * Clasificador estricto de rol institucional para la vista de perfil
+ */
+function getInstitutionalRoleLabel(profile) {
+  const role = (profile?.role || '').toLowerCase();
+  if (role === 'admin' || role === 'administrador') {
+    return 'Administrador';
+  }
+  if (role === 'coordinador_paedis') {
+    return 'Coordinador PAEDIS';
+  }
+  if (Boolean(profile?.isPaedis) || role === 'estudiante_paedis') {
+    return 'Estudiante PAEDIS';
+  }
+  return 'Estudiante Regular';
+}
+
 export const PerfilView = () => {
   const { announce } = useAccessibility();
   const { user, updateUser } = useAuth();
@@ -327,13 +344,7 @@ export const PerfilView = () => {
           <div className="space-y-6 flex-1">
             <div>
               <span className="text-xs font-semibold text-[#002B49] bg-slate-100 px-3 py-1 rounded-full inline-block mb-2">
-                {profile.isPaedis
-                  ? profile.roleLabel || 'Estudiante Regular'
-                  : (profile.roleLabel || 'Estudiante Regular')
-                      .replace(' • PAEDIS', '')
-                      .replace('• PAEDIS', '')
-                      .replace('PAEDIS', '')
-                      .trim()}
+                {getInstitutionalRoleLabel(profile)}
               </span>
               <h2 id="perfil-view-heading" className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 {profile.nombre}
@@ -454,8 +465,8 @@ export const PerfilView = () => {
         </div>
       </div>
 
-      {/* TARJETA: Acompañamiento y Ajustes Razonables (Solo visible si el estudiante cuenta con perfil PAEDIS activo) */}
-      {Boolean(profile.isPaedis) && (
+      {/* TARJETA: Acompañamiento y Ajustes Académicos (Solo visible si el estudiante cuenta con perfil PAEDIS activo) */}
+      {Boolean(profile.isPaedis || profile.role === 'estudiante_paedis') && (
         <article className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
             <div className="w-10 h-10 rounded-xl bg-sky-50 text-[#002B49] flex items-center justify-center shrink-0" aria-hidden="true">
@@ -471,26 +482,14 @@ export const PerfilView = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
-              <span className="text-xs font-medium text-slate-500 block mb-1">
-                Unidad de acompañamiento
-              </span>
-              <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
-                <span>{profile.tutorParAsignado || 'Inclusión y Bienestar • Sede Alameda'}</span>
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
-              <span className="text-xs font-medium text-slate-500 block mb-1">
-                Estado en programa PAEDIS
-              </span>
-              <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
-                <span>Adscrito/a con ajustes académicos activos</span>
-              </p>
-            </div>
+          <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70">
+            <span className="text-xs font-medium text-slate-500 block mb-1">
+              Estado en programa PAEDIS
+            </span>
+            <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
+              <span>Adscrito/a con ajustes académicos activos</span>
+            </p>
           </div>
 
           <div className="space-y-3 pt-1">

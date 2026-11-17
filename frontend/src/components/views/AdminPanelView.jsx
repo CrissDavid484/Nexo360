@@ -36,7 +36,6 @@ import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { CoursesAdminSection } from '../admin/CoursesAdminSection';
-import { AdministrativeStaffSection } from '../admin/AdministrativeStaffSection';
 import { EarlyWarningSatSection } from '../admin/EarlyWarningSatSection';
 
 /**
@@ -53,6 +52,46 @@ const isStaffOrAdministrativeRole = (role) => {
     r === 'director' ||
     r === 'subdirector'
   );
+};
+
+/**
+ * Insignia y descripción funcional para funcionarios administrativos
+ */
+const getStaffRoleBadge = (role) => {
+  const r = (role || '').toLowerCase();
+  if (r === 'coordinador_paedis') {
+    return {
+      label: 'Coordinador PAEDIS',
+      badgeClass: 'bg-purple-100 text-purple-900 border border-purple-200',
+      description: 'Gestión y acompañamiento de estudiantes con necesidades educativas especiales, aprobación de ajustes razonables y vinculación UAP.',
+    };
+  }
+  if (r === 'admin' || r === 'administrador') {
+    return {
+      label: 'Administrador Nexo360',
+      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-200',
+      description: 'Control de plataforma, asignación de roles de seguridad RBAC, parametrización de carreras, sedes y auditorías de actividad.',
+    };
+  }
+  if (r === 'profesor') {
+    return {
+      label: 'Docente Duoc UC',
+      badgeClass: 'bg-blue-100 text-blue-900 border border-blue-200',
+      description: 'Recepción y aplicación de fichas de ajustes razonables en aula y evaluación curricular.',
+    };
+  }
+  if (r === 'director' || r === 'subdirector') {
+    return {
+      label: 'Directivo Institucional',
+      badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-200',
+      description: 'Supervisión de continuidad de estudios, equidad en titulación y excepciones académicas normativas.',
+    };
+  }
+  return {
+    label: 'Personal Administrativo',
+    badgeClass: 'bg-slate-100 text-slate-800 border border-slate-200',
+    description: 'Gestión operativa, soporte de beneficios institucionales y atención a la comunidad.',
+  };
 };
 
 const DEFAULT_CAREERS = [
@@ -104,6 +143,9 @@ export const AdminPanelView = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'activo' | 'desercion' | 'titulado' | 'paedis'
+  const [directoryMode, setDirectoryMode] = useState('estudiantes'); // 'estudiantes' | 'administrativos'
+  const [adminRoleFilter, setAdminRoleFilter] = useState('all'); // 'all' | 'coordinadores' | 'administradores' | 'docentes'
+  const [selectedAdminForDetail, setSelectedAdminForDetail] = useState(null);
 
   // Catálogos dinámicos de Carreras y Sedes sincronizados con la base de datos
   const [careersList, setCareersList] = useState(DEFAULT_CAREERS);
@@ -270,6 +312,54 @@ export const AdminPanelView = () => {
       return (a.rut || '').localeCompare(b.rut || '');
     });
   }, [studentUsers, searchTerm, filterStatus]);
+
+  // Filtrado y ordenamiento alfabético de funcionarios administrativos en el directorio
+  const filteredAdministradores = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    const cleanQ = q.replace(/[^0-9kK]/g, '');
+
+    const filtered = administrativeUsers.filter((u) => {
+      const name = u.fullName || u.nombre || '';
+      const sede = u.campus || u.sede || '';
+      const rut = u.rut || '';
+      const email = u.email || '';
+      const cleanRut = rut.replace(/[^0-9kK]/g, '').toLowerCase();
+
+      const matchesRut =
+        (rut && rut.toLowerCase().includes(q)) ||
+        (cleanQ.length > 0 && cleanRut.includes(cleanQ));
+
+      const matchesSearch =
+        !q ||
+        name.toLowerCase().includes(q) ||
+        sede.toLowerCase().includes(q) ||
+        email.toLowerCase().includes(q) ||
+        matchesRut;
+
+      if (!matchesSearch) return false;
+
+      const r = (u.role || '').toLowerCase();
+      if (adminRoleFilter === 'coordinadores') return r === 'coordinador_paedis';
+      if (adminRoleFilter === 'administradores') return r === 'admin' || r === 'administrador';
+      if (adminRoleFilter === 'docentes') {
+        return (
+          r === 'profesor' ||
+          r === 'director' ||
+          r === 'subdirector' ||
+          r === 'administrativo'
+        );
+      }
+      return true;
+    });
+
+    return filtered.sort((a, b) => {
+      const nameA = (a.fullName || a.nombre || a.email || '').trim();
+      const nameB = (b.fullName || b.nombre || b.email || '').trim();
+      const cmp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      if (cmp !== 0) return cmp;
+      return (a.rut || '').localeCompare(b.rut || '');
+    });
+  }, [administrativeUsers, searchTerm, adminRoleFilter]);
 
   // Manejo de cambio de estado académico
   const handleOpenStatusModal = (student) => {
@@ -659,25 +749,6 @@ export const AdminPanelView = () => {
         <button
           type="button"
           onClick={() => {
-            setAdminSubTab('administrativos');
-            announce('Pestaña de Apartado Administrativo PAEDIS seleccionada.', 'polite');
-          }}
-          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            adminSubTab === 'administrativos'
-              ? 'bg-[#002B49] text-white shadow-xs'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Shield className="w-4 h-4 text-purple-400" />
-          <span>Apartado Administrativo PAEDIS</span>
-          <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200">
-            {administrativeUsers.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
             setAdminSubTab('carreras-sedes');
             announce('Pestaña de Gestión Dinámica de Carreras y Sedes seleccionada.', 'polite');
           }}
@@ -938,26 +1009,6 @@ export const AdminPanelView = () => {
             </div>
           </div>
         </section>
-      ) : adminSubTab === 'administrativos' ? (
-        /* APARTADO ADMINISTRATIVO PAEDIS */
-        <AdministrativeStaffSection
-          staffUsers={administrativeUsers}
-          onOpenCreateModal={() => {
-            setNewUserForm({
-              fullName: '',
-              email: '',
-              password: dynamicInitialPassword,
-              rut: '',
-              role: 'coordinador_paedis',
-              career: 'Programa PAEDIS',
-              campus: 'Sede Alameda',
-            });
-            setIsCreateModalOpen(true);
-          }}
-          isAdmin={isAdmin}
-          isCoordinator={isCoordinator}
-          announce={announce}
-        />
       ) : (
         /* PESTAÑA PRINCIPAL: GESTIÓN DE ESTUDIANTES & MODELO PREDICTIVO */
         <>
@@ -1232,70 +1283,146 @@ export const AdminPanelView = () => {
             </div>
           </section>
 
-          {/* 4. REDISEÑO DEL DIRECTORIO DE ESTUDIANTES */}
+          {/* 4. REDISEÑO DEL DIRECTORIO INSTITUCIONAL: ESTUDIANTES O ADMINISTRATIVOS */}
           {/* REQUISITO ESTRICTO: En la lista principal cada entrada muestra ÚNICAMENTE el Nombre Completo y directamente debajo en texto pequeño la Sede. */}
           <section
             aria-labelledby="students-directory-title"
             className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm space-y-5"
           >
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-[#002B49] bg-amber-100">
-                    <Users className="w-3 h-3 text-amber-700" aria-hidden="true" />
-                    Cuerpo Estudiantil • PAEDIS y Regular
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminSubTab('administrativos');
-                      announce('Navegando al Apartado Administrativo PAEDIS.', 'polite');
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors cursor-pointer"
-                    title="Ver personal docente, directivo y de coordinación PAEDIS"
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider ${
+                      directoryMode === 'estudiantes'
+                        ? 'text-[#002B49] bg-amber-100 border border-amber-300'
+                        : 'text-purple-900 bg-purple-100 border border-purple-300'
+                    }`}
                   >
-                    <Shield className="w-3 h-3 text-purple-600" aria-hidden="true" />
-                    <span>Ver Apartado Administrativo ({administrativeUsers.length}) →</span>
-                  </button>
+                    {directoryMode === 'estudiantes' ? (
+                      <>
+                        <Users className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
+                        Estudiantes
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="w-3.5 h-3.5 text-purple-700" aria-hidden="true" />
+                        Administrativos
+                      </>
+                    )}
+                  </span>
+
+                  {/* Switcher de Directorio */}
+                  <div
+                    className="inline-flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200"
+                    role="tablist"
+                    aria-label="Seleccionar directorio institucional"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={directoryMode === 'estudiantes'}
+                      onClick={() => {
+                        setDirectoryMode('estudiantes');
+                        announce('Mostrando directorio de estudiantes.', 'polite');
+                      }}
+                      className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        directoryMode === 'estudiantes'
+                          ? 'bg-[#002B49] text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Estudiantes ({studentUsers.length})
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={directoryMode === 'administrativos'}
+                      onClick={() => {
+                        setDirectoryMode('administrativos');
+                        announce('Mostrando directorio de administrativos.', 'polite');
+                      }}
+                      className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        directoryMode === 'administrativos'
+                          ? 'bg-[#002B49] text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Administrativos ({administrativeUsers.length})
+                    </button>
+                  </div>
                 </div>
+
                 <h2
                   id="students-directory-title"
                   className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight"
                 >
-                  Directorio de Estudiantes Registrados ({filteredStudents.length})
+                  {directoryMode === 'estudiantes'
+                    ? `Directorio de Estudiantes Registrados (${filteredStudents.length})`
+                    : `Directorio de Administrativos Registrados (${filteredAdministradores.length})`}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                  Haz clic en cualquier estudiante para abrir su ficha completa con asistencia detallada por asignatura y semáforo predictivo.
+                  {directoryMode === 'estudiantes'
+                    ? 'Haz clic en cualquier estudiante para abrir su ficha completa con asistencia detallada por asignatura y semáforo predictivo.'
+                    : 'Haz clic en cualquier miembro del personal para ver su rol institucional, funciones asignadas y datos de contacto.'}
                 </p>
               </div>
 
-              {/* Filtros de Estado */}
-              <div
-                className="flex flex-wrap items-center gap-1.5"
-                role="group"
-                aria-label="Filtrar por estado"
-              >
-                {[
-                  { id: 'all', label: 'Todos' },
-                  { id: 'activo', label: 'Activos' },
-                  { id: 'desercion', label: 'Deserción' },
-                  { id: 'titulado', label: 'Titulados' },
-                  { id: 'paedis', label: 'Solo PAEDIS' },
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setFilterStatus(f.id)}
-                    className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
-                      filterStatus === f.id
-                        ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
+              {/* Filtros dinámicos según el modo de directorio */}
+              {directoryMode === 'estudiantes' ? (
+                <div
+                  className="flex flex-wrap items-center gap-1.5"
+                  role="group"
+                  aria-label="Filtrar por estado"
+                >
+                  {[
+                    { id: 'all', label: 'Todos' },
+                    { id: 'activo', label: 'Activos' },
+                    { id: 'desercion', label: 'Deserción' },
+                    { id: 'titulado', label: 'Titulados' },
+                    { id: 'paedis', label: 'Solo PAEDIS' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setFilterStatus(f.id)}
+                      className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
+                        filterStatus === f.id
+                          ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="flex flex-wrap items-center gap-1.5"
+                  role="group"
+                  aria-label="Filtrar personal administrativo por rol"
+                >
+                  {[
+                    { id: 'all', label: 'Todos' },
+                    { id: 'coordinadores', label: 'Coordinadores PAEDIS' },
+                    { id: 'administradores', label: 'Administradores' },
+                    { id: 'docentes', label: 'Docentes & Directivos' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setAdminRoleFilter(f.id)}
+                      className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
+                        adminRoleFilter === f.id
+                          ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Barra de Búsqueda */}
@@ -1308,14 +1435,23 @@ export const AdminPanelView = () => {
                 type="search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar estudiante por nombre, RUT o sede..."
-                aria-label="Buscar estudiante por nombre, RUT o sede"
+                placeholder={
+                  directoryMode === 'estudiantes'
+                    ? 'Buscar estudiante por nombre, RUT o sede...'
+                    : 'Buscar administrativo por nombre, RUT, correo o sede...'
+                }
+                aria-label={
+                  directoryMode === 'estudiantes'
+                    ? 'Buscar estudiante por nombre, RUT o sede'
+                    : 'Buscar administrativo por nombre, RUT, correo o sede'
+                }
                 className="w-full min-h-[44px] pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
               />
             </div>
 
-            {/* Directorio de Estudiantes: Cada entrada muestra ÚNICAMENTE Nombre Completo y debajo en texto pequeño la Sede */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5" role="list">
+            {/* Listado dinámico según el modo del directorio: Estudiantes o Administrativos */}
+            {directoryMode === 'estudiantes' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5" role="list">
               {filteredStudents.length === 0 ? (
                 <div className="col-span-full p-8 text-center text-slate-500 font-bold bg-slate-50 rounded-2xl border border-slate-200">
                   No se encontraron estudiantes registrados con los criterios seleccionados.
@@ -1688,6 +1824,155 @@ export const AdminPanelView = () => {
                 })
               )}
             </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5" role="list">
+                {filteredAdministradores.length === 0 ? (
+                  <div className="col-span-full p-8 text-center text-slate-500 font-bold bg-slate-50 rounded-2xl border border-slate-200">
+                    No se encontraron funcionarios administrativos con los criterios seleccionados.
+                  </div>
+                ) : (
+                  filteredAdministradores.map((admin) => {
+                    const adminSede = admin.campus || admin.sede || 'Sede Alameda';
+                    const roleBadge = getStaffRoleBadge(admin.role);
+                    const isExpanded =
+                      selectedAdminForDetail &&
+                      (selectedAdminForDetail._id === admin._id || selectedAdminForDetail.id === admin.id);
+                    const isRutSearchMatch = Boolean(
+                      searchTerm &&
+                        admin.rut &&
+                        (admin.rut.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+                          (searchTerm.replace(/[^0-9kK]/g, '').length >= 2 &&
+                            admin.rut
+                              .replace(/[^0-9kK]/g, '')
+                              .toLowerCase()
+                              .includes(searchTerm.replace(/[^0-9kK]/g, '').toLowerCase())))
+                    );
+
+                    return (
+                      <div
+                        key={admin._id || admin.id}
+                        role="listitem"
+                        className={`transition-all duration-300 ${isExpanded ? 'col-span-full' : ''}`}
+                      >
+                        {/* Cabecera de la Tarjeta Administrativa: Nombre y debajo Sede y Rol */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAdminForDetail(isExpanded ? null : admin)}
+                          className={`w-full p-4 text-left flex items-center justify-between gap-3 group cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
+                            isExpanded
+                              ? 'bg-purple-950 text-white border-2 border-purple-950 shadow-lg rounded-t-2xl rounded-b-none'
+                              : 'bg-white hover:bg-slate-50/90 border border-slate-200 hover:border-purple-900/40 rounded-2xl shadow-xs hover:shadow-md'
+                          }`}
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? 'Contraer' : 'Desplegar'} ficha de ${admin.fullName}, ${roleBadge.label}, ${adminSede}`}
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <span
+                              className={`font-black block truncate text-sm sm:text-base ${
+                                isExpanded ? 'text-white' : 'text-slate-900 group-hover:text-purple-950'
+                              }`}
+                            >
+                              {admin.fullName}
+                            </span>
+                            <span
+                              className={`text-xs font-semibold block truncate ${
+                                isExpanded ? 'text-purple-200' : 'text-slate-500'
+                              }`}
+                            >
+                              {adminSede} • {roleBadge.label}
+                              {isRutSearchMatch ? ` • RUT: ${admin.rut}` : ''}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 ${
+                              isExpanded
+                                ? 'bg-white/15 text-purple-200 rotate-90'
+                                : 'bg-slate-100 group-hover:bg-purple-950 text-slate-500 group-hover:text-purple-200'
+                            }`}
+                          >
+                            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+                          </div>
+                        </button>
+
+                        {/* DETALLE DESPLEGADO DEL FUNCIONARIO ADMINISTRATIVO */}
+                        {isExpanded && (
+                          <div className="bg-white rounded-b-2xl border-x-2 border-b-2 border-purple-950 p-5 sm:p-7 shadow-xl space-y-5 animate-fade-in">
+                            <div className="border-b border-slate-100 pb-3 flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <span
+                                  className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded inline-block mb-1 ${roleBadge.badgeClass}`}
+                                >
+                                  {roleBadge.label}
+                                </span>
+                                <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                                  {admin.fullName}
+                                </h3>
+                              </div>
+                              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                Activo Institucional
+                              </span>
+                            </div>
+
+                            {/* Fila de Datos Institucionales */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                                  Correo Institucional
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-slate-800 break-all">
+                                  {admin.email || 'Sin correo registrado'}
+                                </span>
+                              </div>
+
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                                  RUT Institucional
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-slate-800">
+                                  {admin.rut || 'No registrado'}
+                                </span>
+                              </div>
+
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                                  Sede / Campus
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-slate-800">
+                                  {adminSede}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Descripción de Funciones */}
+                            <div className="p-4 bg-purple-50/60 rounded-xl border border-purple-100 space-y-1">
+                              <span className="text-xs font-black text-purple-900 block">
+                                Rol y Atribuciones en la Plataforma
+                              </span>
+                              <p className="text-xs text-purple-800 font-medium leading-relaxed">
+                                {roleBadge.description}
+                              </p>
+                            </div>
+
+                            {/* Pie de Acciones */}
+                            <div className="flex justify-end pt-3 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAdminForDetail(null)}
+                                className="min-h-[40px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
+                              >
+                                Contraer Ficha
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </section>
         </>
       )}
