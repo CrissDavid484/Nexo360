@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const UserProfile = require('../models/UserProfile');
 const ActivityLog = require('../models/ActivityLog');
 const authService = require('../services/authService');
+const satAlertService = require('../services/satAlertService');
 
 const Career = require('../models/Career');
 const Sede = require('../models/Sede');
@@ -1231,6 +1232,251 @@ exports.deleteSede = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error al eliminar la sede.',
+    });
+  }
+};
+
+/**
+ * Helper interno para localizar estudiante por ObjectId o por Email institucional
+ */
+async function findUserByIdOrEmail(rawIdentifier) {
+  const cleanId = String(rawIdentifier || '').trim();
+  if (!cleanId) return null;
+
+  if (mongoose.connection.readyState === 1) {
+    if (mongoose.Types.ObjectId.isValid(cleanId)) {
+      const doc = await UserProfile.findById(cleanId);
+      if (doc) return doc;
+    }
+    const cleanEmail = cleanId.toLowerCase().replace(/[^a-zA-Z0-9._%+-@]/g, '');
+    const docByEmail = await UserProfile.findOne({ email: cleanEmail });
+    if (docByEmail) return docByEmail;
+  }
+
+  const all = await authService.getAllUsers();
+  return (
+    all.find(
+      (u) =>
+        String(u.id) === cleanId ||
+        String(u._id) === cleanId ||
+        (u.email || '').toLowerCase() === cleanId.toLowerCase()
+    ) || null
+  );
+}
+
+/**
+ * GET /api/admin/sat-alerts
+ * Retorna estudiantes con desglose de asistencia por asignatura, nivel SAT y métricas globales
+ */
+exports.getSatAlerts = async (req, res) => {
+  try {
+    const rawUsers = await authService.getAllUsers();
+    const studentUsers = rawUsers.filter(
+      (u) =>
+        u.role === 'estudiante' ||
+        u.role === 'estudiante_paedis' ||
+        u.role === 'tutor_par' ||
+        (Array.isArray(u.courseAttendance) && u.courseAttendance.length > 0)
+    );
+
+    const evaluatedStudents = studentUsers.map((student) => {
+      const satEvaluation = satAlertService.evaluateStudentSat(student);
+      return {
+        ...student,
+        satEvaluation,
+      };
+    });
+
+    const riskPriority = {
+      LEVEL_2_CRITICAL: 1,
+      LEVEL_1_PREVENTIVE: 2,
+      PAEDIS_JUSTIFIED: 3,
+      NONE: 4,
+    };
+
+    evaluatedStudents.sort((a, b) => {
+      const pA = riskPriority[a.satEvaluation.riskLevel] || 5;
+      const pB = riskPriority[b.satEvaluation.riskLevel] || 5;
+      if (pA !== pB) return pA - pB;
+      const nameA = (a.fullName || a.nombre || a.email || '').trim();
+      const nameB = (b.fullName || b.nombre || b.email || '').trim();
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+    });
+
+    const metrics = satAlertService.calculateGlobalMetrics(evaluatedStudents);
+
+    return res.status(200).json({
+      success: true,
+      count: evaluatedStudents.length,
+      metrics,
+      students: evaluatedStudents,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al obtener alertas SAT:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar el Sistema de Alerta Temprana (SAT).',
+    });
+  }
+};
+
+/**
+ * PATCH /api/admin/sat-alerts/:userId/simulate
+ * Permite simular un corte semanal SAP modificando la asistencia de un ramo específico
+ */
+exports.simulateSatCourse = async (req, res) => {
+  try {
+    const rawUserId = String(req.params.userId || '').trim();
+    const rawCourseCode = String(req.body.courseCode || '').trim();
+    const rawAction = String(req.body.action || '').trim().toLowerCase();
+
+    if (!rawUserId || !rawCourseCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de usuario y código de asignatura son obligatorios.',
+      });
+    }
+
+    const user = await findUserByIdOrEmail(rawUserId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Estudiante no encontrado para simulación SAT.',
+      });
+    }
+
+    const currentAttendance = Array.isArray(user.courseAttendance) ? user.courseAttendance : [];
+    const updatedCourses = satAlertService.applySimulatedCourseUpdate(currentAttendance, {
+      courseCode: rawCourseCode,
+      action: rawAction,
+      attendedSessions:
+        typeof req.body.attendedSessions === 'number'
+          ? Math.trunc(req.body.attendedSessions)
+          : undefined,
+      consecutiveAbsences:
+        typeof req.body.consecutiveAbsences === 'number'
+          ? Math.trunc(req.body.consecutiveAbsences)
+          : undefined,
+      missedKeySession:
+        typeof req.body.missedKeySession === 'boolean' ? req.body.missedKeySession : undefined,
+      paedisJustified:
+        typeof req.body.paedisJustified === 'boolean' ? req.body.paedisJustified : undefined,
+    });
+
+    user.courseAttendance = updatedCourses;
+    const satEval = satAlertService.evaluateStudentSat(user);
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    await authService.logActivity({
+      userId: user.id || user._id,
+      userEmail: user.email,
+      userName: user.fullName || user.nombre,
+      userRole: user.role,
+      action: 'sat_weekly_cut_simulated',
+      details: `Simulación SAP aplicada a ramo ${rawCourseCode}: acción '${rawAction || 'personalizada'}'. Nuevo estado SAT: ${satEval.riskLevel}`,
+    });
+
+    const formatted = authService.formatUserResponse(user);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Simulación de corte semanal SAP aplicada exitosamente.',
+      student: {
+        ...formatted,
+        satEvaluation: satEval,
+      },
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al simular alerta SAT:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al simular corte semanal de asistencia.',
+    });
+  }
+};
+
+/**
+ * PATCH /api/admin/sat-alerts/:userId/intervention
+ * Registra o actualiza la gestión en la Ficha 360 de acompañamiento SAT
+ */
+exports.updateSatIntervention = async (req, res) => {
+  try {
+    const rawUserId = String(req.params.userId || '').trim();
+    if (!rawUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de estudiante no proporcionado.',
+      });
+    }
+
+    const user = await findUserByIdOrEmail(rawUserId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Estudiante no encontrado para registrar intervención.',
+      });
+    }
+
+    const allowedStatuses = ['PENDING', 'IN_PROGRESS', 'RESOLVED'];
+    const rawStatus = String(req.body.status || 'IN_PROGRESS').trim().toUpperCase();
+    const cleanStatus = allowedStatuses.includes(rawStatus) ? rawStatus : 'IN_PROGRESS';
+
+    const cleanAssignedTo = String(req.body.assignedTo || 'Coordinación PAEDIS')
+      .slice(0, 120)
+      .trim();
+    const cleanNotes = String(req.body.notes || '').slice(0, 500).trim();
+    const rawSla = req.body.slaDeadline ? new Date(req.body.slaDeadline) : null;
+    const cleanSla =
+      rawSla && !isNaN(rawSla.getTime())
+        ? rawSla
+        : new Date(Date.now() + 48 * 3600 * 1000);
+
+    const cleanRiskLevel = String(req.body.riskLevel || '').trim().toUpperCase();
+    const validRiskLevels = ['NONE', 'LEVEL_1_PREVENTIVE', 'LEVEL_2_CRITICAL', 'PAEDIS_JUSTIFIED'];
+
+    user.satIntervention = {
+      riskLevel: validRiskLevels.includes(cleanRiskLevel)
+        ? cleanRiskLevel
+        : user.satIntervention?.riskLevel || 'NONE',
+      assignedTo: cleanAssignedTo,
+      slaDeadline: cleanSla,
+      status: cleanStatus,
+      notes: cleanNotes,
+      lastUpdated: new Date(),
+    };
+
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    await authService.logActivity({
+      userId: user.id || user._id,
+      userEmail: user.email,
+      userName: user.fullName || user.nombre,
+      userRole: user.role,
+      action: 'sat_intervention_updated',
+      details: `Ficha 360 de intervención SAT actualizada. Responsable: ${cleanAssignedTo}, Estado: ${cleanStatus}`,
+    });
+
+    const satEval = satAlertService.evaluateStudentSat(user);
+    const formatted = authService.formatUserResponse(user);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Ficha 360 de intervención registrada exitosamente.',
+      student: {
+        ...formatted,
+        satEvaluation: satEval,
+      },
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al registrar intervención SAT:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al registrar la intervención en la Ficha 360.',
     });
   }
 };

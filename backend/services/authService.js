@@ -116,6 +116,15 @@ class AuthService {
             isRegisteredInDb: true,
           });
           console.log(`[AuthService] Usuario institucional sembrado en MongoDB: ${cleanEmail}`);
+        } else if (!existing.courseAttendance || existing.courseAttendance.length === 0) {
+          if (Array.isArray(seedUser.courseAttendance) && seedUser.courseAttendance.length > 0) {
+            existing.courseAttendance = seedUser.courseAttendance;
+            if (seedUser.satIntervention) {
+              existing.satIntervention = seedUser.satIntervention;
+            }
+            await existing.save();
+            console.log(`[AuthService] Actualizada asistencia SAT en MongoDB para: ${cleanEmail}`);
+          }
         }
       } catch (err) {
         console.warn(`[AuthService] Aviso sembrando usuario ${seedUser.email}:`, err.message);
@@ -473,6 +482,15 @@ class AuthService {
       lastSimulatorUsage: raw.lastSimulatorUsage || null,
       accessibilityPreferences,
       enrolledCourses,
+      courseAttendance: Array.isArray(raw.courseAttendance) ? raw.courseAttendance : [],
+      satIntervention: raw.satIntervention || {
+        riskLevel: 'NONE',
+        assignedTo: 'Coordinación PAEDIS',
+        slaDeadline: null,
+        status: 'PENDING',
+        notes: '',
+        lastUpdated: new Date(),
+      },
       photo: raw.photo || '',
       address,
       direccion,

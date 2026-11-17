@@ -28,7 +28,64 @@
       "reducedMotion": false,
       "screenReaderOptimized": true
     },
-    "enrolledCourses": []
+    "enrolledCourses": [
+      {
+        "sigla": "ASY1101",
+        "nombre": "Fundamentos de Arquitectura",
+        "seccion": "001D",
+        "creditos": 10,
+        "attendanceRate": 76.5,
+        "porcentajeAsistencia": 76.5,
+        "clasesRegistradas": 20,
+        "asistencias": 15,
+        "profesor": "Rodrigo Silva",
+        "sala": "Laboratorio TI 201"
+      },
+      {
+        "sigla": "PRY1102",
+        "nombre": "Taller de Programación",
+        "seccion": "002D",
+        "creditos": 10,
+        "attendanceRate": 85,
+        "porcentajeAsistencia": 85,
+        "clasesRegistradas": 20,
+        "asistencias": 17,
+        "profesor": "Claudia Muñoz",
+        "sala": "Laboratorio TI 202"
+      }
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY1101",
+        "courseName": "Fundamentos de Arquitectura",
+        "totalSessions": 20,
+        "attendedSessions": 15,
+        "attendancePercentage": 76.5,
+        "consecutiveAbsences": 2,
+        "lateCount": 3,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "PRY1102",
+        "courseName": "Taller de Programación",
+        "totalSessions": 20,
+        "attendedSessions": 17,
+        "attendancePercentage": 85,
+        "consecutiveAbsences": 0,
+        "lateCount": 1,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "LEVEL_1_PREVENTIVE",
+      "assignedTo": "Consejería Académica Sede Antonio Varas",
+      "slaDeadline": "2026-11-20T12:00:00.000Z",
+      "status": "PENDING",
+      "notes": "Alerta preventiva: 2 inasistencias consecutivas y asistencia en 76.5% en Fundamentos de Arquitectura. Monitorear próxima sesión.",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "c.guzman@duocuc.cl",
@@ -109,7 +166,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Sin intervención requerida",
+      "slaDeadline": null,
+      "status": "RESOLVED",
+      "notes": "Rendimiento óptimo y asistencia superior al 85% en todas las asignaturas inscritas.",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "d.diaz@duocuc.cl",
@@ -177,7 +277,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "d.rojas@duocuc.cl",
@@ -254,7 +397,50 @@
         "profesor": "Mauricio Gómez Arratia",
         "sala": "Laboratorio TI 302"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "CSY8301",
+        "courseName": "Calidad de Software",
+        "totalSessions": 25,
+        "attendedSessions": 18,
+        "attendancePercentage": 72,
+        "consecutiveAbsences": 3,
+        "lateCount": 1,
+        "missedKeySession": false,
+        "paedisJustified": true
+      },
+      {
+        "courseCode": "BDY8201",
+        "courseName": "Gestión de Bases de Datos Avanzadas",
+        "totalSessions": 28,
+        "attendedSessions": 25,
+        "attendancePercentage": 89.3,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Proyecto Capstone",
+        "totalSessions": 26,
+        "attendedSessions": 24,
+        "attendancePercentage": 92.3,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "PAEDIS_JUSTIFIED",
+      "assignedTo": "Tania Montes (Coordinación PAEDIS)",
+      "slaDeadline": "2026-11-21T18:00:00.000Z",
+      "status": "IN_PROGRESS",
+      "notes": "Ajuste razonable aplicado: Inasistencias justificadas por control médico PAEDIS. Docente notificado y material de clase compartido.",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "m.contreras@duocuc.cl",
@@ -322,7 +508,50 @@
         "profesor": "Marcelo Díaz",
         "sala": "Laboratorio TI 101"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "PWY2101",
+        "courseName": "Programación Web Frontend",
+        "totalSessions": 25,
+        "attendedSessions": 16,
+        "attendancePercentage": 64,
+        "consecutiveAbsences": 3,
+        "lateCount": 2,
+        "missedKeySession": true,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "BDY2201",
+        "courseName": "Bases de Datos Relacionales",
+        "totalSessions": 28,
+        "attendedSessions": 19,
+        "attendancePercentage": 67.9,
+        "consecutiveAbsences": 2,
+        "lateCount": 1,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "SOY2301",
+        "courseName": "Sistemas Operativos",
+        "totalSessions": 26,
+        "attendedSessions": 18,
+        "attendancePercentage": 69.2,
+        "consecutiveAbsences": 1,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "LEVEL_2_CRITICAL",
+      "assignedTo": "Tania Montes (Coordinación PAEDIS)",
+      "slaDeadline": "2026-11-19T18:00:00.000Z",
+      "status": "PENDING",
+      "notes": "Alerta crítica: Inasistencias consecutivas >= 3 y asistencia bajo 75% en PWY2101. Requiere citación prioritaria a coordinación.",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "v.soto@duocuc.cl",
@@ -395,7 +624,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "f.morales@duocuc.cl",
@@ -463,7 +735,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "j.perez@duocuc.cl",
@@ -519,7 +834,39 @@
         "profesor": "Víctor Mena",
         "sala": "Laboratorio Telecom 104"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "RDY1101",
+        "courseName": "Fundamentos de Redes y Comunicaciones",
+        "totalSessions": 24,
+        "attendedSessions": 11,
+        "attendancePercentage": 45,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "TCY1201",
+        "courseName": "Telecomunicaciones Básicas",
+        "totalSessions": 22,
+        "attendedSessions": 11,
+        "attendancePercentage": 51,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "m.gomez@profesor.duoc.cl",
@@ -587,7 +934,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "p.valenzuela@duoc.cl",
@@ -655,7 +1045,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "r.mendez@duoc.cl",
@@ -723,7 +1156,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "t.montes@duoc.cl",
@@ -791,7 +1267,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "c.herrera@duoc.cl",
@@ -859,7 +1378,50 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   },
   {
     "email": "admin.nexo360@duoc.cl",
@@ -927,6 +1489,49 @@
         "profesor": "Patricia Valenzuela",
         "sala": "Aula 405"
       }
-    ]
+    ],
+    "courseAttendance": [
+      {
+        "courseCode": "ASY9001",
+        "courseName": "Taller de Aplicaciones Móviles (Capstone)",
+        "totalSessions": 27,
+        "attendedSessions": 24,
+        "attendancePercentage": 88.9,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "APY8101",
+        "courseName": "Arquitectura de Software Empresarial",
+        "totalSessions": 30,
+        "attendedSessions": 27,
+        "attendancePercentage": 90,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      },
+      {
+        "courseCode": "EHY8201",
+        "courseName": "Ética Profesional y Ciudadanía",
+        "totalSessions": 20,
+        "attendedSessions": 18,
+        "attendancePercentage": 92.5,
+        "consecutiveAbsences": 0,
+        "lateCount": 0,
+        "missedKeySession": false,
+        "paedisJustified": false
+      }
+    ],
+    "satIntervention": {
+      "riskLevel": "NONE",
+      "assignedTo": "Coordinación PAEDIS",
+      "slaDeadline": null,
+      "status": "PENDING",
+      "notes": "",
+      "lastUpdated": "2026-11-17T08:00:00.000Z"
+    }
   }
 ]

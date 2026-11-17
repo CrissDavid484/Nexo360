@@ -364,4 +364,31 @@ export const api = {
       method: 'DELETE',
     });
   },
+
+  /**
+   * Obtener alertas del Sistema de Alerta Temprana (SAT) y métricas globales
+   */
+  async getSatAlerts() {
+    return request('/admin/sat-alerts');
+  },
+
+  /**
+   * Simular corte semanal SAP sobre una asignatura de un estudiante
+   */
+  async simulateSatCourse(userId, payload) {
+    return request(`/admin/sat-alerts/${encodeURIComponent(userId)}/simulate`, {
+      method: 'PATCH',
+      body: payload,
+    });
+  },
+
+  /**
+   * Actualizar o registrar intervención en Ficha 360 de un estudiante
+   */
+  async saveSatIntervention(userId, payload) {
+    return request(`/admin/sat-alerts/${encodeURIComponent(userId)}/intervention`, {
+      method: 'PATCH',
+      body: payload,
+    });
+  },
 };

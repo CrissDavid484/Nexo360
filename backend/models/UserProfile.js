@@ -44,6 +44,48 @@ const ReasonableAdjustmentSchema = new mongoose.Schema(
 );
 
 /**
+ * Esquema de Asistencia por Asignatura - Sistema de Alerta Temprana (SAT)
+ * Cumple con el estándar Duoc UC (mínimo 75% por asignatura) y justificaciones PAEDIS.
+ */
+const CourseAttendanceSchema = new mongoose.Schema(
+  {
+    courseCode: { type: String, required: true, trim: true, maxlength: 30 },
+    courseName: { type: String, required: true, trim: true, maxlength: 120 },
+    totalSessions: { type: Number, min: 0, default: 20 },
+    attendedSessions: { type: Number, min: 0, default: 20 },
+    attendancePercentage: { type: Number, min: 0, max: 100, default: 100 },
+    consecutiveAbsences: { type: Number, min: 0, default: 0 },
+    lateCount: { type: Number, min: 0, default: 0 },
+    missedKeySession: { type: Boolean, default: false },
+    paedisJustified: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+/**
+ * Esquema de Intervención Ficha 360 - Acompañamiento SAT / PAEDIS
+ */
+const SatInterventionSchema = new mongoose.Schema(
+  {
+    riskLevel: {
+      type: String,
+      enum: ['NONE', 'LEVEL_1_PREVENTIVE', 'LEVEL_2_CRITICAL', 'PAEDIS_JUSTIFIED'],
+      default: 'NONE',
+    },
+    assignedTo: { type: String, trim: true, maxlength: 120, default: 'Coordinación PAEDIS' },
+    slaDeadline: { type: Date, default: null },
+    status: {
+      type: String,
+      enum: ['PENDING', 'IN_PROGRESS', 'RESOLVED'],
+      default: 'PENDING',
+    },
+    notes: { type: String, trim: true, maxlength: 500, default: '' },
+    lastUpdated: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+/**
  * Esquema de Usuario Institucional Nexo360 - Duoc UC
  * Base de Datos Nativa con Autenticación Cifrada (bcryptjs),
  * Estados Académicos (Activo, Deserción, Titulado), Métricas y PAEDIS.
@@ -248,6 +290,14 @@ const UserProfileSchema = new mongoose.Schema(
     enrolledCourses: {
       type: [EnrolledCourseSchema],
       default: [],
+    },
+    courseAttendance: {
+      type: [CourseAttendanceSchema],
+      default: [],
+    },
+    satIntervention: {
+      type: SatInterventionSchema,
+      default: () => ({}),
     },
     lastLogin: {
       type: Date,

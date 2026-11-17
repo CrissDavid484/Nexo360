@@ -34,4 +34,10 @@ router.get('/sedes', requireAdminOrCoordinator, adminController.getSedes);
 router.post('/sedes', requireAdminOrCoordinator, adminController.createSede);
 router.delete('/sedes/:id', requireAdminOrCoordinator, adminController.deleteSede);
 
+// Sistema de Alerta Temprana (SAT) - Asistencia por Asignatura y Ficha 360 PAEDIS
+// Autorizado para Administradores y Coordinadores PAEDIS
+router.get('/sat-alerts', requireAdminOrCoordinator, adminController.getSatAlerts);
+router.patch('/sat-alerts/:userId/simulate', requireAdminOrCoordinator, adminController.simulateSatCourse);
+router.patch('/sat-alerts/:userId/intervention', requireAdminOrCoordinator, adminController.updateSatIntervention);
+
 module.exports = router;

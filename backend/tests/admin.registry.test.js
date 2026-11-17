@@ -193,4 +193,44 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(felipe.prediction?.riskLevel, 'TITULADO');
     assert.equal(felipe.prediction?.trafficLight, 'green');
   });
+
+  test('7. Sistema de Alerta Temprana (SAT): Asistencia por ramo, simulación semanal SAP y Ficha 360', async () => {
+    // 1. GET /api/admin/sat-alerts
+    const satRes = await request('/api/admin/sat-alerts', { headers: coordinatorHeaders });
+    assert.equal(satRes.status, 200);
+    assert.equal(satRes.body?.success, true);
+    assert.ok(satRes.body?.metrics);
+    assert.ok(Array.isArray(satRes.body?.students));
+
+    // Matías Contreras debe estar en LEVEL_2_CRITICAL
+    const matias = satRes.body.students.find((s) => s.email === 'm.contreras@duocuc.cl');
+    assert.ok(matias, 'Matías Contreras debe estar en el listado SAT');
+    assert.equal(matias.satEvaluation?.riskLevel, 'LEVEL_2_CRITICAL');
+
+    // 2. PATCH /api/admin/sat-alerts/:userId/simulate
+    const simRes = await request(`/api/admin/sat-alerts/${matias.id || matias._id}/simulate`, {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: {
+        courseCode: 'PWY2101',
+        action: 'paedis_justify',
+      },
+    });
+    assert.equal(simRes.status, 200);
+    assert.equal(simRes.body?.success, true);
+
+    // 3. PATCH /api/admin/sat-alerts/:userId/intervention
+    const intervRes = await request(`/api/admin/sat-alerts/${matias.id || matias._id}/intervention`, {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: {
+        assignedTo: 'Tania Montes (Coordinación PAEDIS)',
+        status: 'IN_PROGRESS',
+        notes: 'Estudiante contactado telefónicamente y derivado a tutor par.',
+      },
+    });
+    assert.equal(intervRes.status, 200);
+    assert.equal(intervRes.body?.success, true);
+    assert.equal(intervRes.body?.student?.satIntervention?.status, 'IN_PROGRESS');
+  });
 });

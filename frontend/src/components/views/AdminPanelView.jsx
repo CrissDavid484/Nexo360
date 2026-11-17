@@ -4,6 +4,7 @@ import {
   Users,
   GraduationCap,
   AlertTriangle,
+  AlertOctagon,
   CheckCircle2,
   Search,
   UserPlus,
@@ -36,6 +37,7 @@ import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { CoursesAdminSection } from '../admin/CoursesAdminSection';
 import { AdministrativeStaffSection } from '../admin/AdministrativeStaffSection';
+import { EarlyWarningSatSection } from '../admin/EarlyWarningSatSection';
 
 /**
  * Discriminador estricto para separar personal administrativo y de coordinación del alumnado
@@ -704,6 +706,22 @@ export const AdminPanelView = () => {
           <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
           <span>Oferta Académica & Simulador (Excel / BD)</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAdminSubTab('alerta-temprana');
+            announce('Pestaña de Sistema de Alerta Temprana (SAT) seleccionada.', 'polite');
+          }}
+          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            adminSubTab === 'alerta-temprana'
+              ? 'bg-[#002B49] text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <AlertOctagon className="w-4 h-4 text-rose-400" />
+          <span>Alerta Temprana (SAT)</span>
+        </button>
       </nav>
 
       {/* Alerta de Feedback Accesible */}
@@ -737,7 +755,9 @@ export const AdminPanelView = () => {
       )}
 
       {/* RENDERIZADO SEGÚN SUB-PESTAÑA */}
-      {adminSubTab === 'oferta-ramos' ? (
+      {adminSubTab === 'alerta-temprana' ? (
+        <EarlyWarningSatSection announce={announce} />
+      ) : adminSubTab === 'oferta-ramos' ? (
         <CoursesAdminSection />
       ) : adminSubTab === 'carreras-sedes' ? (
         /* GESTIÓN DINÁMICA DE CARRERAS Y SEDES (CRUD) */
