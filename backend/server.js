@@ -76,8 +76,8 @@ app.get('/api/health', (req, res) => {
 
   res.status(200).json({
     status: 'OK',
-    service: 'Nexo360 Backend API • Duoc UC - Sede Alameda (Piloto Oficial)',
-    pilotCampus: 'Duoc UC - Sede Alameda',
+    service: 'Nexo360 Backend API • Duoc UC - Sede Alameda (Plataforma Oficial)',
+    campus: 'Duoc UC - Sede Alameda',
     database: {
       engine: 'MongoDB',
       status: mongoState,

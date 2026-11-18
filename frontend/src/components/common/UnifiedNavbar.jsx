@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 /**
- * Barra de Navegación Principal Nexo360 (Piloto Duoc UC - Sede Alameda)
+ * Barra de Navegación Principal Nexo360 (Duoc UC - Sede Alameda)
  * - Agrupa "Toma de Ramos", "Biblioteca" y "Experiencia Vivo" en el menú desplegable "Simulaciones e instrucciones".
  * - En modo móvil, reemplaza el carrusel horizontal con un botón de menú desplegable limpio y accesible (WCAG 2.2 AAA).
  */

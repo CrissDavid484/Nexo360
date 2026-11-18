@@ -605,7 +605,7 @@ export const PerfilView = () => {
 
                 <div>
                   <label htmlFor="edit-campus" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Sede (Piloto)
+                    Sede Institucional
                   </label>
                   <select
                     id="edit-campus"

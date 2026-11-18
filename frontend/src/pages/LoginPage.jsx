@@ -53,7 +53,7 @@ export const LoginPage = () => {
               }}
             />
             <p className="text-xs sm:text-sm text-slate-500 font-medium mt-2.5">
-              Centro de Ayuda y Servicios • Piloto Duoc UC - Sede Alameda
+              Centro de Ayuda y Servicios • Duoc UC - Sede Alameda
             </p>
           </div>
         </header>

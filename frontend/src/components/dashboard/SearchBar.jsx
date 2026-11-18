@@ -15,7 +15,7 @@ const QUICK_FILTERS = [
 ];
 
 /**
- * Buscador Principal del Centro de Ayuda (Piloto Duoc UC - Sede Alameda)
+ * Buscador Principal del Centro de Ayuda (Duoc UC - Sede Alameda)
  * Diseño limpio, calmado y centrado en el usuario sin sobrecarga de etiquetas técnicas.
  */
 export const SearchBar = ({

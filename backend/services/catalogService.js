@@ -90,7 +90,7 @@ const INITIAL_CAREERS = [
   'Telecomunicaciones y Conectividad',
 ].sort((a, b) => a.localeCompare(b, 'es'));
 
-// Piloto exclusivo Duoc UC - Sede Alameda (CRUD dinámico permite extender sedes en tiempo de ejecución)
+// Sede oficial inicial: Duoc UC - Sede Alameda (CRUD dinámico permite extender sedes en tiempo de ejecución)
 const INITIAL_SEDES = [DEFAULT_SEDE];
 
 /**

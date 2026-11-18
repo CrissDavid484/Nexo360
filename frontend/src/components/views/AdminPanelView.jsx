@@ -186,15 +186,15 @@ const CATALOG_CONFIG = {
   sedes: {
     idPrefix: 'sede',
     title: `Sedes Duoc UC - ${DEFAULT_CAMPUS}`,
-    subtitleFallback: `Campus Piloto Duoc UC - ${DEFAULT_CAMPUS}`,
-    addPlaceholder: `Nombre de sede (Piloto exclusivo Duoc UC - ${DEFAULT_CAMPUS})...`,
+    subtitleFallback: `Campus Duoc UC - ${DEFAULT_CAMPUS}`,
+    addPlaceholder: `Nombre de sede institucional (ej. Sede Antonio Varas)...`,
     searchPlaceholder: 'Filtrar sedes...',
     emptyText: 'No se encontraron sedes.',
     deleteLabelPrefix: 'Eliminar sede',
     icon: MapPin,
     confirmDelete: (item) => `¿Eliminar la sede "${item.name}"?`,
     addFeedback: (name) =>
-      `Sede "${name}" agregada exitosamente al piloto Duoc UC - ${DEFAULT_CAMPUS}.`,
+      `Sede "${name}" agregada exitosamente a Duoc UC.`,
     addAnnounce: (name) => `Sede ${name} agregada.`,
     deleteFeedback: (name) => `Sede "${name}" eliminada exitosamente.`,
     deleteAnnounce: (name) => `Sede ${name} eliminada.`,
@@ -1090,7 +1090,7 @@ export const AdminPanelView = () => {
               Administración de Carreras y Sedes
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 font-medium">
-              Agrega y elimina carreras y sedes dinámicamente para el piloto Duoc UC - Sede
+              Agrega y elimina carreras y sedes dinámicamente para Duoc UC - Sede
               Alameda. Los cambios se sincronizan en tiempo real con el formulario de registro y la
               oferta académica.
             </p>
@@ -2431,7 +2431,7 @@ export const AdminPanelView = () => {
                 )}
               </div>
 
-              {/* 5. Sede Piloto */}
+              {/* 5. Sede Institucional */}
               <div className="space-y-1">
                 <label htmlFor="create-campus-select" className="text-xs font-semibold text-slate-700">
                   Sede Duoc UC - {DEFAULT_CAMPUS} <span className="text-red-600">*</span>
@@ -2441,7 +2441,7 @@ export const AdminPanelView = () => {
                   required
                   value={newUserForm.campus}
                   onChange={(e) => setNewUserForm({ ...newUserForm, campus: e.target.value })}
-                  {...getVoiceProps(`Seleccionar sede, piloto ${DEFAULT_CAMPUS}`)}
+                  {...getVoiceProps(`Seleccionar sede institucional ${DEFAULT_CAMPUS}`)}
                   className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                 >
                   <option value="" disabled>

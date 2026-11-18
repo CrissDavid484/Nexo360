@@ -144,7 +144,7 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.ok(listRes.body.sedes.length >= 1);
     assert.ok(
       listRes.body.sedes.some((s) => s.name === 'Sede Alameda'),
-      'Debe incluir Sede Alameda como sede piloto'
+      'Debe incluir Sede Alameda como sede oficial'
     );
 
     // Crear sede

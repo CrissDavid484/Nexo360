@@ -868,7 +868,7 @@ export const DashboardPage = () => {
               Nexo360 • Centro de Ayuda y Servicios Duoc UC - Sede Alameda
             </p>
             <p className="text-slate-500 mt-0.5">
-              Información oficial sincronizada con centroayuda.duoc.cl • Piloto exclusivo Duoc UC - Sede Alameda
+              Información oficial sincronizada con centroayuda.duoc.cl • Plataforma Oficial Duoc UC - Sede Alameda
             </p>
           </div>
           <div className="text-center sm:text-right">

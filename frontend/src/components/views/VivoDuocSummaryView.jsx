@@ -20,7 +20,7 @@ import { useAccessibility } from '../../context/AccessibilityContext';
 import { DEFAULT_CAMPUS } from '../../utils/studentUtils';
 
 /**
- * Experiencia Vivo Duoc • Manual Interactivo de Instrucciones y Servicios Oficiales (Piloto Sede Alameda)
+ * Experiencia Vivo Duoc • Manual Interactivo de Instrucciones y Servicios Oficiales (Duoc UC - Sede Alameda)
  * Cumple estrictamente con WCAG 2.2 AAA:
  * - Contraste de color superior a 7:1 en todos los textos legibles.
  * - Elementos de foco visible con 4px de grosor y desplazamiento.
@@ -345,7 +345,7 @@ export const VivoDuocSummaryView = () => {
             {/* Botón de acceso directo al servicio oficial */}
             <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <span className="text-[11px] text-slate-600 font-medium">
-                Enlace validado con los servidores oficiales de Duoc UC (Piloto {DEFAULT_CAMPUS}).
+                Enlace validado con los servidores oficiales de Duoc UC ({DEFAULT_CAMPUS}).
               </span>
               <a
                 href={activeService.link}

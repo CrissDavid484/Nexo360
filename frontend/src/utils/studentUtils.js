@@ -250,7 +250,7 @@ function normalizeRutToken(value) {
 }
 
 /**
- * Normaliza un perfil estudiantil para consumo homogéneo bajo piloto Sede Alameda.
+ * Normaliza un perfil estudiantil para consumo homogéneo bajo Duoc UC - Sede Alameda.
  */
 export function normalizeStudentProfile(raw = {}) {
   if (!raw || typeof raw !== 'object') {

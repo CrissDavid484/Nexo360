@@ -1,6 +1,6 @@
 # Arquitectura de Software Nexo360 • Duoc UC - Sede Alameda (PAEDIS)
 
-**Nexo360** es una plataforma One-Stop-Shop diseñada para el estreno piloto en **Duoc UC - Sede Alameda**, enfocada en estudiantes del **Programa de Apoyo a Estudiantes con Discapacidad (PAEDIS)**, coordinación académica y administración institucional. Garantiza cumplimiento **WCAG 2.2 AA / AAA**, protección de datos personales conforme a la **Ley N° 21.719** de Chile y una arquitectura backend/frontend desacoplada bajo principios **DRY** y **SRP**.
+**Nexo360** es una plataforma One-Stop-Shop oficial para **Duoc UC - Sede Alameda**, enfocada en estudiantes del **Programa de Apoyo a Estudiantes con Discapacidad (PAEDIS)**, coordinación académica y administración institucional. Garantiza cumplimiento **WCAG 2.2 AA / AAA**, protección de datos personales conforme a la **Ley N° 21.719** de Chile y una arquitectura backend/frontend desacoplada bajo principios **DRY** y **SRP**.
 
 ---
 
@@ -15,7 +15,7 @@ Nexo360/
 │   │   └── db.js                         # Conexión resiliente a MongoDB + sembrado inicial esperado con await
 │   ├── models/
 │   │   ├── UserProfile.js                # Perfil institucional, ajustes PAEDIS, Ley 21.719 y a11y (strict: true)
-│   │   ├── Sede.js                       # Modelo dinámico de sedes (semilla piloto: Sede Alameda)
+│   │   ├── Sede.js                       # Modelo dinámico de sedes (semilla institucional: Sede Alameda)
 │   │   ├── Career.js                     # Modelo dinámico de carreras Duoc UC
 │   │   ├── CourseOffering.js             # Oferta académica por sede/carrera/período y bloques horarios
 │   │   └── ActivityLog.js                # Auditoría de login, simulador, catálogo y eventos SAT
@@ -42,7 +42,7 @@ Nexo360/
 │   │   ├── authMiddleware.js             # verifyToken, optionalToken, requireAdmin, requireAdminOrCoordinator
 │   │   └── rateLimitMiddleware.js        # Limitación de tasa en memoria para endpoints críticos
 │   ├── data/
-│   │   ├── seedUsers.json                # 14 perfiles institucionales piloto Sede Alameda
+│   │   ├── seedUsers.json                # 14 perfiles institucionales Sede Alameda
 │   │   ├── institutionalModules.json     # 9 categorías institucionales y consejos PAEDIS
 │   │   ├── alameda2026Seed.json          # 7.174 ofertas oficiales Alameda 2026-002 (incluye 87 virtuales sincrónicos)
 │   │   ├── alameda2026Summary.json       # Resumen estadístico de carreras y secciones Alameda
@@ -53,7 +53,7 @@ Nexo360/
 │   └── tests/                            # Suite node --test (QA/OWASP, RBAC, Parser, Accesibilidad, Verifier)
 │
 └── frontend/
-    ├── index.html                        # HTML accesible (OpenDyslexic, Piloto Sede Alameda)
+    ├── index.html                        # HTML accesible (OpenDyslexic, Sede Alameda)
     └── src/
         ├── App.jsx                       # Enrutamiento protegido, Lazy loading y VoiceReaderObserver
         ├── context/
@@ -62,7 +62,7 @@ Nexo360/
         ├── utils/
         │   ├── speechService.js          # Integración Web Speech API en español con deduplicación y cleanup
         │   ├── satUtils.js               # Evaluación unificada de umbrales SAT/RI
-        │   └── studentUtils.js           # Catálogo piloto Sede Alameda y utilidades compartidas
+        │   └── studentUtils.js           # Catálogo Sede Alameda y utilidades compartidas
         ├── hooks/                        # useAccessibleModal, useOnClickOutside
         ├── components/                   # Common (AccessibilityBar, VoiceReaderObserver, ReadingGuideOverlay, Navbar), Auth, Dashboard, Admin, Simulador y Vistas
         └── pages/                        # LoginPage, DashboardPage, NotFoundPage
@@ -100,9 +100,9 @@ El subdocumento `accessibilityPreferences` en `UserProfile.js` y su sanitizador 
 
 ---
 
-## 4. Piloto Duoc UC - Sede Alameda y Oferta Académica
+## 4. Contexto Institucional Duoc UC - Sede Alameda y Oferta Académica
 
-- **Sede Piloto**: Todos los perfiles semilla de `backend/data/seedUsers.json`, módulos institucionales (`backend/data/institutionalModules.json`), defaults de creación (`DEFAULT_SEDE = 'Sede Alameda'`) y semilla de sedes (`INITIAL_SEDES = ['Sede Alameda']`) operan enfocados en **Duoc UC - Sede Alameda**, manteniendo operativos los endpoints CRUD (`/api/admin/sedes`, `/api/admin/careers`) para gestión administrativa dinámica.
+- **Sede Oficial Alameda**: Todos los perfiles semilla de `backend/data/seedUsers.json`, módulos institucionales (`backend/data/institutionalModules.json`), defaults de creación (`DEFAULT_SEDE = 'Sede Alameda'`) y semilla de sedes (`INITIAL_SEDES = ['Sede Alameda']`) operan enfocados en **Duoc UC - Sede Alameda**, manteniendo operativos los endpoints CRUD (`/api/admin/sedes`, `/api/admin/careers`) para gestión administrativa dinámica.
 - **Catálogo Alameda 2026-002**: `backend/data/alameda2026Seed.json` contiene **7.174 filas** (7.087 ofertas presenciales/online de `ALAMEDA` + 87 optativos transversales de `SEDE VIRTUAL SINCRÓNICA`), consolidables en 2.389 secciones de carrera y bloques horarios `b1`–`b18` (`courseScheduleUtils.js`).
 
 ---

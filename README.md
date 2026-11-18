@@ -1,6 +1,6 @@
 # Nexo360 • Plataforma One-Stop-Shop Duoc UC - Sede Alameda (PAEDIS)
 
-> **Proyecto Oficial Capstone 2026 • Piloto Exclusivo: Duoc UC - Sede Alameda**  
+> **Proyecto Oficial Capstone 2026 • Plataforma Institucional: Duoc UC - Sede Alameda**  
 > Plataforma web centralizada, accesible (**WCAG 2.2 AA / AAA**) y conforme a la **Ley N° 21.719 de Protección de Datos Personales**, diseñada para estudiantes y comunidad del **Programa de Apoyo a Estudiantes con Discapacidad (PAEDIS)** de **Duoc UC - Sede Alameda**.
 
 ---
@@ -106,7 +106,7 @@ npm test --prefix backend
 
 ## ♿ Características Principales y Cumplimiento
 
-- **Piloto Exclusivo Duoc UC - Sede Alameda**: Perfiles iniciales, oferta académica oficial Alameda 2026-002 (incluyendo optativos virtuales sincrónicos), biblioteca accesible, guías y endpoints alineados al piloto de Sede Alameda.
+- **Plataforma Oficial Duoc UC - Sede Alameda**: Perfiles iniciales, oferta académica oficial Alameda 2026-002 (incluyendo optativos virtuales sincrónicos), biblioteca accesible, guías y endpoints alineados a Sede Alameda.
 - **Modo Lectura por Voz (TTS WCAG 2.2)**: Nuevo toggle persistente `voiceReader` (`accessibilityPreferences.voiceReader` en MongoDB + Web Speech API en español en frontend) con lectura asistida al enfocar (`onFocus`) o pasar el cursor (`onMouseEnter`) sobre controles, tarjetas y textos clave, más silenciamiento rápido con `Escape`.
 - **WCAG 2.2 AA / AAA**: Foco visible reforzado, modo Alto Contraste, fuente OpenDyslexic, reducción de movimiento, guía de lectura (`ReadingGuideOverlay`) y región en vivo ARIA (`aria-live`).
 - **Seguridad y Ley N° 21.719**: Autenticación nativa con contraseñas cifradas (`bcryptjs`), tokens JWT HS256, flujo directo SSO institucional, limitación de finalidad, metadatos de consentimiento y eliminación de credenciales en serialización (`toJSON`/`toObject`).
