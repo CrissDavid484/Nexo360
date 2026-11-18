@@ -4,9 +4,6 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
-  KeyRound,
-  Mail,
-  ShieldCheck,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -28,7 +25,7 @@ export const LoginForm = ({ onDirectSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSsoLoading, setIsSsoLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const { announce } = useAccessibility();
+  const { announce, getVoiceProps } = useAccessibility();
 
   const handleQuickSelect = (user) => {
     setEmail(user.email);
@@ -118,7 +115,7 @@ export const LoginForm = ({ onDirectSuccess }) => {
             Iniciar Sesión
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Ingresa a tu cuenta institucional Duoc UC
+            Ingresa a tu cuenta institucional Duoc UC - Sede Alameda
           </p>
         </div>
 
@@ -129,6 +126,7 @@ export const LoginForm = ({ onDirectSuccess }) => {
             onClick={handleMicrosoftSso}
             disabled={isSsoLoading || isLoading}
             aria-busy={isSsoLoading}
+            {...getVoiceProps('Acceder con Vivo Duoc')}
             className="w-full min-h-[46px] px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 transition-colors shadow-2xs flex items-center justify-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer disabled:opacity-60"
           >
             {isSsoLoading ? (
@@ -187,6 +185,9 @@ export const LoginForm = ({ onDirectSuccess }) => {
               }}
               placeholder="ejemplo@duocuc.cl"
               aria-invalid={errorMessage ? 'true' : 'false'}
+              {...getVoiceProps(
+                `Correo Institucional${email ? `, ${email}` : ', campo vacío'}`
+              )}
               className="w-full min-h-[42px] px-3.5 py-2 border border-slate-300 text-slate-900 text-xs sm:text-sm rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#002B49] focus:border-transparent transition-all placeholder:text-slate-400"
             />
           </div>
@@ -211,12 +212,14 @@ export const LoginForm = ({ onDirectSuccess }) => {
                 }}
                 placeholder="Contraseña"
                 aria-invalid={errorMessage ? 'true' : 'false'}
+                {...getVoiceProps('Contraseña institucional')}
                 className="w-full min-h-[42px] px-3.5 py-2 pr-10 border border-slate-300 text-slate-900 text-xs sm:text-sm rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#002B49] focus:border-transparent transition-all placeholder:text-slate-400"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                {...getVoiceProps(showPassword ? 'Ocultar contraseña' : 'Ver contraseña')}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-700 cursor-pointer"
               >
                 {showPassword ? (
@@ -232,6 +235,7 @@ export const LoginForm = ({ onDirectSuccess }) => {
             type="submit"
             disabled={isLoading || isSsoLoading}
             aria-busy={isLoading}
+            {...getVoiceProps('Ingresar al portal institucional')}
             className="w-full min-h-[44px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001f35] text-white font-bold text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer disabled:opacity-60"
           >
             {isLoading ? (

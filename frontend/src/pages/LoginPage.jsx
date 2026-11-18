@@ -4,11 +4,13 @@ import { LoginForm } from '../components/auth/LoginForm';
 import { MfaPrompt } from '../components/auth/MfaPrompt';
 import { AccessibilityBar } from '../components/common/AccessibilityBar';
 import { useAuth } from '../context/AuthContext';
+import { useAccessibility } from '../context/AccessibilityContext';
 import logo03 from '../assets/logo03.png';
 
 export const LoginPage = () => {
   const [mfaSession, setMfaSession] = useState(null);
   const { setAuthData, isAuthenticated } = useAuth();
+  const { getVoiceProps } = useAccessibility();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export const LoginPage = () => {
               }}
             />
             <p className="text-xs sm:text-sm text-slate-500 font-medium mt-2.5">
-              Centro de Ayuda y Servicios
+              Centro de Ayuda y Servicios • Piloto Duoc UC - Sede Alameda
             </p>
           </div>
         </header>
@@ -79,6 +81,7 @@ export const LoginPage = () => {
                 href="https://www.duoc.cl/terminos"
                 target="_blank"
                 rel="noopener noreferrer"
+                {...getVoiceProps('Términos de uso de Duoc UC')}
                 className="min-h-[38px] inline-flex items-center hover:underline hover:text-[#002B49] rounded px-1.5"
               >
                 Términos de uso
@@ -87,12 +90,13 @@ export const LoginPage = () => {
                 href="https://www.duoc.cl/privacidad"
                 target="_blank"
                 rel="noopener noreferrer"
+                {...getVoiceProps('Privacidad Duoc UC')}
                 className="min-h-[38px] inline-flex items-center hover:underline hover:text-[#002B49] rounded px-1.5"
               >
                 Privacidad
               </a>
               <span className="min-h-[38px] inline-flex items-center text-slate-400">
-                © 2026 Duoc UC
+                © 2026 Duoc UC • Sede Alameda
               </span>
             </div>
           </nav>

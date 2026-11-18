@@ -2,10 +2,12 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Compass, ArrowRight, ShieldCheck, HelpCircle, LogIn, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAccessibility } from '../context/AccessibilityContext';
+import { DEFAULT_CAMPUS } from '../utils/studentUtils';
 import { AccessibilityBar } from '../components/common/AccessibilityBar';
 
 /**
- * Vista Institucional 404 - Página No Encontrada (Nexo360 • Duoc UC)
+ * Vista Institucional 404 - Página No Encontrada (Nexo360 • Duoc UC - Sede Alameda)
  * 
  * Regla de negocio:
  * Si el usuario cuenta con sesión activa autenticada, el botón "Volver al portal Nexo360"
@@ -14,6 +16,7 @@ import { AccessibilityBar } from '../components/common/AccessibilityBar';
  */
 export const NotFoundPage = () => {
   const { isAuthenticated, user } = useAuth();
+  const { getVoiceProps } = useAccessibility();
   const navigate = useNavigate();
 
   const handleReturnToPortal = () => {
@@ -48,7 +51,10 @@ export const NotFoundPage = () => {
             <span>Error 404 • Ruta no encontrada</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-[#002B49] tracking-tight mb-3">
+          <h1
+            {...getVoiceProps('Error 404. Página no encontrada.')}
+            className="text-2xl sm:text-3xl font-black text-[#002B49] tracking-tight mb-3"
+          >
             Página no encontrada
           </h1>
 
@@ -74,6 +80,9 @@ export const NotFoundPage = () => {
             <button
               type="button"
               onClick={handleReturnToPortal}
+              {...getVoiceProps(
+                isAuthenticated ? 'Volver al portal Nexo360' : 'Volver al Inicio de Sesión'
+              )}
               className="flex-1 min-h-[48px] px-6 py-3 bg-[#002B49] hover:bg-[#001f35] text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 inline-flex items-center justify-center gap-2 focus:outline-hidden focus:ring-4 focus:ring-amber-400"
             >
               {isAuthenticated ? (
@@ -93,6 +102,7 @@ export const NotFoundPage = () => {
             <button
               type="button"
               onClick={() => window.history.length > 1 ? window.history.back() : navigate('/login')}
+              {...getVoiceProps('Regresar a la página anterior')}
               className="min-h-[48px] px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-all active:scale-95 inline-flex items-center justify-center gap-1.5 focus:outline-hidden focus:ring-2 focus:ring-slate-400"
             >
               <HelpCircle className="w-4 h-4 text-slate-500" aria-hidden="true" />
@@ -103,7 +113,7 @@ export const NotFoundPage = () => {
 
         {/* Footer discreto */}
         <p className="mt-6 text-xs text-slate-500 font-medium text-center">
-          Nexo360 • Plataforma Integral de Apoyo Estudiantil Duoc UC
+          Nexo360 • Plataforma Integral de Apoyo Estudiantil Duoc UC - {DEFAULT_CAMPUS}
         </p>
       </main>
     </div>

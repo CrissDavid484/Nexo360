@@ -8,8 +8,33 @@ import React, {
   useMemo,
 } from 'react';
 import { api } from '../services/api';
+import { speak, stopSpeech, resolveReadableText } from '../utils/speechService';
 
 const AccessibilityContext = createContext();
+
+function syncDocumentAccessibilityClasses({
+  fontSize,
+  highContrast,
+  dyslexicFont,
+  reducedMotion,
+  readingGuide,
+  voiceReader,
+}) {
+  const root = document.documentElement;
+  root.classList.remove('font-size-normal', 'font-size-large', 'font-size-xlarge');
+  root.classList.add(`font-size-${fontSize}`);
+
+  root.classList.toggle('high-contrast', highContrast);
+  root.classList.toggle('font-dyslexic', dyslexicFont);
+  root.classList.toggle('reduced-motion', reducedMotion);
+
+  localStorage.setItem('nexo360_font_size', fontSize);
+  localStorage.setItem('nexo360_high_contrast', String(highContrast));
+  localStorage.setItem('nexo360_dyslexic_font', String(dyslexicFont));
+  localStorage.setItem('nexo360_reduced_motion', String(reducedMotion));
+  localStorage.setItem('nexo360_reading_guide', String(readingGuide));
+  localStorage.setItem('nexo360_voice_reader', String(voiceReader));
+}
 
 export const AccessibilityProvider = ({ children }) => {
   // Inicialización desde localStorage
@@ -34,6 +59,11 @@ export const AccessibilityProvider = ({ children }) => {
     return localStorage.getItem('nexo360_reading_guide') === 'true';
   });
 
+  // Lector de pantalla por voz (Web Speech API) bajo hover/foco
+  const [voiceReader, setVoiceReader] = useState(() => {
+    return localStorage.getItem('nexo360_voice_reader') === 'true';
+  });
+
   // Estado para la cortina de transición suave entre temas
   const [isCurtainAnimating, setIsCurtainAnimating] = useState(false);
 
@@ -41,6 +71,8 @@ export const AccessibilityProvider = ({ children }) => {
   const [announcement, setAnnouncement] = useState('');
   const [announcementPriority, setAnnouncementPriority] = useState('polite');
   const announceTimerRef = useRef(null);
+  const curtainToggleTimerRef = useRef(null);
+  const curtainEndTimerRef = useRef(null);
   const isInitialMountRef = useRef(true);
   const skipBackendSyncRef = useRef(false);
 
@@ -58,45 +90,23 @@ export const AccessibilityProvider = ({ children }) => {
 
   useEffect(() => {
     return () => {
-      if (announceTimerRef.current) {
-        clearTimeout(announceTimerRef.current);
-      }
+      if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
+      if (curtainToggleTimerRef.current) clearTimeout(curtainToggleTimerRef.current);
+      if (curtainEndTimerRef.current) clearTimeout(curtainEndTimerRef.current);
+      stopSpeech();
     };
   }, []);
 
   // Sincronizar clases con el elemento raíz <html> y persistir solo ante cambios del usuario autenticado
   useEffect(() => {
-    const root = document.documentElement;
-
-    // Tamaño de fuente
-    root.classList.remove('font-size-normal', 'font-size-large', 'font-size-xlarge');
-    root.classList.add(`font-size-${fontSize}`);
-    localStorage.setItem('nexo360_font_size', fontSize);
-
-    // Alto contraste
-    if (highContrast) {
-      root.classList.add('high-contrast');
-    } else {
-      root.classList.remove('high-contrast');
-    }
-    localStorage.setItem('nexo360_high_contrast', String(highContrast));
-
-    // Fuente para dislexia
-    if (dyslexicFont) {
-      root.classList.add('font-dyslexic');
-    } else {
-      root.classList.remove('font-dyslexic');
-    }
-    localStorage.setItem('nexo360_dyslexic_font', String(dyslexicFont));
-
-    // Movimiento reducido
-    if (reducedMotion) {
-      root.classList.add('reduced-motion');
-    } else {
-      root.classList.remove('reduced-motion');
-    }
-    localStorage.setItem('nexo360_reduced_motion', String(reducedMotion));
-    localStorage.setItem('nexo360_reading_guide', String(readingGuide));
+    syncDocumentAccessibilityClasses({
+      fontSize,
+      highContrast,
+      dyslexicFont,
+      reducedMotion,
+      readingGuide,
+      voiceReader,
+    });
 
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
@@ -117,11 +127,14 @@ export const AccessibilityProvider = ({ children }) => {
           dyslexicFont,
           reducedMotion,
           readingGuide,
+          voiceReader,
           screenReaderOptimized: true,
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('[AccessibilityContext] Error al sincronizar preferencias con backend:', err);
+        });
     }
-  }, [fontSize, highContrast, dyslexicFont, reducedMotion, readingGuide]);
+  }, [fontSize, highContrast, dyslexicFont, reducedMotion, readingGuide, voiceReader]);
 
   // Controles de tamaño de fuente memoizados
   const increaseFontSize = useCallback(() => {
@@ -179,15 +192,18 @@ export const AccessibilityProvider = ({ children }) => {
           setIsCurtainAnimating(false);
         });
     } else {
+      if (curtainToggleTimerRef.current) clearTimeout(curtainToggleTimerRef.current);
+      if (curtainEndTimerRef.current) clearTimeout(curtainEndTimerRef.current);
+
       setIsCurtainAnimating(true);
-      setTimeout(() => {
+      curtainToggleTimerRef.current = setTimeout(() => {
         setHighContrast((prev) => {
           const next = !prev;
           announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
           return next;
         });
       }, 200);
-      setTimeout(() => {
+      curtainEndTimerRef.current = setTimeout(() => {
         setIsCurtainAnimating(false);
       }, 500);
     }
@@ -223,13 +239,66 @@ export const AccessibilityProvider = ({ children }) => {
     });
   }, [announce]);
 
+  const toggleVoiceReader = useCallback(() => {
+    setVoiceReader((prev) => {
+      const next = !prev;
+      localStorage.setItem('nexo360_voice_reader', String(next));
+      if (next) {
+        announce('Lectura por voz activada', 'polite');
+        speak('Lectura por voz activada', { force: true });
+      } else {
+        stopSpeech();
+        announce('Lectura por voz desactivada', 'polite');
+      }
+      return next;
+    });
+  }, [announce]);
+
+  const speakText = useCallback(
+    (text, options = {}) => {
+      if (!voiceReader && !options.force) return false;
+      return speak(text, options);
+    },
+    [voiceReader]
+  );
+
+  const stopSpeaking = useCallback(() => {
+    stopSpeech();
+  }, []);
+
+  const getVoiceProps = useCallback(
+    (customText) => {
+      const handleSpeakEvent = (event) => {
+        if (!voiceReader) return;
+        const target = event?.currentTarget;
+        const resolved =
+          typeof customText === 'function'
+            ? customText(target)
+            : customText || resolveReadableText(target);
+        if (resolved) {
+          speak(resolved, { element: target });
+        }
+      };
+
+      return {
+        'data-voice-managed': 'true',
+        onMouseEnter: handleSpeakEvent,
+        onFocus: handleSpeakEvent,
+      };
+    },
+    [voiceReader]
+  );
+
   const resetPreferences = useCallback(() => {
     setFontSize('normal');
     setHighContrast(false);
     setDyslexicFont(false);
     setReducedMotion(false);
     setReadingGuide(false);
+    setVoiceReader(false);
+    stopSpeech();
     localStorage.removeItem('nexo360_reading_guide');
+    localStorage.removeItem('nexo360_voice_reader');
     announce('Preferencias de visualización restablecidas a los valores predeterminados');
   }, [announce]);
 
@@ -257,6 +326,10 @@ export const AccessibilityProvider = ({ children }) => {
       setReadingGuide(prefs.readingGuide);
       localStorage.setItem('nexo360_reading_guide', String(prefs.readingGuide));
     }
+    if (typeof prefs.voiceReader === 'boolean') {
+      setVoiceReader(prefs.voiceReader);
+      localStorage.setItem('nexo360_voice_reader', String(prefs.voiceReader));
+    }
   }, []);
 
   const contextValue = useMemo(
@@ -266,6 +339,7 @@ export const AccessibilityProvider = ({ children }) => {
       dyslexicFont,
       reducedMotion,
       readingGuide,
+      voiceReader,
       isCurtainAnimating,
       announcement,
       announcementPriority,
@@ -276,7 +350,12 @@ export const AccessibilityProvider = ({ children }) => {
       toggleDyslexicFont,
       toggleReducedMotion,
       toggleReadingGuide,
+      toggleVoiceReader,
+      speakText,
+      stopSpeaking,
+      getVoiceProps,
       resetPreferences,
+      resetAccessibility: resetPreferences,
       loadUserPreferences,
     }),
     [
@@ -285,6 +364,7 @@ export const AccessibilityProvider = ({ children }) => {
       dyslexicFont,
       reducedMotion,
       readingGuide,
+      voiceReader,
       isCurtainAnimating,
       announcement,
       announcementPriority,
@@ -295,6 +375,10 @@ export const AccessibilityProvider = ({ children }) => {
       toggleDyslexicFont,
       toggleReducedMotion,
       toggleReadingGuide,
+      toggleVoiceReader,
+      speakText,
+      stopSpeaking,
+      getVoiceProps,
       resetPreferences,
       loadUserPreferences,
     ]

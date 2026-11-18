@@ -8,13 +8,16 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
   const [currentCode, setCurrentCode] = useState(initialMfaCode || '..');
   const [isApproved, setIsApproved] = useState(false);
   const [pollError, setPollError] = useState(null);
-  const { announce } = useAccessibility();
+  const { announce, getVoiceProps } = useAccessibility();
 
   const pollIntervalRef = useRef(null);
   const redirectTimeoutRef = useRef(null);
   const pollCountRef = useRef(0);
+  const consecutiveErrorsRef = useRef(0);
+  const isPollingInFlightRef = useRef(false);
   const currentCodeRef = useRef(initialMfaCode || '..');
   const MAX_POLL_COUNT = 150; // 5 minutos (150 intentos × 2 segundos)
+  const MAX_CONSECUTIVE_ERRORS = 3;
 
   // A11y: Anuncio por voz accesible al montar el componente
   useEffect(() => {
@@ -26,35 +29,51 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
     }
   }, [initialMfaCode, announce]);
 
-  // Polling reactivo cada 2 segundos sin stale closures
+  // Polling reactivo cada 2 segundos sin stale closures ni promesas colgantes
   useEffect(() => {
     let isMounted = true;
     pollCountRef.current = 0;
+    consecutiveErrorsRef.current = 0;
+    isPollingInFlightRef.current = false;
+
+    const clearPollingInterval = () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+
+    const failPolling = (message) => {
+      clearPollingInterval();
+      if (!isMounted) return;
+      setPollError(message);
+      announce(message, 'assertive');
+    };
 
     const checkStatus = async () => {
+      if (!isMounted || isPollingInFlightRef.current) return;
+      isPollingInFlightRef.current = true;
+
       try {
         const res = await api.checkMfaStatus(sessionId);
-
         if (!isMounted) return;
 
+        consecutiveErrorsRef.current = 0;
         pollCountRef.current += 1;
 
         if (pollCountRef.current >= MAX_POLL_COUNT) {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          const timeoutMsg = 'La sesión de aprobación expiró. Por favor vuelve a iniciar sesión.';
-          setPollError(timeoutMsg);
-          announce(timeoutMsg, 'assertive');
+          failPolling('La sesión de aprobación expiró. Por favor vuelve a iniciar sesión.');
           return;
         }
 
-        if (res.mfaCode && res.mfaCode !== currentCodeRef.current) {
+        if (res?.mfaCode && res.mfaCode !== currentCodeRef.current) {
           currentCodeRef.current = res.mfaCode;
           setCurrentCode(res.mfaCode);
           announce(`Código de autenticación actualizado a: ${res.mfaCode}`, 'assertive');
         }
 
-        if (res.status === 'COMPLETED') {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        if (res?.status === 'COMPLETED') {
+          clearPollingInterval();
           setIsApproved(true);
           announce('Sesión iniciada con éxito. Redirigiendo al panel principal de Nexo360.', 'assertive');
 
@@ -63,26 +82,36 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
               onApproved(res.token, res.user);
             }
           }, 1500);
-        } else if (res.status === 'FAILED') {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          const failMsg = res.errorMessage || 'La solicitud fue rechazada o expiró.';
-          setPollError(failMsg);
-          announce('Error en la autenticación institucional.', 'assertive');
+        } else if (res?.status === 'FAILED') {
+          failPolling(res.errorMessage || 'La solicitud fue rechazada o expiró.');
         }
       } catch (err) {
         console.error('Error durante polling de MFA:', err);
+        consecutiveErrorsRef.current += 1;
+        if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+          failPolling('No se pudo verificar el estado de aprobación MFA. Intenta nuevamente.');
+        }
+      } finally {
+        isPollingInFlightRef.current = false;
       }
     };
 
-    void checkStatus();
-    pollIntervalRef.current = setInterval(() => {
-      void checkStatus();
-    }, 2000);
+    const runPoll = () => {
+      checkStatus().catch((err) => {
+        console.error('[MfaPrompt] Fallo inesperado al consultar estado MFA:', err);
+      });
+    };
+
+    runPoll();
+    pollIntervalRef.current = setInterval(runPoll, 2000);
 
     return () => {
       isMounted = false;
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
+      clearPollingInterval();
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = null;
+      }
     };
   }, [sessionId, announce, onApproved]);
 
@@ -114,8 +143,10 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
       {/* A11y: Caja de alta visibilidad para el número de autenticación con rol de estado */}
       <div
         role="region"
+        tabIndex={0}
         aria-label="Número de confirmación en dos pasos"
-        className="my-8 p-6 bg-slate-950 text-[#FFB81C] rounded-2xl border-4 border-[#FFB81C] shadow-inner"
+        {...getVoiceProps(`Número de confirmación en dos pasos: ${currentCode}`)}
+        className="my-8 p-6 bg-slate-950 text-[#FFB81C] rounded-2xl border-4 border-[#FFB81C] shadow-inner focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
       >
         <span className="block text-xs uppercase tracking-widest text-slate-300 font-bold mb-2">
           Número para marcar en tu teléfono
@@ -157,6 +188,7 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
           <button
             type="button"
             onClick={onCancel}
+            {...getVoiceProps('Volver a intentar inicio de sesión')}
             className="mt-3 w-full min-h-[44px] py-2.5 px-4 bg-red-700 text-white rounded-lg font-black text-sm hover:bg-red-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-all"
           >
             Volver a Intentar
@@ -179,6 +211,7 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
           <button
             type="button"
             onClick={onCancel}
+            {...getVoiceProps('Cancelar y volver al formulario')}
             className="min-h-[44px] inline-flex items-center gap-2 text-sm font-bold text-slate-700 hover:text-slate-950 px-5 py-2.5 rounded-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2 transition-all"
           >
             <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />

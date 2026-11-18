@@ -6,28 +6,9 @@
  * - Catálogo completo de Sedes y Carreras Oficiales Duoc UC
  */
 
-export const SEDES_DUOC = [
-  'Campus Arauco',
-  'Campus Nacimiento',
-  'Campus Villarrica',
-  'Duoc UC Online',
-  'Sede Alameda',
-  'Sede Antonio Varas',
-  'Sede Maipú',
-  'Sede Melipilla',
-  'Sede Padre Alonso de Ovalle',
-  'Sede Plaza Norte',
-  'Sede Plaza Oeste',
-  'Sede Plaza Vespucio',
-  'Sede Puente Alto',
-  'Sede Puerto Montt',
-  'Sede San Andrés de Concepción',
-  'Sede San Bernardo',
-  'Sede San Carlos de Apoquindo',
-  'Sede San Joaquín',
-  'Sede Valparaíso',
-  'Sede Viña del Mar',
-].sort((a, b) => a.localeCompare(b, 'es'));
+export const DEFAULT_CAMPUS = 'Sede Alameda';
+
+export const SEDES_DUOC = [DEFAULT_CAMPUS];
 
 export const CARRERAS_DUOC_LIST = [
   'Actuación',
@@ -260,4 +241,174 @@ export function getStudentRut(user = {}) {
 
   const email = (user?.email || user?.emailDuoc || '').toLowerCase();
   return email ? generateSimulatedRut(email) : '21.987.654-3';
+}
+
+function normalizeRutToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^0-9k]/g, '');
+}
+
+/**
+ * Normaliza un perfil estudiantil para consumo homogéneo bajo piloto Sede Alameda.
+ */
+export function normalizeStudentProfile(raw = {}) {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: '',
+      name: 'Estudiante Duoc UC',
+      email: '',
+      rut: '21.987.654-3',
+      campus: DEFAULT_CAMPUS,
+      sede: DEFAULT_CAMPUS,
+      career: CARRERAS_DUOC_LIST[0] || '',
+      photo: '',
+    };
+  }
+
+  const email = String(raw.email || raw.emailDuoc || '').trim();
+  const career = String(raw.career || raw.carrera || CARRERAS_DUOC_LIST[0] || '').trim();
+
+  return {
+    ...raw,
+    id: raw.id || raw._id || '',
+    email,
+    name: getStudentDisplayName(raw),
+    rut: getStudentRut(raw),
+    campus: DEFAULT_CAMPUS,
+    sede: DEFAULT_CAMPUS,
+    career,
+    photo: raw.photo || '',
+  };
+}
+
+/**
+ * Compara un RUT con una búsqueda ignorando puntos, guiones y mayúsculas.
+ */
+export function matchesRutQuery(rut, query) {
+  const normalizedQuery = normalizeRutToken(query);
+  if (!normalizedQuery) return true;
+  return normalizeRutToken(rut).includes(normalizedQuery);
+}
+
+function readFileWithReader(file, mode, { signal } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('No se proporcionó un archivo válido.'));
+      return;
+    }
+
+    if (signal?.aborted) {
+      reject(new DOMException('Lectura de archivo cancelada', 'AbortError'));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    const cleanup = () => {
+      signal?.removeEventListener('abort', handleAbort);
+    };
+
+    const handleAbort = () => {
+      cleanup();
+      try {
+        reader.abort();
+      } catch {
+        // Ignorar abort en lectores ya finalizados
+      }
+      reject(new DOMException('Lectura de archivo cancelada', 'AbortError'));
+    };
+
+    reader.onload = () => {
+      cleanup();
+      resolve(reader.result);
+    };
+
+    reader.onerror = () => {
+      cleanup();
+      reject(reader.error || new Error('Error al leer el archivo.'));
+    };
+
+    if (signal) {
+      signal.addEventListener('abort', handleAbort, { once: true });
+    }
+
+    if (mode === 'dataUrl') {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
+  });
+}
+
+/**
+ * Lee un File como Data URL con soporte de cancelación vía AbortSignal.
+ */
+export function readFileAsDataUrl(file, options = {}) {
+  return readFileWithReader(file, 'dataUrl', options);
+}
+
+/**
+ * Lee un File como texto plano con soporte de cancelación vía AbortSignal.
+ */
+export function readFileAsText(file, options = {}) {
+  return readFileWithReader(file, 'text', options);
+}
+
+/**
+ * Dispara la descarga segura de un Blob y libera la URL temporal en memoria.
+ */
+export function triggerBlobDownload(content, filename, mimeType = 'text/plain;charset=utf-8') {
+  if (typeof document === 'undefined' || typeof URL === 'undefined') return;
+
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  try {
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+  } finally {
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+/**
+ * Copia texto al portapapeles de forma segura con fallback sin promesas colgadas.
+ */
+export async function copyTextSafely(text) {
+  const value = String(text ?? '');
+  if (!value) return false;
+
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (err) {
+    console.warn('[studentUtils] Fallback de portapapeles activado:', err);
+  }
+
+  if (typeof document === 'undefined') return false;
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+
+  try {
+    textarea.select();
+    return document.execCommand('copy');
+  } catch (err) {
+    console.warn('[studentUtils] No se pudo copiar texto al portapapeles:', err);
+    return false;
+  } finally {
+    textarea.remove();
+  }
 }

@@ -10,6 +10,35 @@ import {
   Users,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useAccessibility } from '../../context/AccessibilityContext';
+
+const ROLE_BADGES = {
+  admin: 'Admin',
+  profesor: 'Docente',
+  tutor_par: 'Tutor Par',
+};
+
+function resolveDemoBadge(user) {
+  if (user.isPaedis) return 'PAEDIS';
+  if (ROLE_BADGES[user.role]) return ROLE_BADGES[user.role];
+  if (user.academicStatus === 'titulado') return 'Titulado';
+  if (user.academicStatus === 'desercion') return 'Riesgo RI';
+  return 'Estudiante';
+}
+
+function formatInstitutionalUser(user) {
+  const role = user.role || 'estudiante';
+  return {
+    email: user.email,
+    fullName: user.fullName || user.nombre || user.email,
+    role,
+    roleLabel: user.roleLabel || (user.isPaedis ? 'Estudiante PAEDIS' : 'Estudiante Regular'),
+    isPaedis: Boolean(user.isPaedis),
+    academicStatus: user.academicStatus || 'activo',
+    badge: resolveDemoBadge(user),
+    password: 'Duoc2026!',
+  };
+}
 
 /**
  * =========================================================================
@@ -57,6 +86,7 @@ const isStudentAccount = (user) => {
 };
 
 export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) => {
+  const { getVoiceProps } = useAccessibility();
   const [dbUsers, setDbUsers] = useState(FALLBACK_USERS);
   const [activeFilter, setActiveFilter] = useState('estudiantes'); // 'estudiantes' | 'personal' | 'todos'
   const [isExpanded, setIsExpanded] = useState(false);
@@ -64,39 +94,23 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
 
   useEffect(() => {
     let isMounted = true;
-    api
-      .getInstitutionalUsers()
-      .then((res) => {
+
+    const loadInstitutionalUsers = async () => {
+      try {
+        const res = await api.getInstitutionalUsers();
         if (!isMounted) return;
         if (res?.success && Array.isArray(res.users) && res.users.length > 0) {
-          const formatted = res.users.map((u) => {
-            const role = u.role || 'estudiante';
-            let badge = 'Estudiante';
-            if (u.isPaedis) badge = 'PAEDIS';
-            else if (role === 'admin') badge = 'Admin';
-            else if (role === 'profesor') badge = 'Docente';
-            else if (role === 'tutor_par') badge = 'Tutor Par';
-            else if (u.academicStatus === 'titulado') badge = 'Titulado';
-            else if (u.academicStatus === 'desercion') badge = 'Riesgo RI';
-
-            return {
-              email: u.email,
-              fullName: u.fullName || u.nombre || u.email,
-              role: role,
-              roleLabel: u.roleLabel || (u.isPaedis ? 'Estudiante PAEDIS' : 'Estudiante Regular'),
-              isPaedis: Boolean(u.isPaedis),
-              academicStatus: u.academicStatus || 'activo',
-              badge,
-              password: 'Duoc2026!',
-            };
-          });
-          setDbUsers(formatted);
+          setDbUsers(res.users.map(formatInstitutionalUser));
           setFromDatabase(true);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.warn('[DemoAccounts] Usando perfiles institucionales locales:', err);
-      });
+      }
+    };
+
+    loadInstitutionalUsers().catch((err) => {
+      console.warn('[DemoAccounts] Error cargando perfiles demo:', err);
+    });
 
     return () => {
       isMounted = false;
@@ -146,6 +160,9 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
+        {...getVoiceProps(
+          `Cuentas de prueba institucionales. ${dbUsers.length} perfiles disponibles.`
+        )}
         className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors text-xs font-medium cursor-pointer border border-slate-200/70"
         aria-expanded={isExpanded}
       >
@@ -178,6 +195,7 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
               role="tab"
               aria-selected={activeFilter === 'estudiantes'}
               onClick={() => setActiveFilter('estudiantes')}
+              {...getVoiceProps(`Estudiantes, ${studentCount} cuentas`)}
               className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                 activeFilter === 'estudiantes'
                   ? 'bg-[#002B49] text-white'
@@ -191,6 +209,7 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
               role="tab"
               aria-selected={activeFilter === 'personal'}
               onClick={() => setActiveFilter('personal')}
+              {...getVoiceProps(`Docentes y Administración, ${dbUsers.length - studentCount} cuentas`)}
               className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                 activeFilter === 'personal'
                   ? 'bg-[#002B49] text-white'
@@ -204,6 +223,7 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
               role="tab"
               aria-selected={activeFilter === 'todos'}
               onClick={() => setActiveFilter('todos')}
+              {...getVoiceProps(`Todos, ${dbUsers.length} cuentas`)}
               className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                 activeFilter === 'todos'
                   ? 'bg-[#002B49] text-white'
@@ -228,6 +248,7 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
                   type="button"
                   onClick={() => handleSelectUser(u)}
                   aria-pressed={isSelected}
+                  {...getVoiceProps(`${u.fullName}, ${u.badge || u.roleLabel}`)}
                   className={`w-full pt-1.5 pb-1 px-2 rounded-lg text-left transition-colors flex items-center justify-between gap-2 cursor-pointer ${
                     isSelected
                       ? 'bg-amber-50/80 text-slate-900 ring-1 ring-amber-300'

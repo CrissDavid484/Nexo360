@@ -5,21 +5,28 @@ import { SkipLink } from './components/common/SkipLink';
 import { LiveAnnouncer } from './components/common/LiveAnnouncer';
 import { ReadingGuideOverlay } from './components/common/ReadingGuideOverlay';
 import { ThemeCurtainOverlay } from './components/common/ThemeCurtainOverlay';
+import { VoiceReaderObserver } from './components/common/VoiceReaderObserver';
 import { LoginPage } from './pages/LoginPage';
 
+function lazyLoad(importer, exportName) {
+  return lazy(() =>
+    importer()
+      .then((module) => ({ default: module[exportName] }))
+      .catch((error) => {
+        console.error(`[App] Error cargando módulo diferido "${exportName}":`, error);
+        throw error;
+      })
+  );
+}
+
 // Code-Splitting para optimización extrema de carga y rendimiento de red
-const DashboardPage = lazy(() =>
-  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage }))
-);
+const DashboardPage = lazyLoad(() => import('./pages/DashboardPage'), 'DashboardPage');
 
-const NotFoundPage = lazy(() =>
-  import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
-);
+const NotFoundPage = lazyLoad(() => import('./pages/NotFoundPage'), 'NotFoundPage');
 
-const TomaRamosSimulator = lazy(() =>
-  import('./components/simulation/TomaRamosSimulator').then((m) => ({
-    default: m.TomaRamosSimulator,
-  }))
+const TomaRamosSimulator = lazyLoad(
+  () => import('./components/simulation/TomaRamosSimulator'),
+  'TomaRamosSimulator'
 );
 
 // Componente para proteger las rutas privadas institucionales
@@ -76,6 +83,9 @@ export const App = () => {
 
       {/* 2.2 Cortina de transición elegante entre temas claro / oscuro */}
       <ThemeCurtainOverlay />
+
+      {/* 2.3 Observador global de lectura en voz alta (Web Speech API) */}
+      <VoiceReaderObserver />
 
       {/* 3. Contenido Principal Rutas */}
       <Suspense

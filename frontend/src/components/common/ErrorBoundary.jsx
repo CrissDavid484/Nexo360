@@ -1,5 +1,24 @@
 import React from 'react';
 import { ShieldAlert, RefreshCw, LogIn, LayoutDashboard } from 'lucide-react';
+import { speak } from '../../utils/speechService';
+
+function getFallbackVoiceProps(text) {
+  const handleSpeak = () => {
+    try {
+      if (localStorage.getItem('nexo360_voice_reader') === 'true') {
+        speak(text);
+      }
+    } catch {
+      // Ignorar errores de localStorage en recuperación de fallos
+    }
+  };
+
+  return {
+    'data-voice-managed': 'true',
+    onMouseEnter: handleSpeak,
+    onFocus: handleSpeak,
+  };
+}
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -61,6 +80,9 @@ export class ErrorBoundary extends React.Component {
               <button
                 type="button"
                 onClick={this.handleReset}
+                {...getFallbackVoiceProps(
+                  isAuth ? 'Volver al portal Nexo360' : 'Volver al Inicio de Sesión'
+                )}
                 className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold bg-[#002B49] text-white hover:bg-[#001f35] focus:outline-hidden focus:ring-4 focus:ring-amber-400 min-h-[44px]"
               >
                 {isAuth ? (
@@ -78,6 +100,7 @@ export class ErrorBoundary extends React.Component {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
+                {...getFallbackVoiceProps('Recargar página')}
                 className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-hidden focus:ring-2 focus:ring-slate-400 min-h-[44px]"
               >
                 <RefreshCw className="w-4 h-4 text-slate-500" aria-hidden="true" />

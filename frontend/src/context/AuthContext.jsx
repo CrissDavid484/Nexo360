@@ -18,19 +18,19 @@ export const AuthProvider = ({ children }) => {
   }, [announce]);
 
   useEffect(() => {
-    let isMounted = true;
+    let isActive = true;
 
     const verifyExistingAuth = async () => {
       if (!token) {
-        if (isMounted) setIsLoading(false);
+        if (isActive) setIsLoading(false);
         return;
       }
 
       try {
         const response = await api.getMe();
-        if (!isMounted) return;
+        if (!isActive) return;
 
-        if (response.success && response.user) {
+        if (response?.success && response?.user) {
           setUser(response.user);
           if (response.user.accessibilityPreferences) {
             loadUserPreferences(response.user.accessibilityPreferences);
@@ -40,15 +40,19 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.warn('Error verificando sesión existente, cerrando sesión por seguridad:', err);
-        if (isMounted) logout();
+        if (isActive) logout();
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isActive) setIsLoading(false);
       }
     };
 
-    verifyExistingAuth().catch((error) => console.error('Error al inicializar sesión:', error));
+    verifyExistingAuth().catch((error) => {
+      console.error('Error al inicializar sesión:', error);
+      if (isActive) setIsLoading(false);
+    });
+
     return () => {
-      isMounted = false;
+      isActive = false;
     };
   }, [token, loadUserPreferences, logout]);
 

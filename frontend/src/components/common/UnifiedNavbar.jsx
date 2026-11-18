@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getStudentDisplayName } from '../../utils/studentUtils';
+import { useAccessibility } from '../../context/AccessibilityContext';
+import { useOnClickOutside } from '../../hooks/useOnClickOutside';
+import { DEFAULT_CAMPUS, getStudentDisplayName } from '../../utils/studentUtils';
 import logo03 from '../../assets/logo03.png';
 import {
   HelpCircle,
@@ -14,18 +16,18 @@ import {
   Menu,
   X,
   Layers,
-  Sparkles,
   Check,
   ShieldAlert,
 } from 'lucide-react';
 
 /**
- * Barra de Navegación Principal Nexo360
+ * Barra de Navegación Principal Nexo360 (Piloto Duoc UC - Sede Alameda)
  * - Agrupa "Toma de Ramos", "Biblioteca" y "Experiencia Vivo" en el menú desplegable "Simulaciones e instrucciones".
  * - En modo móvil, reemplaza el carrusel horizontal con un botón de menú desplegable limpio y accesible (WCAG 2.2 AAA).
  */
 export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
   const { user, logout } = useAuth();
+  const { getVoiceProps } = useAccessibility();
   const [isSimMenuOpen, setIsSimMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -64,20 +66,17 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
 
   const activeSimItem = simulationItems.find((item) => item.id === activeTab);
 
-  // Cerrar menús al hacer clic fuera o presionar Escape
+  useOnClickOutside(simMenuRef, () => setIsSimMenuOpen(false), {
+    enabled: isSimMenuOpen,
+  });
+  useOnClickOutside(mobileMenuRef, () => setIsMobileMenuOpen(false), {
+    enabled: isMobileMenuOpen,
+    ignoreSelector: '#mobile-menu-button',
+  });
+
+  // Cerrar menús al presionar Escape
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (simMenuRef.current && !simMenuRef.current.contains(e.target)) {
-        setIsSimMenuOpen(false);
-      }
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(e.target) &&
-        !e.target.closest('#mobile-menu-button')
-      ) {
-        setIsMobileMenuOpen(false);
-      }
-    };
+    if (!isSimMenuOpen && !isMobileMenuOpen) return undefined;
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -86,13 +85,11 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [isSimMenuOpen, isMobileMenuOpen]);
 
   const handleSelectSimItem = (id) => {
     onTabChange(id);
@@ -101,7 +98,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
   };
 
   const displayName = getStudentDisplayName(user);
-  const displayCampus = user?.campus || user?.sede || 'Sede Alameda';
+  const displayCampus = `Duoc UC · ${DEFAULT_CAMPUS}`;
 
   return (
     <header className="bg-white/95 backdrop-blur-md text-slate-900 sticky top-0 z-40 border-b border-slate-200 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.06)] transition-colors">
@@ -114,12 +111,13 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               onTabChange('centro-ayuda');
               setIsMobileMenuOpen(false);
             }}
+            {...getVoiceProps(`Ir al inicio de Nexo360 Duoc UC ${DEFAULT_CAMPUS}`)}
             className="min-h-[44px] flex items-center group text-left rounded-xl p-1 transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-            aria-label="Ir al inicio de Nexo360 Centro de Ayuda"
+            aria-label={`Ir al inicio de Nexo360 Centro de Ayuda ${DEFAULT_CAMPUS}`}
           >
             <img
               src={logo03}
-              alt="Nexo360 Duoc UC"
+              alt={`Nexo360 Duoc UC - ${DEFAULT_CAMPUS}`}
               className="nexo-logo-official w-auto object-contain transition-all duration-200 group-hover:opacity-95 select-none"
               style={{
                 height: 'clamp(30px, 2.5vw + 16px, 44px)',
@@ -138,6 +136,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               type="button"
               onClick={() => onTabChange('centro-ayuda')}
               aria-current={activeTab === 'centro-ayuda' ? 'page' : undefined}
+              {...getVoiceProps('Centro de Ayuda')}
               className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
                 activeTab === 'centro-ayuda'
                   ? 'bg-[#002B49] text-white shadow-xs'
@@ -160,6 +159,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 onClick={() => setIsSimMenuOpen(!isSimMenuOpen)}
                 aria-haspopup="menu"
                 aria-expanded={isSimMenuOpen}
+                {...getVoiceProps('Simulaciones e instrucciones')}
                 className={`min-h-[44px] flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all duration-200 active:scale-[0.98] ${
                   isSimActive
                     ? 'bg-[#002B49] text-white shadow-xs'
@@ -228,6 +228,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                         type="button"
                         role="menuitem"
                         onClick={() => handleSelectSimItem(item.id)}
+                        {...getVoiceProps(`${item.label}. ${item.subtitle}`)}
                         className={`w-full min-h-[44px] flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors ${
                           isCurrent
                             ? 'bg-[#002B49] text-white shadow-2xs'
@@ -272,6 +273,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               type="button"
               onClick={() => onTabChange('tickets')}
               aria-current={activeTab === 'tickets' ? 'page' : undefined}
+              {...getVoiceProps('Soporte TI')}
               className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
                 activeTab === 'tickets'
                   ? 'bg-[#002B49] text-white shadow-xs'
@@ -292,6 +294,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               type="button"
               onClick={() => onTabChange('perfil')}
               aria-current={activeTab === 'perfil' ? 'page' : undefined}
+              {...getVoiceProps('Mi Perfil')}
               className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
                 activeTab === 'perfil'
                   ? 'bg-[#002B49] text-white shadow-xs'
@@ -321,6 +324,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 type="button"
                 onClick={() => onTabChange('admin-panel')}
                 aria-current={activeTab === 'admin-panel' ? 'page' : undefined}
+                {...getVoiceProps('Panel Admin')}
                 className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 active:scale-[0.98] ${
                   activeTab === 'admin-panel'
                     ? 'bg-amber-500 text-slate-950 shadow-xs'
@@ -343,6 +347,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
             <button
               type="button"
               onClick={() => onTabChange('perfil')}
+              {...getVoiceProps(`Ver mi perfil institucional. ${displayName}, ${displayCampus}`)}
               className="hidden sm:flex items-center gap-2.5 text-right pl-3 py-1 rounded-xl hover:bg-slate-50 transition-colors"
               title="Ver mi perfil institucional"
             >
@@ -373,6 +378,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
             <button
               type="button"
               onClick={logout}
+              {...getVoiceProps('Cerrar sesión')}
               className="hidden sm:flex min-h-[40px] min-w-[40px] items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 hover:text-slate-950 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200/80 transition-all duration-150 active:scale-[0.98]"
               aria-label="Cerrar sesión"
             >
@@ -385,6 +391,9 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               id="mobile-menu-button"
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              {...getVoiceProps(
+                isMobileMenuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'
+              )}
               className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200/90 transition-colors shadow-2xs active:scale-95"
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-nav-drawer"
@@ -421,6 +430,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   onTabChange('centro-ayuda');
                   setIsMobileMenuOpen(false);
                 }}
+                {...getVoiceProps('Centro de Ayuda')}
                 className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-left transition-colors ${
                   activeTab === 'centro-ayuda'
                     ? 'bg-[#002B49] text-white shadow-xs'
@@ -454,6 +464,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                       key={item.id}
                       type="button"
                       onClick={() => handleSelectSimItem(item.id)}
+                      {...getVoiceProps(`${item.label}. ${item.subtitle}`)}
                       className={`w-full min-h-[46px] flex items-center justify-between gap-3 p-2.5 rounded-xl text-left border transition-all ${
                         isCurrent
                           ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
@@ -490,6 +501,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   onTabChange('tickets');
                   setIsMobileMenuOpen(false);
                 }}
+                {...getVoiceProps('Soporte TI')}
                 className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-left transition-colors ${
                   activeTab === 'tickets'
                     ? 'bg-[#002B49] text-white shadow-xs'
@@ -506,6 +518,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   onTabChange('perfil');
                   setIsMobileMenuOpen(false);
                 }}
+                {...getVoiceProps(`Mi Perfil de ${displayName}`)}
                 className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-left transition-colors ${
                   activeTab === 'perfil'
                     ? 'bg-[#002B49] text-white shadow-xs'
@@ -531,6 +544,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                     onTabChange('admin-panel');
                     setIsMobileMenuOpen(false);
                   }}
+                  {...getVoiceProps('Panel de Administración')}
                   className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-black text-left transition-colors ${
                     activeTab === 'admin-panel'
                       ? 'bg-amber-500 text-slate-950 shadow-xs'
@@ -551,6 +565,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               <button
                 type="button"
                 onClick={logout}
+                {...getVoiceProps('Cerrar sesión')}
                 className="min-h-[40px] px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1.5"
               >
                 <LogOut className="w-3.5 h-3.5" />

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import {
   Type,
   PauseCircle,
@@ -9,8 +10,61 @@ import {
   Moon,
   Sun,
   Eye,
-  Sparkles,
+  Volume2,
 } from 'lucide-react';
+
+const A11yToggleOption = ({
+  id,
+  active,
+  onToggle,
+  icon: Icon,
+  title,
+  description,
+  ariaLabel,
+  voiceProps,
+}) => (
+  <button
+    id={id}
+    type="button"
+    onClick={onToggle}
+    aria-label={ariaLabel}
+    aria-pressed={active}
+    {...voiceProps}
+    className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer ${
+      active
+        ? 'bg-[#002B49] text-white border-[#002B49]'
+        : 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-800 border-slate-200/80'
+    }`}
+  >
+    <div className="flex items-center gap-2.5">
+      <Icon
+        className={`w-4 h-4 shrink-0 ${active ? 'text-[#FFB81C]' : 'text-[#002B49]'}`}
+        aria-hidden="true"
+      />
+      <div>
+        <span className="text-xs font-bold block leading-tight">{title}</span>
+        <span
+          className={`text-[11px] block mt-0.5 ${active ? 'text-slate-200' : 'text-slate-500'}`}
+        >
+          {description}
+        </span>
+      </div>
+    </div>
+
+    <span
+      aria-hidden="true"
+      className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 flex items-center shrink-0 ${
+        active ? 'bg-[#FFB81C]' : 'bg-slate-300'
+      }`}
+    >
+      <span
+        className={`a11y-switch-thumb w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
+          active ? 'translate-x-4' : 'translate-x-0'
+        }`}
+      />
+    </span>
+  </button>
+);
 
 /**
  * Widget Flotante de Ajustes de Lectura y Apariencia
@@ -24,53 +78,92 @@ export const AccessibilityBar = () => {
     dyslexicFont,
     reducedMotion,
     readingGuide,
+    voiceReader,
     increaseFontSize,
     decreaseFontSize,
     toggleHighContrast,
     toggleDyslexicFont,
     toggleReducedMotion,
     toggleReadingGuide,
+    toggleVoiceReader,
+    getVoiceProps,
     resetPreferences,
   } = useAccessibility();
 
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
+  const fabRef = useRef(null);
 
   const activeCount =
     (fontSize !== 'normal' ? 1 : 0) +
     (highContrast ? 1 : 0) +
     (dyslexicFont ? 1 : 0) +
     (reducedMotion ? 1 : 0) +
-    (readingGuide ? 1 : 0);
+    (readingGuide ? 1 : 0) +
+    (voiceReader ? 1 : 0);
 
   const hasActivePreferences = activeCount > 0;
 
   const fontPercentage =
     fontSize === 'normal' ? '100%' : fontSize === 'large' ? '115%' : '130%';
 
-  // Cerrar con tecla Escape o al hacer clic fuera del menú flotante
+  useOnClickOutside(containerRef, () => setIsOpen(false), { enabled: isOpen });
+
+  // Cerrar con tecla Escape
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) return undefined;
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setIsOpen(false);
-      }
-    };
-
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false);
+        fabRef.current?.focus();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  const toggleOptions = [
+    {
+      key: 'voiceReader',
+      id: 'a11y-toggle-voice-reader',
+      active: voiceReader,
+      onToggle: toggleVoiceReader,
+      icon: Volume2,
+      title: 'Activar Lectura por Voz',
+      description: 'Lee en voz alta botones y textos al pasar el cursor o enfocar',
+      ariaLabel: 'Activar Lectura por Voz',
+    },
+    {
+      key: 'dyslexicFont',
+      active: dyslexicFont,
+      onToggle: toggleDyslexicFont,
+      icon: Type,
+      title: 'Lectura cómoda (Dislexia)',
+      description: 'Tipografía legible y espaciado adaptado',
+    },
+    {
+      key: 'readingGuide',
+      id: 'a11y-toggle-reading-guide',
+      active: readingGuide,
+      onToggle: toggleReadingGuide,
+      icon: Eye,
+      title: 'Guía de lectura (Enfoque)',
+      description: 'Resalta la línea bajo el cursor para no perderse',
+      ariaLabel: 'Activar o desactivar guía de lectura para enfocar líneas',
+    },
+    {
+      key: 'reducedMotion',
+      active: reducedMotion,
+      onToggle: toggleReducedMotion,
+      icon: PauseCircle,
+      title: 'Sin animaciones (Sensorial)',
+      description: 'Pausa efectos y reduce distracciones',
+    },
+  ];
 
   return (
     <aside
@@ -100,6 +193,7 @@ export const AccessibilityBar = () => {
                 <button
                   type="button"
                   onClick={resetPreferences}
+                  {...getVoiceProps('Restablecer valores predeterminados')}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-[#002B49] hover:underline px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors"
                   title="Restablecer valores predeterminados"
                 >
@@ -112,6 +206,7 @@ export const AccessibilityBar = () => {
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Cerrar panel de ajustes"
+                {...getVoiceProps('Cerrar panel de ajustes')}
                 className="min-h-[32px] min-w-[32px] rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
@@ -147,6 +242,11 @@ export const AccessibilityBar = () => {
                 checked={highContrast}
                 onChange={toggleHighContrast}
                 aria-label="Alternar entre modo claro y modo oscuro de alto contraste"
+                {...getVoiceProps(
+                  highContrast
+                    ? 'Desactivar modo oscuro de alto contraste'
+                    : 'Activar modo oscuro de alto contraste'
+                )}
               />
               <div className="theme-switch__container">
                 <div className="theme-switch__clouds" />
@@ -195,6 +295,7 @@ export const AccessibilityBar = () => {
                 onClick={decreaseFontSize}
                 disabled={fontSize === 'normal'}
                 aria-label="Reducir tamaño de texto"
+                {...getVoiceProps('Reducir tamaño de texto')}
                 className="min-h-[36px] px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none rounded-lg shadow-2xs transition-all flex items-center justify-center"
               >
                 A-
@@ -209,6 +310,7 @@ export const AccessibilityBar = () => {
                 onClick={increaseFontSize}
                 disabled={fontSize === 'xlarge'}
                 aria-label="Aumentar tamaño de texto"
+                {...getVoiceProps('Aumentar tamaño de texto')}
                 className="min-h-[36px] px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none rounded-lg shadow-2xs transition-all flex items-center justify-center"
               >
                 A+
@@ -218,156 +320,26 @@ export const AccessibilityBar = () => {
 
           {/* 3. Opciones de neurodiversidad y comodidad de lectura */}
           <div className="space-y-2 pt-1">
-            {/* Lectura Cómoda / Dislexia */}
-            <button
-              type="button"
-              onClick={toggleDyslexicFont}
-              aria-pressed={dyslexicFont}
-              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer ${
-                dyslexicFont
-                  ? 'bg-[#002B49] text-white border-[#002B49]'
-                  : 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-800 border-slate-200/80'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Type
-                  className={`w-4 h-4 shrink-0 ${
-                    dyslexicFont ? 'text-[#FFB81C]' : 'text-[#002B49]'
-                  }`}
-                  aria-hidden="true"
-                />
-                <div>
-                  <span className="text-xs font-bold block leading-tight">
-                    Lectura cómoda (Dislexia)
-                  </span>
-                  <span
-                    className={`text-[11px] block mt-0.5 ${
-                    dyslexicFont ? 'text-slate-200' : 'text-slate-500'
-                  }`}
-                  >
-                    Tipografía legible y espaciado adaptado
-                  </span>
-                </div>
-              </div>
-
-              <span
-                aria-hidden="true"
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 flex items-center shrink-0 ${
-                  dyslexicFont ? 'bg-[#FFB81C]' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`a11y-switch-thumb w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
-                    dyslexicFont ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </span>
-            </button>
-
-            {/* Guía de Lectura / Regla de Enfoque (TDAH & Dislexia) */}
-            <button
-              id="a11y-toggle-reading-guide"
-              type="button"
-              onClick={toggleReadingGuide}
-              aria-label="Activar o desactivar guía de lectura para enfocar líneas"
-              aria-pressed={readingGuide}
-              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer ${
-                readingGuide
-                  ? 'bg-[#002B49] text-white border-[#002B49]'
-                  : 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-800 border-slate-200/80'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Eye
-                  className={`w-4 h-4 shrink-0 ${
-                    readingGuide ? 'text-[#FFB81C]' : 'text-[#002B49]'
-                  }`}
-                  aria-hidden="true"
-                />
-                <div>
-                  <span className="text-xs font-bold block leading-tight">
-                    Guía de lectura (Enfoque)
-                  </span>
-                  <span
-                    className={`text-[11px] block mt-0.5 ${
-                    readingGuide ? 'text-slate-200' : 'text-slate-500'
-                  }`}
-                  >
-                    Resalta la línea bajo el cursor para no perderse
-                  </span>
-                </div>
-              </div>
-
-              <span
-                aria-hidden="true"
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 flex items-center shrink-0 ${
-                  readingGuide ? 'bg-[#FFB81C]' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`a11y-switch-thumb w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
-                    readingGuide ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </span>
-            </button>
-
-            {/* Sin Animaciones (TDAH / Sobrecarga Sensorial) */}
-            <button
-              type="button"
-              onClick={toggleReducedMotion}
-              aria-pressed={reducedMotion}
-              className={`a11y-option-btn w-full p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer ${
-                reducedMotion
-                  ? 'bg-[#002B49] text-white border-[#002B49]'
-                  : 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-800 border-slate-200/80'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <PauseCircle
-                  className={`w-4 h-4 shrink-0 ${
-                    reducedMotion ? 'text-[#FFB81C]' : 'text-[#002B49]'
-                  }`}
-                  aria-hidden="true"
-                />
-                <div>
-                  <span className="text-xs font-bold block leading-tight">
-                    Sin animaciones (Sensorial)
-                  </span>
-                  <span
-                    className={`text-[11px] block mt-0.5 ${
-                    reducedMotion ? 'text-slate-200' : 'text-slate-500'
-                  }`}
-                  >
-                    Pausa efectos y reduce distracciones
-                  </span>
-                </div>
-              </div>
-
-              <span
-                aria-hidden="true"
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 flex items-center shrink-0 ${
-                  reducedMotion ? 'bg-[#FFB81C]' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`a11y-switch-thumb w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
-                    reducedMotion ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </span>
-            </button>
+            {toggleOptions.map(({ key, ...opt }) => (
+              <A11yToggleOption
+                key={key}
+                {...opt}
+                voiceProps={getVoiceProps(opt.title)}
+              />
+            ))}
           </div>
         </div>
       )}
 
       {/* Botón flotante principal (FAB) con sombra y borde definidos */}
       <button
+        ref={fabRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label="Abrir ajustes de apariencia y lectura"
+        {...getVoiceProps('Abrir ajustes de apariencia y lectura')}
         className={`a11y-fab-btn min-h-[46px] px-4 py-2.5 rounded-full flex items-center gap-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 border ${
           isOpen || hasActivePreferences
             ? 'bg-[#002B49] text-white border-[#002B49] shadow-xl'
