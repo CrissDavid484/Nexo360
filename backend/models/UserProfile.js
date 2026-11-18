@@ -44,6 +44,17 @@ const ReasonableAdjustmentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const TeacherAcknowledgmentSchema = new mongoose.Schema(
+  {
+    sigla: { type: String, required: true, trim: true, maxlength: 30 },
+    nombre: { type: String, required: true, trim: true, maxlength: 140 },
+    profesor: { type: String, trim: true, maxlength: 120, default: 'Docente Titular' },
+    confirmado: { type: Boolean, default: false },
+    fechaAcuse: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 /**
  * Esquema de Asistencia por Asignatura - Sistema de Alerta Temprana (SAT)
  * Cumple con el estándar Duoc UC (mínimo 75% por asignatura) y justificaciones PAEDIS.
@@ -259,6 +270,36 @@ const UserProfileSchema = new mongoose.Schema(
     },
     ajustesAprobados: {
       type: [ReasonableAdjustmentSchema],
+      default: [],
+    },
+    barreraPaedis: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: 'Visual / Sensorial',
+    },
+    acreditacionPaedis: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: 'Credencial RND SENADIS',
+    },
+    notasConfidencialesPaedis: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: '',
+    },
+    fichaDocenteNotificada: {
+      type: Boolean,
+      default: false,
+    },
+    fechaNotificacionDocente: {
+      type: Date,
+      default: null,
+    },
+    acusesDocentes: {
+      type: [TeacherAcknowledgmentSchema],
       default: [],
     },
     accessibilityPreferences: {

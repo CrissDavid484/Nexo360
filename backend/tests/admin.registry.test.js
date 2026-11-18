@@ -1,5 +1,7 @@
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const http = require('node:http');
 const jwt = require('jsonwebtoken');
 const app = require('../server');
@@ -236,5 +238,73 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(intervRes.status, 200);
     assert.equal(intervRes.body?.success, true);
     assert.equal(intervRes.body?.student?.satIntervention?.status, 'IN_PROGRESS');
+  });
+
+  test('8. Centro de Operaciones PAEDIS: Gestión de Ajustes Razonables, Ficha Docente Confidencial (Ley 21.719) y permisos RBAC', async () => {
+    const targetEmail = 'd.rojas@duocuc.cl';
+
+    // 1. Estudiante NO puede modificar expedientes PAEDIS (403 Forbidden)
+    const deniedRes = await request(`/api/admin/paedis/${encodeURIComponent(targetEmail)}/case`, {
+      method: 'PATCH',
+      headers: studentHeaders,
+      body: { tutorParAsignado: 'Intento no autorizado' },
+    });
+    assert.equal(deniedRes.status, 403);
+
+    // 2. Coordinador PAEDIS actualiza expediente, ajustes, notas confidenciales y emite Ficha Docente
+    const updateRes = await request(`/api/admin/paedis/${encodeURIComponent(targetEmail)}/case`, {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: {
+        barreraPaedis: 'Auditiva / LSCh',
+        acreditacionPaedis: 'Credencial RND SENADIS / COMPIN',
+        tutorParAsignado: 'Intérprete LSCh Institucional',
+        diagnosticoDeclarado: 'Hipoacusia bilateral moderada',
+        notasConfidencialesPaedis: 'Entrevista inicial completada. Solicita apoyo LSCh en evaluaciones.',
+        ajustesAprobados: [
+          {
+            tipo: 'Intérprete de Señas (LSCh)',
+            descripcion: 'Acompañamiento de intérprete en clases y certámenes.',
+          },
+          {
+            tipo: 'Tiempo extendido +50%',
+            descripcion: '50% de tiempo adicional en evaluaciones teóricas.',
+          },
+        ],
+        fichaDocenteNotificada: true,
+        acusesDocentes: [
+          {
+            sigla: 'PRY2101',
+            nombre: 'Taller de Base de Datos',
+            profesor: 'Docente Sede Alameda',
+            confirmado: true,
+          },
+        ],
+      },
+    });
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.body?.success, true);
+    assert.equal(updateRes.body?.student?.tutorParAsignado, 'Intérprete LSCh Institucional');
+    assert.equal(updateRes.body?.student?.fichaDocenteNotificada, true);
+    assert.equal(updateRes.body?.student?.ajustesAprobados?.length, 2);
+    assert.equal(
+      updateRes.body?.student?.notasConfidencialesPaedis,
+      'Entrevista inicial completada. Solicita apoyo LSCh en evaluaciones.'
+    );
+    assert.equal(updateRes.body?.student?.acusesDocentes?.[0]?.confirmado, true);
+
+    // 3. Verificar integración en Frontend AdminPanelView y PaedisCaseManagementSection
+    const paedisCompPath = path.resolve(
+      __dirname,
+      '../../frontend/src/components/admin/PaedisCaseManagementSection.jsx'
+    );
+    const adminViewPath = path.resolve(
+      __dirname,
+      '../../frontend/src/components/views/AdminPanelView.jsx'
+    );
+    assert.ok(fs.existsSync(paedisCompPath), 'PaedisCaseManagementSection.jsx debe existir');
+    const adminViewCode = fs.readFileSync(adminViewPath, 'utf8');
+    assert.ok(adminViewCode.includes('PaedisCaseManagementSection'));
+    assert.ok(adminViewCode.includes('Gestión PAEDIS & Ajustes'));
   });
 });

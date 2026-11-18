@@ -340,14 +340,14 @@ export const AccessibilityBar = () => {
         aria-haspopup="dialog"
         aria-label="Ajustes de accesibilidad"
         {...getVoiceProps('Ajustes de accesibilidad')}
-        className={`a11y-fab-btn group min-h-[46px] py-2.5 rounded-l-full border border-r-0 flex items-center text-xs sm:text-sm font-bold transition-all duration-300 ease-out cursor-pointer ${
+        className={`a11y-fab-btn group min-h-[46px] py-2.5 rounded-l-full border border-r-0 shadow-lg flex items-center text-xs sm:text-sm font-bold transition-all duration-300 ease-in-out cursor-pointer ${
           isOpen
             ? 'pl-3 pr-4'
             : 'pl-3 pr-2.5 hover:pl-3 hover:pr-4 focus-visible:pl-3 focus-visible:pr-4'
         } ${
           isOpen || hasActivePreferences
-            ? 'bg-[#002B49] text-white border-[#002B49] shadow-lg'
-            : 'bg-white text-[#002B49] hover:bg-slate-50 border-slate-300 shadow-[0_6px_18px_rgba(0,43,73,0.16)]'
+            ? 'bg-[#002B49] text-white border-[#002B49]'
+            : 'bg-white text-[#002B49] hover:bg-slate-50 border-slate-300'
         }`}
       >
         <div
@@ -361,10 +361,10 @@ export const AccessibilityBar = () => {
           <Accessibility className="w-4 h-4" />
         </div>
         <span
-          className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${
+          className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
             isOpen
-              ? 'max-w-[240px] opacity-100 pl-2.5'
-              : 'max-w-0 opacity-0 group-hover:max-w-[240px] group-hover:opacity-100 group-hover:pl-2.5 group-focus-visible:max-w-[240px] group-focus-visible:opacity-100 group-focus-visible:pl-2.5'
+              ? 'max-w-[260px] opacity-100 pl-2.5'
+              : 'max-w-0 opacity-0 group-hover:max-w-[260px] group-hover:opacity-100 group-hover:pl-2.5 group-focus-visible:max-w-[260px] group-focus-visible:opacity-100 group-focus-visible:pl-2.5'
           }`}
         >
           Ajustes de accesibilidad

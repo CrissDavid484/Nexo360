@@ -61,11 +61,10 @@ function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
 
   return (
     <div
-      tabIndex={0}
       {...getVoiceProps(
         `Asignatura ${course.courseCode}, ${course.courseName}. ${label}, asistencia ${pct} por ciento, ${consecutiveAbs} inasistencias consecutivas`
       )}
-      className={`p-3.5 rounded-2xl border transition-all ${surfaceClass} flex flex-col sm:flex-row sm:items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400`}
+      className={`p-3.5 rounded-2xl border transition-all ${surfaceClass} flex flex-col sm:flex-row sm:items-center justify-between gap-3`}
     >
       <div className="space-y-1 min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -520,9 +519,8 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
             return (
               <div
                 key={kpi.id}
-                tabIndex={0}
                 {...getVoiceProps(`${kpi.label}: ${kpi.value}. ${kpi.subtitle}`)}
-                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between"
               >
                 <div className="space-y-1">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
@@ -717,13 +715,12 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
               return (
                 <article
                   key={student.id || student._id}
-                  tabIndex={0}
                   {...getVoiceProps(
                     `Alerta SAT de ${studentName}, ${student.career}, ${studentCampus}. Estado: ${
                       sat.riskLabel || 'Sin Riesgo'
                     }`
                   )}
-                  className={`p-5 rounded-3xl border transition-all bg-white shadow-2xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 ${
+                  className={`p-5 rounded-3xl border transition-all bg-white shadow-2xs ${
                     isCritical
                       ? 'border-rose-300'
                       : isPreventive

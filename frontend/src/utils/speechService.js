@@ -228,6 +228,7 @@ function resolveFallbackText(el) {
 const ARIA_STATE_MAPPINGS = [
   { attr: 'aria-expanded', values: { true: 'expandido', false: 'contraído' } },
   { attr: 'aria-pressed', values: { true: 'activado', false: 'desactivado' } },
+  { attr: 'aria-selected', values: { true: 'seleccionado', false: 'no seleccionado' } },
 ];
 
 function resolveControlStateTokens(el, baseText) {

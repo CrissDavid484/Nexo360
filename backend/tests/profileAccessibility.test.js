@@ -207,9 +207,9 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
       assert.ok(!a11yBar.includes('SlidersHorizontal'));
       assert.ok(a11yBar.includes('Ajustes de accesibilidad'));
       assert.ok(a11yBar.includes('fixed bottom-5 right-0 z-50'));
-      assert.ok(a11yBar.includes('rounded-l-full border border-r-0'));
+      assert.ok(a11yBar.includes('rounded-l-full border border-r-0 shadow-lg'));
       assert.ok(a11yBar.includes('max-w-0 opacity-0'));
-      assert.ok(a11yBar.includes('max-w-[240px] opacity-100'));
+      assert.ok(a11yBar.includes('max-w-[260px] opacity-100'));
 
       // 2. AccessibilityContext.jsx: locución automática en announce y anuncio del atajo Alt + V
       const a11yContext = readFrontendFile('context/AccessibilityContext.jsx');
@@ -229,13 +229,28 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
       const speechService = readFrontendFile('utils/speechService.js');
       assert.ok(speechService.includes("'expandido'") && speechService.includes("'contraído'"));
       assert.ok(speechService.includes("'activado'") && speechService.includes("'desactivado'"));
-      assert.ok(speechService.includes("'deshabilitado'"));
+      assert.ok(speechService.includes("'deshabilitado'") && speechService.includes("'seleccionado'"));
 
-      // 5. MfaPrompt.jsx: timeout extendido, botón escuchar nuevamente y cero tabIndex en region no interactiva
+      // 5. Cero tabIndex={0} en contenedores no interactivos en componentes críticos
+      for (const relPath of [
+        'components/auth/MfaPrompt.jsx',
+        'components/admin/CoursesAdminSection.jsx',
+        'components/admin/CoursesCatalogTable.jsx',
+        'components/admin/EarlyWarningSatSection.jsx',
+        'components/admin/PaedisCaseManagementSection.jsx',
+        'components/simulation/TomaRamosSimulator.jsx',
+        'components/views/AdminPanelView.jsx',
+      ]) {
+        const content = readFrontendFile(relPath);
+        assert.ok(
+          !content.includes('tabIndex={0}'),
+          `${relPath} no debe declarar tabIndex={0} en elementos no interactivos`
+        );
+      }
+
       const mfaPrompt = readFrontendFile('components/auth/MfaPrompt.jsx');
       assert.ok(mfaPrompt.includes('BASE_MAX_POLL_COUNT * 2'));
       assert.ok(mfaPrompt.includes('Escuchar código nuevamente'));
-      assert.ok(!mfaPrompt.includes('tabIndex={0}'));
     }
   );
 });

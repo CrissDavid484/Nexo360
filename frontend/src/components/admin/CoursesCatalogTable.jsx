@@ -62,18 +62,10 @@ export const CoursesCatalogTable = ({
               return (
                 <tr
                   key={course.sigla}
-                  tabIndex={0}
-                  onClick={() => onSelectCourse && onSelectCourse(course)}
-                  onKeyDown={(e) => {
-                    if (onSelectCourse && (e.key === 'Enter' || e.key === ' ')) {
-                      e.preventDefault();
-                      onSelectCourse(course);
-                    }
-                  }}
                   {...getVoiceProps(voiceText)}
-                  className={`transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                  className={`transition-colors ${
                     isSelected ? 'bg-blue-50/80 hover:bg-blue-100/70' : 'hover:bg-slate-50'
-                  } ${onSelectCourse ? 'cursor-pointer' : ''}`}
+                  }`}
                 >
                   <td className="p-3.5 font-mono font-black text-[#002B49] align-top">
                     <span className="px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg">
@@ -81,7 +73,18 @@ export const CoursesCatalogTable = ({
                     </span>
                   </td>
                   <td className="p-3.5 font-bold align-top">
-                    <div className="text-slate-950">{course.nombre}</div>
+                    {onSelectCourse ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectCourse(course)}
+                        {...getVoiceProps(voiceText)}
+                        className="text-left text-slate-950 hover:text-[#002B49] hover:underline cursor-pointer"
+                      >
+                        {course.nombre}
+                      </button>
+                    ) : (
+                      <div className="text-slate-950">{course.nombre}</div>
+                    )}
                     <div className="text-[11px] text-slate-600 font-normal mt-0.5">
                       {course.carrera || 'Ingeniería Duoc UC - Sede Alameda'}
                     </div>

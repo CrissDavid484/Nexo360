@@ -40,4 +40,7 @@ router.get('/sat-alerts', requireAdminOrCoordinator, adminController.getSatAlert
 router.patch('/sat-alerts/:userId/simulate', requireAdminOrCoordinator, adminController.simulateSatCourse);
 router.patch('/sat-alerts/:userId/intervention', requireAdminOrCoordinator, adminController.updateSatIntervention);
 
+// Centro de Operaciones de Inclusión PAEDIS - Gestión de Ajustes Razonables y Ficha Docente Confidencial
+router.patch('/paedis/:id/case', requireAdminOrCoordinator, adminController.updatePaedisCase);
+
 module.exports = router;

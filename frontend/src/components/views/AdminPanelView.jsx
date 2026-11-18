@@ -46,6 +46,7 @@ import {
 } from '../../utils/satUtils';
 import { CoursesAdminSection } from '../admin/CoursesAdminSection';
 import { EarlyWarningSatSection } from '../admin/EarlyWarningSatSection';
+import { PaedisCaseManagementSection } from '../admin/PaedisCaseManagementSection';
 
 const INITIAL_CAREERS_CATALOG = CARRERAS_DUOC_LIST.map((name, idx) => ({
   id: `career-${idx}`,
@@ -341,6 +342,13 @@ const ADMIN_SUB_TABS = [
     icon: AlertOctagon,
     iconColor: 'text-rose-400',
   },
+  {
+    id: 'gestion-paedis',
+    label: 'Gestión PAEDIS & Ajustes',
+    announceMsg: 'Pestaña de Gestión PAEDIS y Ajustes Razonables seleccionada.',
+    icon: HeartHandshake,
+    iconColor: 'text-amber-400',
+  },
 ];
 
 const STUDENT_STATUS_FILTERS = [
@@ -374,7 +382,9 @@ export const AdminPanelView = () => {
   const isCoordinator = userRole === 'coordinador_paedis';
   const canManageAdmin = isAdmin || isCoordinator;
 
-  const [adminSubTab, setAdminSubTab] = useState('estudiantes');
+  const [adminSubTab, setAdminSubTab] = useState(() =>
+    isCoordinator ? 'gestion-paedis' : 'estudiantes'
+  );
   const [metrics, setMetrics] = useState(null);
   const [students, setStudents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -530,6 +540,24 @@ export const AdminPanelView = () => {
       console.error('[AdminPanelView] Error en carga inicial:', err);
     });
   }, [loadAdminData]);
+
+  const handlePaedisStudentUpdated = useCallback((updatedRaw) => {
+    if (!updatedRaw) return;
+    const normalized = normalizeStudentProfile(updatedRaw);
+    const updatedStudent = {
+      ...normalized,
+      fullName: updatedRaw.fullName || updatedRaw.nombre || normalized.name,
+    };
+    const updatedKey = updatedStudent.email?.toLowerCase();
+    setStudents((prev) =>
+      prev.map((s) =>
+        (s.email || '').toLowerCase() === updatedKey ||
+        (s._id && updatedStudent._id && String(s._id) === String(updatedStudent._id))
+          ? updatedStudent
+          : s
+      )
+    );
+  }, []);
 
   const sortedCareers = useMemo(
     () => sortByNameEs(catalogState.careers.items),
@@ -1075,7 +1103,13 @@ export const AdminPanelView = () => {
       )}
 
       {/* RENDERIZADO SEGÚN SUB-PESTAÑA */}
-      {adminSubTab === 'alerta-temprana' ? (
+      {adminSubTab === 'gestion-paedis' ? (
+        <PaedisCaseManagementSection
+          students={students}
+          onStudentUpdated={handlePaedisStudentUpdated}
+          announce={announce}
+        />
+      ) : adminSubTab === 'alerta-temprana' ? (
         <EarlyWarningSatSection announce={announce} />
       ) : adminSubTab === 'oferta-ramos' ? (
         <CoursesAdminSection />
@@ -1162,9 +1196,8 @@ export const AdminPanelView = () => {
                 return (
                   <div
                     key={kpi.id}
-                    tabIndex={0}
                     {...getVoiceProps(`${kpi.label}: ${kpi.value}. ${kpi.subtitle}`)}
-                    className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                    className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
                   >
                     <div className="space-y-1">
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
@@ -1303,9 +1336,8 @@ export const AdminPanelView = () => {
                   ].map((cell) => (
                     <div
                       key={cell.label}
-                      tabIndex={0}
                       {...getVoiceProps(`${cell.label}: ${cell.count} estudiantes`)}
-                      className={`p-3 border rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${cell.boxClass}`}
+                      className={`p-3 border rounded-xl ${cell.boxClass}`}
                     >
                       <span className={`text-2xl font-black block ${cell.numClass}`}>
                         {cell.count}

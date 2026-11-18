@@ -896,3 +896,146 @@ exports.updateSatIntervention = async (req, res) => {
     });
   }
 };
+
+function parseValidDate(rawDate, fallbackDate = null) {
+  if (!rawDate) return fallbackDate;
+  const parsed = new Date(rawDate);
+  return Number.isNaN(parsed.getTime()) ? fallbackDate : parsed;
+}
+
+function sanitizeReasonableAdjustments(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  return rawList
+    .slice(0, 30)
+    .map((item) => {
+      const tipo = sanitizeString(item?.tipo, 80);
+      const descripcion = sanitizeString(item?.descripcion, 300);
+      if (!tipo || !descripcion) return null;
+      return {
+        tipo,
+        descripcion,
+        fechaAprobacion: parseValidDate(item?.fechaAprobacion, new Date()),
+      };
+    })
+    .filter(Boolean);
+}
+
+function sanitizeTeacherAcknowledgments(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  return rawList
+    .slice(0, 20)
+    .map((item) => {
+      const sigla = sanitizeString(item?.sigla, 30);
+      const nombre = sanitizeString(item?.nombre, 140);
+      if (!sigla || !nombre) return null;
+      const confirmado = Boolean(item?.confirmado);
+      return {
+        sigla,
+        nombre,
+        profesor: sanitizeString(item?.profesor, 120) || 'Docente Titular',
+        confirmado,
+        fechaAcuse: confirmado ? parseValidDate(item?.fechaAcuse, new Date()) : null,
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildPaedisCaseUpdates(body) {
+  const updates = {};
+  const stringFields = [
+    ['diagnosticoDeclarado', 160],
+    ['barreraPaedis', 80],
+    ['acreditacionPaedis', 100],
+    ['notasConfidencialesPaedis', 1000],
+    ['tutorParAsignado', 120],
+  ];
+
+  for (const [key, maxLen] of stringFields) {
+    if (body[key] !== undefined) {
+      updates[key] = sanitizeString(body[key], maxLen) || '';
+    }
+  }
+
+  if (Array.isArray(body.ajustesAprobados)) {
+    updates.ajustesAprobados = sanitizeReasonableAdjustments(body.ajustesAprobados);
+  }
+
+  if (Array.isArray(body.acusesDocentes)) {
+    updates.acusesDocentes = sanitizeTeacherAcknowledgments(body.acusesDocentes);
+  }
+
+  if (typeof body.fichaDocenteNotificada === 'boolean') {
+    updates.fichaDocenteNotificada = body.fichaDocenteNotificada;
+    updates.fechaNotificacionDocente = body.fichaDocenteNotificada
+      ? parseValidDate(body.fechaNotificacionDocente, new Date())
+      : null;
+  }
+
+  return updates;
+}
+
+/**
+ * PATCH /api/admin/paedis/:id/case
+ * Gestión del ciclo de vida de ajustes razonables PAEDIS, asignación de apoyos
+ * y emisión de Ficha Docente Confidencial (Ley N° 21.719).
+ */
+exports.updatePaedisCase = async (req, res) => {
+  try {
+    const rawId = String(req.params.id || '').trim();
+    if (!rawId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de estudiante no proporcionado.',
+      });
+    }
+
+    const user = await findUserByIdOrEmail(rawId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Estudiante no encontrado para gestión de expediente PAEDIS.',
+      });
+    }
+
+    const body = req.body || {};
+    const updates = buildPaedisCaseUpdates(body);
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar al menos un campo de expediente PAEDIS para actualizar.',
+      });
+    }
+
+    const syncResult = await authService.updateProfileFields(user.email, updates);
+    const updatedUser = syncResult.user || { ...user, ...updates };
+    const isNotifyAction = body.fichaDocenteNotificada === true;
+
+    await authService.logActivity({
+      userId: req.user?._id || req.user?.id,
+      userEmail: req.user?.email || 'coordinacion.paedis@duoc.cl',
+      userName: req.user?.fullName || 'Coordinación PAEDIS',
+      userRole: req.user?.role || 'coordinador_paedis',
+      action: isNotifyAction ? 'paedis_docente_notified' : 'paedis_case_updated',
+      details: `${isNotifyAction ? 'Ficha Docente Confidencial emitida' : 'Expediente PAEDIS actualizado'} para ${user.fullName || user.email} (${updates.ajustesAprobados?.length ?? user.ajustesAprobados?.length ?? 0} ajustes). Trazabilidad Ley N° 21.719.`,
+      metadata: {
+        targetEmail: user.email,
+        adjustmentsCount: updates.ajustesAprobados?.length ?? user.ajustesAprobados?.length ?? 0,
+        fichaDocenteNotificada: updates.fichaDocenteNotificada ?? user.fichaDocenteNotificada,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: isNotifyAction
+        ? 'Ficha Docente Confidencial emitida y registrada conforme a la Ley N° 21.719.'
+        : 'Expediente PAEDIS y ajustes razonables actualizados exitosamente.',
+      student: authService.formatUserResponse(updatedUser),
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al actualizar expediente PAEDIS:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al guardar el expediente PAEDIS.',
+    });
+  }
+};

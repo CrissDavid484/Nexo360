@@ -391,4 +391,14 @@ export const api = {
       body: payload,
     });
   },
+
+  /**
+   * Actualizar expediente PAEDIS, ajustes razonables, tutores pares y Ficha Docente Confidencial
+   */
+  async updatePaedisCase(userId, payload) {
+    return request(`/admin/paedis/${encodeURIComponent(userId)}/case`, {
+      method: 'PATCH',
+      body: payload,
+    });
+  },
 };

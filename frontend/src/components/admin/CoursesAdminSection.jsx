@@ -208,9 +208,8 @@ const AdminActionButton = ({
  */
 const AdminKpiCard = ({ label, value, subtitle, icon: Icon, iconBg, iconColor, voiceProps = {} }) => (
   <div
-    tabIndex={0}
     {...voiceProps}
-    className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+    className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs"
   >
     <header className="flex items-center justify-between">
       <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -230,9 +229,8 @@ const AdminKpiCard = ({ label, value, subtitle, icon: Icon, iconBg, iconColor, v
  */
 const PreviewStatCard = ({ label, value, voiceProps = {} }) => (
   <div
-    tabIndex={0}
     {...voiceProps}
-    className="p-3 bg-white rounded-xl border border-amber-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+    className="p-3 bg-white rounded-xl border border-amber-200"
   >
     <span className="text-[10px] uppercase font-bold text-slate-500 block">{label}</span>
     <span className="text-xl font-black text-slate-900">{value}</span>

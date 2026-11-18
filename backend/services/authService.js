@@ -529,6 +529,12 @@ class AuthService {
         raw.tutorParAsignado || (isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado'),
       diagnosticoDeclarado: raw.diagnosticoDeclarado || '',
       ajustesAprobados: Array.isArray(raw.ajustesAprobados) ? raw.ajustesAprobados : [],
+      barreraPaedis: raw.barreraPaedis || (isPaedis ? 'Visual / Sensorial' : ''),
+      acreditacionPaedis: raw.acreditacionPaedis || (isPaedis ? 'Credencial RND SENADIS' : ''),
+      notasConfidencialesPaedis: raw.notasConfidencialesPaedis || '',
+      fichaDocenteNotificada: Boolean(raw.fichaDocenteNotificada),
+      fechaNotificacionDocente: raw.fechaNotificacionDocente || null,
+      acusesDocentes: Array.isArray(raw.acusesDocentes) ? raw.acusesDocentes : [],
       isRegisteredInDb: raw.isRegisteredInDb !== false,
       lastLogin: raw.lastLogin || new Date(),
       consentimientoLey21719: raw.consentimientoLey21719 || {

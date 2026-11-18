@@ -1035,9 +1035,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 return (
                   <div
                     key={p.paso}
-                    tabIndex={0}
                     {...getVoiceProps(`Paso ${idx + 1}: ${stepTitle}. ${p.descripcion}`)}
-                    className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+                    className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-1"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -1371,11 +1370,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
                     {simulationMode === 'asistido' && (
                       <div
-                        tabIndex={0}
                         {...getVoiceProps(
                           'Tutor Guiado: Verifica tu nombre, RUT y créditos curriculares, luego presiona Haz Click Para Continuar.'
                         )}
-                        className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-950 flex items-center justify-between gap-2 max-w-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+                        className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-950 flex items-center justify-between gap-2 max-w-2xl"
                       >
                         <span>
                           <strong>Tutor Guiado:</strong> Verifica arriba tu nombre, RUT y créditos
