@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   ArrowRight,
   Calendar,
@@ -32,11 +32,10 @@ import {
   CARRERAS_DUOC,
   getRandomCoursesForCareer,
   generateTargetPackages,
+  appendDifficultyPracticas,
   DIFFICULTY_LEVELS,
   getBoletinSemesterTitle,
   formatStudentNameForBoletin,
-  PRACTICA_LABORAL_COURSE,
-  PRACTICA_PROFESIONAL_COURSE,
   MALLA_CURRICULAR_SEMANAL,
 } from '../../data/tomaRamosData';
 import {
@@ -53,8 +52,54 @@ import {
 } from './SapSelectBoxIcon';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAccessibleModal } from '../../hooks/useAccessibleModal';
 import { api } from '../../services/api';
-import { getStudentDisplayName, getStudentRut } from '../../utils/studentUtils';
+import { DEFAULT_CAMPUS, getStudentDisplayName, getStudentRut } from '../../utils/studentUtils';
+
+const DIAS_GRILLA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+const DIFFICULTY_BADGE_CLASSES = {
+  facil: 'bg-emerald-100 text-emerald-800',
+  intermedio: 'bg-blue-100 text-blue-800',
+  dificil: 'bg-amber-100 text-amber-900',
+  'muy-dificil': 'bg-rose-100 text-rose-900',
+};
+
+const MALLA_STATUS_CLASSES = {
+  inscrito: 'bg-[#E5DC6C] font-bold text-slate-950',
+  aprobado: 'bg-[#7BC67E] text-slate-950',
+  reprobado: 'bg-[#E57373] text-white',
+  pendiente: 'bg-[#FFB74D] text-slate-950',
+  convalidado: 'bg-[#81D4FA] text-slate-950',
+  'sin-inscribir': 'bg-[#EAEEF3] text-slate-900',
+};
+
+const MALLA_LEGEND_ITEMS = [
+  { label: 'Sin inscribir', classes: 'bg-[#EAEEF3] border-r border-[#7E9BB8]' },
+  { label: 'Inscrito', classes: 'bg-[#E5DC6C] border-r border-[#7E9BB8]' },
+  { label: 'Aprobado', classes: 'bg-[#7BC67E] border-r border-[#7E9BB8]' },
+  { label: 'Reprobado', classes: 'bg-[#E57373] text-white border-r border-[#7E9BB8]' },
+  { label: 'Pendiente', classes: 'bg-[#FFB74D] border-r border-[#7E9BB8]' },
+  { label: 'Convalidado', classes: 'bg-[#81D4FA]' },
+];
+
+function findCourseCellMatch(courses, tipo, dia, bloqueId) {
+  for (const curso of courses) {
+    const match = curso.bloques?.find((b) => b.dia === dia && b.bloqueId === bloqueId);
+    if (match) {
+      return {
+        texto: match.texto || `${curso.sigla}-${curso.seccion}`,
+        tipo,
+        sala: match.salaCorta || match.sala || '',
+        profesor: curso.profesor,
+        nombre: curso.nombre,
+        sigla: curso.sigla,
+        seccion: curso.seccion,
+      };
+    }
+  }
+  return null;
+}
 
 /**
  * Construye la carga académica inicial cuando el usuario elige "Modificación de Asignaturas".
@@ -114,48 +159,61 @@ function buildInitialEnrolledForModificacion(pkg, coursesPool) {
   return result;
 }
 
+function getEstadoRowIcon(pendingModification, estaInscrito, estaSeleccionado) {
+  if (pendingModification) {
+    return (
+      <span title="Pendiente de modificar">
+        <SapEstadoIcon className="w-4 h-4" />
+      </span>
+    );
+  }
+  if (estaInscrito || estaSeleccionado) {
+    return (
+      <span title={estaInscrito ? 'Inscrita' : 'Seleccionada para inscribir'}>
+        <SapEstadoSelectedIcon className="w-4 h-4" />
+      </span>
+    );
+  }
+  return (
+    <span title="No seleccionada">
+      <SapEstadoIcon className="w-4 h-4" />
+    </span>
+  );
+}
+
 export const TomaRamosSimulator = ({ onExit }) => {
-  const { announce, readingGuide, toggleReadingGuide } = useAccessibility();
+  const { announce, readingGuide, toggleReadingGuide, getVoiceProps } = useAccessibility();
   const { user } = useAuth();
+
   const simulatorContainerRef = useRef(null);
   const topGuideRef = useRef(null);
+  const infoModalRef = useRef(null);
+  const infoAcceptBtnRef = useRef(null);
+  const preFlowModalRef = useRef(null);
+  const sapConfirmTimerRef = useRef(null);
+  const printToastTimerRef = useRef(null);
+  const isMountedRef = useRef(true);
 
-  // Tipo de proceso: 'inscripcion' (Toma de Ramos) | 'modificacion' (Modificación de Asignaturas)
   const [processType, setProcessType] = useState('inscripcion');
-  // Pestaña activa en el reproductor superior de video
   const [activeTutorialTab, setActiveTutorialTab] = useState('inscripcion');
-
-  // Modo de simulación: 'asistido' (guiado) | 'real' (realista)
   const [simulationMode, setSimulationMode] = useState('asistido');
-
-  // Cronómetro de sesión
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
 
-  // Estados del flujo principal SAP SICOL:
-  // 'valida' (SicolValidaView) | 'inscripcion' | 'estados' (Malla Alumno + Horario) | 'confirmado' | 'boletin'
   const [step, setStep] = useState('valida');
-
-  // Subvista del panel izquierdo en 'inscripcion': 'lista' | 'seccion'
   const [leftPanelView, setLeftPanelView] = useState('lista');
   const [currentAsignatura, setCurrentAsignatura] = useState(null);
 
-  // Estados de confirmación SAP
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [isLoadingSap, setIsLoadingSap] = useState(false);
   const [isGrabado, setIsGrabado] = useState(false);
   const [isHorarioUnlocked, setIsHorarioUnlocked] = useState(false);
 
-  // Mensaje de estado oficial en barra SAP superior (verde, advertencia amarilla o error rojo)
   const [sapStatusMessage, setSapStatusMessage] = useState(null);
   const [showSapHelpBanner, setShowSapHelpBanner] = useState(false);
-
-  // Mensaje flotante de impresión / descarga en Boletín
   const [printToastMessage, setPrintToastMessage] = useState('');
-  // Error de tope horario o validación
   const [topeHorarioError, setTopeHorarioError] = useState('');
 
-  // Datos reales del estudiante desde AuthContext / BD
   const studentCareer =
     user?.career ||
     user?.carrera ||
@@ -164,7 +222,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
   const studentFullName = getStudentDisplayName(user);
   const studentRutFormatted = getStudentRut(user);
-  const studentRutRaw = String(studentRutFormatted).replace(/[.-]/g, '').toUpperCase() || '219876543';
+  const studentRutRaw =
+    String(studentRutFormatted).replace(/[.-]/g, '').toUpperCase() || '219876543';
 
   const matchedInitialCarrera =
     CARRERAS_DUOC.find(
@@ -181,7 +240,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     getRandomCoursesForCareer(matchedInitialCarrera.nombre, 8, 'facil')
   );
 
-  // Pre-flujo interactivo dentro del contenedor del simulador
   const [isPreFlowActive, setIsPreFlowActive] = useState(true);
   const [preFlowStep, setPreFlowStep] = useState(1);
   const [selectedModeOption, setSelectedModeOption] = useState('guiado');
@@ -191,11 +249,52 @@ export const TomaRamosSimulator = ({ onExit }) => {
   const [selectedTargetPackage, setSelectedTargetPackage] = useState(null);
   const [isReferenceSheetExpanded, setIsReferenceSheetExpanded] = useState(true);
 
-  // Cursos inscritos vs seleccionados en la sesión
   const [cursosInscritos, setCursosInscritos] = useState([]);
   const [cursosSeleccionados, setCursosSeleccionados] = useState([]);
 
-  // Cronómetro activo en selección y revisión
+  const isUnregisteredUser = Boolean(user && user.isRegisteredInDb === false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (sapConfirmTimerRef.current) clearTimeout(sapConfirmTimerRef.current);
+      if (printToastTimerRef.current) clearTimeout(printToastTimerRef.current);
+    };
+  }, []);
+
+  useAccessibleModal({
+    isOpen: showInfoModal,
+    onClose: () => {
+      if (!isLoadingSap) setShowInfoModal(false);
+    },
+    containerRef: infoModalRef,
+    initialFocusRef: infoAcceptBtnRef,
+  });
+
+  useAccessibleModal({
+    isOpen: isPreFlowActive && !isUnregisteredUser,
+    onClose: () => {
+      if (onExit) onExit();
+    },
+    containerRef: preFlowModalRef,
+    restoreFocus: false,
+  });
+
+  const clearPersistedTomaRamos = useCallback(async () => {
+    if (typeof localStorage === 'undefined' || !localStorage.getItem('nexo360_token')) {
+      return;
+    }
+    try {
+      const res = await api.saveTomaRamos([]);
+      if (res && res.success === false) {
+        console.warn('[TomaRamosSimulator] No se pudo limpiar toma de ramos previa:', res.message);
+      }
+    } catch (err) {
+      console.warn('[TomaRamosSimulator] Error al limpiar toma de ramos en servidor:', err);
+    }
+  }, []);
+
   useEffect(() => {
     let interval;
     if (isTimerRunning && !isGrabado && (step === 'inscripcion' || step === 'estados')) {
@@ -214,7 +313,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     return `${mins}:${secs}`;
   };
 
-  // Mantener paquetes objetivos sincronizados con availableCourses y dificultad
   useEffect(() => {
     if (availableCourses && availableCourses.length > 0) {
       const pkgs = generateTargetPackages(availableCourses, selectedDifficulty);
@@ -229,9 +327,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }
   }, [availableCourses, selectedDifficulty]);
 
-  // Evitar discrepancias entre paquete y catálogo disponible
   useEffect(() => {
-    if (!selectedTargetPackage?.targetCourses || !availableCourses || availableCourses.length === 0) return;
+    if (!selectedTargetPackage?.targetCourses || !availableCourses || availableCourses.length === 0) {
+      return;
+    }
     const hasDiscrepancy = selectedTargetPackage.targetCourses.some(
       (tc) => !availableCourses.some((ac) => ac.sigla === tc.sigla)
     );
@@ -244,87 +343,94 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }
   }, [availableCourses, selectedTargetPackage, selectedDifficulty]);
 
+  const refreshRandomCourses = useCallback(
+    async (carreraName, difficulty) => {
+      try {
+        const res = await api.getCourses({ carrera: carreraName, random: true, limit: 12 });
+        if (!isMountedRef.current) return;
+
+        if (res?.success && Array.isArray(res.courses) && res.courses.length > 0) {
+          const coursesList = appendDifficultyPracticas(res.courses, difficulty);
+          setCursosSeleccionados([]);
+          setAvailableCourses(coursesList);
+          const pkgs = generateTargetPackages(coursesList, difficulty);
+          setTargetPackages(pkgs);
+          if (pkgs.length > 0) setSelectedTargetPackage(pkgs[0]);
+          announce(`Nuevos ramos aleatorios cargados para ${carreraName}.`, 'polite');
+          return;
+        }
+      } catch (err) {
+        console.warn('[TomaRamosSimulator] Fallback a catálogo local al obtener cursos:', err);
+      }
+
+      if (!isMountedRef.current) return;
+
+      const localRandom = getRandomCoursesForCareer(carreraName, 8, difficulty);
+      setCursosSeleccionados([]);
+      setAvailableCourses(localRandom);
+      const pkgs = generateTargetPackages(localRandom, difficulty);
+      setTargetPackages(pkgs);
+      if (pkgs.length > 0) setSelectedTargetPackage(pkgs[0]);
+      announce(
+        `Nuevos ramos cargados para ${carreraName} en dificultad ${
+          DIFFICULTY_LEVELS.find((d) => d.id === difficulty)?.name || difficulty
+        }.`,
+        'polite'
+      );
+    },
+    [announce]
+  );
+
   // Actualizar carrera desde perfil
   useEffect(() => {
-    if (studentCareer) {
-      const match =
-        CARRERAS_DUOC.find(
-          (c) =>
-            c.nombre.toLowerCase().includes(studentCareer.toLowerCase()) ||
-            studentCareer.toLowerCase().includes(c.nombre.toLowerCase())
-        ) || {
-          codigo: '1446114',
-          nombre: studentCareer.toUpperCase(),
-          nombreCorto: studentCareer,
-          escuela: 'Escuela Duoc UC',
-          sede: user?.campus || user?.sede || user?.vivoStudentProfile?.sede || 'ALAMEDA',
-          jornada: 'Diurno',
-          periodo: '2026 - 002',
-          creditosTotalesCurriculum: 418,
-          creditosInscritosAprobados: 378,
-          creditosTotalesOptativos: 28,
-          creditosAprobadosOptativos: 28,
-          creditosAprobadosOptativosInterdisciplinarios: 4,
-          creditosAprobadosOptativosFormacionCristiana: 0,
-          creditosAprobadosOptativosProfundizacion: 0,
-        };
-      setSelectedCarrera(match.nombre);
-      setCarreraInfo(match);
-      void refreshRandomCourses(match.nombre, selectedDifficulty);
-    }
-  }, [studentCareer]);
+    if (!studentCareer) return;
+
+    const match =
+      CARRERAS_DUOC.find(
+        (c) =>
+          c.nombre.toLowerCase().includes(studentCareer.toLowerCase()) ||
+          studentCareer.toLowerCase().includes(c.nombre.toLowerCase())
+      ) || {
+        codigo: '1446114',
+        nombre: studentCareer.toUpperCase(),
+        nombreCorto: studentCareer,
+        escuela: 'Escuela Duoc UC',
+        sede: user?.campus || user?.sede || user?.vivoStudentProfile?.sede || DEFAULT_CAMPUS,
+        jornada: 'Diurno',
+        periodo: '2026 - 002',
+        creditosTotalesCurriculum: 418,
+        creditosInscritosAprobados: 378,
+        creditosTotalesOptativos: 28,
+        creditosAprobadosOptativos: 28,
+        creditosAprobadosOptativosInterdisciplinarios: 4,
+        creditosAprobadosOptativosFormacionCristiana: 0,
+        creditosAprobadosOptativosProfundizacion: 0,
+      };
+
+    setSelectedCarrera(match.nombre);
+    setCarreraInfo(match);
+    refreshRandomCourses(match.nombre, 'facil').catch((err) => {
+      console.warn('[TomaRamosSimulator] Error cargando ramos iniciales de carrera:', err);
+    });
+  }, [studentCareer, user?.campus, user?.sede, user?.vivoStudentProfile?.sede, refreshRandomCourses]);
 
   // Limpiar BD simulada al entrar y salir
   useEffect(() => {
-    api.saveTomaRamos([]).catch(() => {});
+    clearPersistedTomaRamos().catch((err) => {
+      console.warn('[TomaRamosSimulator] Error limpiando toma de ramos al iniciar:', err);
+    });
     return () => {
-      api.saveTomaRamos([]).catch(() => {});
+      clearPersistedTomaRamos().catch((err) => {
+        console.warn('[TomaRamosSimulator] Error limpiando toma de ramos al desmontar:', err);
+      });
     };
-  }, []);
-
-  const refreshRandomCourses = async (carreraName = selectedCarrera, difficulty = selectedDifficulty) => {
-    try {
-      const res = await api.getCourses({ carrera: carreraName, random: true, limit: 12 }).catch(() => null);
-      if (res?.success && Array.isArray(res.courses) && res.courses.length > 0) {
-        setCursosSeleccionados([]);
-        let coursesList = [...res.courses];
-        if (difficulty === 'intermedio' || difficulty === 'muy-dificil') {
-          if (!coursesList.some((c) => c.sigla === PRACTICA_LABORAL_COURSE.sigla)) {
-            coursesList.push(PRACTICA_LABORAL_COURSE);
-          }
-        }
-        if (difficulty === 'muy-dificil') {
-          if (!coursesList.some((c) => c.sigla === PRACTICA_PROFESIONAL_COURSE.sigla)) {
-            coursesList.push(PRACTICA_PROFESIONAL_COURSE);
-          }
-        }
-        setAvailableCourses(coursesList);
-        const pkgs = generateTargetPackages(coursesList, difficulty);
-        setTargetPackages(pkgs);
-        if (pkgs.length > 0) setSelectedTargetPackage(pkgs[0]);
-        announce(`Nuevos ramos aleatorios cargados para ${carreraName}.`, 'polite');
-        return;
-      }
-    } catch (e) {
-      // fallback local
-    }
-    const localRandom = getRandomCoursesForCareer(carreraName, 8, difficulty);
-    setCursosSeleccionados([]);
-    setAvailableCourses(localRandom);
-    const pkgs = generateTargetPackages(localRandom, difficulty);
-    setTargetPackages(pkgs);
-    if (pkgs.length > 0) setSelectedTargetPackage(pkgs[0]);
-    announce(
-      `Nuevos ramos cargados para ${carreraName} en dificultad ${
-        DIFFICULTY_LEVELS.find((d) => d.id === difficulty)?.name || difficulty
-      }.`,
-      'polite'
-    );
-  };
+  }, [clearPersistedTomaRamos]);
 
   const handleSelectDifficulty = (diffId) => {
     setSelectedDifficulty(diffId);
-    void refreshRandomCourses(selectedCarrera, diffId);
+    refreshRandomCourses(selectedCarrera, diffId).catch((err) => {
+      console.warn('[TomaRamosSimulator] Error actualizando dificultad:', err);
+    });
   };
 
   const handleSelectCarrera = (newCarreraName) => {
@@ -333,10 +439,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
     setCarreraInfo(info);
     setCursosSeleccionados([]);
     setCursosInscritos([]);
-    void refreshRandomCourses(newCarreraName);
+    refreshRandomCourses(newCarreraName, selectedDifficulty).catch((err) => {
+      console.warn('[TomaRamosSimulator] Error actualizando carrera:', err);
+    });
   };
-
-  const diasGrilla = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
   // Métricas y Logro
   const diffConfig = DIFFICULTY_LEVELS.find((d) => d.id === selectedDifficulty) || DIFFICULTY_LEVELS[0];
@@ -366,7 +472,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
     const saved = localStorage.getItem('nexo360_toma_ramos_record_seconds');
     return saved ? Number.parseInt(saved, 10) : null;
   });
-  const [isNewRecordBeaten, setIsNewRecordBeaten] = useState(false);
+  const [, setIsNewRecordBeaten] = useState(false);
 
   useEffect(() => {
     if (completionPercentage === 100 && (isGrabado || step === 'confirmado' || step === 'boletin')) {
@@ -378,7 +484,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }
   }, [completionPercentage, isGrabado, step, timerSeconds, personalRecordSeconds]);
 
-  // Iniciar simulación desde Pre-Flujo Step 2
   const handleStartSimulationFromPreFlow = () => {
     setSapStatusMessage(null);
     setTopeHorarioError('');
@@ -393,7 +498,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
     setStep('valida');
 
     if (processType === 'modificacion' && selectedTargetPackage) {
-      const preEnrolled = buildInitialEnrolledForModificacion(selectedTargetPackage, availableCourses);
+      const preEnrolled = buildInitialEnrolledForModificacion(
+        selectedTargetPackage,
+        availableCourses
+      );
       setCursosInscritos(preEnrolled);
       setCursosSeleccionados([]);
     } else {
@@ -410,11 +518,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
     );
   };
 
-  // Totales de créditos
   const totalCreditosInscritos = cursosInscritos.reduce((acc, c) => acc + (c.creditos || 0), 0);
-  const totalCreditosSeleccionados = cursosSeleccionados.reduce((acc, c) => acc + (c.creditos || 0), 0);
+  const totalCreditosSeleccionados = cursosSeleccionados.reduce(
+    (acc, c) => acc + (c.creditos || 0),
+    0
+  );
 
-  // Verificación de tope de horario (excluye la misma sigla cuando se modifica su sección)
   const findScheduleCollision = (seccion, ignoreSigla = null) => {
     const todosLosCursos = [...cursosInscritos, ...cursosSeleccionados].filter(
       (c) => c.sigla !== ignoreSigla
@@ -452,7 +561,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     announce('Regresando al listado de asignaturas disponibles.', 'polite');
   };
 
-  // Eliminar una asignatura ya inscrita (2ª columna en modo Modificación)
   const handleDropEnrolledCourse = (asig) => {
     if (isGrabado) return;
     setCursosInscritos((prev) => prev.filter((c) => c.sigla !== asig.sigla));
@@ -463,15 +571,20 @@ export const TomaRamosSimulator = ({ onExit }) => {
     announce(`Asignatura ${asig.sigla} desinscrita temporalmente.`, 'polite');
   };
 
-  // Seleccionar una sección en la tabla de secciones disponibles
   const handleSelectSeccion = (asig, seccion) => {
     setTopeHorarioError('');
 
-    if (seccion.sinCupos) {
-      const msg = `A esta asignatura ya no le quedan vacantes disponibles (sección ${asig.sigla}-${seccion.seccion}).`;
+    const rejectSelection = (msg, broadcast = false) => {
       setTopeHorarioError(msg);
       setSapStatusMessage({ type: 'error', text: msg });
-      announce(msg, 'assertive');
+      if (broadcast) announce(msg, 'assertive');
+    };
+
+    if (seccion.sinCupos) {
+      rejectSelection(
+        `A esta asignatura ya no le quedan vacantes disponibles (sección ${asig.sigla}-${seccion.seccion}).`,
+        true
+      );
       return;
     }
 
@@ -479,31 +592,32 @@ export const TomaRamosSimulator = ({ onExit }) => {
     const yaSeleccionadaItem = cursosSeleccionados.find((c) => c.sigla === asig.sigla);
 
     if (yaInscritaItem && processType === 'inscripcion') {
-      const msg = `La asignatura ${asig.nombre} ya se encuentra en tu lista de cursos inscritos.`;
-      setTopeHorarioError(msg);
-      setSapStatusMessage({ type: 'error', text: msg });
+      rejectSelection(
+        `La asignatura ${asig.nombre} ya se encuentra en tu lista de cursos inscritos.`
+      );
       return;
     }
 
     if (yaInscritaItem && yaInscritaItem.seccion === seccion.seccion) {
-      const msg = `La sección ${asig.sigla}-${seccion.seccion} ya se encuentra inscrita actualmente.`;
-      setTopeHorarioError(msg);
-      setSapStatusMessage({ type: 'error', text: msg });
+      rejectSelection(
+        `La sección ${asig.sigla}-${seccion.seccion} ya se encuentra inscrita actualmente.`
+      );
       return;
     }
 
     if (yaSeleccionadaItem && yaSeleccionadaItem.seccion === seccion.seccion) {
-      const msg = `La sección ${asig.sigla}-${seccion.seccion} ya se encuentra en Cursos seleccionados.`;
-      setTopeHorarioError(msg);
+      setTopeHorarioError(
+        `La sección ${asig.sigla}-${seccion.seccion} ya se encuentra en Cursos seleccionados.`
+      );
       return;
     }
 
     const colision = findScheduleCollision(seccion, asig.sigla);
     if (colision) {
-      const msg = `Tope de Horario Detectado: La sección ${asig.sigla}-${seccion.seccion} choca el día ${colision.dia} (${colision.hora}) con "${colision.cursoConflicto.nombre}" (${colision.cursoConflicto.sigla}-${colision.cursoConflicto.seccion}).`;
-      setTopeHorarioError(msg);
-      setSapStatusMessage({ type: 'error', text: msg });
-      announce(msg, 'assertive');
+      rejectSelection(
+        `Tope de Horario Detectado: La sección ${asig.sigla}-${seccion.seccion} choca el día ${colision.dia} (${colision.hora}) con "${colision.cursoConflicto.nombre}" (${colision.cursoConflicto.sigla}-${colision.cursoConflicto.seccion}).`,
+        true
+      );
       return;
     }
 
@@ -527,12 +641,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
       detallePractica: seccion.detallePractica || asig.detallePractica,
     };
 
-    // En Modificación, si estaba inscrita previamente, se mueve de inscritos a seleccionados
     if (yaInscritaItem) {
       setCursosInscritos((prev) => prev.filter((c) => c.sigla !== asig.sigla));
     }
 
-    // Reemplaza si ya existía una selección previa de la misma sigla, o agrega
     setCursosSeleccionados((prev) => [
       ...prev.filter((c) => c.sigla !== asig.sigla),
       nuevoCurso,
@@ -550,7 +662,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     );
   };
 
-  // Quitar una asignatura de Cursos Seleccionados (ícono basurero SAP)
   const handleRemoveSeleccionado = (sigla) => {
     if (isGrabado) return;
     setCursosSeleccionados((prev) => prev.filter((c) => c.sigla !== sigla));
@@ -558,7 +669,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     announce(`Curso ${sigla} removido de Cursos seleccionados.`, 'polite');
   };
 
-  // Avanzar a Pantalla 3: Resumen Malla Alumno + Horario (botón "Siguiente ▶")
   const handleSiguienteToEstados = () => {
     if (isGrabado || step !== 'inscripcion') return;
     if (cursosSeleccionados.length === 0 && cursosInscritos.length === 0) {
@@ -579,7 +689,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     );
   };
 
-  // Retroceder desde Malla Alumno (botón "◀ Anterior")
   const handleAnteriorToInscripcion = () => {
     if (isGrabado || step !== 'estados') return;
     setStep('inscripcion');
@@ -587,12 +696,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
     announce('Regresando a la selección de asignaturas.', 'polite');
   };
 
-  // Confirmar grabación de inscripción / modificación (Ventana Información -> Spinner Azul -> Pantalla Confirmado)
   const handleAceptarInformacion = () => {
     setIsLoadingSap(true);
     announce('Procesando inscripción de asignaturas en SICOL...', 'polite');
 
-    setTimeout(() => {
+    if (sapConfirmTimerRef.current) clearTimeout(sapConfirmTimerRef.current);
+    sapConfirmTimerRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
+
       const nuevosInscritos = [...cursosInscritos, ...cursosSeleccionados].map((c) => ({
         ...c,
         estado: 'inscrito',
@@ -615,8 +726,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }, 1100);
   };
 
-  // Reiniciar / Abrir Pre-flujo desde 0
   const handleRepeatSimulation = (mode = 'asistido', newRandom = false) => {
+    if (sapConfirmTimerRef.current) {
+      clearTimeout(sapConfirmTimerRef.current);
+      sapConfirmTimerRef.current = null;
+    }
     setSimulationMode(mode);
     setSelectedModeOption(mode === 'real' ? 'realista' : 'guiado');
     setIsGrabado(false);
@@ -637,10 +751,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
     setIsNewRecordBeaten(false);
 
     if (newRandom) {
-      void refreshRandomCourses(selectedCarrera, selectedDifficulty);
+      refreshRandomCourses(selectedCarrera, selectedDifficulty).catch((err) => {
+        console.warn('[TomaRamosSimulator] Error recargando ramos al repetir:', err);
+      });
     }
 
-    api.saveTomaRamos([]).catch(() => {});
+    clearPersistedTomaRamos().catch((err) => {
+      console.warn('[TomaRamosSimulator] Error limpiando carga al reiniciar:', err);
+    });
     announce('Simulador reiniciado desde cero.', 'polite');
   };
 
@@ -649,7 +767,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
   };
 
   const handleExitSimulator = () => {
-    api.saveTomaRamos([]).catch(() => {});
+    clearPersistedTomaRamos().catch((err) => {
+      console.warn('[TomaRamosSimulator] Error limpiando carga al salir:', err);
+    });
     if (onExit) {
       onExit();
     } else {
@@ -657,42 +777,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }
   };
 
-  // Contenido de celda del horario
-  const getCeldaContenido = (dia, bloqueId) => {
-    for (const curso of cursosInscritos) {
-      const match = curso.bloques?.find((b) => b.dia === dia && b.bloqueId === bloqueId);
-      if (match) {
-        return {
-          texto: match.texto || `${curso.sigla}-${curso.seccion}`,
-          tipo: 'inscrito',
-          sala: match.salaCorta || match.sala || '',
-          profesor: curso.profesor,
-          nombre: curso.nombre,
-          sigla: curso.sigla,
-          seccion: curso.seccion,
-        };
-      }
-    }
+  const getCeldaContenido = (dia, bloqueId) =>
+    findCourseCellMatch(cursosInscritos, 'inscrito', dia, bloqueId) ||
+    findCourseCellMatch(cursosSeleccionados, 'seleccionado', dia, bloqueId);
 
-    for (const curso of cursosSeleccionados) {
-      const match = curso.bloques?.find((b) => b.dia === dia && b.bloqueId === bloqueId);
-      if (match) {
-        return {
-          texto: match.texto || `${curso.sigla}-${curso.seccion}`,
-          tipo: 'seleccionado',
-          sala: match.salaCorta || match.sala || '',
-          profesor: curso.profesor,
-          nombre: curso.nombre,
-          sigla: curso.sigla,
-          seccion: curso.seccion,
-        };
-      }
-    }
-
-    return null;
-  };
-
-  // Mostrar solo las asignaturas incluidas en los paquetes generados
   const packageCourseSiglas = useMemo(() => {
     const set = new Set();
     (targetPackages || []).forEach((pkg) => {
@@ -706,7 +794,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     return availableCourses.filter((asig) => packageCourseSiglas.has(asig.sigla));
   }, [availableCourses, packageCourseSiglas]);
 
-  // Construcción dinámica de Malla Alumno (Semestres 1 a 9) para la vista 'estados'
   const mallaAlumnoGrid = useMemo(() => {
     const activos = [...cursosInscritos, ...cursosSeleccionados];
     const activosSet = new Set(activos.map((c) => c.sigla));
@@ -728,7 +815,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
         if (activosSet.has(item.sigla)) {
           return { ...item, status: 'inscrito' };
         }
-        // Inyectar asignaturas activas del estudiante en espacios "sin-inscribir" de Semestres 6-8
         if (
           colIdx >= 5 &&
           colIdx <= 7 &&
@@ -741,7 +827,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
         return { ...item, status: item.defaultStatus };
       });
 
-      // Si aún quedan ramos activos al llegar al Semestre 8, añadirlos al Semestre 8
       if (colIdx === 7 && unplacedIdx < unplaced.length) {
         while (unplacedIdx < unplaced.length) {
           const placedCourse = unplaced[unplacedIdx++];
@@ -757,20 +842,19 @@ export const TomaRamosSimulator = ({ onExit }) => {
   }, [cursosInscritos, cursosSeleccionados]);
 
   const triggerPrintToast = () => {
-    setPrintToastMessage(
-      'Desde aquí puedes imprimir o descargar tu Boletín Oficial de Carga Académica en PDF.'
-    );
-    announce(
-      'Desde aquí puedes imprimir o descargar tu Boletín Oficial de Carga Académica en PDF.',
-      'polite'
-    );
-    setTimeout(() => {
-      setPrintToastMessage('');
+    const message =
+      'Desde aquí puedes imprimir o descargar tu Boletín Oficial de Carga Académica en PDF.';
+    setPrintToastMessage(message);
+    announce(message, 'polite');
+    if (printToastTimerRef.current) clearTimeout(printToastTimerRef.current);
+    printToastTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        setPrintToastMessage('');
+      }
     }, 4500);
   };
 
-  // Control de acceso BD
-  if (user && user.isRegisteredInDb === false) {
+  if (isUnregisteredUser) {
     return (
       <div
         role="alert"
@@ -792,6 +876,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
           <button
             type="button"
             onClick={onExit}
+            {...getVoiceProps('Volver al Centro de Ayuda')}
             className="min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-sm rounded-xl transition-all shadow-xs cursor-pointer"
           >
             Volver al Centro de Ayuda
@@ -811,24 +896,22 @@ export const TomaRamosSimulator = ({ onExit }) => {
       aria-label="Guía oficial y Simulador de Toma de Ramos y Modificación de Asignaturas"
       className="space-y-6 pb-10"
     >
-      {/* ===================================================================== */}
       {/* 1. SECCIÓN SUPERIOR FIJA: VIDEO A LA IZQUIERDA + INSTRUCCIONES DERECHA */}
-      {/* ===================================================================== */}
       <div
         ref={topGuideRef}
         className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
       >
-        {/* Cabecera Superior limpia (homologada con BibliotecaView) */}
         <div className="px-6 sm:px-8 py-5 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
             <span className="text-xs font-semibold text-[#002B49] block">
-              Vida Académica Duoc UC • Sistema SICOL (SAP NetWeaver)
+              Vida Académica Duoc UC - Sede Alameda • Sistema SICOL (SAP NetWeaver)
             </span>
             <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
               Inscripción y Modificación de Asignaturas (Toma de Ramos)
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
-              Revisa el video oficial paso a paso a tu izquierda y las instrucciones clave a la derecha antes o durante tu práctica en el simulador de abajo.
+              Revisa el video oficial paso a paso a tu izquierda y las instrucciones clave a la
+              derecha antes o durante tu práctica en el simulador de abajo.
             </p>
           </div>
 
@@ -837,6 +920,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
               <button
                 type="button"
                 onClick={() => handleRepeatSimulation(simulationMode, false)}
+                {...getVoiceProps('Cambiar modo o dificultad del simulador')}
                 className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold text-xs flex items-center gap-2 border border-slate-200 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
@@ -848,6 +932,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
               href={PORTAL_INSC_URL}
               target="_blank"
               rel="noopener noreferrer"
+              {...getVoiceProps('Ir a Toma de Ramos Oficial en nueva pestaña')}
               className="min-h-[42px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all active:scale-[0.98]"
             >
               <span>Ir a Toma de Ramos Oficial</span>
@@ -858,13 +943,13 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
         {/* Grilla Video Tutorial (Izquierda) + Instrucciones Paso a Paso (Derecha) */}
         <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Izquierda (7 cols): Reproductor de Video con Selector Toma vs Modificación */}
           <div className="lg:col-span-7 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setActiveTutorialTab('inscripcion')}
+                  {...getVoiceProps('Ver video tutorial de Toma de Ramos')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                     activeTutorialTab === 'inscripcion'
                       ? 'bg-[#002B49] text-white shadow-xs'
@@ -877,6 +962,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 <button
                   type="button"
                   onClick={() => setActiveTutorialTab('modificacion')}
+                  {...getVoiceProps('Ver video tutorial de Modificación de Asignaturas')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                     activeTutorialTab === 'modificacion'
                       ? 'bg-[#002B49] text-white shadow-xs'
@@ -892,6 +978,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 href={currentVideo.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                {...getVoiceProps('Ver video tutorial en YouTube')}
                 className="text-xs font-semibold text-[#002B49] hover:underline inline-flex items-center gap-1"
               >
                 <span>Ver en YouTube</span>
@@ -919,12 +1006,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 </span>
               </span>
               <span className="text-[11px] text-slate-500">
-                Activa subtítulos con tecla <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded font-semibold">C</kbd>
+                Activa subtítulos con tecla{' '}
+                <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded font-semibold">
+                  C
+                </kbd>
               </span>
             </div>
           </div>
 
-          {/* Derecha (5 cols): Instrucciones Paso a Paso Reales */}
           <div className="lg:col-span-5 bg-slate-50/80 rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-200">
               <div>
@@ -941,51 +1030,54 @@ export const TomaRamosSimulator = ({ onExit }) => {
             </div>
 
             <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-              {TOMA_RAMOS_TUTORIAL_VIDEO.pasosClave.map((p, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-1"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-[#002B49] text-[#FFB81C] font-bold text-[11px] flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <span className="text-xs font-bold text-slate-900 leading-snug">
-                        {p.paso.replace(/^\d+\.\s*/, '')}
+              {TOMA_RAMOS_TUTORIAL_VIDEO.pasosClave.map((p, idx) => {
+                const stepTitle = p.paso.replace(/^\d+\.\s*/, '');
+                return (
+                  <div
+                    key={p.paso}
+                    tabIndex={0}
+                    {...getVoiceProps(`Paso ${idx + 1}: ${stepTitle}. ${p.descripcion}`)}
+                    className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-[#002B49] text-[#FFB81C] font-bold text-[11px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="text-xs font-bold text-slate-900 leading-snug">
+                          {stepTitle}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">
+                        {p.tiempo}
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">
-                      {p.tiempo}
-                    </span>
+                    <p className="text-[11px] text-slate-600 leading-relaxed pl-7">
+                      {p.descripcion}
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed pl-7">
-                    {p.descripcion}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ===================================================================== */}
-      {/* 2. CONTENEDOR DEL SIMULADOR SAP SICOL (DEBAJO DEL VIDEO)              */}
-      {/*    El Pre-Flujo con desenfoque se contiene SOLO aquí dentro           */}
-      {/* ===================================================================== */}
+      {/* 2. CONTENEDOR DEL SIMULADOR SAP SICOL */}
       <div
         ref={simulatorContainerRef}
         role="region"
-        aria-label="Simulador Oficial de Toma de Ramos Duoc UC (SAP WebDynpro SICOL)"
+        aria-label="Simulador Oficial de Toma de Ramos Duoc UC - Sede Alameda (SAP WebDynpro SICOL)"
         className="relative min-h-[780px] rounded-2xl overflow-hidden border border-slate-300 shadow-xl bg-[#EEF3F8] text-slate-900 flex flex-col font-sans select-none"
       >
-        {/* Capa Principal del Simulador (se desenfoca únicamente cuando isPreFlowActive es true) */}
         <div
           className={`flex-1 flex flex-col transition-all duration-300 ${
-            isPreFlowActive ? 'filter blur-md pointer-events-none select-none opacity-65' : 'filter blur-0'
+            isPreFlowActive
+              ? 'filter blur-md pointer-events-none select-none opacity-65'
+              : 'filter blur-0'
           }`}
         >
-          {/* Barra compacta superior de herramientas del simulador (Carrera, Modo, Reloj) */}
+          {/* Barra superior de herramientas del simulador */}
           <div className="bg-slate-800 text-slate-200 px-3 py-1.5 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-slate-700">
             <div className="flex items-center gap-2 flex-1 min-w-[240px]">
               <div className="flex items-center gap-1">
@@ -1003,6 +1095,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 type="button"
                 onClick={handleReset}
                 title="Recargar y configurar nueva práctica"
+                {...getVoiceProps('Recargar simulador')}
                 className="p-1 hover:text-white rounded hover:bg-slate-700 cursor-pointer"
                 aria-label="Recargar simulador"
               >
@@ -1020,6 +1113,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 <select
                   value={selectedCarrera}
                   onChange={(e) => handleSelectCarrera(e.target.value)}
+                  {...getVoiceProps('Seleccionar carrera en el simulador')}
                   className="bg-transparent text-white font-medium text-[11px] focus:outline-none cursor-pointer max-w-[160px] truncate"
                   aria-label="Seleccionar Carrera"
                 >
@@ -1034,6 +1128,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
               <button
                 type="button"
                 onClick={toggleReadingGuide}
+                {...getVoiceProps(`Guía de lectura ${readingGuide ? 'activada' : 'desactivada'}`)}
                 className={`px-2 py-0.5 rounded font-bold border text-[11px] flex items-center gap-1 cursor-pointer ${
                   readingGuide
                     ? 'bg-amber-400 text-slate-950 border-amber-300'
@@ -1054,6 +1149,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
               <button
                 type="button"
                 onClick={handleReset}
+                {...getVoiceProps('Reiniciar simulador')}
                 className="px-2 py-0.5 rounded font-bold border text-[11px] bg-slate-900 hover:bg-rose-950 text-rose-300 border-rose-700/60 flex items-center gap-1 cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3 text-rose-400" aria-hidden="true" />
@@ -1062,10 +1158,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
             </div>
           </div>
 
-          {/* Mostrar portal SAP SICOL salvo en vista Boletín PDF */}
           {step !== 'boletin' && (
             <>
-              {/* BARRAS SUPERIORES INSTITUCIONALES (Capturas 1, 18, 19, 20, 29) */}
               <div className="bg-[#111C2D] text-white px-4 py-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="flex items-baseline font-sans tracking-tight leading-none">
@@ -1074,7 +1168,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </div>
                   <span className="text-slate-400 text-sm font-light">|</span>
                   <span className="text-sm font-medium text-slate-100">
-                    {processType === 'modificacion' ? 'Modificación de Asignaturas' : 'Toma de Ramos'}
+                    {processType === 'modificacion'
+                      ? 'Modificación de Asignaturas'
+                      : 'Toma de Ramos'}
                   </span>
                 </div>
                 {simulationMode === 'asistido' && !isPreFlowActive && (
@@ -1084,11 +1180,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 )}
               </div>
 
-              {/* Franja Verde Oficial + Ayuda */}
               <div className="bg-[#84A83B] text-white px-4 py-1 text-xs font-bold flex items-center justify-between border-b border-[#6C8C2E]">
                 <button
                   type="button"
                   onClick={() => setShowSapHelpBanner((prev) => !prev)}
+                  {...getVoiceProps('Mostrar u ocultar ayuda SICOL')}
                   className="inline-flex items-center gap-1 hover:underline cursor-pointer"
                 >
                   <span className="w-3.5 h-3.5 bg-[#E67E22] text-white font-black text-[10px] leading-none flex items-center justify-center rounded-[1px]">
@@ -1106,14 +1202,19 @@ export const TomaRamosSimulator = ({ onExit }) => {
               {showSapHelpBanner && (
                 <div className="bg-[#FFFDE7] border-b border-amber-300 px-4 py-2 text-xs text-slate-800 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-[#002B49] shrink-0" />
+                    <HelpCircle className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
                     <span>
-                      <strong>Ayuda SICOL:</strong> Haz clic en el ícono de la primera columna (cubo con mano) para elegir o cambiar sección. En <em>Modificación</em> puedes desinscribir un ramo con el ícono de hoja con X roja. Luego pulsa <strong>Siguiente ▶</strong>, <strong>Inscribir</strong> y <strong>Aceptar</strong>.
+                      <strong>Ayuda SICOL:</strong> Haz clic en el ícono de la primera columna (cubo
+                      con mano) para elegir o cambiar sección. En <em>Modificación</em> puedes
+                      desinscribir un ramo con el ícono de hoja con X roja. Luego pulsa{' '}
+                      <strong>Siguiente ▶</strong>, <strong>Inscribir</strong> y{' '}
+                      <strong>Aceptar</strong>.
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => topGuideRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                    {...getVoiceProps('Desplazar arriba para ver video tutorial')}
                     className="text-[#002B49] font-bold underline cursor-pointer shrink-0"
                   >
                     Ver Video Tutorial
@@ -1121,9 +1222,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 </div>
               )}
 
-              {/* HEADER SAP WEBDYNPRO (GJOM.Header.Header) */}
               <header className="bg-[#CBD9E8] border-b border-[#8EA8C3] shadow-2xs">
-                {/* Franja degradada celeste superior con Identidad del Alumno */}
                 <div className="bg-gradient-to-r from-[#8BAAC9] via-[#B8CFE5] to-[#DCE8F3] px-3 py-1.5 border-b border-[#98B4CE] flex flex-wrap items-center justify-between gap-2">
                   <div className="font-sans italic font-bold text-sm sm:text-[15px] tracking-wide text-slate-950 flex flex-wrap items-center gap-x-6 gap-y-0.5 uppercase">
                     <span>{studentFullName}</span>
@@ -1132,11 +1231,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </div>
                 </div>
 
-                {/* Fila con botón Cerrar Sesión ! */}
                 <div className="px-3 pt-1.5 flex justify-end">
                   <button
                     type="button"
                     onClick={handleExitSimulator}
+                    {...getVoiceProps('Cerrar sesión del simulador SICOL')}
                     className="bg-gradient-to-b from-[#EFEFEF] to-[#D4D4D4] hover:from-white hover:to-[#E2E2E2] border border-[#8E8E8E] rounded-[2px] px-2.5 py-0.5 text-[11px] font-bold text-slate-800 inline-flex items-center gap-2 shadow-2xs cursor-pointer"
                   >
                     <span>Cerrar Sesión</span>
@@ -1146,7 +1245,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </button>
                 </div>
 
-                {/* Tabla de Datos Académicos SAP (4 columnas exactas del HTML oficial) */}
                 <div className="px-3 pb-2 pt-1 grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-1 text-[10px] leading-snug text-slate-900">
                   <div className="md:col-span-3">
                     <div className="font-black text-slate-950">
@@ -1155,54 +1253,72 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     </div>
                     <div className="uppercase">{carreraInfo.sede || TOMA_RAMOS_ESTUDIANTE.sede}</div>
                     <div className="uppercase">
-                      {(selectedTargetPackage?.jornada || carreraInfo.jornada || TOMA_RAMOS_ESTUDIANTE.jornada).toUpperCase()}
+                      {(
+                        selectedTargetPackage?.jornada ||
+                        carreraInfo.jornada ||
+                        TOMA_RAMOS_ESTUDIANTE.jornada
+                      ).toUpperCase()}
                     </div>
                   </div>
 
                   <div className="md:col-span-3 space-y-0.5">
                     <div className="flex justify-between gap-2 max-w-[260px]">
                       <span>Créditos Totales Curriculum:</span>
-                      <strong className="font-bold">{carreraInfo.creditosTotalesCurriculum ?? 418}</strong>
+                      <strong className="font-bold">
+                        {carreraInfo.creditosTotalesCurriculum ?? 418}
+                      </strong>
                     </div>
                     <div className="flex justify-between gap-2 max-w-[260px]">
                       <span>Créditos Aprobados Optativos Interdisciplinarios:</span>
-                      <strong className="font-bold">{carreraInfo.creditosAprobadosOptativosInterdisciplinarios ?? 4}</strong>
+                      <strong className="font-bold">
+                        {carreraInfo.creditosAprobadosOptativosInterdisciplinarios ?? 4}
+                      </strong>
                     </div>
                     <div className="flex justify-between gap-2 max-w-[260px]">
                       <span>Créditos Aprobados Optativos:</span>
-                      <strong className="font-bold">{carreraInfo.creditosAprobadosOptativos ?? 28}</strong>
+                      <strong className="font-bold">
+                        {carreraInfo.creditosAprobadosOptativos ?? 28}
+                      </strong>
                     </div>
                   </div>
 
                   <div className="md:col-span-3 space-y-0.5">
                     <div className="flex justify-between gap-2 max-w-[260px]">
                       <span>Créditos Inscritos Aprobados:</span>
-                      <strong className="font-bold">{carreraInfo.creditosInscritosAprobados ?? 378}</strong>
+                      <strong className="font-bold">
+                        {carreraInfo.creditosInscritosAprobados ?? 378}
+                      </strong>
                     </div>
                     <div className="flex justify-between gap-2 max-w-[260px]">
                       <span>Créditos Aprobados Optativos Formación Cristiana:</span>
-                      <strong className="font-bold">{carreraInfo.creditosAprobadosOptativosFormacionCristiana ?? 0}</strong>
+                      <strong className="font-bold">
+                        {carreraInfo.creditosAprobadosOptativosFormacionCristiana ?? 0}
+                      </strong>
                     </div>
                   </div>
 
                   <div className="md:col-span-3 space-y-0.5">
                     <div className="flex justify-between gap-2 max-w-[250px]">
                       <span>Créditos Totales Optativos:</span>
-                      <strong className="font-bold">{carreraInfo.creditosTotalesOptativos ?? 28}</strong>
+                      <strong className="font-bold">
+                        {carreraInfo.creditosTotalesOptativos ?? 28}
+                      </strong>
                     </div>
                     <div className="flex justify-between gap-2 max-w-[250px]">
                       <span>Créditos Aprobados Optativos Profundización:</span>
-                      <strong className="font-bold">{carreraInfo.creditosAprobadosOptativosProfundizacion ?? 0}</strong>
+                      <strong className="font-bold">
+                        {carreraInfo.creditosAprobadosOptativosProfundizacion ?? 0}
+                      </strong>
                     </div>
                   </div>
                 </div>
               </header>
 
-              {/* BARRA DE MENSAJE DE ESTADO SAP (Check verde, Advertencia amarilla o Error rojo) */}
               {sapStatusMessage && step !== 'valida' && (
                 <div
                   role="status"
                   aria-live="polite"
+                  {...getVoiceProps(sapStatusMessage.text)}
                   className="bg-white border-b border-[#9AB2CA] px-3 py-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-900"
                 >
                   <div className="flex items-center gap-2">
@@ -1226,11 +1342,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 </div>
               )}
 
-              {/* CONTENIDO SAP CENTRAL SEGÚN STEP */}
               <div className="flex-1 bg-white p-2 sm:p-3 flex flex-col">
-                {/* ====================================================== */}
-                {/* PANTALLA 1: VALIDA / HAZ CLICK PARA CONTINUAR          */}
-                {/* ====================================================== */}
+                {/* PANTALLA 1: VALIDA */}
                 {step === 'valida' && (
                   <div className="flex-1 border border-[#9CB8D0] bg-white p-4 flex flex-col justify-between min-h-[430px]">
                     <div>
@@ -1246,6 +1359,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               'polite'
                             );
                           }}
+                          {...getVoiceProps('Haz Click Para Continuar al portal de asignaturas')}
                           className="bg-gradient-to-b from-[#F5F5F5] to-[#DCDCDC] hover:from-white hover:to-[#E8E8E8] border border-[#8E8E8E] rounded-[2px] px-3.5 py-1.5 text-xs font-bold text-[#003366] flex items-center gap-2.5 shadow-2xs active:scale-[0.98] cursor-pointer"
                         >
                           <span>Haz Click Para Continuar</span>
@@ -1255,27 +1369,33 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     </div>
 
                     {simulationMode === 'asistido' && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-950 flex items-center justify-between gap-2 max-w-2xl">
+                      <div
+                        tabIndex={0}
+                        {...getVoiceProps(
+                          'Tutor Guiado: Verifica tu nombre, RUT y créditos curriculares, luego presiona Haz Click Para Continuar.'
+                        )}
+                        className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-950 flex items-center justify-between gap-2 max-w-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+                      >
                         <span>
-                          <strong>Tutor Guiado:</strong> Verifica arriba tu nombre, RUT y créditos curriculares, luego presiona{' '}
-                          <strong>&ldquo;Haz Click Para Continuar&rdquo;</strong> para acceder a tu carga académica.
+                          <strong>Tutor Guiado:</strong> Verifica arriba tu nombre, RUT y créditos
+                          curriculares, luego presiona{' '}
+                          <strong>&ldquo;Haz Click Para Continuar&rdquo;</strong> para acceder a tu
+                          carga académica.
                         </span>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* ====================================================== */}
-                {/* BARRA DE BOTONES SAP COMPARTIDA (inscripcion / estados / confirmado) */}
-                {/* ====================================================== */}
+                {/* BARRA DE BOTONES SAP COMPARTIDA */}
                 {(step === 'inscripcion' || step === 'estados' || step === 'confirmado') && (
                   <div className="bg-gradient-to-b from-[#BDCEE0] to-[#9EB6D0] border border-[#7E9BB8] px-2 py-1 flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="flex flex-wrap items-center gap-1">
-                      {/* Botón Anterior */}
                       <button
                         type="button"
                         disabled={step !== 'estados' || isGrabado}
                         onClick={handleAnteriorToInscripcion}
+                        {...getVoiceProps('Anterior, volver a selección de asignaturas')}
                         className={`h-[24px] px-2.5 border rounded-[2px] text-[11px] font-bold flex items-center gap-1 ${
                           step === 'estados' && !isGrabado
                             ? 'bg-gradient-to-b from-[#F5F5F5] to-[#DCDCDC] hover:from-white hover:to-[#E8E8E8] border-[#888888] text-slate-900 cursor-pointer active:scale-95'
@@ -1285,11 +1405,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <span>◀ Anterior</span>
                       </button>
 
-                      {/* Botón Siguiente */}
                       <button
                         type="button"
                         disabled={step !== 'inscripcion' || isGrabado}
                         onClick={handleSiguienteToEstados}
+                        {...getVoiceProps('Siguiente, avanzar al resumen de Malla Alumno')}
                         className={`h-[24px] px-2.5 border rounded-[2px] text-[11px] font-bold flex items-center gap-1 ${
                           step === 'inscripcion' && !isGrabado
                             ? 'bg-gradient-to-b from-[#FFF3BA] to-[#FAD35A] hover:from-[#FFF8D6] hover:to-[#FFE07D] border-[#9C7A14] text-slate-900 cursor-pointer active:scale-95'
@@ -1301,7 +1421,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
                       <span className="h-4 w-px bg-[#7E9BB8] mx-0.5" aria-hidden="true" />
 
-                      {/* Botón Inscribir */}
                       <button
                         type="button"
                         disabled={step !== 'estados' || isGrabado}
@@ -1309,6 +1428,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           setShowInfoModal(true);
                           announce('Abriendo confirmación de inscripción.', 'polite');
                         }}
+                        {...getVoiceProps('Inscribir asignaturas seleccionadas')}
                         className={`h-[24px] px-2.5 border rounded-[2px] text-[11px] font-bold flex items-center gap-1.5 ${
                           step === 'estados' && !isGrabado
                             ? 'bg-gradient-to-b from-[#F5F5F5] to-[#DCDCDC] hover:from-white hover:to-[#E8E8E8] border-[#888888] text-slate-900 cursor-pointer active:scale-95'
@@ -1321,7 +1441,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
                       <span className="h-4 w-px bg-[#7E9BB8] mx-0.5" aria-hidden="true" />
 
-                      {/* Botón Ver Horario */}
                       <button
                         type="button"
                         disabled={!isHorarioUnlocked}
@@ -1330,6 +1449,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           setStep('boletin');
                           announce('Abriendo Boletín Oficial de Carga Académica.', 'polite');
                         }}
+                        {...getVoiceProps('Ver Horario y Boletín Oficial de Carga Académica')}
                         className={`h-[24px] px-2.5 border rounded-[2px] text-[11px] font-bold flex items-center gap-1.5 ${
                           isHorarioUnlocked
                             ? 'bg-gradient-to-b from-[#FFF3BA] to-[#FAD35A] hover:from-[#FFF8D6] hover:to-[#FFE07D] border-[#9C7A14] text-slate-950 cursor-pointer active:scale-95 shadow-xs'
@@ -1346,7 +1466,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       </button>
                     </div>
 
-                    {/* Totales de Créditos a la derecha en la misma barra SAP (en inscripcion) */}
                     {step === 'inscripcion' && (
                       <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-900 font-medium">
                         <label className="flex items-center gap-1.5">
@@ -1355,6 +1474,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             type="text"
                             readOnly
                             value={totalCreditosInscritos}
+                            {...getVoiceProps(`Total créditos inscritos: ${totalCreditosInscritos}`)}
                             className="w-11 h-5 bg-white border border-[#8FA9C4] text-right px-1.5 font-sans font-semibold text-slate-900 text-[11px]"
                           />
                         </label>
@@ -1364,6 +1484,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             type="text"
                             readOnly
                             value={totalCreditosSeleccionados}
+                            {...getVoiceProps(
+                              `Total créditos seleccionados: ${totalCreditosSeleccionados}`
+                            )}
                             className="w-11 h-5 bg-white border border-[#8FA9C4] text-right px-1.5 font-sans font-semibold text-slate-900 text-[11px]"
                           />
                         </label>
@@ -1372,9 +1495,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </div>
                 )}
 
-                {/* ====================================================== */}
-                {/* PANTALLA 2: SELECCIÓN / MODIFICACIÓN DE ASIGNATURAS    */}
-                {/* ====================================================== */}
+                {/* PANTALLA 2: SELECCIÓN / MODIFICACIÓN DE ASIGNATURAS */}
                 {step === 'inscripcion' && (
                   <div className="space-y-2 flex-1">
                     {simulationMode === 'asistido' && (
@@ -1391,7 +1512,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 items-start">
-                      {/* PANEL IZQUIERDO (6 cols): TABLA 7 COLUMNAS O SUBVISTA SECCIÓN */}
+                      {/* PANEL IZQUIERDO */}
                       <div className="lg:col-span-6 space-y-2">
                         {leftPanelView === 'lista' && (
                           <div className="space-y-2">
@@ -1402,25 +1523,43 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                     <tr>
                                       <th scope="col" className="p-1 border-r border-[#A8C2D8] w-7 text-center" />
                                       <th scope="col" className="p-1 border-r border-[#A8C2D8] w-7 text-center" />
-                                      <th scope="col" className="p-1 border-r border-[#A8C2D8] w-11 text-center">Estado</th>
-                                      <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">Sigla</th>
-                                      <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">Sigla Eq...</th>
-                                      <th scope="col" className="p-1 border-r border-[#A8C2D8]">Nombre de la Asignatura</th>
-                                      <th scope="col" className="p-1 text-center w-10">Créd.</th>
+                                      <th scope="col" className="p-1 border-r border-[#A8C2D8] w-11 text-center">
+                                        Estado
+                                      </th>
+                                      <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">
+                                        Sigla
+                                      </th>
+                                      <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">
+                                        Sigla Eq...
+                                      </th>
+                                      <th scope="col" className="p-1 border-r border-[#A8C2D8]">
+                                        Nombre de la Asignatura
+                                      </th>
+                                      <th scope="col" className="p-1 text-center w-10">
+                                        Créd.
+                                      </th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-[#D7E4F0] text-[10px]">
                                     {asignaturasParaTomar.map((asig, rowIdx) => {
-                                      const estaInscrito = cursosInscritos.some((c) => c.sigla === asig.sigla);
-                                      const selCurso = cursosSeleccionados.find((c) => c.sigla === asig.sigla);
+                                      const estaInscrito = cursosInscritos.some(
+                                        (c) => c.sigla === asig.sigla
+                                      );
+                                      const selCurso = cursosSeleccionados.find(
+                                        (c) => c.sigla === asig.sigla
+                                      );
                                       const estaSeleccionado = Boolean(selCurso);
                                       const pendingModification = Boolean(selCurso?.wasEnrolled);
-                                      const rowBg =
-                                        rowIdx % 2 === 1 ? 'bg-[#EDF3F9]' : 'bg-white';
+                                      const rowBg = rowIdx % 2 === 1 ? 'bg-[#EDF3F9]' : 'bg-white';
 
                                       return (
-                                        <tr key={asig.sigla} className={`${rowBg} hover:bg-[#DCEAF7]`}>
-                                          {/* Col 1: Selecciona Opción */}
+                                        <tr
+                                          key={asig.sigla}
+                                          {...getVoiceProps(
+                                            `Asignatura ${asig.sigla}, ${asig.nombre}, ${asig.creditos} créditos`
+                                          )}
+                                          className={`${rowBg} hover:bg-[#DCEAF7]`}
+                                        >
                                           <td className="p-1 text-center border-r border-[#D7E4F0]">
                                             <button
                                               type="button"
@@ -1429,6 +1568,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                                 isGrabado ||
                                                 (processType === 'inscripcion' && estaInscrito)
                                               }
+                                              {...getVoiceProps(`Selecciona opción para ${asig.nombre}`)}
                                               className={`w-5 h-5 flex items-center justify-center mx-auto rounded-[2px] ${
                                                 isGrabado ||
                                                 (processType === 'inscripcion' && estaInscrito)
@@ -1442,13 +1582,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                             </button>
                                           </td>
 
-                                          {/* Col 2: Eliminar en Modificación cuando está inscrita */}
                                           <td className="p-1 text-center border-r border-[#D7E4F0]">
-                                            {processType === 'modificacion' && estaInscrito && !estaSeleccionado ? (
+                                            {processType === 'modificacion' &&
+                                            estaInscrito &&
+                                            !estaSeleccionado ? (
                                               <button
                                                 type="button"
                                                 onClick={() => handleDropEnrolledCourse(asig)}
                                                 disabled={isGrabado}
+                                                {...getVoiceProps(`Eliminar asignatura ${asig.sigla}`)}
                                                 className="w-5 h-5 flex items-center justify-center mx-auto hover:bg-red-100 rounded-[2px] cursor-pointer active:scale-95"
                                                 title={`Eliminar asignatura ${asig.sigla}`}
                                                 aria-label={`Eliminar asignatura ${asig.sigla}`}
@@ -1458,21 +1600,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                             ) : null}
                                           </td>
 
-                                          {/* Col 3: Estado */}
                                           <td className="p-1 text-center border-r border-[#D7E4F0]">
                                             <div className="flex items-center justify-center">
-                                              {pendingModification ? (
-                                                <span title="Pendiente de modificar">
-                                                  <SapEstadoIcon className="w-4 h-4" />
-                                                </span>
-                                              ) : estaInscrito || estaSeleccionado ? (
-                                                <span title={estaInscrito ? 'Inscrita' : 'Seleccionada para inscribir'}>
-                                                  <SapEstadoSelectedIcon className="w-4 h-4" />
-                                                </span>
-                                              ) : (
-                                                <span title="No seleccionada">
-                                                  <SapEstadoIcon className="w-4 h-4" />
-                                                </span>
+                                              {getEstadoRowIcon(
+                                                pendingModification,
+                                                estaInscrito,
+                                                estaSeleccionado
                                               )}
                                             </div>
                                           </td>
@@ -1497,7 +1630,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               </div>
                             </div>
 
-                            {/* Recuadro Leyenda 2x2 Fiel a Imagen SAP */}
                             <div className="inline-grid grid-cols-2 border border-black text-[10px] font-normal text-slate-950">
                               <div className="bg-white px-2.5 py-0.5 border-r border-b border-black min-w-[78px]">
                                 Optativo
@@ -1508,27 +1640,24 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               <div className="bg-[#4CAF50] px-2.5 py-0.5 border-r border-black min-w-[78px]">
                                 Certificable
                               </div>
-                              <div className="bg-[#FFFF00] px-2.5 py-0.5 min-w-[78px]">
-                                &nbsp;
-                              </div>
+                              <div className="bg-[#FFFF00] px-2.5 py-0.5 min-w-[78px]">&nbsp;</div>
                             </div>
                           </div>
                         )}
 
-                        {/* SUBVISTA B: SELECCIÓN DE SECCIÓN */}
                         {leftPanelView === 'seccion' && currentAsignatura && (
                           <div className="bg-white border border-[#91B1CC] p-2 space-y-2 min-h-[410px]">
                             <div>
                               <button
                                 type="button"
                                 onClick={handleVolverALista}
+                                {...getVoiceProps('Volver al listado de asignaturas')}
                                 className="bg-gradient-to-b from-[#F5F5F5] to-[#DCDCDC] hover:from-white hover:to-[#E6E6E6] border border-[#8E8E8E] rounded-[2px] px-3 py-0.5 text-[11px] font-bold text-slate-900 flex items-center gap-1 cursor-pointer active:scale-95"
                               >
                                 <span>◀ Volver</span>
                               </button>
                             </div>
 
-                            {/* Barra Azul * Seleccione una Sección para su Asignatura */}
                             <div className="bg-gradient-to-b from-[#6F96BE] to-[#4C77A4] text-white px-2 py-1 text-[11px] font-bold flex items-center justify-between border border-[#3C628A]">
                               <span>* Seleccione una Sección para su Asignatura</span>
                               <div className="flex items-center gap-1 text-[10px] bg-[#365B82] px-1.5 py-0.5 rounded-[1px]">
@@ -1537,7 +1666,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               </div>
                             </div>
 
-                            {/* Sigla, Nombre y Créditos */}
                             <div className="flex items-center justify-between text-[11px] font-bold text-slate-900 px-1 py-0.5 border-b border-[#C5D6E6]">
                               <span>
                                 {currentAsignatura.sigla} &nbsp; {currentAsignatura.nombre}
@@ -1549,12 +1677,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               <div
                                 role="alert"
                                 aria-live="assertive"
+                                {...getVoiceProps(topeHorarioError)}
                                 className="p-2.5 bg-red-50 border border-red-400 text-[11px] text-red-900 font-semibold flex items-start justify-between gap-2"
                               >
                                 <span>{topeHorarioError}</span>
                                 <button
                                   type="button"
                                   onClick={() => setTopeHorarioError('')}
+                                  {...getVoiceProps('Cerrar aviso de error')}
                                   className="underline font-bold shrink-0 cursor-pointer"
                                 >
                                   Cerrar
@@ -1562,17 +1692,26 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               </div>
                             )}
 
-                            {/* Tabla de Secciones Disponibles */}
                             <div className="border border-[#A8C2D8] overflow-x-auto">
                               <table className="w-full text-left border-collapse">
                                 <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px]">
                                   <tr>
                                     <th scope="col" className="p-1 border-r border-[#A8C2D8] w-7 text-center" />
-                                    <th scope="col" className="p-1 border-r border-[#A8C2D8] w-24">Sección</th>
-                                    <th scope="col" className="p-1 border-r border-[#A8C2D8] w-20">Cupos</th>
-                                    <th scope="col" className="p-1 border-r border-[#A8C2D8] w-24">Sala</th>
-                                    <th scope="col" className="p-1 border-r border-[#A8C2D8]">Profesor</th>
-                                    <th scope="col" className="p-1">Horario</th>
+                                    <th scope="col" className="p-1 border-r border-[#A8C2D8] w-24">
+                                      Sección
+                                    </th>
+                                    <th scope="col" className="p-1 border-r border-[#A8C2D8] w-20">
+                                      Cupos
+                                    </th>
+                                    <th scope="col" className="p-1 border-r border-[#A8C2D8] w-24">
+                                      Sala
+                                    </th>
+                                    <th scope="col" className="p-1 border-r border-[#A8C2D8]">
+                                      Profesor
+                                    </th>
+                                    <th scope="col" className="p-1">
+                                      Horario
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#D7E4F0] text-[10px]">
@@ -1586,7 +1725,16 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                     currentAsignatura.secciones?.map((sec, sIdx) => (
                                       <tr
                                         key={sec.seccion}
-                                        className={`${sIdx % 2 === 1 ? 'bg-[#EDF3F9]' : 'bg-white'} hover:bg-[#DCEAF7]`}
+                                        {...getVoiceProps(
+                                          `Sección ${currentAsignatura.sigla}-${sec.seccion}, ${
+                                            sec.sinCupos
+                                              ? 'sin cupos'
+                                              : `${sec.cuposDisponibles} cupos`
+                                          }, profesor ${sec.profesor}, horario ${sec.horarioTexto}`
+                                        )}
+                                        className={`${
+                                          sIdx % 2 === 1 ? 'bg-[#EDF3F9]' : 'bg-white'
+                                        } hover:bg-[#DCEAF7]`}
                                       >
                                         <td className="p-1 text-center border-r border-[#D7E4F0]">
                                           {sec.sinCupos ? (
@@ -1594,7 +1742,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                           ) : (
                                             <button
                                               type="button"
-                                              onClick={() => handleSelectSeccion(currentAsignatura, sec)}
+                                              onClick={() =>
+                                                handleSelectSeccion(currentAsignatura, sec)
+                                              }
+                                              {...getVoiceProps(
+                                                `Agregar sección ${currentAsignatura.sigla}-${sec.seccion}`
+                                              )}
                                               className="w-5 h-5 flex items-center justify-center mx-auto hover:bg-[#C6DDF2] rounded-[2px] cursor-pointer active:scale-95"
                                               title="Agregar sección a Cursos seleccionados"
                                               aria-label={`Agregar sección ${currentAsignatura.sigla}-${sec.seccion} a Cursos seleccionados`}
@@ -1634,9 +1787,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         )}
                       </div>
 
-                      {/* PANEL DERECHO (6 cols): HORARIO + CURSOS SELECCIONADOS */}
+                      {/* PANEL DERECHO */}
                       <div className="lg:col-span-6 space-y-4 pt-2">
-                        {/* CUADRO 1: HORARIO */}
                         <div className="border border-[#7DA2C5] bg-[#EBF2F8] p-2 relative">
                           <div
                             className="inline-flex items-center gap-1.5 bg-gradient-to-b from-[#AFC7DD] to-[#95B2CE] border-t border-l border-r border-[#4C749A] text-[#1B365D] font-bold text-xs py-0.5 -mt-5 -ml-2 mb-1"
@@ -1657,7 +1809,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                   <th scope="col" className="p-1 border-r border-[#A8C2D8] w-20 text-left">
                                     Hora
                                   </th>
-                                  {diasGrilla.map((dia) => (
+                                  {DIAS_GRILLA.map((dia) => (
                                     <th
                                       key={dia}
                                       scope="col"
@@ -1674,7 +1826,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                     <td className="p-1 text-left font-sans font-semibold text-slate-800 bg-[#F4F7FA] border-r border-[#D0DCE5] whitespace-nowrap">
                                       {bloque.hora.replace(' - ', '-')}
                                     </td>
-                                    {diasGrilla.map((dia) => {
+                                    {DIAS_GRILLA.map((dia) => {
                                       const match = getCeldaContenido(dia, bloque.id);
                                       return (
                                         <td
@@ -1698,7 +1850,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           </div>
                         </div>
 
-                        {/* CUADRO 2: CURSOS SELECCIONADOS */}
                         <div className="border border-[#7DA2C5] bg-[#EBF2F8] p-2 relative">
                           <div
                             className="inline-flex items-center gap-1.5 bg-gradient-to-b from-[#AFC7DD] to-[#95B2CE] border-t border-l border-r border-[#4C749A] text-[#1B365D] font-bold text-xs py-0.5 -mt-5 -ml-2 mb-1"
@@ -1717,22 +1868,39 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px] sticky top-0 z-10">
                                 <tr>
                                   <th scope="col" className="p-1 border-r border-[#A8C2D8] w-7 text-center" />
-                                  <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">Sigla</th>
-                                  <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">Sigla Eq...</th>
-                                  <th scope="col" className="p-1 border-r border-[#A8C2D8]">Nombre de la Asignatura</th>
-                                  <th scope="col" className="p-1 border-r border-[#A8C2D8] text-center w-20">Sección</th>
-                                  <th scope="col" className="p-1 text-center w-10">Créd.</th>
+                                  <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">
+                                    Sigla
+                                  </th>
+                                  <th scope="col" className="p-1 border-r border-[#A8C2D8] w-16">
+                                    Sigla Eq...
+                                  </th>
+                                  <th scope="col" className="p-1 border-r border-[#A8C2D8]">
+                                    Nombre de la Asignatura
+                                  </th>
+                                  <th scope="col" className="p-1 border-r border-[#A8C2D8] text-center w-20">
+                                    Sección
+                                  </th>
+                                  <th scope="col" className="p-1 text-center w-10">
+                                    Créd.
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-[#D0DCE5] text-[10px]">
                                 {cursosSeleccionados.map((c) => (
-                                  <tr key={c.sigla} className="bg-[#FFFDE7] hover:bg-[#FFF9C4]">
+                                  <tr
+                                    key={c.sigla}
+                                    {...getVoiceProps(
+                                      `Curso seleccionado ${c.sigla}-${c.seccion}, ${c.nombre}, ${c.creditos} créditos`
+                                    )}
+                                    className="bg-[#FFFDE7] hover:bg-[#FFF9C4]"
+                                  >
                                     <td className="p-1 text-center border-r border-[#D0DCE5]">
                                       <button
                                         type="button"
                                         onClick={() => handleRemoveSeleccionado(c.sigla)}
                                         title={`Quitar ${c.sigla} de Cursos seleccionados`}
                                         aria-label={`Quitar ${c.sigla}`}
+                                        {...getVoiceProps(`Quitar ${c.sigla} de cursos seleccionados`)}
                                         className="w-5 h-5 inline-flex items-center justify-center rounded-[2px] hover:bg-red-100 cursor-pointer"
                                       >
                                         <SapTrashIcon className="w-3.5 h-3.5" />
@@ -1754,18 +1922,18 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                   </tr>
                                 ))}
 
-                                {Array.from({ length: Math.max(0, 5 - cursosSeleccionados.length) }).map(
-                                  (_, idx) => (
-                                    <tr key={`empty-${idx}`} className="h-6">
-                                      <td className="border-r border-[#D0DCE5]" />
-                                      <td className="border-r border-[#D0DCE5]" />
-                                      <td className="border-r border-[#D0DCE5]" />
-                                      <td className="border-r border-[#D0DCE5]" />
-                                      <td className="border-r border-[#D0DCE5]" />
-                                      <td />
-                                    </tr>
-                                  )
-                                )}
+                                {Array.from({
+                                  length: Math.max(0, 5 - cursosSeleccionados.length),
+                                }).map((_, idx) => (
+                                  <tr key={`empty-${idx}`} className="h-6">
+                                    <td className="border-r border-[#D0DCE5]" />
+                                    <td className="border-r border-[#D0DCE5]" />
+                                    <td className="border-r border-[#D0DCE5]" />
+                                    <td className="border-r border-[#D0DCE5]" />
+                                    <td className="border-r border-[#D0DCE5]" />
+                                    <td />
+                                  </tr>
+                                ))}
                               </tbody>
                             </table>
                           </div>
@@ -1775,20 +1943,19 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </div>
                 )}
 
-                {/* ====================================================== */}
-                {/* PANTALLA 3: MALLA ALUMNO + HORARIO (step === 'estados') */}
-                {/* ====================================================== */}
+                {/* PANTALLA 3: MALLA ALUMNO + HORARIO */}
                 {step === 'estados' && (
                   <div className="space-y-3 flex-1">
                     {simulationMode === 'asistido' && (
                       <div className="bg-blue-50 border border-blue-300 text-blue-950 px-3 py-1.5 text-[11px] rounded-[2px]">
-                        <strong>Tutor Guiado:</strong> Verifica que tus asignaturas marcadas en amarillo (<strong>Inscrito</strong>) y tu horario a la derecha estén sin topes, y luego haz clic en el botón{' '}
-                        <strong>Inscribir</strong> de la barra superior.
+                        <strong>Tutor Guiado:</strong> Verifica que tus asignaturas marcadas en
+                        amarillo (<strong>Inscrito</strong>) y tu horario a la derecha estén sin
+                        topes, y luego haz clic en el botón <strong>Inscribir</strong> de la barra
+                        superior.
                       </div>
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-                      {/* Izquierda (7 cols): Malla Alumno + Barra de 6 colores */}
                       <div className="lg:col-span-7 space-y-2">
                         <div className="border border-[#7E9BB8] bg-white overflow-x-auto">
                           <div className="bg-[#BACDE0] border-b border-[#8FA8C2] px-2 py-1 text-[11px] font-bold text-slate-900">
@@ -1815,7 +1982,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                   ...mallaAlumnoGrid.map((c) => c.asignaturas.length)
                                 );
                                 return Array.from({ length: maxRows }).map((_, rowIndex) => (
-                                  <tr key={rowIndex} className="border-b border-[#CFDCE8] last:border-b-0">
+                                  <tr
+                                    key={rowIndex}
+                                    className="border-b border-[#CFDCE8] last:border-b-0"
+                                  >
                                     {mallaAlumnoGrid.map((col) => {
                                       const cell = col.asignaturas[rowIndex];
                                       if (!cell) {
@@ -1828,17 +1998,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                       }
 
                                       const statusBg =
-                                        cell.status === 'inscrito'
-                                          ? 'bg-[#E5DC6C] font-bold text-slate-950'
-                                          : cell.status === 'aprobado'
-                                          ? 'bg-[#7BC67E] text-slate-950'
-                                          : cell.status === 'reprobado'
-                                          ? 'bg-[#E57373] text-white'
-                                          : cell.status === 'pendiente'
-                                          ? 'bg-[#FFB74D] text-slate-950'
-                                          : cell.status === 'convalidado'
-                                          ? 'bg-[#81D4FA] text-slate-950'
-                                          : 'bg-[#EAEEF3] text-slate-900';
+                                        MALLA_STATUS_CLASSES[cell.status] ||
+                                        MALLA_STATUS_CLASSES['sin-inscribir'];
 
                                       return (
                                         <td
@@ -1865,18 +2026,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           </table>
                         </div>
 
-                        {/* Leyenda de 6 celdas pegadas fiel a Captura 15 */}
                         <div className="grid grid-cols-3 sm:grid-cols-6 border border-[#7E9BB8] text-[10px] font-semibold text-center text-slate-950">
-                          <div className="bg-[#EAEEF3] py-1 px-1 border-r border-[#7E9BB8]">Sin inscribir</div>
-                          <div className="bg-[#E5DC6C] py-1 px-1 border-r border-[#7E9BB8]">Inscrito</div>
-                          <div className="bg-[#7BC67E] py-1 px-1 border-r border-[#7E9BB8]">Aprobado</div>
-                          <div className="bg-[#E57373] text-white py-1 px-1 border-r border-[#7E9BB8]">Reprobado</div>
-                          <div className="bg-[#FFB74D] py-1 px-1 border-r border-[#7E9BB8]">Pendiente</div>
-                          <div className="bg-[#81D4FA] py-1 px-1">Convalidado</div>
+                          {MALLA_LEGEND_ITEMS.map((item) => (
+                            <div key={item.label} className={`py-1 px-1 ${item.classes}`}>
+                              {item.label}
+                            </div>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Derecha (5 cols): Horario Proyectado */}
                       <div className="lg:col-span-5 border border-[#7E9BB8] bg-white overflow-x-auto">
                         <table className="w-full text-center text-[10px] border-collapse">
                           <thead className="bg-[#DFE8F2] border-b border-[#98B2CC] text-slate-900 font-bold">
@@ -1884,7 +2042,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               <th scope="col" className="p-1 border-r border-[#A8C2D8] text-left w-20">
                                 Hora
                               </th>
-                              {diasGrilla.map((dia) => (
+                              {DIAS_GRILLA.map((dia) => (
                                 <th
                                   key={dia}
                                   scope="col"
@@ -1897,14 +2055,17 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           </thead>
                           <tbody className="divide-y divide-[#D0DCE5] text-[10px]">
                             {(() => {
-                              const allActivosBlocks = [...cursosInscritos, ...cursosSeleccionados].flatMap(
-                                (c) => c.bloques || []
-                              );
+                              const allActivosBlocks = [
+                                ...cursosInscritos,
+                                ...cursosSeleccionados,
+                              ].flatMap((c) => c.bloques || []);
                               let minIdx = 0;
                               let maxIdx = 5;
                               if (allActivosBlocks.length > 0) {
                                 const indices = allActivosBlocks
-                                  .map((b) => BLOQUES_HORARIOS_TOMA.findIndex((bh) => bh.id === b.bloqueId))
+                                  .map((b) =>
+                                    BLOQUES_HORARIOS_TOMA.findIndex((bh) => bh.id === b.bloqueId)
+                                  )
                                   .filter((idx) => idx !== -1);
                                 if (indices.length > 0) {
                                   minIdx = Math.min(...indices);
@@ -1920,7 +2081,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                   <td className="p-1 text-left font-sans text-slate-800 border-r border-[#D0DCE5] whitespace-nowrap">
                                     {bloque.hora.replace(' - ', '-')}
                                   </td>
-                                  {diasGrilla.map((dia) => {
+                                  {DIAS_GRILLA.map((dia) => {
                                     const match = getCeldaContenido(dia, bloque.id);
                                     return (
                                       <td
@@ -1945,9 +2106,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </div>
                 )}
 
-                {/* ====================================================== */}
-                {/* PANTALLA 4: CONFIRMADO (Capturas 18, 19 y 29)          */}
-                {/* ====================================================== */}
+                {/* PANTALLA 4: CONFIRMADO */}
                 {step === 'confirmado' && (
                   <div className="flex-1 flex flex-col justify-between min-h-[380px]">
                     <div className="border border-[#A9C0D6] bg-white p-3 min-h-[260px]">
@@ -1956,12 +2115,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       </div>
                       <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
                         <span className="inline-flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>Inscripción confirmada • Botón &ldquo;Ver Horario&rdquo; habilitado arriba</span>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+                          <span>
+                            Inscripción confirmada • Botón &ldquo;Ver Horario&rdquo; habilitado arriba
+                          </span>
                         </span>
                         <p className="text-xs text-slate-600 max-w-md">
-                          Tal como en el portal SICOL oficial, ya no es posible modificar ramos en esta instancia. Haz clic en{' '}
-                          <strong>Ver Horario</strong> para descargar o revisar tu Boletín de Carga Académica.
+                          Tal como en el portal SICOL oficial, ya no es posible modificar ramos en
+                          esta instancia. Haz clic en <strong>Ver Horario</strong> para descargar o
+                          revisar tu Boletín de Carga Académica.
                         </p>
                       </div>
                     </div>
@@ -1969,7 +2131,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="font-bold text-slate-800">
-                          Logro del Paquete: <span className="text-emerald-700">{completionPercentage}%</span> ({matchedCount}/{totalTargetCount} ramos)
+                          Logro del Paquete:{' '}
+                          <span className="text-emerald-700">{completionPercentage}%</span> (
+                          {matchedCount}/{totalTargetCount} ramos)
                         </span>
                         <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded border border-amber-200">
                           {liveScore} pts
@@ -1983,6 +2147,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <button
                           type="button"
                           onClick={() => handleRepeatSimulation(simulationMode, false)}
+                          {...getVoiceProps('Iniciar nueva práctica desde cero')}
                           className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 rounded text-xs font-bold text-slate-800 cursor-pointer"
                         >
                           Nueva Práctica (Desde 0)
@@ -1990,9 +2155,10 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <button
                           type="button"
                           onClick={() => setStep('boletin')}
+                          {...getVoiceProps('Abrir Boletín Horario oficial')}
                           className="px-4 py-1.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                         >
-                          <Calendar className="w-3.5 h-3.5 text-[#FFB81C]" />
+                          <Calendar className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
                           <span>Abrir Boletín Horario</span>
                         </button>
                       </div>
@@ -2003,22 +2169,20 @@ export const TomaRamosSimulator = ({ onExit }) => {
             </>
           )}
 
-          {/* ============================================================== */}
           {/* PANTALLA 5: VER HORARIO (BOLETÍN DE CARGA ACADÉMICA PDF DUOC) */}
-          {/* ============================================================== */}
           {step === 'boletin' && (
             <div className="flex-1 bg-slate-200 p-4 space-y-4">
               {printToastMessage && (
                 <div
                   role="alert"
+                  {...getVoiceProps(printToastMessage)}
                   className="p-3 bg-amber-100 border-2 border-amber-500 rounded text-xs font-black text-amber-950 flex items-center justify-center gap-2 shadow-md"
                 >
-                  <Info className="w-4 h-4 text-amber-800 shrink-0" />
+                  <Info className="w-4 h-4 text-amber-800 shrink-0" aria-hidden="true" />
                   <span>{printToastMessage}</span>
                 </div>
               )}
 
-              {/* Barra Visor PDF */}
               <div className="bg-slate-800 text-white p-3 rounded flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
                 <div className="flex items-center gap-3">
                   <FileText className="w-5 h-5 text-amber-400" aria-hidden="true" />
@@ -2034,24 +2198,27 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   <button
                     type="button"
                     onClick={triggerPrintToast}
+                    {...getVoiceProps('Imprimir boletín oficial')}
                     className="min-h-[34px] px-3.5 py-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Printer className="w-4 h-4" />
+                    <Printer className="w-4 h-4" aria-hidden="true" />
                     <span>Imprimir</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={triggerPrintToast}
+                    {...getVoiceProps('Descargar boletín oficial en PDF')}
                     className="min-h-[34px] px-3.5 py-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-4 h-4" aria-hidden="true" />
                     <span>Descargar</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setStep('confirmado')}
+                    {...getVoiceProps('Volver al portal SICOL')}
                     className="min-h-[34px] px-3.5 py-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center gap-1 cursor-pointer"
                   >
                     <span>Volver al Portal</span>
@@ -2060,6 +2227,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   <button
                     type="button"
                     onClick={() => handleRepeatSimulation('asistido', false)}
+                    {...getVoiceProps('Nueva práctica desde cero')}
                     className="min-h-[34px] px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded flex items-center gap-1 shadow-2xs cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
@@ -2069,6 +2237,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   <button
                     type="button"
                     onClick={handleExitSimulator}
+                    {...getVoiceProps('Salir del simulador')}
                     className="min-h-[34px] px-3.5 py-1 bg-rose-700 hover:bg-rose-800 text-white font-bold rounded flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
@@ -2077,7 +2246,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 </div>
               </div>
 
-              {/* Hoja Oficial del Boletín de Carga Académica */}
               <div className="bg-white max-w-4xl mx-auto p-6 sm:p-10 rounded border border-slate-300 shadow-2xl space-y-6 font-mono text-slate-900">
                 <div className="flex items-start justify-between border-b border-black pb-3">
                   <div>
@@ -2153,7 +2321,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   </h3>
                 </div>
 
-                {/* Grilla Horaria Adaptativa */}
                 {(() => {
                   const enrolledBlocks = cursosInscritos.flatMap((c) => c.bloques || []);
                   let minBlockIdx = 0;
@@ -2179,7 +2346,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               <br />
                               Horario
                             </th>
-                            {diasGrilla.map((dia) => (
+                            {DIAS_GRILLA.map((dia) => (
                               <th
                                 key={dia}
                                 scope="col"
@@ -2204,7 +2371,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                   <div>{horaFin}</div>
                                 </td>
 
-                                {diasGrilla.map((dia) => {
+                                {DIAS_GRILLA.map((dia) => {
                                   const match = getCeldaContenido(dia, bloque.id);
 
                                   return (
@@ -2234,7 +2401,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   );
                 })()}
 
-                {/* Detalle condicional solo para Portafolio y Prácticas */}
                 {(() => {
                   const portafolioCourse = cursosInscritos.find(
                     (c) =>
@@ -2302,7 +2468,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                       {clase.nro}
                                     </td>
                                     <td className="p-1.5 border-r border-black px-3">{clase.fecha}</td>
-                                    <td className="p-1.5 border-r border-black text-center">{clase.horario}</td>
+                                    <td className="p-1.5 border-r border-black text-center">
+                                      {clase.horario}
+                                    </td>
                                     <td className="p-1.5 text-center">{clase.sala}</td>
                                   </tr>
                                 ))}
@@ -2325,7 +2493,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                   {practica.sigla}-{practica.seccion} • {practica.nombre}
                                 </span>
                                 <span>
-                                  {practica.detallePractica?.horas || '360 hrs.'} • Horario a coordinar con centro de práctica
+                                  {practica.detallePractica?.horas || '360 hrs.'} • Horario a
+                                  coordinar con centro de práctica
                                 </span>
                               </div>
                             ))}
@@ -2337,9 +2506,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 })()}
 
                 <div className="pt-4 border-t border-black text-center text-[10px] text-slate-700 font-mono space-y-0.5">
-                  <p>Comprobante oficial emitido por el Sistema de Información Curricular Duoc UC (SICOL).</p>
                   <p>
-                    Sede {carreraInfo.sede || 'ALAMEDA'} • Periodo{' '}
+                    Comprobante oficial emitido por el Sistema de Información Curricular Duoc UC -
+                    Sede Alameda (SICOL).
+                  </p>
+                  <p>
+                    Duoc UC - Sede Alameda • Periodo{' '}
                     {carreraInfo.periodo || TOMA_RAMOS_ESTUDIANTE.periodo}
                   </p>
                 </div>
@@ -2348,23 +2520,26 @@ export const TomaRamosSimulator = ({ onExit }) => {
           )}
         </div>
 
-        {/* =================================================================== */}
-        {/* MODAL SAP: INFORMACIÓN (CON SPINNER AZUL INCOMPLETO DE CARGA)        */}
-        {/* =================================================================== */}
+        {/* MODAL SAP: INFORMACIÓN */}
         {showInfoModal && (
           <div
             role="dialog"
             aria-modal="true"
+            aria-labelledby="sap-info-modal-title"
             className="absolute inset-0 z-50 bg-slate-900/35 flex items-center justify-center p-4"
           >
-            <div className="relative w-full max-w-[440px] bg-[#E8EFF6] border-2 border-[#1B5387] shadow-2xl rounded-[2px] overflow-hidden">
-              {/* Barra de Título Azul Oscuro SAP */}
+            <div
+              ref={infoModalRef}
+              tabIndex={-1}
+              className="relative w-full max-w-[440px] bg-[#E8EFF6] border-2 border-[#1B5387] shadow-2xl rounded-[2px] overflow-hidden focus:outline-none"
+            >
               <div className="bg-gradient-to-b from-[#2A6BA5] to-[#174A7A] text-white px-3 py-1.5 text-xs font-bold flex items-center justify-between">
-                <span>Información</span>
+                <span id="sap-info-modal-title">Información</span>
                 <button
                   type="button"
                   disabled={isLoadingSap}
                   onClick={() => setShowInfoModal(false)}
+                  {...getVoiceProps('Cerrar ventana de información')}
                   className="w-5 h-5 flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 rounded-[1px] font-bold text-xs cursor-pointer disabled:opacity-40"
                   aria-label="Cerrar ventana de información"
                 >
@@ -2372,10 +2547,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 </button>
               </div>
 
-              {/* Cuerpo del diálogo SAP */}
               <div className="p-5 bg-[#EBF2F8] min-h-[120px] flex flex-col justify-center gap-4 text-xs text-slate-900">
                 <div className="flex items-start gap-2.5">
-                  <AlertTriangle className="w-5 h-5 fill-[#FFD54F] text-[#7A5900] shrink-0 mt-0.5" />
+                  <AlertTriangle
+                    className="w-5 h-5 fill-[#FFD54F] text-[#7A5900] shrink-0 mt-0.5"
+                    aria-hidden="true"
+                  />
                   <p className="font-normal text-slate-900 text-xs leading-relaxed">
                     Una vez aceptada esta ventana no podra volver a inscribir los ramos.
                   </p>
@@ -2383,7 +2560,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
                 {isLoadingSap && (
                   <div className="flex justify-center py-2" role="status" aria-label="Procesando en SICOL">
-                    {/* Círculo incompleto azul SAP girando */}
                     <div
                       className="w-9 h-9 rounded-full border-[4px] border-transparent border-t-[#1976D2] border-r-[#1976D2] border-b-[#1976D2] animate-spin"
                       aria-hidden="true"
@@ -2392,12 +2568,13 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 )}
               </div>
 
-              {/* Botones Aceptar y Cancelar */}
               <div className="bg-[#DCE6F0] px-3 py-2 border-t border-[#B0C4D8] flex justify-end gap-2">
                 <button
+                  ref={infoAcceptBtnRef}
                   type="button"
                   disabled={isLoadingSap}
                   onClick={handleAceptarInformacion}
+                  {...getVoiceProps('Aceptar y confirmar inscripción de ramos')}
                   className="px-4 py-1 bg-gradient-to-b from-[#FFE680] to-[#F7C631] hover:from-[#FFF0A6] hover:to-[#FAD252] border border-[#9E7B12] rounded-[2px] text-xs font-bold text-slate-900 shadow-2xs cursor-pointer disabled:opacity-50"
                 >
                   Aceptar
@@ -2406,6 +2583,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   type="button"
                   disabled={isLoadingSap}
                   onClick={() => setShowInfoModal(false)}
+                  {...getVoiceProps('Cancelar confirmación')}
                   className="px-4 py-1 bg-gradient-to-b from-[#FFF1A8] to-[#F2CA52] hover:from-[#FFF6C4] hover:to-[#FAD96E] border border-[#9E7B12] rounded-[2px] text-xs font-bold text-slate-900 shadow-2xs cursor-pointer disabled:opacity-50"
                 >
                   Cancelar
@@ -2415,9 +2593,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
           </div>
         )}
 
-        {/* =================================================================== */}
-        {/* MODAL DE PRE-FLUJO CONTENIDO DENTRO DEL SIMULADOR (SIN TAPAR VIDEO) */}
-        {/* =================================================================== */}
+        {/* MODAL DE PRE-FLUJO CONTENIDO DENTRO DEL SIMULADOR */}
         {isPreFlowActive && (
           <div
             role="dialog"
@@ -2425,13 +2601,16 @@ export const TomaRamosSimulator = ({ onExit }) => {
             aria-labelledby="preflow-title"
             className="absolute inset-0 z-40 flex items-start sm:items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xs overflow-y-auto"
           >
-            <div className="bg-white rounded-3xl max-w-5xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 space-y-5 my-4 max-h-[94%] overflow-y-auto">
-              {/* Encabezado Pre-Flujo */}
+            <div
+              ref={preFlowModalRef}
+              tabIndex={-1}
+              className="bg-white rounded-3xl max-w-5xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 space-y-5 my-4 max-h-[94%] overflow-y-auto focus:outline-none"
+            >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-bold text-[#002B49] uppercase tracking-wider mb-1">
-                    <Building2 className="w-4 h-4 text-[#FFB81C]" />
-                    <span>Simulador Oficial Duoc UC • {studentCareer}</span>
+                    <Building2 className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+                    <span>Simulador Oficial Duoc UC - Sede Alameda • {studentCareer}</span>
                   </div>
                   <h2 id="preflow-title" className="text-lg sm:text-2xl font-black text-slate-900">
                     {preFlowStep === 1
@@ -2449,6 +2628,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   <button
                     type="button"
                     onClick={onExit}
+                    {...getVoiceProps('Volver al menú anterior')}
                     className="self-start sm:self-center px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                   >
                     Volver
@@ -2459,7 +2639,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
               {/* PASO 1 */}
               {preFlowStep === 1 && (
                 <div className="space-y-5">
-                  {/* 1.1 PROCESO A PRACTICAR */}
                   <div className="space-y-2.5">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                       1.1 ¿Qué proceso deseas practicar?
@@ -2471,6 +2650,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           setProcessType('inscripcion');
                           setActiveTutorialTab('inscripcion');
                         }}
+                        {...getVoiceProps(
+                          'Inscripción de Asignaturas, Toma de Ramos. Comienzas con 0 créditos inscritos para tomar tu paquete horario completo.'
+                        )}
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-2.5 cursor-pointer ${
                           processType === 'inscripcion'
                             ? 'border-[#002B49] bg-blue-50/70 ring-2 ring-[#002B49]/25 shadow-sm'
@@ -2480,7 +2662,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#002B49] bg-blue-100 px-2.5 py-0.5 rounded-full">
-                              <PlusCircle className="w-3.5 h-3.5" />
+                              <PlusCircle className="w-3.5 h-3.5" aria-hidden="true" />
                               <span>Desde 0 ramos</span>
                             </span>
                             <span className="text-xs font-bold text-[#002B49]">
@@ -2491,7 +2673,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             Inscripción de Asignaturas (Toma de Ramos)
                           </h4>
                           <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                            Comienzas con <strong>0 créditos inscritos</strong> para tomar tu paquete horario completo desde el inicio.
+                            Comienzas con <strong>0 créditos inscritos</strong> para tomar tu paquete
+                            horario completo desde el inicio.
                           </p>
                         </div>
                       </button>
@@ -2502,6 +2685,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           setProcessType('modificacion');
                           setActiveTutorialTab('modificacion');
                         }}
+                        {...getVoiceProps(
+                          'Modificación de Asignaturas. Comienzas con tu carga ya inscrita para practicar eliminar asignaturas o cambiar secciones.'
+                        )}
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-2.5 cursor-pointer ${
                           processType === 'modificacion'
                             ? 'border-[#002B49] bg-amber-50/70 ring-2 ring-[#002B49]/25 shadow-sm'
@@ -2511,7 +2697,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                              <ClipboardEdit className="w-3.5 h-3.5" />
+                              <ClipboardEdit className="w-3.5 h-3.5" aria-hidden="true" />
                               <span>Con ramos ya tomados</span>
                             </span>
                             <span className="text-xs font-bold text-[#002B49]">
@@ -2522,14 +2708,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             Modificación de Asignaturas
                           </h4>
                           <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                            Comienzas con tu <strong>carga ya inscrita</strong> para practicar eliminar asignaturas (ícono X roja) o cambiar secciones.
+                            Comienzas con tu <strong>carga ya inscrita</strong> para practicar
+                            eliminar asignaturas (ícono X roja) o cambiar secciones.
                           </p>
                         </div>
                       </button>
                     </div>
                   </div>
 
-                  {/* 1.2 MODO DE SIMULACIÓN */}
                   <div className="space-y-2.5">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                       1.2 Selecciona el Modo de Simulación
@@ -2538,6 +2724,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       <button
                         type="button"
                         onClick={() => setSelectedModeOption('guiado')}
+                        {...getVoiceProps(
+                          'Modo Guiado, recomendado. Indicaciones paso a paso dentro del portal SICOL.'
+                        )}
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-2 cursor-pointer ${
                           selectedModeOption === 'guiado'
                             ? 'border-[#002B49] bg-blue-50/60 ring-2 ring-[#002B49]/20 shadow-sm'
@@ -2546,7 +2735,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       >
                         <div className="flex items-center justify-between">
                           <span className="inline-flex items-center gap-1.5 font-bold text-sm text-slate-900">
-                            <Sparkles className="w-4 h-4 text-[#002B49]" />
+                            <Sparkles className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
                             <span>Modo Guiado</span>
                           </span>
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-600 text-white">
@@ -2554,13 +2743,17 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 leading-relaxed">
-                          Indicaciones paso a paso dentro del portal SICOL sobre qué botón pulsar en cada pantalla.
+                          Indicaciones paso a paso dentro del portal SICOL sobre qué botón pulsar en
+                          cada pantalla.
                         </p>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSelectedModeOption('realista')}
+                        {...getVoiceProps(
+                          'Modo Realista, desafío oficial. Entorno SAP idéntico al día de inscripción oficial sin ayudas.'
+                        )}
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-2 cursor-pointer ${
                           selectedModeOption === 'realista'
                             ? 'border-[#002B49] bg-blue-50/60 ring-2 ring-[#002B49]/20 shadow-sm'
@@ -2569,7 +2762,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       >
                         <div className="flex items-center justify-between">
                           <span className="inline-flex items-center gap-1.5 font-bold text-sm text-slate-900">
-                            <Flame className="w-4 h-4 text-amber-600" />
+                            <Flame className="w-4 h-4 text-amber-600" aria-hidden="true" />
                             <span>Modo Realista</span>
                           </span>
                           <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-900 text-white">
@@ -2577,26 +2770,32 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 leading-relaxed">
-                          Entorno SAP idéntico al día de inscripción oficial, sin ayudas ni avisos adicionales.
+                          Entorno SAP idéntico al día de inscripción oficial, sin ayudas ni avisos
+                          adicionales.
                         </p>
                       </button>
                     </div>
                   </div>
 
-                  {/* 1.3 NIVEL DE DIFICULTAD */}
                   <div className="space-y-2.5">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Target className="w-4 h-4 text-[#002B49]" />
+                      <Target className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
                       <span>1.3 Nivel de Dificultad Académica</span>
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {DIFFICULTY_LEVELS.map((diff) => {
                         const isSelected = selectedDifficulty === diff.id;
+                        const badgeClass =
+                          DIFFICULTY_BADGE_CLASSES[diff.id] || DIFFICULTY_BADGE_CLASSES['muy-dificil'];
+
                         return (
                           <button
                             key={diff.id}
                             type="button"
                             onClick={() => handleSelectDifficulty(diff.id)}
+                            {...getVoiceProps(
+                              `Dificultad ${diff.name}. ${diff.badge}. ${diff.description}`
+                            )}
                             className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-2 cursor-pointer ${
                               isSelected
                                 ? 'border-[#002B49] bg-blue-50/70 ring-2 ring-[#002B49]/20 shadow-sm'
@@ -2605,17 +2804,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           >
                             <div>
                               <div className="flex items-center justify-between mb-1">
-                                <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    diff.id === 'facil'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : diff.id === 'intermedio'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : diff.id === 'dificil'
-                                      ? 'bg-amber-100 text-amber-900'
-                                      : 'bg-rose-100 text-rose-900'
-                                  }`}
-                                >
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeClass}`}>
                                   {diff.badge}
                                 </span>
                                 <span className="text-xs font-bold text-[#002B49]">
@@ -2640,10 +2829,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         setSimulationMode(selectedModeOption === 'guiado' ? 'asistido' : 'real');
                         setPreFlowStep(2);
                       }}
+                      {...getVoiceProps('Continuar al Paquete Objetivo')}
                       className="min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-sm rounded-xl flex items-center gap-2 shadow-md cursor-pointer"
                     >
                       <span>Continuar al Paquete Objetivo</span>
-                      <ArrowRight className="w-4 h-4 text-[#FFB81C]" />
+                      <ArrowRight className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -2660,6 +2850,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           key={pkg.id}
                           type="button"
                           onClick={() => setSelectedTargetPackage(pkg)}
+                          {...getVoiceProps(
+                            `${pkg.name}. ${pkg.badge}. ${pkg.targetCourses?.length || 0} asignaturas.`
+                          )}
                           className={`p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
                             isSelected
                               ? 'border-[#002B49] bg-blue-50/80 ring-2 ring-[#002B49]/25 shadow-sm'
@@ -2675,8 +2868,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             </span>
                           </div>
                           <div>
-                            <h4 className="text-xs font-black text-slate-900 leading-snug">{pkg.name}</h4>
-                            <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{pkg.description}</p>
+                            <h4 className="text-xs font-black text-slate-900 leading-snug">
+                              {pkg.name}
+                            </h4>
+                            <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">
+                              {pkg.description}
+                            </p>
                           </div>
                           <div className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded text-center">
                             {pkg.targetCourses?.length || 0} Asignaturas
@@ -2694,7 +2891,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       </div>
 
                       <div className="bg-[#FFB81C] text-slate-950 px-4 py-1.5 grid grid-cols-12 font-black text-xs border-b border-black">
-                        <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">Sección:</div>
+                        <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">
+                          Sección:
+                        </div>
                         <div className="col-span-5 sm:col-span-6 px-2">Nom. Asignatura:</div>
                         <div className="col-span-4 sm:col-span-4 text-right">Horario y Sala</div>
                       </div>
@@ -2705,6 +2904,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           return (
                             <div
                               key={tc.sigla}
+                              {...getVoiceProps(
+                                `Bloque objetivo ${tc.sigla}, ${tc.nombre}, sección ${tc.seccion}, horario ${tc.horarioTexto}`
+                              )}
                               className={`px-4 py-2 grid grid-cols-12 items-center ${
                                 isOptativo ? 'bg-[#bbdefb]' : 'bg-white'
                               }`}
@@ -2737,6 +2939,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     <button
                       type="button"
                       onClick={() => setPreFlowStep(1)}
+                      {...getVoiceProps('Volver al Paso 1')}
                       className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl cursor-pointer"
                     >
                       ← Volver al Paso 1
@@ -2745,6 +2948,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     <button
                       type="button"
                       onClick={handleStartSimulationFromPreFlow}
+                      {...getVoiceProps(
+                        processType === 'modificacion'
+                          ? 'Iniciar modificación de asignaturas'
+                          : 'Iniciar toma de ramos'
+                      )}
                       className="min-h-[46px] px-7 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-black text-sm rounded-xl flex items-center gap-2 shadow-lg cursor-pointer active:scale-95"
                     >
                       <span>
@@ -2752,7 +2960,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           ? 'Iniciar modificación de asignaturas'
                           : 'Iniciar toma de ramos'}
                       </span>
-                      <ArrowRight className="w-4 h-4 text-[#FFB81C]" />
+                      <ArrowRight className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -2762,9 +2970,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
         )}
       </div>
 
-      {/* ===================================================================== */}
-      {/* 3. HOJA DE RUTA / PAQUETE OBJETIVO (DEBAJO DEL SIMULADOR)              */}
-      {/* ===================================================================== */}
+      {/* 3. HOJA DE RUTA / PAQUETE OBJETIVO */}
       {!isPreFlowActive && selectedTargetPackage && step === 'inscripcion' && (
         <aside
           role="region"
@@ -2813,20 +3019,25 @@ export const TomaRamosSimulator = ({ onExit }) => {
               </div>
 
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
                 <span>{liveScore} pts</span>
               </div>
 
               <button
                 type="button"
                 onClick={() => setIsReferenceSheetExpanded((prev) => !prev)}
+                {...getVoiceProps(
+                  isReferenceSheetExpanded
+                    ? 'Ocultar lista del paquete objetivo'
+                    : 'Ver lista del paquete objetivo'
+                )}
                 className="min-h-[32px] px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer"
               >
                 <span>{isReferenceSheetExpanded ? 'Ocultar' : 'Ver Lista'}</span>
                 {isReferenceSheetExpanded ? (
-                  <ChevronDown className="w-3.5 h-3.5" />
+                  <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
                 ) : (
-                  <ChevronUp className="w-3.5 h-3.5" />
+                  <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
                 )}
               </button>
             </div>
@@ -2858,6 +3069,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     return (
                       <div
                         key={tc.sigla}
+                        {...getVoiceProps(
+                          `Meta ${tc.sigla} ${tc.nombre}, sección ${tc.seccion}, ${
+                            hasExactMatch
+                              ? 'meta lograda'
+                              : hasWrongSection
+                              ? `cambiar de sección ${currentSelected?.seccion} a ${tc.seccion}`
+                              : 'pendiente'
+                          }`
+                        )}
                         className={`px-4 py-1.5 grid grid-cols-12 items-center ${
                           hasExactMatch
                             ? 'bg-emerald-50'

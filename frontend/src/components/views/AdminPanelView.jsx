@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   ShieldAlert,
   Users,
@@ -10,151 +10,385 @@ import {
   UserPlus,
   Laptop,
   HeartHandshake,
-  Calendar,
   X,
   Loader2,
   Trash2,
   RefreshCw,
-  Info,
-  Clock,
   Sparkles,
-  ArrowUpRight,
-  TrendingDown,
   ChevronRight,
-  UserCheck,
   FileSpreadsheet,
   Building2,
   MapPin,
   BookOpen,
   Plus,
   Shield,
-  Eye,
   Check,
   ChevronDown,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAccessibleModal } from '../../hooks/useAccessibleModal';
+import { useOnClickOutside } from '../../hooks/useOnClickOutside';
+import {
+  SEDES_DUOC,
+  CARRERAS_DUOC_LIST,
+  DEFAULT_CAMPUS,
+  matchesRutQuery,
+  normalizeStudentProfile,
+} from '../../utils/studentUtils';
+import {
+  evaluateAttendanceStatus,
+  getAttendanceColorClasses,
+  resolveTrafficLightColor,
+  getSatRiskBadgeMeta,
+  extractCourseAttendanceRate,
+} from '../../utils/satUtils';
 import { CoursesAdminSection } from '../admin/CoursesAdminSection';
 import { EarlyWarningSatSection } from '../admin/EarlyWarningSatSection';
 
-/**
- * Discriminador estricto para separar personal administrativo y de coordinación del alumnado
- */
-const isStaffOrAdministrativeRole = (role) => {
-  const r = (role || '').toLowerCase();
-  return (
-    r === 'coordinador_paedis' ||
-    r === 'admin' ||
-    r === 'administrador' ||
-    r === 'administrativo' ||
-    r === 'profesor' ||
-    r === 'director' ||
-    r === 'subdirector'
-  );
-};
+const INITIAL_CAREERS_CATALOG = CARRERAS_DUOC_LIST.map((name, idx) => ({
+  id: `career-${idx}`,
+  name,
+  school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}`,
+}));
 
-/**
- * Insignia y descripción funcional para funcionarios administrativos
- */
-const getStaffRoleBadge = (role) => {
-  const r = (role || '').toLowerCase();
-  if (r === 'coordinador_paedis') {
-    return {
-      label: 'Coordinador PAEDIS',
-      badgeClass: 'bg-purple-100 text-purple-900 border border-purple-200',
-      description: 'Gestión y acompañamiento de estudiantes con necesidades educativas especiales, aprobación de ajustes razonables y vinculación UAP.',
-    };
-  }
-  if (r === 'admin' || r === 'administrador') {
-    return {
-      label: 'Administrador Nexo360',
-      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-200',
-      description: 'Control de plataforma, asignación de roles de seguridad RBAC, parametrización de carreras, sedes y auditorías de actividad.',
-    };
-  }
-  if (r === 'profesor') {
-    return {
-      label: 'Docente Duoc UC',
-      badgeClass: 'bg-blue-100 text-blue-900 border border-blue-200',
-      description: 'Recepción y aplicación de fichas de ajustes razonables en aula y evaluación curricular.',
-    };
-  }
-  if (r === 'director' || r === 'subdirector') {
-    return {
-      label: 'Directivo Institucional',
-      badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-200',
-      description: 'Supervisión de continuidad de estudios, equidad en titulación y excepciones académicas normativas.',
-    };
-  }
-  return {
+const INITIAL_SEDES_CATALOG = SEDES_DUOC.map((name, idx) => ({
+  id: `sede-${idx}`,
+  name,
+  city: 'Región Metropolitana',
+}));
+
+const STAFF_ROLES = new Set([
+  'coordinador_paedis',
+  'admin',
+  'administrador',
+  'administrativo',
+  'profesor',
+  'director',
+  'subdirector',
+]);
+
+const isStaffOrAdministrativeRole = (role) => STAFF_ROLES.has((role || '').toLowerCase());
+
+const STAFF_ROLE_BADGES = {
+  coordinador_paedis: {
+    label: 'Coordinador PAEDIS',
+    badgeClass: 'bg-purple-100 text-purple-900 border border-purple-200',
+    description:
+      'Gestión y acompañamiento de estudiantes con necesidades educativas especiales, aprobación de ajustes razonables y vinculación UAP.',
+  },
+  admin: {
+    label: 'Administrador Nexo360',
+    badgeClass: 'bg-amber-100 text-amber-900 border border-amber-200',
+    description:
+      'Control de plataforma, asignación de roles de seguridad RBAC, parametrización de carreras, sedes y auditorías de actividad.',
+  },
+  profesor: {
+    label: 'Docente Duoc UC',
+    badgeClass: 'bg-blue-100 text-blue-900 border border-blue-200',
+    description:
+      'Recepción y aplicación de fichas de ajustes razonables en aula y evaluación curricular.',
+  },
+  director: {
+    label: 'Directivo Institucional',
+    badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-200',
+    description:
+      'Supervisión de continuidad de estudios, equidad en titulación y excepciones académicas normativas.',
+  },
+  default: {
     label: 'Personal Administrativo',
     badgeClass: 'bg-slate-100 text-slate-800 border border-slate-200',
-    description: 'Gestión operativa, soporte de beneficios institucionales y atención a la comunidad.',
-  };
+    description:
+      'Gestión operativa, soporte de beneficios institucionales y atención a la comunidad.',
+  },
 };
 
-const DEFAULT_CAREERS = [
-  'Ingeniería en Informática',
-  'Analista Programador Computacional',
-  'Ingeniería en Conectividad y Redes',
-  'Ingeniería en Ciberseguridad',
-  'Ingeniería en Infraestructura Tecnológica',
-  'Ingeniería en Infraest. y Plataformas Tecn.',
-  'Administración de Empresas',
-  'Auditoría y Análisis de Negocios',
-].map((name, i) => ({ id: `career-${i}`, name, school: 'Escuela Duoc UC' }));
+const getStaffRoleBadge = (role) => {
+  const r = (role || '').toLowerCase();
+  if (r === 'administrador') return STAFF_ROLE_BADGES.admin;
+  if (r === 'subdirector') return STAFF_ROLE_BADGES.director;
+  return STAFF_ROLE_BADGES[r] || STAFF_ROLE_BADGES.default;
+};
 
-const DEFAULT_SEDES = [
-  'Sede Alameda',
-  'Sede Antonio Varas',
-  'Sede Maipú',
-  'Sede Melipilla',
-  'Sede Padre Alonso de Ovalle',
-  'Sede Plaza Norte',
-  'Sede Plaza Oeste',
-  'Sede Plaza Vespucio',
-  'Sede Puente Alto',
-  'Sede Puerto Montt',
-  'Sede San Andrés de Concepción',
-  'Sede San Bernardo',
-  'Sede San Carlos de Apoquindo',
-  'Sede San Joaquín',
-  'Sede Valparaíso',
-  'Sede Viña del Mar',
-].map((name, i) => ({ id: `sede-${i}`, name, city: 'Campus Duoc UC' }));
+const ACADEMIC_STATUS_BADGE_MAP = {
+  activo: 'bg-emerald-50 text-emerald-900 border-emerald-300',
+  titulado: 'bg-purple-50 text-purple-900 border-purple-200',
+  desercion: 'bg-rose-50 text-rose-900 border-rose-300',
+};
+
+const sortByNameEs = (items) =>
+  [...items].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+
+const filterCatalogByName = (sortedItems, search) => {
+  const q = search.toLowerCase().trim();
+  if (!q) return sortedItems;
+  return sortedItems.filter((item) => (item.name || '').toLowerCase().includes(q));
+};
+
+const isNumericRutMatch = (rut, searchTerm) =>
+  Boolean(searchTerm && /\d/.test(searchTerm) && rut && matchesRutQuery(rut, searchTerm));
+
+/**
+ * Filtra y ordena alfabéticamente usuarios del directorio institucional reutilizando matchesRutQuery.
+ */
+function filterAndSortDirectoryUsers(users, searchTerm, extraPredicate) {
+  const q = searchTerm.toLowerCase().trim();
+  const hasDigitQuery = /\d/.test(searchTerm);
+
+  return users
+    .filter((u) => {
+      const name = u.fullName || u.nombre || '';
+      const sede = u.campus || u.sede || '';
+      const email = u.email || '';
+
+      const matchesSearch =
+        !q ||
+        name.toLowerCase().includes(q) ||
+        sede.toLowerCase().includes(q) ||
+        email.toLowerCase().includes(q) ||
+        (hasDigitQuery && matchesRutQuery(u.rut, searchTerm));
+
+      return matchesSearch && extraPredicate(u);
+    })
+    .sort((a, b) => {
+      const nameA = (a.fullName || a.nombre || a.email || '').trim();
+      const nameB = (b.fullName || b.nombre || b.email || '').trim();
+      const cmp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      return cmp !== 0 ? cmp : (a.rut || '').localeCompare(b.rut || '');
+    });
+}
+
+const CATALOG_CONFIG = {
+  careers: {
+    idPrefix: 'career',
+    title: `Carreras Duoc UC - ${DEFAULT_CAMPUS}`,
+    subtitleFallback: `Escuela Duoc UC - ${DEFAULT_CAMPUS}`,
+    addPlaceholder: 'Nombre de la nueva carrera...',
+    searchPlaceholder: 'Filtrar carreras...',
+    emptyText: 'No se encontraron carreras.',
+    deleteLabelPrefix: 'Eliminar carrera',
+    icon: BookOpen,
+    confirmDelete: (item) => `¿Eliminar la carrera "${item.name}"?`,
+    addFeedback: (name) => `Carrera "${name}" agregada exitosamente a la oferta académica.`,
+    addAnnounce: (name) => `Carrera ${name} agregada.`,
+    deleteFeedback: (name) => `Carrera "${name}" eliminada exitosamente.`,
+    deleteAnnounce: (name) => `Carrera ${name} eliminada.`,
+    buildLocalItem: (name) => ({
+      id: `career-${Date.now()}`,
+      name,
+      school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}`,
+    }),
+    createApi: (name) =>
+      api.createAdminCareer({ name, school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` }),
+    deleteApi: (key) => api.deleteAdminCareer(key),
+  },
+  sedes: {
+    idPrefix: 'sede',
+    title: `Sedes Duoc UC - ${DEFAULT_CAMPUS}`,
+    subtitleFallback: `Campus Piloto Duoc UC - ${DEFAULT_CAMPUS}`,
+    addPlaceholder: `Nombre de sede (Piloto exclusivo Duoc UC - ${DEFAULT_CAMPUS})...`,
+    searchPlaceholder: 'Filtrar sedes...',
+    emptyText: 'No se encontraron sedes.',
+    deleteLabelPrefix: 'Eliminar sede',
+    icon: MapPin,
+    confirmDelete: (item) => `¿Eliminar la sede "${item.name}"?`,
+    addFeedback: (name) =>
+      `Sede "${name}" agregada exitosamente al piloto Duoc UC - ${DEFAULT_CAMPUS}.`,
+    addAnnounce: (name) => `Sede ${name} agregada.`,
+    deleteFeedback: (name) => `Sede "${name}" eliminada exitosamente.`,
+    deleteAnnounce: (name) => `Sede ${name} eliminada.`,
+    buildLocalItem: (name) => ({
+      id: `sede-${Date.now()}`,
+      name,
+      city: 'Región Metropolitana',
+    }),
+    createApi: (name) => api.createAdminSede({ name, city: 'Región Metropolitana' }),
+    deleteApi: (key) => api.deleteAdminSede(key),
+  },
+};
+
+/**
+ * Tarjeta CRUD reutilizable para Carreras y Sedes Duoc UC.
+ */
+function CatalogCrudCard({
+  kind,
+  items,
+  totalCount,
+  newInput,
+  searchValue,
+  onNewInputChange,
+  onSearchChange,
+  onAddSubmit,
+  onDeleteItem,
+  getVoiceProps,
+}) {
+  const cfg = CATALOG_CONFIG[kind];
+  const Icon = cfg.icon;
+
+  return (
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="flex items-center gap-2">
+          <Icon className="w-5 h-5 text-[#002B49]" aria-hidden="true" />
+          <h3 className="text-base sm:text-lg font-black text-slate-900">
+            {cfg.title} ({totalCount})
+          </h3>
+        </div>
+        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+          Orden Alfabético
+        </span>
+      </div>
+
+      <form onSubmit={onAddSubmit} className="space-y-2.5">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            required
+            value={newInput}
+            onChange={(e) => onNewInputChange(e.target.value)}
+            placeholder={cfg.addPlaceholder}
+            aria-label={cfg.addPlaceholder}
+            {...getVoiceProps(cfg.addPlaceholder)}
+            className="flex-1 min-h-[40px] px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+          />
+          <button
+            type="submit"
+            {...getVoiceProps(`Agregar ${kind === 'careers' ? 'carrera' : 'sede'}`)}
+            className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs font-black inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+          >
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            <span>Agregar</span>
+          </button>
+        </div>
+      </form>
+
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+        <input
+          type="search"
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={cfg.searchPlaceholder}
+          aria-label={cfg.searchPlaceholder}
+          {...getVoiceProps(cfg.searchPlaceholder)}
+          className="w-full min-h-[38px] pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+        />
+      </div>
+
+      <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100">
+        {items.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-4">{cfg.emptyText}</p>
+        ) : (
+          items.map((item) => (
+            <div
+              key={item._id || item.id || item.name}
+              className="pt-2 flex items-center justify-between gap-2 hover:bg-slate-50 p-2 rounded-xl transition-colors"
+            >
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-bold text-slate-800 block truncate">
+                  {item.name}
+                </span>
+                <span className="text-[11px] text-slate-400 block truncate">
+                  {item.school || item.city || cfg.subtitleFallback}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDeleteItem(item)}
+                title={`${cfg.deleteLabelPrefix} ${item.name}`}
+                aria-label={`${cfg.deleteLabelPrefix} ${item.name}`}
+                {...getVoiceProps(`${cfg.deleteLabelPrefix} ${item.name}`)}
+                className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+              >
+                <Trash2 className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+const ADMIN_SUB_TABS = [
+  {
+    id: 'estudiantes',
+    label: 'Alumnado & Estudiantes PAEDIS',
+    announceMsg: 'Pestaña de Alumnado y Retención Estudiantil seleccionada.',
+    icon: Users,
+    iconColor: 'text-amber-400',
+    showCount: true,
+  },
+  {
+    id: 'carreras-sedes',
+    label: 'Carreras & Sedes (CRUD)',
+    announceMsg: 'Pestaña de Gestión Dinámica de Carreras y Sedes seleccionada.',
+    icon: Building2,
+    iconColor: 'text-blue-400',
+  },
+  {
+    id: 'oferta-ramos',
+    label: 'Oferta Académica & Simulador (Excel / BD)',
+    announceMsg: 'Pestaña de Oferta Académica y Carga de Ramos seleccionada.',
+    icon: FileSpreadsheet,
+    iconColor: 'text-emerald-400',
+  },
+  {
+    id: 'alerta-temprana',
+    label: 'Alerta Temprana (SAT)',
+    announceMsg: 'Pestaña de Sistema de Alerta Temprana (SAT) seleccionada.',
+    icon: AlertOctagon,
+    iconColor: 'text-rose-400',
+  },
+];
+
+const STUDENT_STATUS_FILTERS = [
+  { id: 'all', label: 'Todos' },
+  { id: 'activo', label: 'Activos' },
+  { id: 'desercion', label: 'Deserción' },
+  { id: 'titulado', label: 'Titulados' },
+  { id: 'paedis', label: 'Solo PAEDIS' },
+];
+
+const ADMIN_ROLE_FILTERS = [
+  { id: 'all', label: 'Todos' },
+  { id: 'coordinadores', label: 'Coordinadores PAEDIS' },
+  { id: 'administradores', label: 'Administradores' },
+  { id: 'docentes', label: 'Docentes & Directivos' },
+];
+
+const ATTENDANCE_STATUS_TEXT = {
+  ri: '⚠️ RI (Reprobado)',
+  preventive: 'Alerta Preventiva',
+  normal: 'Cumple Asistencia',
+  justified: 'Justificada',
+};
 
 export const AdminPanelView = () => {
-  const { announce } = useAccessibility();
+  const { announce, getVoiceProps } = useAccessibility();
   const { user } = useAuth();
 
-  // Permisos institucionales Duoc UC: Administrador o Coordinador PAEDIS tienen acceso de gestión
   const userRole = (user?.role || '').toLowerCase();
   const isAdmin = userRole === 'admin' || userRole === 'administrador';
   const isCoordinator = userRole === 'coordinador_paedis';
   const canManageAdmin = isAdmin || isCoordinator;
 
-  // Sub-pestaña activa del Panel Admin: 'estudiantes' | 'oferta-ramos' | 'carreras-sedes'
   const [adminSubTab, setAdminSubTab] = useState('estudiantes');
-
-  // Estados de datos principales
   const [metrics, setMetrics] = useState(null);
   const [students, setStudents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'activo' | 'desercion' | 'titulado' | 'paedis'
-  const [directoryMode, setDirectoryMode] = useState('estudiantes'); // 'estudiantes' | 'administrativos'
-  const [adminRoleFilter, setAdminRoleFilter] = useState('all'); // 'all' | 'coordinadores' | 'administradores' | 'docentes'
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [directoryMode, setDirectoryMode] = useState('estudiantes');
+  const [adminRoleFilter, setAdminRoleFilter] = useState('all');
   const [selectedAdminForDetail, setSelectedAdminForDetail] = useState(null);
 
-  // Catálogos dinámicos de Carreras y Sedes sincronizados con la base de datos
-  const [careersList, setCareersList] = useState(DEFAULT_CAREERS);
-  const [sedesList, setSedesList] = useState(DEFAULT_SEDES);
-  const [newCareerInput, setNewCareerInput] = useState('');
-  const [newCareerSchool, setNewCareerSchool] = useState('');
-  const [careerSearch, setCareerSearch] = useState('');
-  const [newSedeInput, setNewSedeInput] = useState('');
-  const [sedeSearch, setSedeSearch] = useState('');
+  // Estado CRUD unificado de Carreras y Sedes
+  const [catalogState, setCatalogState] = useState({
+    careers: { items: INITIAL_CAREERS_CATALOG, newInput: '', search: '' },
+    sedes: { items: INITIAL_SEDES_CATALOG, newInput: '', search: '' },
+  });
 
   // Modales
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -167,7 +401,6 @@ export const AdminPanelView = () => {
   const [consentAccepted, setConsentAccepted] = useState(true);
   const [modalError, setModalError] = useState('');
 
-  // Formulario de registro - Contraseña dinámica por año ('Duoc' + año + '!')
   const currentYear = new Date().getFullYear();
   const dynamicInitialPassword = `Duoc${currentYear}!`;
 
@@ -178,190 +411,190 @@ export const AdminPanelView = () => {
     rut: '',
     role: '',
     career: '',
-    campus: '',
+    campus: DEFAULT_CAMPUS,
   });
 
-  // Combobox de Carrera en el modal de registro
   const [careerQuery, setCareerQuery] = useState('');
   const [isCareerDropdownOpen, setIsCareerDropdownOpen] = useState(false);
   const careerDropdownRef = useRef(null);
+  const statusModalRef = useRef(null);
+  const statusCloseBtnRef = useRef(null);
+  const createModalRef = useRef(null);
+  const createCloseBtnRef = useRef(null);
+  const isMountedRef = useRef(true);
 
-  // Cerrar combobox al hacer click afuera
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (careerDropdownRef.current && !careerDropdownRef.current.contains(e.target)) {
-        setIsCareerDropdownOpen(false);
-      }
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Cargar datos del panel, métricas, estudiantes, carreras y sedes
-  const loadAdminData = async () => {
+  useOnClickOutside(careerDropdownRef, () => setIsCareerDropdownOpen(false), {
+    enabled: isCareerDropdownOpen,
+  });
+
+  useAccessibleModal({
+    isOpen: isStatusModalOpen && Boolean(selectedStudentForStatus),
+    onClose: () => setIsStatusModalOpen(false),
+    containerRef: statusModalRef,
+    initialFocusRef: statusCloseBtnRef,
+  });
+
+  useAccessibleModal({
+    isOpen: isCreateModalOpen,
+    onClose: () => {
+      setIsCreateModalOpen(false);
+      setIsCareerDropdownOpen(false);
+    },
+    containerRef: createModalRef,
+    initialFocusRef: createCloseBtnRef,
+  });
+
+  const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [metricsRes, studentsRes, careersRes, sedesRes] = await Promise.all([
-        api.getAdminMetrics().catch(() => null),
-        api.getAdminStudents().catch(() => null),
-        api.getAdminCareers().catch(() => null),
-        api.getAdminSedes().catch(() => null),
+      const [metricsRes, studentsRes, careersRes, sedesRes] = await Promise.allSettled([
+        api.getAdminMetrics(),
+        api.getAdminStudents(),
+        api.getAdminCareers(),
+        api.getAdminSedes(),
       ]);
 
-      if (metricsRes?.success) {
-        setMetrics(metricsRes.metrics);
-      }
-      if (studentsRes?.success) {
-        setStudents(studentsRes.students);
-      }
-      if (careersRes?.success && Array.isArray(careersRes.careers) && careersRes.careers.length > 0) {
-        setCareersList(careersRes.careers);
-      }
-      if (sedesRes?.success && Array.isArray(sedesRes.sedes) && sedesRes.sedes.length > 0) {
-        setSedesList(sedesRes.sedes);
-      }
-    } catch (err) {
-      console.error('Error cargando datos del panel de administración:', err);
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Error al conectar con la base de datos de administración.',
+      if (!isMountedRef.current) return;
+
+      const settledResults = [
+        ['métricas', metricsRes],
+        ['estudiantes', studentsRes],
+        ['carreras', careersRes],
+        ['sedes', sedesRes],
+      ];
+      settledResults.forEach(([label, res]) => {
+        if (res.status === 'rejected') {
+          console.warn(`[AdminPanelView] Error cargando ${label}:`, res.reason);
+        }
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    void loadAdminData();
-  }, []);
+      const metricsData = metricsRes.status === 'fulfilled' ? metricsRes.value : null;
+      const studentsData = studentsRes.status === 'fulfilled' ? studentsRes.value : null;
+      const careersData = careersRes.status === 'fulfilled' ? careersRes.value : null;
+      const sedesData = sedesRes.status === 'fulfilled' ? sedesRes.value : null;
 
-  // Carreras y Sedes ordenadas alfabéticamente
-  const sortedCareers = useMemo(() => {
-    return [...careersList].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
-  }, [careersList]);
-
-  const sortedSedes = useMemo(() => {
-    return [...sedesList].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
-  }, [sedesList]);
-
-  // Carreras filtradas para el combobox
-  const filteredCareersForCombobox = useMemo(() => {
-    const q = careerQuery.toLowerCase().trim();
-    if (!q) return sortedCareers;
-    return sortedCareers.filter((c) => (c.name || '').toLowerCase().includes(q));
-  }, [sortedCareers, careerQuery]);
-
-  // Carreras y Sedes filtradas para la pestaña de gestión CRUD
-  const filteredCareersCrud = useMemo(() => {
-    const q = careerSearch.toLowerCase().trim();
-    if (!q) return sortedCareers;
-    return sortedCareers.filter((c) => (c.name || '').toLowerCase().includes(q));
-  }, [sortedCareers, careerSearch]);
-
-  const filteredSedesCrud = useMemo(() => {
-    const q = sedeSearch.toLowerCase().trim();
-    if (!q) return sortedSedes;
-    return sortedSedes.filter((s) => (s.name || '').toLowerCase().includes(q));
-  }, [sortedSedes, sedeSearch]);
-
-  // Separación estricta entre Alumnado y Apartado Administrativo PAEDIS
-  const studentUsers = useMemo(() => {
-    return students.filter((s) => !isStaffOrAdministrativeRole(s.role));
-  }, [students]);
-
-  const administrativeUsers = useMemo(() => {
-    return students.filter((s) => isStaffOrAdministrativeRole(s.role));
-  }, [students]);
-
-  // Filtrado y ordenamiento alfabético de estudiantes en el directorio
-  const filteredStudents = useMemo(() => {
-    const q = searchTerm.toLowerCase().trim();
-    const cleanQ = q.replace(/[^0-9kK]/g, '');
-
-    const filtered = studentUsers.filter((s) => {
-      const studentName = s.fullName || s.nombre || '';
-      const studentSede = s.campus || s.sede || '';
-      const studentRut = s.rut || '';
-      const cleanRut = studentRut.replace(/[^0-9kK]/g, '').toLowerCase();
-
-      // Búsqueda flexible por RUT (directa o dígitos limpios sin puntos ni guion)
-      const matchesRut =
-        (studentRut && studentRut.toLowerCase().includes(q)) ||
-        (cleanQ.length > 0 && cleanRut.includes(cleanQ));
-
-      const matchesSearch =
-        !q ||
-        studentName.toLowerCase().includes(q) ||
-        studentSede.toLowerCase().includes(q) ||
-        matchesRut;
-
-      if (!matchesSearch) return false;
-
-      if (filterStatus === 'paedis') return Boolean(s.isPaedis) || s.role === 'estudiante_paedis';
-      if (filterStatus !== 'all') return s.academicStatus === filterStatus;
-
-      return true;
-    });
-
-    // Orden alfabético estricto de A a Z por nombre completo
-    return filtered.sort((a, b) => {
-      const nameA = (a.fullName || a.nombre || a.email || '').trim();
-      const nameB = (b.fullName || b.nombre || b.email || '').trim();
-      const cmp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
-      if (cmp !== 0) return cmp;
-      return (a.rut || '').localeCompare(b.rut || '');
-    });
-  }, [studentUsers, searchTerm, filterStatus]);
-
-  // Filtrado y ordenamiento alfabético de funcionarios administrativos en el directorio
-  const filteredAdministradores = useMemo(() => {
-    const q = searchTerm.toLowerCase().trim();
-    const cleanQ = q.replace(/[^0-9kK]/g, '');
-
-    const filtered = administrativeUsers.filter((u) => {
-      const name = u.fullName || u.nombre || '';
-      const sede = u.campus || u.sede || '';
-      const rut = u.rut || '';
-      const email = u.email || '';
-      const cleanRut = rut.replace(/[^0-9kK]/g, '').toLowerCase();
-
-      const matchesRut =
-        (rut && rut.toLowerCase().includes(q)) ||
-        (cleanQ.length > 0 && cleanRut.includes(cleanQ));
-
-      const matchesSearch =
-        !q ||
-        name.toLowerCase().includes(q) ||
-        sede.toLowerCase().includes(q) ||
-        email.toLowerCase().includes(q) ||
-        matchesRut;
-
-      if (!matchesSearch) return false;
-
-      const r = (u.role || '').toLowerCase();
-      if (adminRoleFilter === 'coordinadores') return r === 'coordinador_paedis';
-      if (adminRoleFilter === 'administradores') return r === 'admin' || r === 'administrador';
-      if (adminRoleFilter === 'docentes') {
-        return (
-          r === 'profesor' ||
-          r === 'director' ||
-          r === 'subdirector' ||
-          r === 'administrativo'
+      if (metricsData?.success) {
+        setMetrics(metricsData.metrics);
+      }
+      if (studentsData?.success && Array.isArray(studentsData.students)) {
+        setStudents(
+          studentsData.students.map((raw) => {
+            const normalized = normalizeStudentProfile(raw);
+            return {
+              ...normalized,
+              fullName: raw.fullName || raw.nombre || normalized.name,
+            };
+          })
         );
       }
-      return true;
-    });
+      setCatalogState((prev) => ({
+        careers: {
+          ...prev.careers,
+          items:
+            careersData?.success && Array.isArray(careersData.careers) && careersData.careers.length > 0
+              ? careersData.careers
+              : prev.careers.items,
+        },
+        sedes: {
+          ...prev.sedes,
+          items:
+            sedesData?.success && Array.isArray(sedesData.sedes) && sedesData.sedes.length > 0
+              ? sedesData.sedes
+              : prev.sedes.items,
+        },
+      }));
+    } catch (err) {
+      console.error('[AdminPanelView] Error cargando datos del panel de administración:', err);
+      if (isMountedRef.current) {
+        setFeedbackMessage({
+          type: 'error',
+          text: 'Error al conectar con la base de datos de administración.',
+        });
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
-    return filtered.sort((a, b) => {
-      const nameA = (a.fullName || a.nombre || a.email || '').trim();
-      const nameB = (b.fullName || b.nombre || b.email || '').trim();
-      const cmp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
-      if (cmp !== 0) return cmp;
-      return (a.rut || '').localeCompare(b.rut || '');
+  useEffect(() => {
+    loadAdminData().catch((err) => {
+      console.error('[AdminPanelView] Error en carga inicial:', err);
     });
-  }, [administrativeUsers, searchTerm, adminRoleFilter]);
+  }, [loadAdminData]);
 
-  // Manejo de cambio de estado académico
+  const sortedCareers = useMemo(
+    () => sortByNameEs(catalogState.careers.items),
+    [catalogState.careers.items]
+  );
+  const sortedSedes = useMemo(
+    () => sortByNameEs(catalogState.sedes.items),
+    [catalogState.sedes.items]
+  );
+
+  const filteredCareersForCombobox = useMemo(
+    () => filterCatalogByName(sortedCareers, careerQuery),
+    [sortedCareers, careerQuery]
+  );
+  const filteredCareersCrud = useMemo(
+    () => filterCatalogByName(sortedCareers, catalogState.careers.search),
+    [sortedCareers, catalogState.careers.search]
+  );
+  const filteredSedesCrud = useMemo(
+    () => filterCatalogByName(sortedSedes, catalogState.sedes.search),
+    [sortedSedes, catalogState.sedes.search]
+  );
+
+  const studentUsers = useMemo(
+    () => students.filter((s) => !isStaffOrAdministrativeRole(s.role)),
+    [students]
+  );
+  const administrativeUsers = useMemo(
+    () => students.filter((s) => isStaffOrAdministrativeRole(s.role)),
+    [students]
+  );
+
+  const filteredStudents = useMemo(
+    () =>
+      filterAndSortDirectoryUsers(studentUsers, searchTerm, (s) => {
+        if (filterStatus === 'paedis') {
+          return Boolean(s.isPaedis) || s.role === 'estudiante_paedis';
+        }
+        if (filterStatus !== 'all') {
+          return s.academicStatus === filterStatus;
+        }
+        return true;
+      }),
+    [studentUsers, searchTerm, filterStatus]
+  );
+
+  const filteredAdministradores = useMemo(
+    () =>
+      filterAndSortDirectoryUsers(administrativeUsers, searchTerm, (u) => {
+        const r = (u.role || '').toLowerCase();
+        if (adminRoleFilter === 'coordinadores') return r === 'coordinador_paedis';
+        if (adminRoleFilter === 'administradores') return r === 'admin' || r === 'administrador';
+        if (adminRoleFilter === 'docentes') {
+          return (
+            r === 'profesor' ||
+            r === 'director' ||
+            r === 'subdirector' ||
+            r === 'administrativo'
+          );
+        }
+        return true;
+      }),
+    [administrativeUsers, searchTerm, adminRoleFilter]
+  );
+
   const handleOpenStatusModal = (student) => {
     setSelectedStudentForStatus(student);
     setStatusForm({
@@ -383,6 +616,8 @@ export const AdminPanelView = () => {
         statusForm.statusReason
       );
 
+      if (!isMountedRef.current) return;
+
       if (res?.success) {
         setFeedbackMessage({
           type: 'success',
@@ -391,8 +626,11 @@ export const AdminPanelView = () => {
         announce(`Estado de ${selectedStudentForStatus.fullName} actualizado.`, 'polite');
         setIsStatusModalOpen(false);
 
-        // Actualizar también en el detalle si está abierto
-        if (selectedStudentForDetail && (selectedStudentForDetail._id === selectedStudentForStatus._id || selectedStudentForDetail.id === selectedStudentForStatus.id)) {
+        if (
+          selectedStudentForDetail &&
+          (selectedStudentForDetail._id === selectedStudentForStatus._id ||
+            selectedStudentForDetail.id === selectedStudentForStatus.id)
+        ) {
           setSelectedStudentForDetail({
             ...selectedStudentForDetail,
             academicStatus: statusForm.academicStatus,
@@ -405,73 +643,71 @@ export const AdminPanelView = () => {
         setFeedbackMessage({ type: 'error', text: res?.message || 'Error al actualizar estado.' });
       }
     } catch (err) {
-      setFeedbackMessage({ type: 'error', text: 'Error de conexión al actualizar estado.' });
+      console.error('[AdminPanelView] Error actualizando estado:', err);
+      if (isMountedRef.current) {
+        setFeedbackMessage({ type: 'error', text: 'Error de conexión al actualizar estado.' });
+      }
     } finally {
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
-  // Manejo de creación de nuevo usuario con Ley N° 21.719
+  const failCreateModalValidation = (errText) => {
+    setModalError(errText);
+    setFeedbackMessage({ type: 'error', text: errText });
+    announce(errText, 'assertive');
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setModalError('');
 
     if (!consentAccepted) {
-      const errText = 'Debe aceptar la declaración de consentimiento y tratamiento de datos personales conforme a la Ley N° 21.719.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation(
+        'Debe aceptar la declaración de consentimiento y tratamiento de datos personales conforme a la Ley N° 21.719.'
+      );
       return;
     }
 
     if (!newUserForm.fullName.trim()) {
-      const errText = 'Por favor, ingresa el nombre completo.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation('Por favor, ingresa el nombre completo.');
       return;
     }
 
     if (!newUserForm.email.trim() || !newUserForm.email.includes('@')) {
-      const errText = 'Debe ingresar un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation(
+        'Debe ingresar un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).'
+      );
       return;
     }
 
     if (!newUserForm.rut.trim()) {
-      const errText = 'Por favor, ingresa el RUT del estudiante.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation('Por favor, ingresa el RUT del estudiante.');
       return;
     }
 
-    // Validaciones de campos requeridos
     if (!newUserForm.role) {
-      const errText = 'Por favor, selecciona un rol institucional.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation('Por favor, selecciona un rol institucional.');
       return;
     }
 
     const effectiveCareer = (newUserForm.career || careerQuery || '').trim();
     if (!effectiveCareer) {
-      const errText = 'Por favor, selecciona o escribe una carrera.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation('Por favor, selecciona o escribe una carrera.');
       return;
     }
 
     if (!newUserForm.campus.trim()) {
-      const errText = 'Por favor, selecciona una sede.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation('Por favor, selecciona una sede.');
       return;
     }
 
-    // Validación de restricción exclusiva para rol Administrador
     if ((newUserForm.role === 'admin' || newUserForm.role === 'administrador') && !isAdmin) {
-      const errText = 'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      failCreateModalValidation(
+        'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.'
+      );
       return;
     }
 
@@ -495,6 +731,7 @@ export const AdminPanelView = () => {
       };
 
       const res = await api.createAdminStudent(payload);
+      if (!isMountedRef.current) return;
 
       if (res?.success) {
         setFeedbackMessage({
@@ -503,8 +740,7 @@ export const AdminPanelView = () => {
         });
         announce(`Usuario ${newUserForm.fullName} registrado exitosamente.`, 'polite');
         setIsCreateModalOpen(false);
-
-        // Reset form
+        setIsCareerDropdownOpen(false);
         setNewUserForm({
           fullName: '',
           email: '',
@@ -512,27 +748,27 @@ export const AdminPanelView = () => {
           rut: '',
           role: '',
           career: '',
-          campus: '',
+          campus: DEFAULT_CAMPUS,
         });
         setCareerQuery('');
         setModalError('');
         setConsentAccepted(true);
         await loadAdminData();
       } else {
-        const errText = res?.message || 'Error al registrar usuario.';
-        setModalError(errText);
-        setFeedbackMessage({ type: 'error', text: errText });
+        failCreateModalValidation(res?.message || 'Error al registrar usuario.');
       }
     } catch (err) {
-      const errText = err.message || 'Error de conexión al registrar usuario.';
-      setModalError(errText);
-      setFeedbackMessage({ type: 'error', text: errText });
+      console.error('[AdminPanelView] Error al crear usuario:', err);
+      if (isMountedRef.current) {
+        failCreateModalValidation(err.message || 'Error de conexión al registrar usuario.');
+      }
     } finally {
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
-  // Manejo de eliminación de usuario
   const handleDeleteStudent = async (student) => {
     if (
       !window.confirm(
@@ -544,12 +780,18 @@ export const AdminPanelView = () => {
 
     try {
       const res = await api.deleteStudent(student._id || student.id);
+      if (!isMountedRef.current) return;
+
       if (res?.success) {
         setFeedbackMessage({
           type: 'success',
           text: `Usuario ${student.fullName} eliminado de la base de datos.`,
         });
-        if (selectedStudentForDetail && (selectedStudentForDetail._id === student._id || selectedStudentForDetail.id === student.id)) {
+        if (
+          selectedStudentForDetail &&
+          (selectedStudentForDetail._id === student._id ||
+            selectedStudentForDetail.id === student.id)
+        ) {
           setSelectedStudentForDetail(null);
         }
         await loadAdminData();
@@ -560,93 +802,126 @@ export const AdminPanelView = () => {
         });
       }
     } catch (err) {
-      setFeedbackMessage({ type: 'error', text: 'Error de conexión al eliminar usuario.' });
+      console.error('[AdminPanelView] Error eliminando usuario:', err);
+      if (isMountedRef.current) {
+        setFeedbackMessage({ type: 'error', text: 'Error de conexión al eliminar usuario.' });
+      }
     }
   };
 
-  // CRUD Carreras con sincronización optimista inmediata
-  const handleAddCareer = async (e) => {
+  const updateCatalogField = (kind, patch) => {
+    setCatalogState((prev) => ({
+      ...prev,
+      [kind]: { ...prev[kind], ...patch },
+    }));
+  };
+
+  const handleCatalogAdd = async (kind, e) => {
     e.preventDefault();
-    const clean = newCareerInput.trim();
+    const cfg = CATALOG_CONFIG[kind];
+    const clean = catalogState[kind].newInput.trim();
     if (!clean) return;
 
-    const newObj = {
-      id: `career-${Date.now()}`,
-      name: clean,
-      school: newCareerSchool.trim() || 'Escuela Duoc UC',
-    };
-
-    setCareersList((prev) => [newObj, ...prev]);
-    setNewCareerInput('');
-    setNewCareerSchool('');
-    setFeedbackMessage({ type: 'success', text: `Carrera "${clean}" agregada exitosamente a la oferta académica.` });
-    announce(`Carrera ${clean} agregada.`, 'polite');
+    const newObj = cfg.buildLocalItem(clean);
+    setCatalogState((prev) => ({
+      ...prev,
+      [kind]: {
+        ...prev[kind],
+        items: [newObj, ...prev[kind].items],
+        newInput: '',
+      },
+    }));
+    setFeedbackMessage({ type: 'success', text: cfg.addFeedback(clean) });
+    announce(cfg.addAnnounce(clean), 'polite');
 
     try {
-      await api.createAdminCareer({
-        name: clean,
-        school: newObj.school,
-      });
+      const res = await cfg.createApi(clean);
+      if (res && res.success === false) {
+        console.warn(`[AdminPanelView] Sincronización de ${kind}:`, res.message);
+      }
     } catch (err) {
-      console.warn('Sincronización de carrera con backend:', err);
+      console.warn(`[AdminPanelView] Sincronización de ${kind} con backend:`, err);
     }
   };
 
-  const handleDeleteCareer = async (career) => {
-    if (!window.confirm(`¿Eliminar la carrera "${career.name}"?`)) return;
-    const targetKey = career._id || career.id || career.name;
-    setCareersList((prev) => prev.filter((c) => (c._id || c.id || c.name) !== targetKey));
-    setFeedbackMessage({ type: 'success', text: `Carrera "${career.name}" eliminada exitosamente.` });
-    announce(`Carrera ${career.name} eliminada.`, 'polite');
+  const handleCatalogDelete = async (kind, item) => {
+    const cfg = CATALOG_CONFIG[kind];
+    if (!window.confirm(cfg.confirmDelete(item))) return;
+
+    const targetKey = item._id || item.id || item.name;
+    setCatalogState((prev) => ({
+      ...prev,
+      [kind]: {
+        ...prev[kind],
+        items: prev[kind].items.filter((entry) => (entry._id || entry.id || entry.name) !== targetKey),
+      },
+    }));
+    setFeedbackMessage({ type: 'success', text: cfg.deleteFeedback(item.name) });
+    announce(cfg.deleteAnnounce(item.name), 'polite');
 
     try {
-      await api.deleteAdminCareer(targetKey);
+      const res = await cfg.deleteApi(targetKey);
+      if (res && res.success === false) {
+        console.warn(`[AdminPanelView] Eliminación de ${kind} en backend:`, res.message);
+      }
     } catch (err) {
-      console.warn('Sincronización de eliminación de carrera:', err);
+      console.warn(`[AdminPanelView] Sincronización de eliminación de ${kind}:`, err);
     }
   };
 
-  // CRUD Sedes con sincronización optimista inmediata
-  const handleAddSede = async (e) => {
-    e.preventDefault();
-    const clean = newSedeInput.trim();
-    if (!clean) return;
+  const executiveKpis = [
+    {
+      id: 'total-users',
+      label: 'Total Registrados',
+      value: metrics?.totalUsers ?? '...',
+      subtitle: `${metrics?.totalStudents ?? 0} estudiantes • ${metrics?.totalFaculty ?? 0} personal`,
+      valueClass: 'text-slate-950',
+      subtitleClass: 'text-[11px] font-bold text-slate-600 block',
+      icon: Users,
+      iconWrapperClass: 'bg-blue-50 text-[#002B49] border-blue-100',
+    },
+    {
+      id: 'paedis-pop',
+      label: 'Población PAEDIS',
+      value: metrics?.paedisCount ?? '...',
+      subtitle: `${metrics?.paedisPercentage ?? 0}% de los estudiantes`,
+      valueClass: 'text-slate-950',
+      subtitleClass:
+        'text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md inline-block',
+      icon: HeartHandshake,
+      iconWrapperClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    },
+    {
+      id: 'sim-usage',
+      label: 'Uso del Simulador',
+      value: metrics?.simulatorUsersCount ?? '...',
+      subtitle: metrics?.totalSimulatorInteractions
+        ? `${metrics.totalSimulatorInteractions} sesiones registradas`
+        : `${metrics?.simulatorUsersCount ?? 0} estudiantes activos`,
+      valueClass: 'text-slate-950',
+      subtitleClass:
+        'text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md inline-block',
+      icon: Laptop,
+      iconWrapperClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    },
+    {
+      id: 'alert-dropout',
+      label: 'En Alerta de Deserción',
+      value: metrics?.riskSummary?.altoRiesgo ?? '...',
+      subtitle: `${metrics?.riskSummary?.medioRiesgo ?? 0} en riesgo moderado`,
+      valueClass: 'text-rose-700',
+      subtitleClass:
+        'text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md inline-block',
+      icon: AlertTriangle,
+      iconWrapperClass: 'bg-rose-50 text-rose-700 border-rose-100',
+    },
+  ];
 
-    const newObj = {
-      id: `sede-${Date.now()}`,
-      name: clean,
-      city: 'Campus Duoc UC',
-    };
-
-    setSedesList((prev) => [newObj, ...prev]);
-    setNewSedeInput('');
-    setFeedbackMessage({ type: 'success', text: `Sede "${clean}" agregada exitosamente a la red institucional.` });
-    announce(`Sede ${clean} agregada.`, 'polite');
-
-    try {
-      await api.createAdminSede({ name: clean });
-    } catch (err) {
-      console.warn('Sincronización de sede con backend:', err);
-    }
-  };
-
-  const handleDeleteSede = async (sede) => {
-    if (!window.confirm(`¿Eliminar la sede "${sede.name}"?`)) return;
-    const targetKey = sede._id || sede.id || sede.name;
-    setSedesList((prev) => prev.filter((s) => (s._id || s.id || s.name) !== targetKey));
-    setFeedbackMessage({ type: 'success', text: `Sede "${sede.name}" eliminada exitosamente.` });
-    announce(`Sede ${sede.name} eliminada.`, 'polite');
-
-    try {
-      await api.deleteAdminSede(targetKey);
-    } catch (err) {
-      console.warn('Sincronización de eliminación de sede:', err);
-    }
-  };
+  const careerInputVoiceProps = getVoiceProps('Carrera Duoc UC. Escribe o selecciona una carrera');
 
   return (
     <div className="space-y-7 animate-fade-in pb-12">
-      {/* 1. HERO BANNER INSTITUCIONAL DUOC UC */}
+      {/* 1. HERO BANNER INSTITUCIONAL DUOC UC - SEDE ALAMEDA */}
       <section
         aria-labelledby="admin-panel-title"
         className="relative overflow-hidden rounded-3xl bg-[#002B49] text-white p-7 sm:p-9 shadow-sm border border-slate-200/20"
@@ -662,8 +937,8 @@ export const AdminPanelView = () => {
               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
               <span>
                 {isAdmin
-                  ? 'Módulo Exclusivo Administrador • Duoc UC'
-                  : 'Módulo Coordinación PAEDIS • Gestión Institucional'}
+                  ? 'Módulo Exclusivo Administrador • Duoc UC - Sede Alameda'
+                  : 'Módulo Coordinación PAEDIS • Duoc UC - Sede Alameda'}
               </span>
             </div>
             <h1
@@ -673,16 +948,22 @@ export const AdminPanelView = () => {
               Panel de Control & Analítica Predictiva
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed">
-              Supervisión de métricas de retención, modelo predictivo de deserción por asistencia
-              reglamentaria (&lt; 70% RI) y gestión institucional conforme a la Ley N° 21.719 de Protección de Datos.
+              Supervisión de métricas de retención en Duoc UC - Sede Alameda, modelo predictivo
+              de deserción por asistencia reglamentaria (&lt; 70% RI) y gestión institucional
+              conforme a la Ley N° 21.719 de Protección de Datos.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               type="button"
-              onClick={loadAdminData}
+              onClick={() => {
+                loadAdminData().catch((err) => {
+                  console.error('[AdminPanelView] Error al refrescar datos:', err);
+                });
+              }}
               aria-label="Actualizar datos de la base de datos"
+              {...getVoiceProps('Refrescar datos del panel de administración')}
               className="min-h-[44px] px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-medium text-xs inline-flex items-center gap-2 border border-white/15 backdrop-blur-xs transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
             >
               <RefreshCw
@@ -695,7 +976,10 @@ export const AdminPanelView = () => {
               type="button"
               onClick={() => {
                 if (!canManageAdmin) {
-                  announce('Acción denegada: Requiere privilegios de Administrador o Coordinador PAEDIS.', 'assertive');
+                  announce(
+                    'Acción denegada: Requiere privilegios de Administrador o Coordinador PAEDIS.',
+                    'assertive'
+                  );
                   return;
                 }
                 setIsCreateModalOpen(true);
@@ -704,6 +988,7 @@ export const AdminPanelView = () => {
               }}
               disabled={!canManageAdmin}
               aria-disabled={!canManageAdmin}
+              {...getVoiceProps('Registrar nuevo estudiante o usuario en Nexo360')}
               title={
                 !canManageAdmin
                   ? 'Acción restringida: Se requiere rol de Administrador o Coordinador PAEDIS'
@@ -727,72 +1012,34 @@ export const AdminPanelView = () => {
         aria-label="Secciones del Panel de Administración"
         className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2"
       >
-        <button
-          type="button"
-          onClick={() => {
-            setAdminSubTab('estudiantes');
-            announce('Pestaña de Alumnado y Retención Estudiantil seleccionada.', 'polite');
-          }}
-          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            adminSubTab === 'estudiantes'
-              ? 'bg-[#002B49] text-white shadow-xs'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4 text-amber-400" />
-          <span>Alumnado & Estudiantes PAEDIS</span>
-          <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-[#002B49]">
-            {studentUsers.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setAdminSubTab('carreras-sedes');
-            announce('Pestaña de Gestión Dinámica de Carreras y Sedes seleccionada.', 'polite');
-          }}
-          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            adminSubTab === 'carreras-sedes'
-              ? 'bg-[#002B49] text-white shadow-xs'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Building2 className="w-4 h-4 text-blue-400" />
-          <span>Carreras & Sedes (CRUD)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setAdminSubTab('oferta-ramos');
-            announce('Pestaña de Oferta Académica y Carga de Ramos seleccionada.', 'polite');
-          }}
-          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            adminSubTab === 'oferta-ramos'
-              ? 'bg-[#002B49] text-white shadow-xs'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-          <span>Oferta Académica & Simulador (Excel / BD)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setAdminSubTab('alerta-temprana');
-            announce('Pestaña de Sistema de Alerta Temprana (SAT) seleccionada.', 'polite');
-          }}
-          className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            adminSubTab === 'alerta-temprana'
-              ? 'bg-[#002B49] text-white shadow-xs'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <AlertOctagon className="w-4 h-4 text-rose-400" />
-          <span>Alerta Temprana (SAT)</span>
-        </button>
+        {ADMIN_SUB_TABS.map((tab) => {
+          const TabIcon = tab.icon;
+          const isActive = adminSubTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setAdminSubTab(tab.id);
+                announce(tab.announceMsg, 'polite');
+              }}
+              {...getVoiceProps(tab.label)}
+              className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
+                isActive
+                  ? 'bg-[#002B49] text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <TabIcon className={`w-4 h-4 ${tab.iconColor}`} aria-hidden="true" />
+              <span>{tab.label}</span>
+              {tab.showCount && (
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-[#002B49]">
+                  {studentUsers.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
       {/* Alerta de Feedback Accesible */}
@@ -800,6 +1047,7 @@ export const AdminPanelView = () => {
         <div
           role="status"
           aria-live="polite"
+          {...getVoiceProps(feedbackMessage.text)}
           className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm font-bold shadow-xs transition-all ${
             feedbackMessage.type === 'success'
               ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
@@ -817,7 +1065,8 @@ export const AdminPanelView = () => {
           <button
             type="button"
             onClick={() => setFeedbackMessage(null)}
-            className="text-slate-500 hover:text-slate-900 p-1 rounded-lg"
+            {...getVoiceProps('Cerrar notificación')}
+            className="text-slate-500 hover:text-slate-900 p-1 rounded-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
             aria-label="Cerrar notificación"
           >
             <X className="w-4 h-4" />
@@ -831,192 +1080,76 @@ export const AdminPanelView = () => {
       ) : adminSubTab === 'oferta-ramos' ? (
         <CoursesAdminSection />
       ) : adminSubTab === 'carreras-sedes' ? (
-        /* GESTIÓN DINÁMICA DE CARRERAS Y SEDES (CRUD) */
         <section aria-labelledby="careers-sedes-title" className="space-y-6">
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider text-[#002B49] bg-blue-100">
               <Building2 className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
-              <span>Gestión Dinámica Institucional Duoc UC</span>
+              <span>Gestión Dinámica • Duoc UC - Sede Alameda</span>
             </div>
             <h2 id="careers-sedes-title" className="text-xl sm:text-2xl font-black text-slate-900">
               Administración de Carreras y Sedes
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 font-medium">
-              Agrega y elimina carreras y sedes dinámicamente. Los cambios se sincronizan en tiempo
-              real con el formulario de registro y la oferta académica.
+              Agrega y elimina carreras y sedes dinámicamente para el piloto Duoc UC - Sede
+              Alameda. Los cambios se sincronizan en tiempo real con el formulario de registro y la
+              oferta académica.
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 1. CRUD CARRERAS */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-[#002B49]" />
-                  <h3 className="text-base sm:text-lg font-black text-slate-900">
-                    Carreras Duoc UC ({sortedCareers.length})
-                  </h3>
-                </div>
-                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
-                  Orden Alfabético
-                </span>
-              </div>
+            <CatalogCrudCard
+              kind="careers"
+              items={filteredCareersCrud}
+              totalCount={sortedCareers.length}
+              newInput={catalogState.careers.newInput}
+              searchValue={catalogState.careers.search}
+              onNewInputChange={(val) => updateCatalogField('careers', { newInput: val })}
+              onSearchChange={(val) => updateCatalogField('careers', { search: val })}
+              onAddSubmit={(e) => {
+                handleCatalogAdd('careers', e).catch((err) => {
+                  console.error('[AdminPanelView] Error agregando carrera:', err);
+                });
+              }}
+              onDeleteItem={(item) => {
+                handleCatalogDelete('careers', item).catch((err) => {
+                  console.error('[AdminPanelView] Error eliminando carrera:', err);
+                });
+              }}
+              getVoiceProps={getVoiceProps}
+            />
 
-              {/* Formulario Agregar Carrera */}
-              <form onSubmit={handleAddCareer} className="space-y-2.5">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={newCareerInput}
-                    onChange={(e) => setNewCareerInput(e.target.value)}
-                    placeholder="Nombre de la nueva carrera..."
-                    className="flex-1 min-h-[40px] px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-                  />
-                  <button
-                    type="submit"
-                    className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs font-black inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Agregar</span>
-                  </button>
-                </div>
-              </form>
-
-              {/* Búsqueda de Carreras */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="search"
-                  value={careerSearch}
-                  onChange={(e) => setCareerSearch(e.target.value)}
-                  placeholder="Filtrar carreras..."
-                  className="w-full min-h-[38px] pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
-                />
-              </div>
-
-              {/* Lista con Scroll */}
-              <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100">
-                {filteredCareersCrud.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4">No se encontraron carreras.</p>
-                ) : (
-                  filteredCareersCrud.map((c) => (
-                    <div
-                      key={c._id || c.id || c.name}
-                      className="pt-2 flex items-center justify-between gap-2 hover:bg-slate-50 p-2 rounded-xl transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <span className="text-xs sm:text-sm font-bold text-slate-800 block truncate">
-                          {c.name}
-                        </span>
-                        <span className="text-[11px] text-slate-400 block truncate">
-                          {c.school || 'Escuela Duoc UC'}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCareer(c)}
-                        title={`Eliminar carrera ${c.name}`}
-                        aria-label={`Eliminar carrera ${c.name}`}
-                        className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* 2. CRUD SEDES */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-[#002B49]" />
-                  <h3 className="text-base sm:text-lg font-black text-slate-900">
-                    Sedes Duoc UC ({sortedSedes.length})
-                  </h3>
-                </div>
-                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
-                  Orden Alfabético
-                </span>
-              </div>
-
-              {/* Formulario Agregar Sede */}
-              <form onSubmit={handleAddSede} className="space-y-2.5">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={newSedeInput}
-                    onChange={(e) => setNewSedeInput(e.target.value)}
-                    placeholder="Nombre de la nueva sede (Ej: Sede Providencia)..."
-                    className="flex-1 min-h-[40px] px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-                  />
-                  <button
-                    type="submit"
-                    className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs font-black inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Agregar</span>
-                  </button>
-                </div>
-              </form>
-
-              {/* Búsqueda de Sedes */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="search"
-                  value={sedeSearch}
-                  onChange={(e) => setSedeSearch(e.target.value)}
-                  placeholder="Filtrar sedes..."
-                  className="w-full min-h-[38px] pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
-                />
-              </div>
-
-              {/* Lista con Scroll */}
-              <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100">
-                {filteredSedesCrud.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4">No se encontraron sedes.</p>
-                ) : (
-                  filteredSedesCrud.map((s) => (
-                    <div
-                      key={s._id || s.id || s.name}
-                      className="pt-2 flex items-center justify-between gap-2 hover:bg-slate-50 p-2 rounded-xl transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <span className="text-xs sm:text-sm font-bold text-slate-800 block truncate">
-                          {s.name}
-                        </span>
-                        <span className="text-[11px] text-slate-400 block truncate">
-                          {s.city || 'Campus Duoc UC'}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSede(s)}
-                        title={`Eliminar sede ${s.name}`}
-                        aria-label={`Eliminar sede ${s.name}`}
-                        className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <CatalogCrudCard
+              kind="sedes"
+              items={filteredSedesCrud}
+              totalCount={sortedSedes.length}
+              newInput={catalogState.sedes.newInput}
+              searchValue={catalogState.sedes.search}
+              onNewInputChange={(val) => updateCatalogField('sedes', { newInput: val })}
+              onSearchChange={(val) => updateCatalogField('sedes', { search: val })}
+              onAddSubmit={(e) => {
+                handleCatalogAdd('sedes', e).catch((err) => {
+                  console.error('[AdminPanelView] Error agregando sede:', err);
+                });
+              }}
+              onDeleteItem={(item) => {
+                handleCatalogDelete('sedes', item).catch((err) => {
+                  console.error('[AdminPanelView] Error eliminando sede:', err);
+                });
+              }}
+              getVoiceProps={getVoiceProps}
+            />
           </div>
         </section>
       ) : (
-        /* PESTAÑA PRINCIPAL: GESTIÓN DE ESTUDIANTES & MODELO PREDICTIVO */
         <>
           {/* 2. TARJETAS KPI EJECUTIVAS */}
           <section aria-labelledby="kpis-heading" className="space-y-3.5">
             <div className="flex items-center justify-between">
-              <h2 id="kpis-heading" className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                Métricas Clave de Uso & Matrícula
+              <h2
+                id="kpis-heading"
+                className="text-base sm:text-lg font-black text-slate-900 tracking-tight"
+              >
+                Métricas Clave de Uso & Matrícula • Duoc UC - {DEFAULT_CAMPUS}
               </h2>
               <span className="text-xs font-semibold text-slate-500">
                 Actualización en vivo vía MongoDB & Scraping
@@ -1024,77 +1157,32 @@ export const AdminPanelView = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Tarjeta 1: Total Usuarios */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    Total Registrados
-                  </span>
-                  <span className="text-3xl font-black text-slate-950 block tracking-tight">
-                    {metrics?.totalUsers ?? '...'}
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-600 block">
-                    {metrics?.totalStudents ?? 0} estudiantes • {metrics?.totalFaculty ?? 0} personal
-                  </span>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#002B49] border border-blue-100 flex items-center justify-center shrink-0">
-                  <Users className="w-6 h-6" aria-hidden="true" />
-                </div>
-              </div>
-
-              {/* Tarjeta 2: Estudiantes PAEDIS */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    Población PAEDIS
-                  </span>
-                  <span className="text-3xl font-black text-slate-950 block tracking-tight">
-                    {metrics?.paedisCount ?? '...'}
-                  </span>
-                  <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md inline-block">
-                    {metrics?.paedisPercentage ?? 0}% de los estudiantes
-                  </span>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0">
-                  <HeartHandshake className="w-6 h-6" aria-hidden="true" />
-                </div>
-              </div>
-
-              {/* Tarjeta 3: Uso de Simuladores */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    Uso del Simulador
-                  </span>
-                  <span className="text-3xl font-black text-slate-950 block tracking-tight">
-                    {metrics?.simulatorUsersCount ?? '...'}
-                  </span>
-                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md inline-block">
-                    {metrics?.totalSimulatorInteractions ? `${metrics.totalSimulatorInteractions} sesiones registradas` : `${metrics?.simulatorUsersCount ?? 0} estudiantes activos`}
-                  </span>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center shrink-0">
-                  <Laptop className="w-6 h-6" aria-hidden="true" />
-                </div>
-              </div>
-
-              {/* Tarjeta 4: Alertas de Deserción */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                    En Alerta de Deserción
-                  </span>
-                  <span className="text-3xl font-black text-rose-700 block tracking-tight">
-                    {metrics?.riskSummary?.altoRiesgo ?? '...'}
-                  </span>
-                  <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md inline-block">
-                    {metrics?.riskSummary?.medioRiesgo ?? 0} en riesgo moderado
-                  </span>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-700 border border-rose-100 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-6 h-6" aria-hidden="true" />
-                </div>
-              </div>
+              {executiveKpis.map((kpi) => {
+                const KpiIcon = kpi.icon;
+                return (
+                  <div
+                    key={kpi.id}
+                    tabIndex={0}
+                    {...getVoiceProps(`${kpi.label}: ${kpi.value}. ${kpi.subtitle}`)}
+                    className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-center justify-between focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                  >
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                        {kpi.label}
+                      </span>
+                      <span className={`text-3xl font-black block tracking-tight ${kpi.valueClass}`}>
+                        {kpi.value}
+                      </span>
+                      <span className={kpi.subtitleClass}>{kpi.subtitle}</span>
+                    </div>
+                    <div
+                      className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 ${kpi.iconWrapperClass}`}
+                    >
+                      <KpiIcon className="w-6 h-6" aria-hidden="true" />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
@@ -1107,7 +1195,7 @@ export const AdminPanelView = () => {
               <div>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider text-[#002B49] bg-amber-100">
                   <Sparkles className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
-                  <span>Modelo Predictivo de Inteligencia Académica Duoc UC</span>
+                  <span>Modelo Predictivo de Inteligencia Académica • Duoc UC - Sede Alameda</span>
                 </div>
                 <h2
                   id="predictive-analytics-title"
@@ -1116,7 +1204,9 @@ export const AdminPanelView = () => {
                   Semáforo Predictivo de Retención vs. Deserción
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                  Algoritmo regulatorio Duoc UC alimentado por asistencias reales (&lt; 70% Reprobación por Inasistencia [RI], 70-75% Alerta Preventiva, &gt; 75% Retención Favorable).
+                  Algoritmo regulatorio Duoc UC - Sede Alameda alimentado por asistencias reales
+                  (&lt; 70% Reprobación por Inasistencia [RI], 70-75% Alerta Preventiva, &gt; 75%
+                  Retención Favorable).
                 </p>
               </div>
 
@@ -1144,68 +1234,41 @@ export const AdminPanelView = () => {
                   1. Distribución de Estados Académicos
                 </span>
                 <div className="space-y-3 pt-1">
-                  <div>
-                    <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
-                      <span>Estudiantes Activos</span>
-                      <span className="font-black text-[#002B49]">
-                        {metrics?.statusDistribution?.activo ?? 0}
-                      </span>
+                  {[
+                    {
+                      label: 'Estudiantes Activos',
+                      value: metrics?.statusDistribution?.activo ?? 0,
+                      textClass: 'text-[#002B49]',
+                      barClass: 'bg-[#002B49]',
+                    },
+                    {
+                      label: 'En Deserción / Retiro',
+                      value: metrics?.statusDistribution?.desercion ?? 0,
+                      textClass: 'text-rose-700',
+                      barClass: 'bg-rose-500',
+                    },
+                    {
+                      label: 'Titulados / Egresados',
+                      value: metrics?.statusDistribution?.titulado ?? 0,
+                      textClass: 'text-emerald-700',
+                      barClass: 'bg-emerald-500',
+                    },
+                  ].map((item) => (
+                    <div key={item.label}>
+                      <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                        <span>{item.label}</span>
+                        <span className={`font-black ${item.textClass}`}>{item.value}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className={`${item.barClass} h-full rounded-full transition-all duration-500`}
+                          style={{
+                            width: `${(item.value / (metrics?.totalStudents || 1)) * 100}%`,
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-[#002B49] h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${
-                            ((metrics?.statusDistribution?.activo ?? 0) /
-                              (metrics?.totalStudents || 1)) *
-                            100
-                          }%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
-                      <span>En Deserción / Retiro</span>
-                      <span className="font-black text-rose-700">
-                        {metrics?.statusDistribution?.desercion ?? 0}
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-rose-500 h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${
-                            ((metrics?.statusDistribution?.desercion ?? 0) /
-                              (metrics?.totalStudents || 1)) *
-                            100
-                          }%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
-                      <span>Titulados / Egresados</span>
-                      <span className="font-black text-emerald-700">
-                        {metrics?.statusDistribution?.titulado ?? 0}
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${
-                            ((metrics?.statusDistribution?.titulado ?? 0) /
-                              (metrics?.totalStudents || 1)) *
-                            100
-                          }%`,
-                        }}
-                      />
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -1215,32 +1278,43 @@ export const AdminPanelView = () => {
                   2. Semáforo Predictivo Global
                 </span>
                 <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                    <span className="text-2xl font-black text-emerald-950 block">
-                      {metrics?.riskSummary?.bajoRiesgo ?? 0}
-                    </span>
-                    <span className="text-[10px] font-black text-emerald-800 uppercase mt-0.5 block">
-                      Bajo Riesgo (&gt;75%)
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <span className="text-2xl font-black text-amber-950 block">
-                      {metrics?.riskSummary?.medioRiesgo ?? 0}
-                    </span>
-                    <span className="text-[10px] font-black text-amber-800 uppercase mt-0.5 block">
-                      Alerta (70-75%)
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
-                    <span className="text-2xl font-black text-rose-950 block">
-                      {metrics?.riskSummary?.altoRiesgo ?? 0}
-                    </span>
-                    <span className="text-[10px] font-black text-rose-800 uppercase mt-0.5 block">
-                      Riesgo RI (&lt;70%)
-                    </span>
-                  </div>
+                  {[
+                    {
+                      label: 'Bajo Riesgo (>75%)',
+                      count: metrics?.riskSummary?.bajoRiesgo ?? 0,
+                      boxClass: 'bg-emerald-50 border-emerald-200',
+                      numClass: 'text-emerald-950',
+                      tagClass: 'text-emerald-800',
+                    },
+                    {
+                      label: 'Alerta (70-75%)',
+                      count: metrics?.riskSummary?.medioRiesgo ?? 0,
+                      boxClass: 'bg-amber-50 border-amber-200',
+                      numClass: 'text-amber-950',
+                      tagClass: 'text-amber-800',
+                    },
+                    {
+                      label: 'Riesgo RI (<70%)',
+                      count: metrics?.riskSummary?.altoRiesgo ?? 0,
+                      boxClass: 'bg-rose-50 border-rose-200',
+                      numClass: 'text-rose-950',
+                      tagClass: 'text-rose-800',
+                    },
+                  ].map((cell) => (
+                    <div
+                      key={cell.label}
+                      tabIndex={0}
+                      {...getVoiceProps(`${cell.label}: ${cell.count} estudiantes`)}
+                      className={`p-3 border rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${cell.boxClass}`}
+                    >
+                      <span className={`text-2xl font-black block ${cell.numClass}`}>
+                        {cell.count}
+                      </span>
+                      <span className={`text-[10px] font-black uppercase mt-0.5 block ${cell.tagClass}`}>
+                        {cell.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
                   *Las alertas tempranas calculan el riesgo de reprobación por inasistencia (RI)
@@ -1251,7 +1325,7 @@ export const AdminPanelView = () => {
               {/* Columna 3: Normativa Duoc UC */}
               <div className="p-5 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3.5">
                 <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">
-                  3. Normativa Académica Duoc UC
+                  3. Normativa Académica Duoc UC - {DEFAULT_CAMPUS}
                 </span>
                 <ul className="space-y-2.5 text-xs font-medium text-slate-700">
                   <li className="flex items-start gap-2.5">
@@ -1259,7 +1333,8 @@ export const AdminPanelView = () => {
                       RI
                     </span>
                     <span>
-                      <strong>Asistencia &lt; 70%:</strong> Reprobación por Inasistencia inmediata en la asignatura.
+                      <strong>Asistencia &lt; 70%:</strong> Reprobación por Inasistencia inmediata en
+                      la asignatura.
                     </span>
                   </li>
                   <li className="flex items-start gap-2.5">
@@ -1267,7 +1342,8 @@ export const AdminPanelView = () => {
                       ⚠️
                     </span>
                     <span>
-                      <strong>Asistencia 70% a 75%:</strong> Zona de riesgo crítico, requiere seguimiento docente y tutor PAR.
+                      <strong>Asistencia 70% a 75%:</strong> Zona de riesgo crítico, requiere
+                      seguimiento docente y tutor PAR.
                     </span>
                   </li>
                   <li className="flex items-start gap-2.5">
@@ -1275,7 +1351,8 @@ export const AdminPanelView = () => {
                       ✓
                     </span>
                     <span>
-                      <strong>Asistencia &gt; 75%:</strong> Cumplimiento regular con alta probabilidad de titulación y retención.
+                      <strong>Asistencia &gt; 75%:</strong> Cumplimiento regular con alta probabilidad
+                      de titulación y retención.
                     </span>
                   </li>
                 </ul>
@@ -1283,8 +1360,7 @@ export const AdminPanelView = () => {
             </div>
           </section>
 
-          {/* 4. REDISEÑO DEL DIRECTORIO INSTITUCIONAL: ESTUDIANTES O ADMINISTRATIVOS */}
-          {/* REQUISITO ESTRICTO: En la lista principal cada entrada muestra ÚNICAMENTE el Nombre Completo y directamente debajo en texto pequeño la Sede. */}
+          {/* 4. DIRECTORIO INSTITUCIONAL: ESTUDIANTES O ADMINISTRATIVOS */}
           <section
             aria-labelledby="students-directory-title"
             className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm space-y-5"
@@ -1312,7 +1388,6 @@ export const AdminPanelView = () => {
                     )}
                   </span>
 
-                  {/* Switcher de Directorio */}
                   <div
                     className="inline-flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200"
                     role="tablist"
@@ -1326,6 +1401,7 @@ export const AdminPanelView = () => {
                         setDirectoryMode('estudiantes');
                         announce('Mostrando directorio de estudiantes.', 'polite');
                       }}
+                      {...getVoiceProps(`Directorio de Estudiantes, ${studentUsers.length} registros`)}
                       className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                         directoryMode === 'estudiantes'
                           ? 'bg-[#002B49] text-white shadow-xs'
@@ -1342,6 +1418,9 @@ export const AdminPanelView = () => {
                         setDirectoryMode('administrativos');
                         announce('Mostrando directorio de administrativos.', 'polite');
                       }}
+                      {...getVoiceProps(
+                        `Directorio de Administrativos, ${administrativeUsers.length} registros`
+                      )}
                       className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                         directoryMode === 'administrativos'
                           ? 'bg-[#002B49] text-white shadow-xs'
@@ -1363,29 +1442,23 @@ export const AdminPanelView = () => {
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 font-medium">
                   {directoryMode === 'estudiantes'
-                    ? 'Haz clic en cualquier estudiante para abrir su ficha completa con asistencia detallada por asignatura y semáforo predictivo.'
-                    : 'Haz clic en cualquier miembro del personal para ver su rol institucional, funciones asignadas y datos de contacto.'}
+                    ? `Haz clic en cualquier estudiante de Duoc UC - ${DEFAULT_CAMPUS} para abrir su ficha completa con asistencia detallada por asignatura y semáforo predictivo.`
+                    : `Haz clic en cualquier miembro del personal de Duoc UC - ${DEFAULT_CAMPUS} para ver su rol institucional, funciones asignadas y datos de contacto.`}
                 </p>
               </div>
 
-              {/* Filtros dinámicos según el modo de directorio */}
               {directoryMode === 'estudiantes' ? (
                 <div
                   className="flex flex-wrap items-center gap-1.5"
                   role="group"
                   aria-label="Filtrar por estado"
                 >
-                  {[
-                    { id: 'all', label: 'Todos' },
-                    { id: 'activo', label: 'Activos' },
-                    { id: 'desercion', label: 'Deserción' },
-                    { id: 'titulado', label: 'Titulados' },
-                    { id: 'paedis', label: 'Solo PAEDIS' },
-                  ].map((f) => (
+                  {STUDENT_STATUS_FILTERS.map((f) => (
                     <button
                       key={f.id}
                       type="button"
                       onClick={() => setFilterStatus(f.id)}
+                      {...getVoiceProps(`Filtrar estudiantes por estado: ${f.label}`)}
                       className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
                         filterStatus === f.id
                           ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
@@ -1402,16 +1475,12 @@ export const AdminPanelView = () => {
                   role="group"
                   aria-label="Filtrar personal administrativo por rol"
                 >
-                  {[
-                    { id: 'all', label: 'Todos' },
-                    { id: 'coordinadores', label: 'Coordinadores PAEDIS' },
-                    { id: 'administradores', label: 'Administradores' },
-                    { id: 'docentes', label: 'Docentes & Directivos' },
-                  ].map((f) => (
+                  {ADMIN_ROLE_FILTERS.map((f) => (
                     <button
                       key={f.id}
                       type="button"
                       onClick={() => setAdminRoleFilter(f.id)}
+                      {...getVoiceProps(`Filtrar personal administrativo por rol: ${f.label}`)}
                       className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
                         adminRoleFilter === f.id
                           ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
@@ -1445,385 +1514,409 @@ export const AdminPanelView = () => {
                     ? 'Buscar estudiante por nombre, RUT o sede'
                     : 'Buscar administrativo por nombre, RUT, correo o sede'
                 }
+                {...getVoiceProps(
+                  directoryMode === 'estudiantes'
+                    ? 'Buscar estudiante por nombre, RUT o sede'
+                    : 'Buscar administrativo por nombre, RUT, correo o sede'
+                )}
                 className="w-full min-h-[44px] pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
               />
             </div>
 
-            {/* Listado dinámico según el modo del directorio: Estudiantes o Administrativos */}
             {directoryMode === 'estudiantes' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5" role="list">
-              {filteredStudents.length === 0 ? (
-                <div className="col-span-full p-8 text-center text-slate-500 font-bold bg-slate-50 rounded-2xl border border-slate-200">
-                  No se encontraron estudiantes registrados con los criterios seleccionados.
-                </div>
-              ) : (
-                filteredStudents.map((student) => {
-                  const studentSede = student.campus || student.sede || 'Sede Alameda';
-                  const isExpanded =
-                    selectedStudentForDetail &&
-                    (selectedStudentForDetail._id === student._id || selectedStudentForDetail.id === student.id);
-                  const isRutSearchMatch = Boolean(
-                    searchTerm &&
-                      student.rut &&
-                      (student.rut.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
-                        (searchTerm.replace(/[^0-9kK]/g, '').length >= 2 &&
-                          student.rut
-                            .replace(/[^0-9kK]/g, '')
-                            .toLowerCase()
-                            .includes(searchTerm.replace(/[^0-9kK]/g, '').toLowerCase())))
-                  );
+                {filteredStudents.length === 0 ? (
+                  <div className="col-span-full p-8 text-center text-slate-500 font-bold bg-slate-50 rounded-2xl border border-slate-200">
+                    No se encontraron estudiantes registrados con los criterios seleccionados.
+                  </div>
+                ) : (
+                  filteredStudents.map((student) => {
+                    const studentSede = student.campus || student.sede || DEFAULT_CAMPUS;
+                    const isExpanded =
+                      selectedStudentForDetail &&
+                      (selectedStudentForDetail._id === student._id ||
+                        selectedStudentForDetail.id === student.id);
+                    const isRutSearchMatch = isNumericRutMatch(student.rut, searchTerm);
+                    const detailCourses =
+                      selectedStudentForDetail?.enrolledCourses || student.enrolledCourses;
 
-                  return (
-                    <div
-                      key={student._id || student.id}
-                      role="listitem"
-                      className={`transition-all duration-300 ${isExpanded ? 'col-span-full' : ''}`}
-                    >
-                      {/* Cabecera / Tarjeta del Estudiante: Nombre y Sede directamente abajo */}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedStudentForDetail(isExpanded ? null : student)}
-                        className={`w-full p-4 text-left flex items-center justify-between gap-3 group cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
-                          isExpanded
-                            ? 'bg-[#002B49] text-white border-2 border-[#002B49] shadow-lg rounded-t-2xl rounded-b-none'
-                            : 'bg-white hover:bg-slate-50/90 border border-slate-200 hover:border-[#002B49]/40 rounded-2xl shadow-xs hover:shadow-md'
-                        }`}
-                        aria-expanded={isExpanded}
-                        aria-label={`${isExpanded ? 'Contraer' : 'Desplegar'} ficha y analítica de ${student.fullName}, ${studentSede}`}
+                    return (
+                      <div
+                        key={student._id || student.id}
+                        role="listitem"
+                        className={`transition-all duration-300 ${isExpanded ? 'col-span-full' : ''}`}
                       >
-                        <div className="space-y-0.5 min-w-0">
-                          {/* 1. Nombre Completo */}
-                          <span
-                            className={`font-black block truncate text-sm sm:text-base ${
-                              isExpanded ? 'text-white' : 'text-slate-900 group-hover:text-[#002B49]'
-                            }`}
-                          >
-                            {student.fullName}
-                          </span>
-                          {/* 2. Directamente debajo en texto pequeño la Sede */}
-                          <span
-                            className={`text-xs font-semibold block truncate ${
-                              isExpanded ? 'text-amber-300' : 'text-slate-500'
-                            }`}
-                          >
-                            {studentSede}
-                            {isRutSearchMatch ? ` • RUT: ${student.rut}` : ''}
-                          </span>
-                        </div>
-
-                        <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 ${
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentForDetail(isExpanded ? null : student)}
+                          {...getVoiceProps(
+                            `${isExpanded ? 'Contraer' : 'Desplegar'} ficha de ${student.fullName}, ${studentSede}`
+                          )}
+                          className={`w-full p-4 text-left flex items-center justify-between gap-3 group cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
                             isExpanded
-                              ? 'bg-white/15 text-amber-300 rotate-90'
-                              : 'bg-slate-100 group-hover:bg-[#002B49] text-slate-500 group-hover:text-amber-300'
+                              ? 'bg-[#002B49] text-white border-2 border-[#002B49] shadow-lg rounded-t-2xl rounded-b-none'
+                              : 'bg-white hover:bg-slate-50/90 border border-slate-200 hover:border-[#002B49]/40 rounded-2xl shadow-xs hover:shadow-md'
                           }`}
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? 'Contraer' : 'Desplegar'} ficha y analítica de ${student.fullName}, ${studentSede}`}
                         >
-                          <ChevronRight className="w-4 h-4" aria-hidden="true" />
-                        </div>
-                      </button>
-
-                      {/* DETALLE DESPLEGADO DIRECTAMENTE DESDE EL MISMO RECUADRO */}
-                      {isExpanded && (
-                        <div className="bg-white rounded-b-2xl border-x-2 border-b-2 border-[#002B49] p-5 sm:p-7 shadow-xl space-y-5 animate-fade-in">
-                          {/* Cabecera del Detalle desplegado */}
-                          <div className="border-b border-slate-100 pb-3">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mb-1">
-                              Ficha Integral del Estudiante • Nexo360
-                            </span>
-                            <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                          <div className="space-y-0.5 min-w-0">
+                            <span
+                              className={`font-black block truncate text-sm sm:text-base ${
+                                isExpanded ? 'text-white' : 'text-slate-900 group-hover:text-[#002B49]'
+                              }`}
+                            >
                               {student.fullName}
-                            </h3>
-                            <span className="text-xs font-bold text-slate-500 block">
-                              {studentSede} • {student.email} • RUT: {student.rut || 'Sin RUT'}
+                            </span>
+                            <span
+                              className={`text-xs font-semibold block truncate ${
+                                isExpanded ? 'text-amber-300' : 'text-slate-500'
+                              }`}
+                            >
+                              {studentSede}
+                              {isRutSearchMatch ? ` • RUT: ${student.rut}` : ''}
                             </span>
                           </div>
 
-                          {/* Ficha: Carrera, Estado Académico y PAEDIS */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            {/* Carrera */}
-                            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                                Carrera
+                          <div
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 ${
+                              isExpanded
+                                ? 'bg-white/15 text-amber-300 rotate-90'
+                                : 'bg-slate-100 group-hover:bg-[#002B49] text-slate-500 group-hover:text-amber-300'
+                            }`}
+                          >
+                            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="bg-white rounded-b-2xl border-x-2 border-b-2 border-[#002B49] p-5 sm:p-7 shadow-xl space-y-5 animate-fade-in">
+                            <div className="border-b border-slate-100 pb-3">
+                              <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mb-1">
+                                Ficha Integral del Estudiante • Duoc UC - {DEFAULT_CAMPUS}
                               </span>
-                              <span className="text-xs sm:text-sm font-black text-slate-900 block leading-tight">
-                                {student.career || 'Ingeniería en Informática'}
+                              <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                                {student.fullName}
+                              </h3>
+                              <span className="text-xs font-bold text-slate-500 block">
+                                {studentSede} • {student.email} • RUT: {student.rut || 'Sin RUT'}
                               </span>
                             </div>
 
-                            {/* Estado Académico (Calculado a partir de asistencia y registro) */}
-                            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                                Estado Académico
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className={`text-xs font-black uppercase px-2 py-0.5 rounded-md border ${
-                                    student.academicStatus === 'activo'
-                                      ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                                      : student.academicStatus === 'titulado'
-                                      ? 'bg-purple-50 text-purple-900 border-purple-200'
-                                      : 'bg-rose-50 text-rose-900 border-rose-300'
-                                  }`}
-                                >
-                                  {student.academicStatus || 'activo'}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                                  Carrera
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-slate-900 block leading-tight">
+                                  {student.career || 'Ingeniería en Informática'}
                                 </span>
                               </div>
-                              <span className="text-[10px] text-slate-500 block truncate">
-                                {student.statusReason || 'Calculado según asistencia y carga'}
-                              </span>
-                            </div>
 
-                            {/* Condición PAEDIS */}
-                            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                                Condición PAEDIS
-                              </span>
-                              {student.isPaedis ? (
-                                <span className="inline-flex items-center gap-1 text-xs font-black bg-blue-50 text-blue-900 px-2 py-0.5 rounded-md border border-blue-200">
-                                  <span>♿ PAEDIS Acreditado</span>
+                              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                                  Estado Académico
                                 </span>
-                              ) : (
-                                <span className="text-xs font-bold text-slate-600 block">Estudiante Regular</span>
-                              )}
-                              {student.diagnosticoDeclarado && (
-                                <span className="text-[10px] text-slate-500 block truncate">
-                                  {student.diagnosticoDeclarado}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Ajustes Razonables si es PAEDIS */}
-                          {student.isPaedis && Array.isArray(student.ajustesAprobados) && student.ajustesAprobados.length > 0 && (
-                            <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 space-y-1.5">
-                              <span className="text-xs font-black text-blue-950 block">
-                                Ajustes Razonables PAEDIS Aprobados ({student.ajustesAprobados.length}):
-                              </span>
-                              <ul className="space-y-1 text-xs text-blue-900 font-medium">
-                                {student.ajustesAprobados.map((aj, idx) => (
-                                  <li key={idx} className="flex items-start gap-1.5">
-                                    <span className="text-blue-700 font-bold">•</span>
-                                    <span><strong>{aj.tipo}:</strong> {aj.descripcion}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-
-                          {/* Semáforo Predictivo de Deserción con Normativa Duoc UC */}
-                          {(() => {
-                            const pred = student.prediction || {};
-                            const trafficColor = pred.trafficLight || (pred.riskLevel === 'ALTO' || pred.riskLevel === 'DESERTOR' ? 'red' : pred.riskLevel === 'MEDIO' ? 'yellow' : 'green');
-
-                            return (
-                              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-amber-600" />
-                                    <span className="text-xs font-black uppercase tracking-wider text-slate-900">
-                                      Semáforo Predictivo de Retención vs. Deserción
-                                    </span>
-                                  </div>
-
-                                  {/* Semáforo Visual de 3 Luces */}
-                                  <div className="flex items-center gap-1.5 bg-slate-200/90 p-1.5 rounded-full border border-slate-300">
-                                    <span
-                                      title="Verde: Bajo Riesgo (> 75%)"
-                                      className={`w-3.5 h-3.5 rounded-full transition-all ${
-                                        trafficColor === 'green'
-                                          ? 'bg-emerald-500 shadow-md ring-2 ring-emerald-300 animate-pulse'
-                                          : 'bg-emerald-200 opacity-40'
-                                      }`}
-                                    />
-                                    <span
-                                      title="Amarillo: Riesgo Moderado (70% - 75%)"
-                                      className={`w-3.5 h-3.5 rounded-full transition-all ${
-                                        trafficColor === 'yellow'
-                                          ? 'bg-amber-400 shadow-md ring-2 ring-amber-200 animate-pulse'
-                                          : 'bg-amber-200 opacity-40'
-                                      }`}
-                                    />
-                                    <span
-                                      title="Rojo: Alto Riesgo / RI (< 70%)"
-                                      className={`w-3.5 h-3.5 rounded-full transition-all ${
-                                        trafficColor === 'red'
-                                          ? 'bg-rose-500 shadow-md ring-2 ring-rose-300 animate-pulse'
-                                          : 'bg-rose-200 opacity-40'
-                                      }`}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-200/60 pt-2.5">
-                                  <div>
-                                    <span className="text-sm font-black text-slate-900 block">
-                                      {pred.predictionLabel || 'Evaluación de Retención Duoc UC'}
-                                    </span>
-                                    <span className="text-xs text-slate-600 font-semibold block">
-                                      Nivel de Riesgo: <strong>{pred.riskLevel || 'BAJO'}</strong> • Probabilidad de Titulación: <strong>{pred.graduationProbability ?? 90}%</strong>
-                                    </span>
-                                  </div>
+                                <div className="flex items-center gap-1.5">
                                   <span
-                                    className={`text-xs font-black px-3 py-1 rounded-xl self-start sm:self-auto border ${
-                                      trafficColor === 'red'
-                                        ? 'bg-rose-100 text-rose-950 border-rose-300'
-                                        : trafficColor === 'yellow'
-                                        ? 'bg-amber-100 text-amber-950 border-amber-300'
-                                        : 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                                    className={`text-xs font-black uppercase px-2 py-0.5 rounded-md border ${
+                                      ACADEMIC_STATUS_BADGE_MAP[student.academicStatus] ||
+                                      ACADEMIC_STATUS_BADGE_MAP.desercion
                                     }`}
                                   >
-                                    Score de Riesgo: {pred.score ?? 15}%
+                                    {student.academicStatus || 'activo'}
                                   </span>
                                 </div>
+                                <span className="text-[10px] text-slate-500 block truncate">
+                                  {student.statusReason || 'Calculado según asistencia y carga'}
+                                </span>
+                              </div>
 
-                                {/* Factores del modelo */}
-                                {Array.isArray(pred.factors) && pred.factors.length > 0 && (
-                                  <ul className="space-y-1 text-xs text-slate-600 pt-1 border-t border-slate-200/50">
-                                    {pred.factors.map((f, i) => (
-                                      <li key={i} className="flex items-start gap-1.5">
-                                        <span className="text-slate-400 font-bold">•</span>
-                                        <span>{f}</span>
+                              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                                  Condición PAEDIS
+                                </span>
+                                {student.isPaedis ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-black bg-blue-50 text-blue-900 px-2 py-0.5 rounded-md border border-blue-200">
+                                    <span>♿ PAEDIS Acreditado</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-bold text-slate-600 block">
+                                    Estudiante Regular
+                                  </span>
+                                )}
+                                {student.diagnosticoDeclarado && (
+                                  <span className="text-[10px] text-slate-500 block truncate">
+                                    {student.diagnosticoDeclarado}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {student.isPaedis &&
+                              Array.isArray(student.ajustesAprobados) &&
+                              student.ajustesAprobados.length > 0 && (
+                                <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 space-y-1.5">
+                                  <span className="text-xs font-black text-blue-950 block">
+                                    Ajustes Razonables PAEDIS Aprobados (
+                                    {student.ajustesAprobados.length}):
+                                  </span>
+                                  <ul className="space-y-1 text-xs text-blue-900 font-medium">
+                                    {student.ajustesAprobados.map((aj, idx) => (
+                                      <li key={idx} className="flex items-start gap-1.5">
+                                        <span className="text-blue-700 font-bold">•</span>
+                                        <span>
+                                          <strong>{aj.tipo}:</strong> {aj.descripcion}
+                                        </span>
                                       </li>
                                     ))}
                                   </ul>
-                                )}
+                                </div>
+                              )}
+
+                            {/* Semáforo Predictivo de Deserción con Normativa Duoc UC */}
+                            {(() => {
+                              const pred = student.prediction || {};
+                              const trafficMeta = resolveTrafficLightColor({
+                                ...pred,
+                                semaforo: pred.trafficLight || pred.semaforo || pred.color,
+                              });
+                              const satBadgeMeta = getSatRiskBadgeMeta(trafficMeta.key);
+                              const trafficColor =
+                                trafficMeta.key === 'rojo'
+                                  ? 'red'
+                                  : trafficMeta.key === 'amarillo'
+                                  ? 'yellow'
+                                  : 'green';
+
+                              return (
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Sparkles className="w-4 h-4 text-amber-600" aria-hidden="true" />
+                                      <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+                                        Semáforo Predictivo de Retención vs. Deserción
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 bg-slate-200/90 p-1.5 rounded-full border border-slate-300">
+                                      <span
+                                        title="Verde: Bajo Riesgo (> 75%)"
+                                        className={`w-3.5 h-3.5 rounded-full transition-all ${
+                                          trafficColor === 'green'
+                                            ? 'bg-emerald-500 shadow-md ring-2 ring-emerald-300 animate-pulse'
+                                            : 'bg-emerald-200 opacity-40'
+                                        }`}
+                                      />
+                                      <span
+                                        title="Amarillo: Riesgo Moderado (70% - 75%)"
+                                        className={`w-3.5 h-3.5 rounded-full transition-all ${
+                                          trafficColor === 'yellow'
+                                            ? 'bg-amber-400 shadow-md ring-2 ring-amber-200 animate-pulse'
+                                            : 'bg-amber-200 opacity-40'
+                                        }`}
+                                      />
+                                      <span
+                                        title="Rojo: Alto Riesgo / RI (< 70%)"
+                                        className={`w-3.5 h-3.5 rounded-full transition-all ${
+                                          trafficColor === 'red'
+                                            ? 'bg-rose-500 shadow-md ring-2 ring-rose-300 animate-pulse'
+                                            : 'bg-rose-200 opacity-40'
+                                        }`}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-200/60 pt-2.5">
+                                    <div>
+                                      <span className="text-sm font-black text-slate-900 block">
+                                        {pred.predictionLabel ||
+                                          `Evaluación de Retención Duoc UC - ${DEFAULT_CAMPUS}`}
+                                      </span>
+                                      <span className="text-xs text-slate-600 font-semibold block">
+                                        Nivel de Riesgo:{' '}
+                                        <strong>{pred.riskLevel || 'BAJO'}</strong> • Probabilidad de
+                                        Titulación:{' '}
+                                        <strong>{pred.graduationProbability ?? 90}%</strong>
+                                      </span>
+                                    </div>
+                                    <span
+                                      className={`text-xs font-black px-3 py-1 rounded-xl self-start sm:self-auto border ${satBadgeMeta.badgeClass}`}
+                                    >
+                                      Score de Riesgo: {pred.score ?? 15}%
+                                    </span>
+                                  </div>
+
+                                  {Array.isArray(pred.factors) && pred.factors.length > 0 && (
+                                    <ul className="space-y-1 text-xs text-slate-600 pt-1 border-t border-slate-200/50">
+                                      {pred.factors.map((f, i) => (
+                                        <li key={i} className="flex items-start gap-1.5">
+                                          <span className="text-slate-400 font-bold">•</span>
+                                          <span>{f}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
+                            {/* ASISTENCIA DETALLADA POR ASIGNATURA */}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <div className="flex items-center gap-2">
+                                  <GraduationCap className="w-5 h-5 text-[#002B49]" aria-hidden="true" />
+                                  <h4 className="text-sm sm:text-base font-black text-slate-900">
+                                    Asistencia Detallada por Asignatura Cursada
+                                  </h4>
+                                </div>
+                                <span className="text-xs font-bold text-slate-500">
+                                  {Array.isArray(detailCourses)
+                                    ? `${detailCourses.length} asignaturas`
+                                    : 'Sin ramos'}
+                                </span>
                               </div>
-                            );
-                          })()}
 
-                          {/* ASISTENCIA DETALLADA POR ASIGNATURA */}
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                              <div className="flex items-center gap-2">
-                                <GraduationCap className="w-5 h-5 text-[#002B49]" />
-                                <h4 className="text-sm sm:text-base font-black text-slate-900">
-                                  Asistencia Detallada por Asignatura Cursada
-                                </h4>
-                              </div>
-                              <span className="text-xs font-bold text-slate-500">
-                                {Array.isArray(selectedStudentForDetail?.enrolledCourses || student.enrolledCourses)
-                                  ? `${(selectedStudentForDetail?.enrolledCourses || student.enrolledCourses).length} asignaturas`
-                                  : 'Sin ramos'}
-                              </span>
-                            </div>
+                              {Array.isArray(selectedStudentForDetail?.enrolledCourses || student.enrolledCourses) &&
+                              (selectedStudentForDetail.enrolledCourses || student.enrolledCourses).length >
+                                0 ? (
+                                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                                  <table className="w-full text-left border-collapse text-xs">
+                                    <thead className="bg-slate-100 text-slate-700 font-black uppercase text-[11px] border-b border-slate-200">
+                                      <tr>
+                                        <th className="p-3">Asignatura</th>
+                                        <th className="p-3">Sección / Sala</th>
+                                        <th className="p-3">Clases Asistidas</th>
+                                        <th className="p-3">% Asistencia</th>
+                                        <th className="p-3">Estado Normativo</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                      {(
+                                        selectedStudentForDetail.enrolledCourses ||
+                                        student.enrolledCourses
+                                      ).map((c, i) => {
+                                        const rate = extractCourseAttendanceRate({
+                                          ...c,
+                                          attendanceRate:
+                                            c.attendanceRate ??
+                                            c.porcentajeAsistencia ??
+                                            c.asistenciaPorcentaje,
+                                        });
+                                        const attendanceEval = evaluateAttendanceStatus(rate, {
+                                          mode: 'ri70',
+                                        });
+                                        const attendanceColors = getAttendanceColorClasses(
+                                          rate,
+                                          false,
+                                          'ri70'
+                                        );
+                                        const statusText =
+                                          ATTENDANCE_STATUS_TEXT[attendanceEval.status] ||
+                                          'Cumple Asistencia';
 
-                            {Array.isArray(selectedStudentForDetail?.enrolledCourses || student.enrolledCourses) && (selectedStudentForDetail.enrolledCourses || student.enrolledCourses).length > 0 ? (
-                              <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                                <table className="w-full text-left border-collapse text-xs">
-                                  <thead className="bg-slate-100 text-slate-700 font-black uppercase text-[11px] border-b border-slate-200">
-                                    <tr>
-                                      <th className="p-3">Asignatura</th>
-                                      <th className="p-3">Sección / Sala</th>
-                                      <th className="p-3">Clases Asistidas</th>
-                                      <th className="p-3">% Asistencia</th>
-                                      <th className="p-3">Estado Normativo</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100 bg-white">
-                                    {(selectedStudentForDetail.enrolledCourses || student.enrolledCourses).map((c, i) => {
-                                      const rate = Number(c.attendanceRate ?? c.porcentajeAsistencia ?? c.asistenciaPorcentaje ?? 100);
-                                      const isRI = rate < 70;
-                                      const isAlert = rate >= 70 && rate <= 75;
-
-                                      return (
-                                        <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                                          <td className="p-3 font-black text-slate-900">
-                                            <span>{c.nombre || c.curso || c.sigla}</span>
-                                            <span className="text-[11px] text-slate-400 block font-normal">{c.sigla}</span>
-                                          </td>
-                                          <td className="p-3 font-semibold text-slate-600">
-                                            <span>Sec. {c.seccion || '001D'}</span>
-                                            <span className="text-[11px] text-slate-400 block">{c.sala || 'Alameda'}</span>
-                                          </td>
-                                          <td className="p-3 font-bold text-slate-700">
-                                            {c.clasesRegistradas
-                                              ? `${c.asistencias ?? c.asistencia ?? 0} de ${c.clasesRegistradas} clases`
-                                              : 'Registrado'}
-                                          </td>
-                                          <td className="p-3">
-                                            <span
-                                              className={`font-black px-2 py-0.5 rounded-md border text-xs ${
-                                                isRI
-                                                  ? 'bg-rose-50 text-rose-900 border-rose-300'
-                                                  : isAlert
-                                                  ? 'bg-amber-50 text-amber-900 border-amber-300'
-                                                  : 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                                              }`}
-                                            >
-                                              {rate}%
-                                            </span>
-                                          </td>
-                                          <td className="p-3">
-                                            {isRI ? (
-                                              <span className="inline-flex items-center gap-1 text-[11px] font-black text-rose-800 bg-rose-100 px-2 py-0.5 rounded">
-                                                <span>⚠️ RI (Reprobado)</span>
-                                              </span>
-                                            ) : isAlert ? (
-                                              <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
-                                                <span>Alerta Preventiva</span>
-                                              </span>
-                                            ) : (
-                                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                                                <span>Cumple Asistencia</span>
-                                              </span>
+                                        return (
+                                          <tr
+                                            key={c.sigla || i}
+                                            {...getVoiceProps(
+                                              `${c.nombre || c.curso || c.sigla}, asistencia ${rate} por ciento, ${statusText}`
                                             )}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-600 space-y-1">
-                                <p className="font-bold text-slate-900">
-                                  Asistencia General Estimada: {student.attendanceRate ?? 88.9}%
-                                </p>
-                                <p>
-                                  Las asignaturas específicas y su porcentaje de asistencia se extraen y sincronizan
-                                  automáticamente en segundo plano al iniciar sesión mediante el portal Vivo Duoc.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Acciones del Detalle */}
-                          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenStatusModal(student)}
-                                disabled={!canManageAdmin}
-                                className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-black rounded-xl border border-amber-400 cursor-pointer shadow-xs disabled:opacity-50"
-                              >
-                                Cambiar Estado Académico
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteStudent(student)}
-                                disabled={!canManageAdmin}
-                                className="min-h-[40px] px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-xl border border-rose-200 cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
-                              >
-                                <Trash2 className="w-4 h-4 text-rose-700" />
-                                <span>Eliminar Estudiante</span>
-                              </button>
+                                            className="hover:bg-slate-50/80 transition-colors"
+                                          >
+                                            <td className="p-3 font-black text-slate-900">
+                                              <span>{c.nombre || c.curso || c.sigla}</span>
+                                              <span className="text-[11px] text-slate-400 block font-normal">
+                                                {c.sigla}
+                                              </span>
+                                            </td>
+                                            <td className="p-3 font-semibold text-slate-600">
+                                              <span>Sec. {c.seccion || '001D'}</span>
+                                              <span className="text-[11px] text-slate-400 block">
+                                                {c.sala || DEFAULT_CAMPUS}
+                                              </span>
+                                            </td>
+                                            <td className="p-3 font-bold text-slate-700">
+                                              {c.clasesRegistradas
+                                                ? `${c.asistencias ?? c.asistencia ?? 0} de ${c.clasesRegistradas} clases`
+                                                : 'Registrado'}
+                                            </td>
+                                            <td className="p-3">
+                                              <span
+                                                className={`font-black px-2 py-0.5 rounded-md border text-xs ${attendanceColors.badgeClass}`}
+                                              >
+                                                {rate}%
+                                              </span>
+                                            </td>
+                                            <td className="p-3">
+                                              <span
+                                                className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded border ${attendanceColors.badgeClass}`}
+                                              >
+                                                <span>{statusText}</span>
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-600 space-y-1">
+                                  <p className="font-bold text-slate-900">
+                                    Asistencia General Estimada: {student.attendanceRate ?? 88.9}%
+                                  </p>
+                                  <p>
+                                    Las asignaturas específicas y su porcentaje de asistencia se
+                                    extraen y sincronizan automáticamente en segundo plano al
+                                    iniciar sesión mediante el portal Vivo Duoc.
+                                  </p>
+                                </div>
+                              )}
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setSelectedStudentForDetail(null)}
-                              className="min-h-[40px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
-                            >
-                              Contraer Ficha
-                            </button>
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenStatusModal(student)}
+                                  disabled={!canManageAdmin}
+                                  {...getVoiceProps(`Cambiar estado académico de ${student.fullName}`)}
+                                  className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-black rounded-xl border border-amber-400 cursor-pointer shadow-xs disabled:opacity-50"
+                                >
+                                  Cambiar Estado Académico
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleDeleteStudent(student).catch((err) => {
+                                      console.error('[AdminPanelView] Error eliminando estudiante:', err);
+                                    });
+                                  }}
+                                  disabled={!canManageAdmin}
+                                  {...getVoiceProps(`Eliminar estudiante ${student.fullName}`)}
+                                  className="min-h-[40px] px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-xl border border-rose-200 cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                                >
+                                  <Trash2 className="w-4 h-4 text-rose-700" aria-hidden="true" />
+                                  <span>Eliminar Estudiante</span>
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => setSelectedStudentForDetail(null)}
+                                {...getVoiceProps('Contraer ficha del estudiante')}
+                                className="min-h-[40px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
+                              >
+                                Contraer Ficha
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5" role="list">
                 {filteredAdministradores.length === 0 ? (
@@ -1832,21 +1925,13 @@ export const AdminPanelView = () => {
                   </div>
                 ) : (
                   filteredAdministradores.map((admin) => {
-                    const adminSede = admin.campus || admin.sede || 'Sede Alameda';
+                    const adminSede = admin.campus || admin.sede || DEFAULT_CAMPUS;
                     const roleBadge = getStaffRoleBadge(admin.role);
                     const isExpanded =
                       selectedAdminForDetail &&
-                      (selectedAdminForDetail._id === admin._id || selectedAdminForDetail.id === admin.id);
-                    const isRutSearchMatch = Boolean(
-                      searchTerm &&
-                        admin.rut &&
-                        (admin.rut.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
-                          (searchTerm.replace(/[^0-9kK]/g, '').length >= 2 &&
-                            admin.rut
-                              .replace(/[^0-9kK]/g, '')
-                              .toLowerCase()
-                              .includes(searchTerm.replace(/[^0-9kK]/g, '').toLowerCase())))
-                    );
+                      (selectedAdminForDetail._id === admin._id ||
+                        selectedAdminForDetail.id === admin.id);
+                    const isRutSearchMatch = isNumericRutMatch(admin.rut, searchTerm);
 
                     return (
                       <div
@@ -1854,10 +1939,12 @@ export const AdminPanelView = () => {
                         role="listitem"
                         className={`transition-all duration-300 ${isExpanded ? 'col-span-full' : ''}`}
                       >
-                        {/* Cabecera de la Tarjeta Administrativa: Nombre y debajo Sede y Rol */}
                         <button
                           type="button"
                           onClick={() => setSelectedAdminForDetail(isExpanded ? null : admin)}
+                          {...getVoiceProps(
+                            `${isExpanded ? 'Contraer' : 'Desplegar'} ficha de ${admin.fullName}, ${roleBadge.label}, ${adminSede}`
+                          )}
                           className={`w-full p-4 text-left flex items-center justify-between gap-3 group cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
                             isExpanded
                               ? 'bg-purple-950 text-white border-2 border-purple-950 shadow-lg rounded-t-2xl rounded-b-none'
@@ -1869,7 +1956,9 @@ export const AdminPanelView = () => {
                           <div className="space-y-0.5 min-w-0">
                             <span
                               className={`font-black block truncate text-sm sm:text-base ${
-                                isExpanded ? 'text-white' : 'text-slate-900 group-hover:text-purple-950'
+                                isExpanded
+                                  ? 'text-white'
+                                  : 'text-slate-900 group-hover:text-purple-950'
                               }`}
                             >
                               {admin.fullName}
@@ -1895,7 +1984,6 @@ export const AdminPanelView = () => {
                           </div>
                         </button>
 
-                        {/* DETALLE DESPLEGADO DEL FUNCIONARIO ADMINISTRATIVO */}
                         {isExpanded && (
                           <div className="bg-white rounded-b-2xl border-x-2 border-b-2 border-purple-950 p-5 sm:p-7 shadow-xl space-y-5 animate-fade-in">
                             <div className="border-b border-slate-100 pb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1915,7 +2003,6 @@ export const AdminPanelView = () => {
                               </span>
                             </div>
 
-                            {/* Fila de Datos Institucionales */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
                                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
@@ -1945,7 +2032,6 @@ export const AdminPanelView = () => {
                               </div>
                             </div>
 
-                            {/* Descripción de Funciones */}
                             <div className="p-4 bg-purple-50/60 rounded-xl border border-purple-100 space-y-1">
                               <span className="text-xs font-black text-purple-900 block">
                                 Rol y Atribuciones en la Plataforma
@@ -1955,11 +2041,11 @@ export const AdminPanelView = () => {
                               </p>
                             </div>
 
-                            {/* Pie de Acciones */}
                             <div className="flex justify-end pt-3 border-t border-slate-100">
                               <button
                                 type="button"
                                 onClick={() => setSelectedAdminForDetail(null)}
+                                {...getVoiceProps('Contraer ficha administrativa')}
                                 className="min-h-[40px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
                               >
                                 Contraer Ficha
@@ -1985,21 +2071,35 @@ export const AdminPanelView = () => {
           aria-labelledby="status-modal-title"
           className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-6 sm:pt-10 overflow-y-auto bg-slate-900/60 backdrop-blur-xs"
         >
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 my-0 sm:my-4 animate-fade-in">
+          <div
+            ref={statusModalRef}
+            tabIndex={-1}
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 my-0 sm:my-4 animate-fade-in focus:outline-none"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 id="status-modal-title" className="text-xl font-black text-slate-900">
                 Cambiar Estado Académico
               </h3>
               <button
+                ref={statusCloseBtnRef}
                 type="button"
                 onClick={() => setIsStatusModalOpen(false)}
-                className="text-slate-400 hover:text-slate-900 p-1 rounded-lg"
+                aria-label="Cerrar modal de estado académico"
+                {...getVoiceProps('Cerrar modal de estado académico')}
+                className="text-slate-400 hover:text-slate-900 p-1 rounded-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveStatus} className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                handleSaveStatus(e).catch((err) => {
+                  console.error('[AdminPanelView] Error guardando estado:', err);
+                });
+              }}
+              className="space-y-4"
+            >
               <div>
                 <span className="text-xs text-slate-500 font-bold block">Estudiante</span>
                 <span className="text-sm font-black text-slate-900">
@@ -2018,6 +2118,7 @@ export const AdminPanelView = () => {
                   id="academic-status-select"
                   value={statusForm.academicStatus}
                   onChange={(e) => setStatusForm({ ...statusForm, academicStatus: e.target.value })}
+                  {...getVoiceProps('Seleccionar nuevo estado académico')}
                   className="w-full min-h-[44px] p-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
                 >
                   <option value="activo">Activo (Estudiante Regular Cursando)</option>
@@ -2038,6 +2139,7 @@ export const AdminPanelView = () => {
                     id="status-reason-input"
                     value={statusForm.statusReason}
                     onChange={(e) => setStatusForm({ ...statusForm, statusReason: e.target.value })}
+                    {...getVoiceProps('Seleccionar motivo de deserción')}
                     className="w-full min-h-[44px] p-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
                   >
                     <option value="">Seleccione motivo de deserción...</option>
@@ -2065,6 +2167,7 @@ export const AdminPanelView = () => {
                         ? 'Ej. Proyecto Capstone y Práctica profesional aprobadas'
                         : 'Ej. Reincorporación regular para periodo 2026'
                     }
+                    {...getVoiceProps('Motivo u observación del cambio de estado')}
                     className="w-full min-h-[44px] p-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
                   />
                 )}
@@ -2074,6 +2177,7 @@ export const AdminPanelView = () => {
                 <button
                   type="button"
                   onClick={() => setIsStatusModalOpen(false)}
+                  {...getVoiceProps('Cancelar cambio de estado académico')}
                   className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl"
                 >
                   Cancelar
@@ -2081,6 +2185,7 @@ export const AdminPanelView = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
+                  {...getVoiceProps('Guardar estado académico')}
                   className="min-h-[42px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-black rounded-xl border border-amber-400 disabled:opacity-60 flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin text-[#FFB81C]" />}
@@ -2093,7 +2198,6 @@ export const AdminPanelView = () => {
       )}
 
       {/* MODAL 2: Registrar Nuevo Estudiante / Usuario */}
-      {/* CUMPLE ESTRICTAMENTE: Posición al tope del viewport (pt-6 sm:pt-10), Ley N° 21.719, Contraseña DuocYYYY!, RUT, 4 Roles, Combobox Carrera y Sedes, Campos removidos */}
       {isCreateModalOpen && (
         <div
           role="dialog"
@@ -2101,11 +2205,15 @@ export const AdminPanelView = () => {
           aria-labelledby="create-modal-title"
           className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-6 sm:pt-10 overflow-y-auto bg-slate-900/60 backdrop-blur-xs"
         >
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-xl space-y-5 my-0 sm:my-4 animate-fade-in">
+          <div
+            ref={createModalRef}
+            tabIndex={-1}
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-xl space-y-5 my-0 sm:my-4 animate-fade-in focus:outline-none"
+          >
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-[#002B49] bg-slate-100 px-2.5 py-0.5 rounded-full inline-block mb-1">
-                  Registro Institucional Oficial • Duoc UC
+                  Registro Institucional Oficial • Duoc UC - Sede Alameda
                 </span>
                 <h3 id="create-modal-title" className="text-xl font-bold text-slate-900">
                   Registrar Estudiante / Usuario en Nexo360
@@ -2115,16 +2223,28 @@ export const AdminPanelView = () => {
                 </p>
               </div>
               <button
+                ref={createCloseBtnRef}
                 type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl transition-colors"
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setIsCareerDropdownOpen(false);
+                }}
+                {...getVoiceProps('Cerrar modal de registro')}
+                className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
                 aria-label="Cerrar modal de registro"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="space-y-4 text-xs sm:text-sm">
+            <form
+              onSubmit={(e) => {
+                handleCreateUser(e).catch((err) => {
+                  console.error('[AdminPanelView] Error creando usuario:', err);
+                });
+              }}
+              className="space-y-4 text-xs sm:text-sm"
+            >
               {/* 1. Nombre Completo y Correo Institucional */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -2138,6 +2258,7 @@ export const AdminPanelView = () => {
                     value={newUserForm.fullName}
                     onChange={(e) => setNewUserForm({ ...newUserForm, fullName: e.target.value })}
                     placeholder="Ej. Matías Soto Gómez"
+                    {...getVoiceProps('Nombre completo del usuario')}
                     className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                   />
                 </div>
@@ -2153,6 +2274,7 @@ export const AdminPanelView = () => {
                     value={newUserForm.email}
                     onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
                     placeholder="ejemplo@duocuc.cl"
+                    {...getVoiceProps('Correo institucional Duoc UC')}
                     className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                   />
                 </div>
@@ -2177,6 +2299,7 @@ export const AdminPanelView = () => {
                     value={newUserForm.password}
                     onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
                     placeholder={`Duoc${currentYear}!`}
+                    {...getVoiceProps(`Contraseña inicial, formato Duoc${currentYear}!`)}
                     className="w-full min-h-[44px] px-3.5 py-2.5 bg-amber-50/40 hover:bg-amber-50/60 focus:bg-white border border-amber-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                   />
                 </div>
@@ -2192,6 +2315,7 @@ export const AdminPanelView = () => {
                     value={newUserForm.rut}
                     onChange={(e) => setNewUserForm({ ...newUserForm, rut: e.target.value })}
                     placeholder="20.123.456-7"
+                    {...getVoiceProps('RUT del estudiante o funcionario')}
                     className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                   />
                 </div>
@@ -2207,10 +2331,13 @@ export const AdminPanelView = () => {
                   required
                   value={newUserForm.role}
                   onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                  {...getVoiceProps('Seleccionar rol institucional')}
                   className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                 >
-                  <option value="" disabled>Selecciona un rol...</option>
-                  <optgroup label="Alumnado Duoc UC">
+                  <option value="" disabled>
+                    Selecciona un rol...
+                  </option>
+                  <optgroup label={`Alumnado Duoc UC - ${DEFAULT_CAMPUS}`}>
                     <option value="estudiante">Estudiante</option>
                     <option value="estudiante_paedis">Estudiante PAEDIS</option>
                   </optgroup>
@@ -2227,7 +2354,8 @@ export const AdminPanelView = () => {
                 </select>
                 {!isAdmin && (
                   <span className="text-[11px] text-slate-500 font-medium block">
-                    *Por política de seguridad institucional, solo un Administrador puede crear usuarios con rol Administrador.
+                    *Por política de seguridad institucional, solo un Administrador puede crear
+                    usuarios con rol Administrador.
                   </span>
                 )}
               </div>
@@ -2248,7 +2376,12 @@ export const AdminPanelView = () => {
                       setNewUserForm({ ...newUserForm, career: e.target.value });
                       setIsCareerDropdownOpen(true);
                     }}
-                    onFocus={() => setIsCareerDropdownOpen(true)}
+                    data-voice-managed={careerInputVoiceProps['data-voice-managed']}
+                    onMouseEnter={careerInputVoiceProps.onMouseEnter}
+                    onFocus={(e) => {
+                      careerInputVoiceProps.onFocus(e);
+                      setIsCareerDropdownOpen(true);
+                    }}
                     placeholder="Selecciona una carrera..."
                     className="w-full min-h-[44px] px-3.5 py-2.5 pr-10 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                     autoComplete="off"
@@ -2256,6 +2389,7 @@ export const AdminPanelView = () => {
                   <button
                     type="button"
                     onClick={() => setIsCareerDropdownOpen(!isCareerDropdownOpen)}
+                    {...getVoiceProps('Desplegar lista de carreras')}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
                     aria-label="Desplegar lista de carreras"
                   >
@@ -2279,12 +2413,17 @@ export const AdminPanelView = () => {
                             setNewUserForm({ ...newUserForm, career: c.name });
                             setIsCareerDropdownOpen(false);
                           }}
+                          {...getVoiceProps(`Seleccionar carrera ${c.name}`)}
                           className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold hover:bg-slate-50 transition-colors flex items-center justify-between ${
-                            newUserForm.career === c.name ? 'bg-amber-50 text-[#002B49]' : 'text-slate-800'
+                            newUserForm.career === c.name
+                              ? 'bg-amber-50 text-[#002B49]'
+                              : 'text-slate-800'
                           }`}
                         >
                           <span>{c.name}</span>
-                          {newUserForm.career === c.name && <Check className="w-4 h-4 text-amber-600" />}
+                          {newUserForm.career === c.name && (
+                            <Check className="w-4 h-4 text-amber-600" aria-hidden="true" />
+                          )}
                         </button>
                       ))
                     )}
@@ -2292,19 +2431,22 @@ export const AdminPanelView = () => {
                 )}
               </div>
 
-              {/* 5. Sede: LISTA ORDENADA ALFABÉTICAMENTE */}
+              {/* 5. Sede Piloto */}
               <div className="space-y-1">
                 <label htmlFor="create-campus-select" className="text-xs font-semibold text-slate-700">
-                  Sede Duoc UC <span className="text-red-600">*</span>
+                  Sede Duoc UC - {DEFAULT_CAMPUS} <span className="text-red-600">*</span>
                 </label>
                 <select
                   id="create-campus-select"
                   required
                   value={newUserForm.campus}
                   onChange={(e) => setNewUserForm({ ...newUserForm, campus: e.target.value })}
+                  {...getVoiceProps(`Seleccionar sede, piloto ${DEFAULT_CAMPUS}`)}
                   className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                 >
-                  <option value="" disabled>Selecciona una sede...</option>
+                  <option value="" disabled>
+                    Selecciona una sede...
+                  </option>
                   {sortedSedes.map((s) => (
                     <option key={s._id || s.id || s.name} value={s.name}>
                       {s.name}
@@ -2313,33 +2455,40 @@ export const AdminPanelView = () => {
                 </select>
               </div>
 
-              {/* 6. Cumplimiento Ley N° 21.719 de Protección de Datos Personales de Chile */}
+              {/* 6. Cumplimiento Ley N° 21.719 */}
               <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl space-y-2">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#002B49]">
                   <Shield className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
                   <span>Aviso de Privacidad y Cumplimiento Ley N° 21.719</span>
                 </div>
                 <p className="text-[11px] text-slate-600 font-normal leading-relaxed">
-                  En cumplimiento de la <strong>Ley N° 21.719 sobre Protección de Datos Personales</strong>, los datos recopilados en Nexo360 tienen como finalidad exclusiva la gestión académica, la asignación de ajustes de accesibilidad PAEDIS y el seguimiento de retención estudiantil. Los datos no se cederán a terceros no autorizados.
+                  En cumplimiento de la <strong>Ley N° 21.719 sobre Protección de Datos Personales</strong>,
+                  los datos recopilados en Nexo360 tienen como finalidad exclusiva la gestión
+                  académica, la asignación de ajustes de accesibilidad PAEDIS y el seguimiento de
+                  retención estudiantil. Los datos no se cederán a terceros no autorizados.
                 </p>
                 <label className="flex items-start gap-2.5 pt-1 text-xs font-medium text-slate-800 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={consentAccepted}
                     onChange={(e) => setConsentAccepted(e.target.checked)}
+                    {...getVoiceProps(
+                      `Consentimiento Ley 21.719: ${consentAccepted ? 'aceptado' : 'no aceptado'}`
+                    )}
                     className="mt-0.5 w-4 h-4 text-[#002B49] rounded border-slate-300 focus:ring-[#002B49] shrink-0"
                   />
                   <span>
-                    Al registrar el usuario, se formaliza la aceptación expresa e informada del tratamiento institucional de sus datos según la Ley N° 21.719.
+                    Al registrar el usuario, se formaliza la aceptación expresa e informada del
+                    tratamiento institucional de sus datos según la Ley N° 21.719.
                   </span>
                 </label>
               </div>
 
-              {/* Mensaje de Error en el Modal */}
               {modalError && (
                 <div
                   role="alert"
                   aria-live="assertive"
+                  {...getVoiceProps(modalError)}
                   className="p-3.5 bg-red-50 border border-red-300 text-red-900 text-xs font-bold rounded-2xl flex items-center gap-2.5 animate-fade-in"
                 >
                   <AlertTriangle className="w-4 h-4 text-red-700 shrink-0" aria-hidden="true" />
@@ -2347,11 +2496,14 @@ export const AdminPanelView = () => {
                 </div>
               )}
 
-              {/* Botones de Acción */}
               <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setIsCareerDropdownOpen(false);
+                  }}
+                  {...getVoiceProps('Cancelar registro de usuario')}
                   className="min-h-[42px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer transition-colors"
                 >
                   Cancelar
@@ -2359,6 +2511,7 @@ export const AdminPanelView = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
+                  {...getVoiceProps('Registrar usuario en Nexo360')}
                   className="min-h-[42px] px-6 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-semibold rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin text-[#FFB81C]" />}

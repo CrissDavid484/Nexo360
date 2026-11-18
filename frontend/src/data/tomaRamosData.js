@@ -1,5 +1,5 @@
 /**
- * Datos estructurados para el Simulador Oficial de Toma de Ramos Duoc UC (SAP WebDynpro SICOL)
+ * Datos estructurados para el Simulador Oficial de Toma de Ramos Duoc UC - Sede Alameda (SAP WebDynpro SICOL)
  * Fiel a las pantallas de inscripción de asignaturas:
  * https://portalinsc.duoc.cl/webdynpro/dispatcher/duoc.com.student/sicol/StudentSicol?inportal=xi
  * y a los videos tutoriales oficiales de Duoc UC:
@@ -135,25 +135,64 @@ export const CARRERAS_DUOC = CAREER_DEFINITIONS.map((def) => ({
   ...def,
 }));
 
-export const BLOQUES_HORARIOS_TOMA = [
-  { id: 'b1', hora: '08:31 - 09:10', labelPdf: '08:31 A 09:10' },
-  { id: 'b2', hora: '09:11 - 09:50', labelPdf: '09:11 A 09:50' },
-  { id: 'b3', hora: '10:01 - 10:40', labelPdf: '10:01 A 10:40' },
-  { id: 'b4', hora: '10:41 - 11:20', labelPdf: '10:41 A 11:20' },
-  { id: 'b5', hora: '11:31 - 12:10', labelPdf: '11:31 A 12:10' },
-  { id: 'b6', hora: '12:11 - 12:50', labelPdf: '12:11 A 12:50' },
-  { id: 'b7', hora: '13:01 - 13:40', labelPdf: '13:01 A 13:40' },
-  { id: 'b8', hora: '14:31 - 15:10', labelPdf: '14:31 A 15:10' },
-  { id: 'b9', hora: '15:11 - 15:50', labelPdf: '15:11 A 15:50' },
-  { id: 'b10', hora: '16:01 - 16:40', labelPdf: '16:01 A 16:40' },
-  { id: 'b11', hora: '16:41 - 17:20', labelPdf: '16:41 A 17:20' },
-  { id: 'b12', hora: '17:31 - 18:10', labelPdf: '17:31 A 18:10' },
-  { id: 'b13', hora: '18:11 - 18:50', labelPdf: '18:11 A 18:50' },
-  { id: 'b14', hora: '19:01 - 19:40', labelPdf: '19:01 A 19:40' },
-  { id: 'b15', hora: '19:41 - 20:20', labelPdf: '19:41 A 20:20' },
-  { id: 'b16', hora: '20:31 - 21:10', labelPdf: '20:31 A 21:10' },
-  { id: 'b17', hora: '21:11 - 21:50', labelPdf: '21:11 A 21:50' },
+const BLOQUE_RANGES = [
+  ['b1', '08:31', '09:10'],
+  ['b2', '09:11', '09:50'],
+  ['b3', '10:01', '10:40'],
+  ['b4', '10:41', '11:20'],
+  ['b5', '11:31', '12:10'],
+  ['b6', '12:11', '12:50'],
+  ['b7', '13:01', '13:40'],
+  ['b8', '14:31', '15:10'],
+  ['b9', '15:11', '15:50'],
+  ['b10', '16:01', '16:40'],
+  ['b11', '16:41', '17:20'],
+  ['b12', '17:31', '18:10'],
+  ['b13', '18:11', '18:50'],
+  ['b14', '19:01', '19:40'],
+  ['b15', '19:41', '20:20'],
+  ['b16', '20:31', '21:10'],
+  ['b17', '21:11', '21:50'],
 ];
+
+export const BLOQUES_HORARIOS_TOMA = BLOQUE_RANGES.map(([id, start, end]) => ({
+  id,
+  hora: `${start} - ${end}`,
+  labelPdf: `${start} A ${end}`,
+}));
+
+const dayBlocks = (dia, bloqueIds, salaCorta) =>
+  bloqueIds.map((bloqueId) => ({ dia, bloqueId, salaCorta }));
+
+const createSection = (
+  seccion,
+  cuposTotales,
+  cuposDisponibles,
+  sala,
+  profesor,
+  horarioTexto,
+  bloques = [],
+  extra = {}
+) => ({
+  seccion,
+  cuposTotales,
+  cuposDisponibles,
+  sala,
+  profesor,
+  horarioTexto,
+  bloques,
+  ...extra,
+});
+
+const createCourse = (sigla, nombre, creditos, tipo, secciones, extra = {}) => ({
+  sigla,
+  siglaEq: '',
+  nombre,
+  creditos,
+  tipo,
+  ...extra,
+  secciones,
+});
 
 const createOptativoSport = (
   sigla,
@@ -165,320 +204,218 @@ const createOptativoSport = (
   horarioTexto,
   bloques = [],
   sinCupos = false
-) => ({
-  sigla,
-  siglaEq: '',
-  nombre,
-  creditos: 0,
-  tipo: 'optativo',
-  secciones: [
-    {
-      seccion: '001D',
+) =>
+  createCourse(sigla, nombre, 0, 'optativo', [
+    createSection(
+      '001D',
       cuposTotales,
       cuposDisponibles,
       sala,
       profesor,
       horarioTexto,
       bloques,
-      ...(sinCupos ? { sinCupos: true } : {}),
-    },
-  ],
-});
+      sinCupos ? { sinCupos: true } : {}
+    ),
+  ]);
 
 export const ASIGNATURAS_DISPONIBLES = [
-  {
-    sigla: 'PTY4614',
-    siglaEq: '',
-    nombre: 'PROYECTO CAPSTONE',
-    creditos: 10,
-    tipo: 'obligatorio',
-    yaInscrito: true,
-    seccionInscrita: '001D',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 30,
-        cuposDisponibles: 12,
-        sala: 'AL-503A / AL-LAB-IP4',
-        profesor: 'Mauricio Gómez Arratia',
-        horarioTexto: 'Mié 08:31-09:50, Vie 08:31-10:40',
-        bloques: [
-          { dia: 'Miércoles', bloqueId: 'b1', salaCorta: 'AL-503A' },
-          { dia: 'Miércoles', bloqueId: 'b2', salaCorta: 'AL-503A' },
-          { dia: 'Viernes', bloqueId: 'b1', salaCorta: 'AL-LAB-IP4' },
-          { dia: 'Viernes', bloqueId: 'b2', salaCorta: 'AL-LAB-IP4' },
-          { dia: 'Viernes', bloqueId: 'b3', salaCorta: 'AL-LAB-IP4' },
-        ],
-      },
+  createCourse(
+    'PTY4614',
+    'PROYECTO CAPSTONE',
+    10,
+    'obligatorio',
+    [
+      createSection(
+        '001D',
+        30,
+        12,
+        'AL-503A / AL-LAB-IP4',
+        'Mauricio Gómez Arratia',
+        'Mié 08:31-09:50, Vie 08:31-10:40',
+        [
+          ...dayBlocks('Miércoles', ['b1', 'b2'], 'AL-503A'),
+          ...dayBlocks('Viernes', ['b1', 'b2', 'b3'], 'AL-LAB-IP4'),
+        ]
+      ),
     ],
-  },
-  {
-    sigla: 'ASY4131',
-    siglaEq: '',
-    nombre: 'ARQUITECTURA DE SOFTWARE',
-    creditos: 10,
-    tipo: 'obligatorio',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 30,
-        cuposDisponibles: 14,
-        sala: 'Laboratorio de Software IP2',
-        profesor: 'Andrés Silva Paredes',
-        horarioTexto: 'Jueves 14:31 - 15:50',
-        bloques: [
-          { dia: 'Jueves', bloqueId: 'b8', salaCorta: 'AL-LAB-IP2' },
-          { dia: 'Jueves', bloqueId: 'b9', salaCorta: 'AL-LAB-IP2' },
-        ],
-      },
-      {
-        seccion: '002D',
-        cuposTotales: 30,
-        cuposDisponibles: 8,
-        sala: 'Laboratorio de Software IP1',
-        profesor: 'Claudio Vergara Soto',
-        horarioTexto: 'Miércoles 08:31 - 09:50 (Tope potencial con Capstone)',
-        bloques: [
-          { dia: 'Miércoles', bloqueId: 'b1', salaCorta: 'AL-LAB-IP1' },
-          { dia: 'Miércoles', bloqueId: 'b2', salaCorta: 'AL-LAB-IP1' },
-        ],
-      },
-      {
-        seccion: '003D',
-        cuposTotales: 28,
-        cuposDisponibles: 11,
-        sala: 'Laboratorio Redes IP3',
-        profesor: 'Carolina Muñoz R.',
-        horarioTexto: 'Viernes 11:31 - 12:50',
-        bloques: [
-          { dia: 'Viernes', bloqueId: 'b5', salaCorta: 'AL-LAB-IP3' },
-          { dia: 'Viernes', bloqueId: 'b6', salaCorta: 'AL-LAB-IP3' },
-        ],
-      },
-      {
-        seccion: '004V',
-        cuposTotales: 30,
-        cuposDisponibles: 14,
-        sala: 'Laboratorio de Software IP2',
-        profesor: 'Andrés Silva Paredes',
-        horarioTexto: 'Lunes 19:01 - 20:20 (Vespertino)',
-        bloques: [
-          { dia: 'Lunes', bloqueId: 'b14', salaCorta: 'AL-LAB-IP2' },
-          { dia: 'Lunes', bloqueId: 'b15', salaCorta: 'AL-LAB-IP2' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'GPI4121',
-    siglaEq: '',
-    nombre: 'GESTIÓN DE PROYECTOS ÁGILES',
-    creditos: 10,
-    tipo: 'obligatorio',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 28,
-        cuposDisponibles: 9,
-        sala: 'Sala 402 Alameda',
-        profesor: 'Lorena Castillo V.',
-        horarioTexto: 'Lunes 11:31 - 12:50',
-        bloques: [
-          { dia: 'Lunes', bloqueId: 'b5', salaCorta: 'AL-402' },
-          { dia: 'Lunes', bloqueId: 'b6', salaCorta: 'AL-402' },
-        ],
-      },
-      {
-        seccion: '002D',
-        cuposTotales: 30,
-        cuposDisponibles: 15,
-        sala: 'Sala 305 Alameda',
-        profesor: 'Rodrigo Fuentes M.',
-        horarioTexto: 'Martes 10:01 - 11:20',
-        bloques: [
-          { dia: 'Martes', bloqueId: 'b3', salaCorta: 'AL-305' },
-          { dia: 'Martes', bloqueId: 'b4', salaCorta: 'AL-305' },
-        ],
-      },
-      {
-        seccion: '003D',
-        cuposTotales: 30,
-        cuposDisponibles: 0,
-        sala: 'Sala 401 Alameda',
-        profesor: 'Esteban Morales P.',
-        horarioTexto: 'Lunes 08:31 - 09:50',
-        bloques: [],
-        sinCupos: true,
-      },
-      {
-        seccion: '004V',
-        cuposTotales: 30,
-        cuposDisponibles: 12,
-        sala: 'Sala 402 Alameda',
-        profesor: 'Lorena Castillo V.',
-        horarioTexto: 'Martes 19:01 - 20:20 (Vespertino)',
-        bloques: [
-          { dia: 'Martes', bloqueId: 'b14', salaCorta: 'AL-402' },
-          { dia: 'Martes', bloqueId: 'b15', salaCorta: 'AL-402' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'CAL4101',
-    siglaEq: '',
-    nombre: 'CALIDAD Y TESTING DE SOFTWARE',
-    creditos: 8,
-    tipo: 'obligatorio',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 26,
-        cuposDisponibles: 10,
-        sala: 'Laboratorio QA AL-LAB-4',
-        profesor: 'Gabriel Arancibia N.',
-        horarioTexto: 'Martes 08:31 - 09:50',
-        bloques: [
-          { dia: 'Martes', bloqueId: 'b1', salaCorta: 'AL-LAB-QA' },
-          { dia: 'Martes', bloqueId: 'b2', salaCorta: 'AL-LAB-QA' },
-        ],
-      },
-      {
-        seccion: '002D',
-        cuposTotales: 26,
-        cuposDisponibles: 12,
-        sala: 'Laboratorio QA AL-LAB-4',
-        profesor: 'Felipe Sandoval G.',
-        horarioTexto: 'Jueves 10:01 - 11:20',
-        bloques: [
-          { dia: 'Jueves', bloqueId: 'b3', salaCorta: 'AL-LAB-QA' },
-          { dia: 'Jueves', bloqueId: 'b4', salaCorta: 'AL-LAB-QA' },
-        ],
-      },
-      {
-        seccion: '003V',
-        cuposTotales: 28,
-        cuposDisponibles: 10,
-        sala: 'Laboratorio QA AL-LAB-4',
-        profesor: 'Gabriel Arancibia N.',
-        horarioTexto: 'Miércoles 19:01 - 20:20 (Vespertino)',
-        bloques: [
-          { dia: 'Miércoles', bloqueId: 'b14', salaCorta: 'AL-LAB-QA' },
-          { dia: 'Miércoles', bloqueId: 'b15', salaCorta: 'AL-LAB-QA' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'SEG4102',
-    siglaEq: '',
-    nombre: 'SEGURIDAD EN APLICACIONES Y REDES',
-    creditos: 8,
-    tipo: 'obligatorio',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 30,
-        cuposDisponibles: 16,
-        sala: 'Laboratorio Ciberseguridad IP5',
-        profesor: 'Hernán Carrasco D.',
-        horarioTexto: 'Lunes 14:31 - 15:50',
-        bloques: [
-          { dia: 'Lunes', bloqueId: 'b8', salaCorta: 'AL-LAB-CS' },
-          { dia: 'Lunes', bloqueId: 'b9', salaCorta: 'AL-LAB-CS' },
-        ],
-      },
-      {
-        seccion: '002D',
-        cuposTotales: 28,
-        cuposDisponibles: 7,
-        sala: 'Laboratorio Ciberseguridad IP5',
-        profesor: 'Viviana Orellana T.',
-        horarioTexto: 'Miércoles 14:31 - 15:50',
-        bloques: [
-          { dia: 'Miércoles', bloqueId: 'b8', salaCorta: 'AL-LAB-CS' },
-          { dia: 'Miércoles', bloqueId: 'b9', salaCorta: 'AL-LAB-CS' },
-        ],
-      },
-      {
-        seccion: '003V',
-        cuposTotales: 30,
-        cuposDisponibles: 15,
-        sala: 'Laboratorio Ciberseguridad IP5',
-        profesor: 'Hernán Carrasco D.',
-        horarioTexto: 'Jueves 19:01 - 20:20 (Vespertino)',
-        bloques: [
-          { dia: 'Jueves', bloqueId: 'b14', salaCorta: 'AL-LAB-CS' },
-          { dia: 'Jueves', bloqueId: 'b15', salaCorta: 'AL-LAB-CS' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'FCG4101',
-    siglaEq: '',
-    nombre: 'ÉTICA PROFESIONAL',
-    creditos: 6,
-    tipo: 'formacionCristiana',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 35,
-        cuposDisponibles: 18,
-        sala: 'Auditorio A-201 Alameda',
-        profesor: 'Padre Marcelo Reyes C.',
-        horarioTexto: 'Martes 14:31 - 15:50',
-        bloques: [
-          { dia: 'Martes', bloqueId: 'b8', salaCorta: 'AL-AUD-2' },
-          { dia: 'Martes', bloqueId: 'b9', salaCorta: 'AL-AUD-2' },
-        ],
-      },
-      {
-        seccion: '002D',
-        cuposTotales: 35,
-        cuposDisponibles: 22,
-        sala: 'Sala 501 Alameda',
-        profesor: 'Mónica Henríquez B.',
-        horarioTexto: 'Jueves 08:31 - 09:50',
-        bloques: [
-          { dia: 'Jueves', bloqueId: 'b1', salaCorta: 'AL-501' },
-          { dia: 'Jueves', bloqueId: 'b2', salaCorta: 'AL-501' },
-        ],
-      },
-    ],
-  },
-  {
-    sigla: 'AJEMS',
-    siglaEq: '',
-    nombre: 'AJEDREZ MIXTO SÁBADO',
-    creditos: 0,
-    tipo: 'optativo',
-    secciones: [
-      {
-        seccion: '001D',
-        cuposTotales: 30,
-        cuposDisponibles: 15,
-        sala: 'S-204 Alameda',
-        profesor: 'Carlos Riquelme Bravo',
-        horarioTexto: 'Sábado 08:31 - 10:40',
-        bloques: [
-          { dia: 'Sábado', bloqueId: 'b1', salaCorta: 'AL-204' },
-          { dia: 'Sábado', bloqueId: 'b2', salaCorta: 'AL-204' },
-          { dia: 'Sábado', bloqueId: 'b3', salaCorta: 'AL-204' },
-        ],
-      },
-      {
-        seccion: '002D',
-        cuposTotales: 30,
-        cuposDisponibles: 0,
-        sala: 'S-205 Alameda',
-        profesor: 'Jorge Valenzuela',
-        horarioTexto: 'Sábado 10:41 - 12:50',
-        bloques: [],
-        sinCupos: true,
-      },
-    ],
-  },
+    { yaInscrito: true, seccionInscrita: '001D' }
+  ),
+  createCourse('ASY4131', 'ARQUITECTURA DE SOFTWARE', 10, 'obligatorio', [
+    createSection(
+      '001D',
+      30,
+      14,
+      'Laboratorio de Software IP2',
+      'Andrés Silva Paredes',
+      'Jueves 14:31 - 15:50',
+      dayBlocks('Jueves', ['b8', 'b9'], 'AL-LAB-IP2')
+    ),
+    createSection(
+      '002D',
+      30,
+      8,
+      'Laboratorio de Software IP1',
+      'Claudio Vergara Soto',
+      'Miércoles 08:31 - 09:50 (Tope potencial con Capstone)',
+      dayBlocks('Miércoles', ['b1', 'b2'], 'AL-LAB-IP1')
+    ),
+    createSection(
+      '003D',
+      28,
+      11,
+      'Laboratorio Redes IP3',
+      'Carolina Muñoz R.',
+      'Viernes 11:31 - 12:50',
+      dayBlocks('Viernes', ['b5', 'b6'], 'AL-LAB-IP3')
+    ),
+    createSection(
+      '004V',
+      30,
+      14,
+      'Laboratorio de Software IP2',
+      'Andrés Silva Paredes',
+      'Lunes 19:01 - 20:20 (Vespertino)',
+      dayBlocks('Lunes', ['b14', 'b15'], 'AL-LAB-IP2')
+    ),
+  ]),
+  createCourse('GPI4121', 'GESTIÓN DE PROYECTOS ÁGILES', 10, 'obligatorio', [
+    createSection(
+      '001D',
+      28,
+      9,
+      'Sala 402 Alameda',
+      'Lorena Castillo V.',
+      'Lunes 11:31 - 12:50',
+      dayBlocks('Lunes', ['b5', 'b6'], 'AL-402')
+    ),
+    createSection(
+      '002D',
+      30,
+      15,
+      'Sala 305 Alameda',
+      'Rodrigo Fuentes M.',
+      'Martes 10:01 - 11:20',
+      dayBlocks('Martes', ['b3', 'b4'], 'AL-305')
+    ),
+    createSection(
+      '003D',
+      30,
+      0,
+      'Sala 401 Alameda',
+      'Esteban Morales P.',
+      'Lunes 08:31 - 09:50',
+      [],
+      { sinCupos: true }
+    ),
+    createSection(
+      '004V',
+      30,
+      12,
+      'Sala 402 Alameda',
+      'Lorena Castillo V.',
+      'Martes 19:01 - 20:20 (Vespertino)',
+      dayBlocks('Martes', ['b14', 'b15'], 'AL-402')
+    ),
+  ]),
+  createCourse('CAL4101', 'CALIDAD Y TESTING DE SOFTWARE', 8, 'obligatorio', [
+    createSection(
+      '001D',
+      26,
+      10,
+      'Laboratorio QA AL-LAB-4',
+      'Gabriel Arancibia N.',
+      'Martes 08:31 - 09:50',
+      dayBlocks('Martes', ['b1', 'b2'], 'AL-LAB-QA')
+    ),
+    createSection(
+      '002D',
+      26,
+      12,
+      'Laboratorio QA AL-LAB-4',
+      'Felipe Sandoval G.',
+      'Jueves 10:01 - 11:20',
+      dayBlocks('Jueves', ['b3', 'b4'], 'AL-LAB-QA')
+    ),
+    createSection(
+      '003V',
+      28,
+      10,
+      'Laboratorio QA AL-LAB-4',
+      'Gabriel Arancibia N.',
+      'Miércoles 19:01 - 20:20 (Vespertino)',
+      dayBlocks('Miércoles', ['b14', 'b15'], 'AL-LAB-QA')
+    ),
+  ]),
+  createCourse('SEG4102', 'SEGURIDAD EN APLICACIONES Y REDES', 8, 'obligatorio', [
+    createSection(
+      '001D',
+      30,
+      16,
+      'Laboratorio Ciberseguridad IP5',
+      'Hernán Carrasco D.',
+      'Lunes 14:31 - 15:50',
+      dayBlocks('Lunes', ['b8', 'b9'], 'AL-LAB-CS')
+    ),
+    createSection(
+      '002D',
+      28,
+      7,
+      'Laboratorio Ciberseguridad IP5',
+      'Viviana Orellana T.',
+      'Miércoles 14:31 - 15:50',
+      dayBlocks('Miércoles', ['b8', 'b9'], 'AL-LAB-CS')
+    ),
+    createSection(
+      '003V',
+      30,
+      15,
+      'Laboratorio Ciberseguridad IP5',
+      'Hernán Carrasco D.',
+      'Jueves 19:01 - 20:20 (Vespertino)',
+      dayBlocks('Jueves', ['b14', 'b15'], 'AL-LAB-CS')
+    ),
+  ]),
+  createCourse('FCG4101', 'ÉTICA PROFESIONAL', 6, 'formacionCristiana', [
+    createSection(
+      '001D',
+      35,
+      18,
+      'Auditorio A-201 Alameda',
+      'Padre Marcelo Reyes C.',
+      'Martes 14:31 - 15:50',
+      dayBlocks('Martes', ['b8', 'b9'], 'AL-AUD-2')
+    ),
+    createSection(
+      '002D',
+      35,
+      22,
+      'Sala 501 Alameda',
+      'Mónica Henríquez B.',
+      'Jueves 08:31 - 09:50',
+      dayBlocks('Jueves', ['b1', 'b2'], 'AL-501')
+    ),
+  ]),
+  createCourse('AJEMS', 'AJEDREZ MIXTO SÁBADO', 0, 'optativo', [
+    createSection(
+      '001D',
+      30,
+      15,
+      'S-204 Alameda',
+      'Carlos Riquelme Bravo',
+      'Sábado 08:31 - 10:40',
+      dayBlocks('Sábado', ['b1', 'b2', 'b3'], 'AL-204')
+    ),
+    createSection(
+      '002D',
+      30,
+      0,
+      'S-205 Alameda',
+      'Jorge Valenzuela',
+      'Sábado 10:41 - 12:50',
+      [],
+      { sinCupos: true }
+    ),
+  ]),
   createOptativoSport(
     'FITW',
     'FITNESS MIERCOLES',
@@ -487,10 +424,7 @@ export const ASIGNATURAS_DISPONIBLES = [
     'Gimnasio Alameda',
     'Valeria Soto M.',
     'Miércoles 11:31 - 12:50',
-    [
-      { dia: 'Miércoles', bloqueId: 'b5', salaCorta: 'GIM-ALM' },
-      { dia: 'Miércoles', bloqueId: 'b6', salaCorta: 'GIM-ALM' },
-    ]
+    dayBlocks('Miércoles', ['b5', 'b6'], 'GIM-ALM')
   ),
   createOptativoSport(
     'BASDW',
@@ -500,7 +434,7 @@ export const ASIGNATURAS_DISPONIBLES = [
     'Multicancha Alameda',
     'Patricia Fuentes',
     'Miércoles 13:01 - 14:30',
-    [{ dia: 'Miércoles', bloqueId: 'b7', salaCorta: 'CANCHA-1' }]
+    dayBlocks('Miércoles', ['b7'], 'CANCHA-1')
   ),
   createOptativoSport(
     'DEFPL',
@@ -510,10 +444,7 @@ export const ASIGNATURAS_DISPONIBLES = [
     'Sala Multiuso Alameda',
     'Rodrigo Morales',
     'Lunes 10:01 - 11:20',
-    [
-      { dia: 'Lunes', bloqueId: 'b3', salaCorta: 'MULTIUSO' },
-      { dia: 'Lunes', bloqueId: 'b4', salaCorta: 'MULTIUSO' },
-    ]
+    dayBlocks('Lunes', ['b3', 'b4'], 'MULTIUSO')
   ),
   createOptativoSport(
     'FUTVJ',
@@ -523,10 +454,7 @@ export const ASIGNATURAS_DISPONIBLES = [
     'Cancha Central Alameda',
     'Esteban Paredes Q.',
     'Jueves 11:31 - 12:50',
-    [
-      { dia: 'Jueves', bloqueId: 'b5', salaCorta: 'CANCHA-C' },
-      { dia: 'Jueves', bloqueId: 'b6', salaCorta: 'CANCHA-C' },
-    ]
+    dayBlocks('Jueves', ['b5', 'b6'], 'CANCHA-C')
   ),
   createOptativoSport(
     'KARAS',
@@ -541,29 +469,34 @@ export const ASIGNATURAS_DISPONIBLES = [
   ),
 ];
 
+const SCHEDULE_DAY_MAP = {
+  lu: 'Lunes',
+  ma: 'Martes',
+  mi: 'Miércoles',
+  ju: 'Jueves',
+  vi: 'Viernes',
+  sa: 'Sábado',
+  do: 'Domingo',
+  lunes: 'Lunes',
+  martes: 'Martes',
+  miercoles: 'Miércoles',
+  miércoles: 'Miércoles',
+  jueves: 'Jueves',
+  viernes: 'Viernes',
+  sabado: 'Sábado',
+  sábado: 'Sábado',
+};
+
+const toMinutes = (timeStr) => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
 /**
  * Parsea un horario de Duoc UC a bloques horarios de la cuadrícula
  */
 export function parseDuocSchedule(scheduleStr, sala = 'ONLINE') {
   if (!scheduleStr || typeof scheduleStr !== 'string') return [];
-
-  const dayMap = {
-    lu: 'Lunes',
-    ma: 'Martes',
-    mi: 'Miércoles',
-    ju: 'Jueves',
-    vi: 'Viernes',
-    sa: 'Sábado',
-    do: 'Domingo',
-    lunes: 'Lunes',
-    martes: 'Martes',
-    miercoles: 'Miércoles',
-    miércoles: 'Miércoles',
-    jueves: 'Jueves',
-    viernes: 'Viernes',
-    sabado: 'Sábado',
-    sábado: 'Sábado',
-  };
 
   const match = scheduleStr
     .trim()
@@ -571,36 +504,22 @@ export function parseDuocSchedule(scheduleStr, sala = 'ONLINE') {
 
   if (!match) return [];
 
-  const day = dayMap[match[1].toLowerCase()] || 'Lunes';
-  const toMinutes = (timeStr) => {
-    const parts = timeStr.split(':').map(Number);
-    return parts[0] * 60 + parts[1];
-  };
-
+  const day = SCHEDULE_DAY_MAP[match[1].toLowerCase()] || 'Lunes';
   const startMin = toMinutes(match[2]);
   const endMin = toMinutes(match[3]);
+  const targetSala = sala || 'ONLINE';
 
   const matched = [];
   for (const blk of BLOQUES_HORARIOS_TOMA) {
     const [hIni, hFin] = blk.hora.split(' - ');
-    const bStart = toMinutes(hIni);
-    const bEnd = toMinutes(hFin);
-
-    if (Math.max(startMin, bStart) < Math.min(endMin, bEnd)) {
-      matched.push({
-        dia: day,
-        bloqueId: blk.id,
-        salaCorta: sala || 'ONLINE',
-      });
+    if (Math.max(startMin, toMinutes(hIni)) < Math.min(endMin, toMinutes(hFin))) {
+      matched.push({ dia: day, bloqueId: blk.id, salaCorta: targetSala });
     }
   }
 
   if (matched.length === 0) {
-    matched.push({
-      dia: day,
-      bloqueId: startMin < 12 * 60 ? 'b1' : startMin < 17 * 60 ? 'b8' : 'b12',
-      salaCorta: sala || 'ONLINE',
-    });
+    const fallbackId = startMin < 12 * 60 ? 'b1' : startMin < 17 * 60 ? 'b8' : 'b12';
+    matched.push({ dia: day, bloqueId: fallbackId, salaCorta: targetSala });
   }
 
   return matched;
@@ -612,7 +531,7 @@ export function parseDuocSchedule(scheduleStr, sala = 'ONLINE') {
 export const CATALOGO_INFRAESTRUCTURA_TECNOLOGICA = infrastructureCatalog;
 
 /**
- * Plantillas Institucionales para Prácticas y Portafolio Duoc UC
+ * Plantillas Institucionales para Prácticas y Portafolio Duoc UC - Sede Alameda
  */
 const createPracticaCourse = ({
   sigla,
@@ -627,32 +546,25 @@ const createPracticaCourse = ({
   supervisor,
   horas,
   periodo,
-}) => ({
-  sigla,
-  siglaEq: '',
-  nombre,
-  creditos: 0,
-  tipo: 'practica',
-  subtipo,
-  secciones: [
-    {
-      seccion: '001D',
-      cuposTotales: 60,
-      cuposDisponibles,
-      sala,
-      profesor,
-      horarioTexto,
-      bloques: [],
-      detallePractica: {
-        tipo: tipoDetalle,
-        centroPractica,
-        supervisor,
-        horas,
-        periodo,
-      },
-    },
-  ],
-});
+}) =>
+  createCourse(
+    sigla,
+    nombre,
+    0,
+    'practica',
+    [
+      createSection('001D', 60, cuposDisponibles, sala, profesor, horarioTexto, [], {
+        detallePractica: {
+          tipo: tipoDetalle,
+          centroPractica,
+          supervisor,
+          horas,
+          periodo,
+        },
+      }),
+    ],
+    { subtipo }
+  );
 
 export const PRACTICA_LABORAL_COURSE = createPracticaCourse({
   sigla: 'PRL3100',
@@ -663,7 +575,7 @@ export const PRACTICA_LABORAL_COURSE = createPracticaCourse({
   profesor: 'COORDINACIÓN DE PRÁCTICAS DUOC UC',
   horarioTexto: 'Supervisión en terreno (360 hrs)',
   tipoDetalle: 'Práctica Laboral',
-  centroPractica: 'Empresa TI en Convenio • Sede Alameda',
+  centroPractica: 'Empresa TI en Convenio • Duoc UC - Sede Alameda',
   supervisor: 'Coordinador de Prácticas Laborales Escuela Informática',
   horas: '360 horas cronológicas',
   periodo: 'Primer y Segundo Semestre 2026',
@@ -684,33 +596,28 @@ export const PRACTICA_PROFESIONAL_COURSE = createPracticaCourse({
   periodo: 'Semestre de Egreso 2026',
 });
 
-export const PORTAFOLIO_TITULO_COURSE = {
-  sigla: 'PTF6101',
-  siglaEq: '',
-  nombre: 'PORTAFOLIO DE TÍTULO',
-  creditos: 10,
-  tipo: 'portafolio',
-  secciones: [
+export const PORTAFOLIO_TITULO_COURSE = createCourse('PTF6101', 'PORTAFOLIO DE TÍTULO', 10, 'portafolio', [
+  createSection(
+    '001D',
+    30,
+    18,
+    'AL-503A',
+    'Mauricio Gómez Arratia',
+    'Mi 08:31 - 09:50 / Vi 08:31 - 10:40',
+    [
+      ...dayBlocks('Miércoles', ['b1'], 'AL-503A'),
+      ...dayBlocks('Viernes', ['b1'], 'AL-LAB-IP4'),
+    ],
     {
-      seccion: '001D',
-      cuposTotales: 30,
-      cuposDisponibles: 18,
-      sala: 'AL-503A',
-      profesor: 'Mauricio Gómez Arratia',
-      horarioTexto: 'Mi 08:31 - 09:50 / Vi 08:31 - 10:40',
-      bloques: [
-        { dia: 'Miércoles', bloqueId: 'b1', salaCorta: 'AL-503A' },
-        { dia: 'Viernes', bloqueId: 'b1', salaCorta: 'AL-LAB-IP4' },
-      ],
       clasesPortafolio: [
         { nro: 'Clase 01', fecha: 'Miércoles 04 de Marzo de 2026', horario: '08:31 a 09:50', sala: 'AL-503A' },
         { nro: 'Clase 02', fecha: 'Viernes 06 de Marzo de 2026', horario: '08:31 a 10:40', sala: 'AL-LAB-IP4' },
         { nro: 'Clase 03', fecha: 'Miércoles 11 de Marzo de 2026', horario: '08:31 a 09:50', sala: 'AL-503A' },
         { nro: 'Clase 04', fecha: 'Viernes 13 de Marzo de 2026', horario: '08:31 a 10:40', sala: 'AL-LAB-IP4' },
       ],
-    },
-  ],
-};
+    }
+  ),
+]);
 
 /**
  * 4 Niveles de Dificultad para el Simulador
@@ -771,18 +678,15 @@ export const DIFFICULTY_LEVELS = [
  * Mar - 15 Jul: 1er Sem. / 16 Jul - 21 Dic: 2do Sem.
  */
 export function getBoletinSemesterTitle(date = new Date()) {
-  const month = date.getMonth() + 1; // 1-12
+  const month = date.getMonth() + 1;
   const day = date.getDate();
   const year = date.getFullYear();
 
-  let semester = '1er Sem.';
-  if (month >= 3 && (month < 7 || (month === 7 && day <= 15))) {
-    semester = '1er Sem.';
-  } else if ((month === 7 && day >= 16) || (month > 7 && (month < 12 || (month === 12 && day <= 21)))) {
-    semester = '2do Sem.';
-  } else {
-    semester = '1er Sem.';
-  }
+  const isSecondSemester =
+    (month === 7 && day >= 16) ||
+    (month > 7 && month < 12) ||
+    (month === 12 && day <= 21);
+  const semester = isSecondSemester ? '2do Sem.' : '1er Sem.';
 
   return `BOLETIN DE CARGA ACADEMICA ${semester}    ${year}`;
 }
@@ -800,26 +704,37 @@ export function formatStudentNameForBoletin(fullName) {
 }
 
 /**
+ * Anexa prácticas institucionales a una lista de asignaturas según nivel de dificultad.
+ */
+export function appendDifficultyPracticas(coursesList, difficulty) {
+  const result = [...coursesList];
+  if (difficulty === 'intermedio' || difficulty === 'muy-dificil') {
+    if (!result.some((c) => c.sigla === PRACTICA_LABORAL_COURSE.sigla)) {
+      result.push(PRACTICA_LABORAL_COURSE);
+    }
+  }
+  if (difficulty === 'muy-dificil') {
+    if (!result.some((c) => c.sigla === PRACTICA_PROFESIONAL_COURSE.sigla)) {
+      result.push(PRACTICA_PROFESIONAL_COURSE);
+    }
+  }
+  return result;
+}
+
+/**
  * Función que retorna asignaturas aleatorias según la carrera elegida y nivel de dificultad
  */
 export function getRandomCoursesForCareer(carreraNombre, limit = 7, difficulty = 'facil') {
   const norm = (carreraNombre || '').toLowerCase();
-  let pool = [];
+  const isInformatica = norm.includes('informática') || norm.includes('informatica');
+  const pool = isInformatica
+    ? [...ASIGNATURAS_DISPONIBLES, ...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA]
+    : [...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA, ...ASIGNATURAS_DISPONIBLES];
 
-  if (norm.includes('infraestructura') || norm.includes('plataformas')) {
-    pool = [...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA, ...ASIGNATURAS_DISPONIBLES];
-  } else if (norm.includes('informática') || norm.includes('informatica')) {
-    pool = [...ASIGNATURAS_DISPONIBLES, ...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA];
-  } else {
-    pool = [...CATALOGO_INFRAESTRUCTURA_TECNOLOGICA, ...ASIGNATURAS_DISPONIBLES];
-  }
-
-  // Asegurar catálogo de Portafolio
   if (!pool.some((c) => c.sigla === PORTAFOLIO_TITULO_COURSE.sigla)) {
     pool.unshift(PORTAFOLIO_TITULO_COURSE);
   }
 
-  // Ajustar límite según dificultad
   let effectiveLimit = limit;
   if (difficulty === 'dificil' || difficulty === 'muy-dificil') {
     effectiveLimit = Math.max(limit, 16);
@@ -827,40 +742,24 @@ export function getRandomCoursesForCareer(carreraNombre, limit = 7, difficulty =
     effectiveLimit = Math.max(limit, 10);
   }
 
-  // Barajado aleatorio Fisher-Yates
   const shuffled = [...pool];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  const selected = shuffled.slice(0, Math.min(effectiveLimit, shuffled.length));
-
-  // Simular 1 asignatura previamente inscrita
-  const list = selected.map((item, idx) => ({
+  const selected = shuffled.slice(0, Math.min(effectiveLimit, shuffled.length)).map((item, idx) => ({
     ...item,
     yaInscrito: idx === 0,
     seccionInscrita: idx === 0 && item.secciones[0] ? item.secciones[0].seccion : undefined,
   }));
 
-  // Agregar prácticas si la dificultad lo requiere
-  if (difficulty === 'intermedio' || difficulty === 'muy-dificil') {
-    if (!list.some((c) => c.sigla === PRACTICA_LABORAL_COURSE.sigla)) {
-      list.push(PRACTICA_LABORAL_COURSE);
-    }
-  }
-  if (difficulty === 'muy-dificil') {
-    if (!list.some((c) => c.sigla === PRACTICA_PROFESIONAL_COURSE.sigla)) {
-      list.push(PRACTICA_PROFESIONAL_COURSE);
-    }
-  }
-
-  return list;
+  return appendDifficultyPracticas(selected, difficulty);
 }
 
-/**
- * Helpers para la construcción de cursos seleccionados en paquetes objetivo
- */
+const hasBlockConflict = (bloques, occupiedSlots) =>
+  (bloques || []).some((b) => occupiedSlots.has(`${b.dia}-${b.bloqueId}`));
+
 const addCourseSectionToPackage = (selected, occupiedSlots, course, sec) => {
   selected.push({
     sigla: course.sigla,
@@ -893,6 +792,73 @@ const addPracticaToPackage = (selected, practicaCourse) => {
   });
 };
 
+const fillPackageCourses = ({ courses, selected, occupiedSlots, limit, filterBlock }) => {
+  for (const course of courses) {
+    if (selected.length >= limit) break;
+    if (selected.some((s) => s.sigla === course.sigla)) continue;
+
+    const validSections = (course.secciones || []).filter(
+      (sec) => !sec.sinCupos && (sec.bloques || []).length > 0
+    );
+
+    const orderedSections = filterBlock
+      ? [...validSections].sort((s1, s2) => {
+          const m1 = s1.bloques.some((b) => filterBlock(b.bloqueId)) ? 1 : 0;
+          const m2 = s2.bloques.some((b) => filterBlock(b.bloqueId)) ? 1 : 0;
+          return m2 - m1;
+        })
+      : validSections;
+
+    const chosen = orderedSections.find((sec) => !hasBlockConflict(sec.bloques, occupiedSlots));
+    if (chosen) {
+      addCourseSectionToPackage(selected, occupiedSlots, course, chosen);
+    }
+  }
+};
+
+const PACKAGE_SHIFT_CONFIGS = [
+  {
+    id: 'pkg-manana',
+    name: 'Paquete 1: Bloque Diurno Mañana',
+    badge: 'Jornada Mañana',
+    jornada: 'Diurno',
+    color: 'emerald',
+    buildDesc: (diffBadge) =>
+      `Cursos en horario matutino (08:31 - 12:50 hrs). ${diffBadge} coordinados sin topes.`,
+    filterBlock: (bId) => ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'].includes(bId),
+  },
+  {
+    id: 'pkg-media-tarde',
+    name: 'Paquete 2: Bloque Media Tarde',
+    badge: 'Media Tarde',
+    jornada: 'Diurno',
+    color: 'blue',
+    buildDesc: () =>
+      'Cursos planificados entre 13:01 y 16:40 hrs. Diseñado para evitar traslados matutinos.',
+    filterBlock: (bId) => ['b7', 'b8', 'b9', 'b10'].includes(bId),
+  },
+  {
+    id: 'pkg-tarde',
+    name: 'Paquete 3: Bloque Tarde',
+    badge: 'Jornada Tarde',
+    jornada: 'Diurno',
+    color: 'amber',
+    buildDesc: () =>
+      'Cursos en la segunda mitad de la tarde (16:41 - 19:40 hrs). Ideal para liberar mañanas.',
+    filterBlock: (bId) => ['b11', 'b12', 'b13', 'b14'].includes(bId),
+  },
+  {
+    id: 'pkg-vespertino',
+    name: 'Paquete 4: Bloque Vespertino',
+    badge: 'Jornada Vespertina',
+    jornada: 'Vespertino',
+    color: 'purple',
+    buildDesc: () =>
+      'Asignaturas en horario vespertino (19:01 - 21:50 hrs). Compatibilidad laboral garantizada.',
+    filterBlock: (bId) => ['b14', 'b15', 'b16', 'b17'].includes(bId),
+  },
+];
+
 /**
  * Genera los paquetes objetivos predefinidos (Mañana, Media Tarde, Tarde y Vespertino)
  * soportando los 4 niveles de dificultad (Fácil, Intermedio, Difícil, Muy Difícil).
@@ -911,9 +877,9 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
   );
 
   const selectableCourses = validCourses.filter((c) => !c.yaInscrito);
-  const coursesToUse = selectableCourses.length >= requiredRegularCount ? selectableCourses : validCourses;
+  const coursesToUse =
+    selectableCourses.length >= requiredRegularCount ? selectableCourses : validCourses;
 
-  // Registrar bloques de cualquier curso pre-inscrito en la sesión para evitar colisiones
   const preInscrito = courses.find((c) => c.yaInscrito);
   const preInscritoSlots = new Set();
   if (preInscrito && Array.isArray(preInscrito.secciones) && preInscrito.secciones.length > 0) {
@@ -923,106 +889,32 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
     (preSec.bloques || []).forEach((b) => preInscritoSlots.add(`${b.dia}-${b.bloqueId}`));
   }
 
-  const configs = [
-    {
-      id: 'pkg-manana',
-      name: 'Paquete 1: Bloque Diurno Mañana',
-      badge: 'Jornada Mañana',
-      jornada: 'Diurno',
-      color: 'emerald',
-      description:
-        `Cursos en horario matutino (08:31 - 12:50 hrs). ${diffConfig.badge} coordinados sin topes.`,
-      filterBlock: (bId) => ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'].includes(bId),
-    },
-    {
-      id: 'pkg-media-tarde',
-      name: 'Paquete 2: Bloque Media Tarde',
-      badge: 'Media Tarde',
-      jornada: 'Diurno',
-      color: 'blue',
-      description:
-        `Cursos planificados entre 13:01 y 16:40 hrs. Diseñado para evitar traslados matutinos.`,
-      filterBlock: (bId) => ['b7', 'b8', 'b9', 'b10'].includes(bId),
-    },
-    {
-      id: 'pkg-tarde',
-      name: 'Paquete 3: Bloque Tarde',
-      badge: 'Jornada Tarde',
-      jornada: 'Diurno',
-      color: 'amber',
-      description:
-        `Cursos en la segunda mitad de la tarde (16:41 - 19:40 hrs). Ideal para liberar mañanas.`,
-      filterBlock: (bId) => ['b11', 'b12', 'b13', 'b14'].includes(bId),
-    },
-    {
-      id: 'pkg-vespertino',
-      name: 'Paquete 4: Bloque Vespertino',
-      badge: 'Jornada Vespertina',
-      jornada: 'Vespertino',
-      color: 'purple',
-      description:
-        `Asignaturas en horario vespertino (19:01 - 21:50 hrs). Compatibilidad laboral garantizada.`,
-      filterBlock: (bId) => ['b14', 'b15', 'b16', 'b17'].includes(bId),
-    },
-  ];
-
-  // Asignaturas curriculares requeridas para esta sesión (uniformes en todos los paquetes)
   const targetSubjects = coursesToUse.slice(0, requiredRegularCount);
 
-  return configs.map((cfg, pIdx) => {
+  return PACKAGE_SHIFT_CONFIGS.map((cfg) => {
     const selected = [];
     const occupiedSlots = new Set(preInscritoSlots);
 
-    // Iterar de forma consistente sobre las mismas asignaturas curriculares del paquete
-    for (const course of targetSubjects) {
-      if (selected.length >= requiredRegularCount) break;
-      if (selected.some((s) => s.sigla === course.sigla)) continue;
+    fillPackageCourses({
+      courses: targetSubjects,
+      selected,
+      occupiedSlots,
+      limit: requiredRegularCount,
+      filterBlock: cfg.filterBlock,
+    });
 
-      const eligibleSections = (course.secciones || [])
-        .filter((sec) => !sec.sinCupos && (sec.bloques || []).length > 0)
-        .sort((s1, s2) => {
-          const match1 = (s1.bloques || []).some((b) => cfg.filterBlock(b.bloqueId)) ? 1 : 0;
-          const match2 = (s2.bloques || []).some((b) => cfg.filterBlock(b.bloqueId)) ? 1 : 0;
-          return match2 - match1;
-        });
-
-      for (const sec of eligibleSections) {
-        const hasConflict = (sec.bloques || []).some((b) =>
-          occupiedSlots.has(`${b.dia}-${b.bloqueId}`)
-        );
-
-        if (!hasConflict) {
-          addCourseSectionToPackage(selected, occupiedSlots, course, sec);
-          break;
-        }
-      }
-    }
-
-    // Si faltaron asignaturas para cumplir el objetivo regular, completar sin choque desde coursesToUse
     if (selected.length < requiredRegularCount) {
-      for (const course of coursesToUse) {
-        if (selected.length >= requiredRegularCount) break;
-        if (selected.some((s) => s.sigla === course.sigla)) continue;
-
-        for (const sec of course.secciones || []) {
-          if (sec.sinCupos || !(sec.bloques || []).length) continue;
-          const hasConflict = (sec.bloques || []).some((b) =>
-            occupiedSlots.has(`${b.dia}-${b.bloqueId}`)
-          );
-          if (!hasConflict) {
-            addCourseSectionToPackage(selected, occupiedSlots, course, sec);
-            break;
-          }
-        }
-      }
+      fillPackageCourses({
+        courses: coursesToUse,
+        selected,
+        occupiedSlots,
+        limit: requiredRegularCount,
+      });
     }
 
-    // Agregar Práctica Laboral si la dificultad lo requiere
     if (diffConfig.hasPracticaLaboral) {
       addPracticaToPackage(selected, PRACTICA_LABORAL_COURSE);
     }
-
-    // Agregar Práctica Profesional si la dificultad lo requiere
     if (diffConfig.hasPracticaProfesional) {
       addPracticaToPackage(selected, PRACTICA_PROFESIONAL_COURSE);
     }
@@ -1033,110 +925,46 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
       badge: `${cfg.badge} • ${diffConfig.name}`,
       jornada: cfg.jornada,
       color: cfg.color,
-      description: cfg.description,
+      description: cfg.buildDesc(diffConfig.badge),
       difficulty: diffConfig.id,
       targetCourses: selected,
     };
   });
 }
 
+const MALLA_STATUS_CODES = {
+  A: 'aprobado',
+  C: 'convalidado',
+  R: 'reprobado',
+  P: 'pendiente',
+  S: 'sin-inscribir',
+};
+
+const MALLA_SEMESTERS_RAW = [
+  ['Semestre 1', ['IPF1501:A', 'SPD1501:A', 'THS1501:A', 'LMT1501:C', 'FET001:A', 'MAT100:A']],
+  ['Semestre 2', ['OIN1446101:A', 'MAT200:A', 'PEF2501:A', 'MDD2501:A', 'LDP2501:A', 'FET102:C']],
+  ['Semestre 3', ['OPR1446101:A', 'MAT330:R', 'INU111:A', 'LDP3501:A', 'TAP3501:A', 'PBD3501:A']],
+  ['Semestre 4', ['FDR1501:A', 'DAI4501:A', 'INU211:P', 'FET003:A', 'SOR4501:A', 'EMP110:A']],
+  ['Semestre 5', ['FET212:A', 'PLF5503:A', 'ASF5501:A', 'ABD5501:A', 'MPN5501:A', 'INU311:A', 'ISF5501:S']],
+  ['Semestre 6', ['CPI6501:S', 'ADF4501:S', 'INU411:S', 'GBI6501:S']],
+  ['Semestre 7', ['EMP120:S', 'SCF6501:S', 'SSC7501:S', 'TSF7502:S', 'EDP7201:S']],
+  ['Semestre 8', ['ARF8502:S', 'DSF7501:S', 'AHF8502:S', 'TAL011:S', 'PTF8502:S', 'PPF8502:S']],
+  ['Semestre 9', ['-:S:info']],
+];
+
 /**
  * Malla curricular de referencia (Semestres 1 al 9) fiel a las capturas de SAP SICOL "Malla Alumno"
  */
-export const MALLA_CURRICULAR_BASE = [
-  {
-    semestre: 'Semestre 1',
-    asignaturas: [
-      { sigla: 'IPF1501', defaultStatus: 'aprobado' },
-      { sigla: 'SPD1501', defaultStatus: 'aprobado' },
-      { sigla: 'THS1501', defaultStatus: 'aprobado' },
-      { sigla: 'LMT1501', defaultStatus: 'convalidado' },
-      { sigla: 'FET001', defaultStatus: 'aprobado' },
-      { sigla: 'MAT100', defaultStatus: 'aprobado' },
-    ],
-  },
-  {
-    semestre: 'Semestre 2',
-    asignaturas: [
-      { sigla: 'OIN1446101', defaultStatus: 'aprobado' },
-      { sigla: 'MAT200', defaultStatus: 'aprobado' },
-      { sigla: 'PEF2501', defaultStatus: 'aprobado' },
-      { sigla: 'MDD2501', defaultStatus: 'aprobado' },
-      { sigla: 'LDP2501', defaultStatus: 'aprobado' },
-      { sigla: 'FET102', defaultStatus: 'convalidado' },
-    ],
-  },
-  {
-    semestre: 'Semestre 3',
-    asignaturas: [
-      { sigla: 'OPR1446101', defaultStatus: 'aprobado' },
-      { sigla: 'MAT330', defaultStatus: 'reprobado' },
-      { sigla: 'INU111', defaultStatus: 'aprobado' },
-      { sigla: 'LDP3501', defaultStatus: 'aprobado' },
-      { sigla: 'TAP3501', defaultStatus: 'aprobado' },
-      { sigla: 'PBD3501', defaultStatus: 'aprobado' },
-    ],
-  },
-  {
-    semestre: 'Semestre 4',
-    asignaturas: [
-      { sigla: 'FDR1501', defaultStatus: 'aprobado' },
-      { sigla: 'DAI4501', defaultStatus: 'aprobado' },
-      { sigla: 'INU211', defaultStatus: 'pendiente' },
-      { sigla: 'FET003', defaultStatus: 'aprobado' },
-      { sigla: 'SOR4501', defaultStatus: 'aprobado' },
-      { sigla: 'EMP110', defaultStatus: 'aprobado' },
-    ],
-  },
-  {
-    semestre: 'Semestre 5',
-    asignaturas: [
-      { sigla: 'FET212', defaultStatus: 'aprobado' },
-      { sigla: 'PLF5503', defaultStatus: 'aprobado' },
-      { sigla: 'ASF5501', defaultStatus: 'aprobado' },
-      { sigla: 'ABD5501', defaultStatus: 'aprobado' },
-      { sigla: 'MPN5501', defaultStatus: 'aprobado' },
-      { sigla: 'INU311', defaultStatus: 'aprobado' },
-      { sigla: 'ISF5501', defaultStatus: 'sin-inscribir' },
-    ],
-  },
-  {
-    semestre: 'Semestre 6',
-    asignaturas: [
-      { sigla: 'CPI6501', defaultStatus: 'sin-inscribir' },
-      { sigla: 'ADF4501', defaultStatus: 'sin-inscribir' },
-      { sigla: 'INU411', defaultStatus: 'sin-inscribir' },
-      { sigla: 'GBI6501', defaultStatus: 'sin-inscribir' },
-    ],
-  },
-  {
-    semestre: 'Semestre 7',
-    asignaturas: [
-      { sigla: 'EMP120', defaultStatus: 'sin-inscribir' },
-      { sigla: 'SCF6501', defaultStatus: 'sin-inscribir' },
-      { sigla: 'SSC7501', defaultStatus: 'sin-inscribir' },
-      { sigla: 'TSF7502', defaultStatus: 'sin-inscribir' },
-      { sigla: 'EDP7201', defaultStatus: 'sin-inscribir' },
-    ],
-  },
-  {
-    semestre: 'Semestre 8',
-    asignaturas: [
-      { sigla: 'ARF8502', defaultStatus: 'sin-inscribir' },
-      { sigla: 'DSF7501', defaultStatus: 'sin-inscribir' },
-      { sigla: 'AHF8502', defaultStatus: 'sin-inscribir' },
-      { sigla: 'TAL011', defaultStatus: 'sin-inscribir' },
-      { sigla: 'PTF8502', defaultStatus: 'sin-inscribir' },
-      { sigla: 'PPF8502', defaultStatus: 'sin-inscribir' },
-    ],
-  },
-  {
-    semestre: 'Semestre 9',
-    asignaturas: [
-      { sigla: '-', isInfoPlaceholder: true, defaultStatus: 'sin-inscribir' },
-    ],
-  },
-];
+export const MALLA_CURRICULAR_BASE = MALLA_SEMESTERS_RAW.map(([semestre, items]) => ({
+  semestre,
+  asignaturas: items.map((entry) => {
+    const [sigla, code, flag] = entry.split(':');
+    return {
+      sigla,
+      ...(flag === 'info' ? { isInfoPlaceholder: true } : {}),
+      defaultStatus: MALLA_STATUS_CODES[code] || 'sin-inscribir',
+    };
+  }),
+}));
 
 export const MALLA_CURRICULAR_SEMANAL = MALLA_CURRICULAR_BASE;
-

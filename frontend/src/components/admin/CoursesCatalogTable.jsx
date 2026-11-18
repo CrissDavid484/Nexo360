@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAccessibility } from '../../context/AccessibilityContext';
 
 /**
  * Tabla accesible para visualización del catálogo de asignaturas en el panel de administración.
@@ -14,11 +15,13 @@ export const CoursesCatalogTable = ({
   selectedCourse,
   ...props
 }) => {
+  const { getVoiceProps } = useAccessibility();
+
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs" {...props}>
       <table className="w-full text-left text-xs" role="table">
         <caption className="sr-only">
-          Catálogo actual de asignaturas almacenadas en la base de datos de Nexo360
+          Catálogo actual de asignaturas de Duoc UC - Sede Alameda almacenadas en la base de datos de Nexo360
         </caption>
         <thead className="bg-[#002B49] text-white font-bold">
           <tr>
@@ -53,12 +56,22 @@ export const CoursesCatalogTable = ({
                   ((typeof selectedCourse === 'string' && selectedCourse === course.sigla) ||
                     (selectedCourse.sigla && selectedCourse.sigla === course.sigla))
               );
+              const sectionCount = course.secciones?.length || 0;
+              const voiceText = `Asignatura ${course.sigla}, ${course.nombre}, ${course.creditos} créditos, ${sectionCount} secciones disponibles`;
 
               return (
                 <tr
                   key={course.sigla}
+                  tabIndex={0}
                   onClick={() => onSelectCourse && onSelectCourse(course)}
-                  className={`transition-colors ${
+                  onKeyDown={(e) => {
+                    if (onSelectCourse && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      onSelectCourse(course);
+                    }
+                  }}
+                  {...getVoiceProps(voiceText)}
+                  className={`transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                     isSelected ? 'bg-blue-50/80 hover:bg-blue-100/70' : 'hover:bg-slate-50'
                   } ${onSelectCourse ? 'cursor-pointer' : ''}`}
                 >
@@ -70,7 +83,7 @@ export const CoursesCatalogTable = ({
                   <td className="p-3.5 font-bold align-top">
                     <div className="text-slate-950">{course.nombre}</div>
                     <div className="text-[11px] text-slate-600 font-normal mt-0.5">
-                      {course.carrera || 'Ingeniería Duoc UC'}
+                      {course.carrera || 'Ingeniería Duoc UC - Sede Alameda'}
                     </div>
                   </td>
                   <td className="p-3.5 align-top font-medium">
@@ -81,7 +94,7 @@ export const CoursesCatalogTable = ({
                   </td>
                   <td className="p-3.5 align-top">
                     <span className="inline-block px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-bold text-[11px]">
-                      {course.secciones?.length || 0} sección(es)
+                      {sectionCount} sección(es)
                     </span>
                   </td>
                   <td className="p-3.5 align-top space-y-1">
@@ -103,9 +116,9 @@ export const CoursesCatalogTable = ({
                         </div>
                       </div>
                     ))}
-                    {course.secciones?.length > 3 && (
+                    {sectionCount > 3 && (
                       <span className="text-[10px] text-slate-500 font-semibold block">
-                        +{course.secciones.length - 3} secciones adicionales...
+                        +{sectionCount - 3} secciones adicionales...
                       </span>
                     )}
                   </td>
