@@ -75,8 +75,11 @@ export const AccessibilityProvider = ({ children }) => {
   const curtainEndTimerRef = useRef(null);
   const isInitialMountRef = useRef(true);
   const skipBackendSyncRef = useRef(false);
+  const voiceReaderRef = useRef(voiceReader);
+  voiceReaderRef.current = voiceReader;
 
   // Función memoizada para anunciar cambios dinámicos a lectores de pantalla (NVDA, JAWS, VoiceOver)
+  // y locutar automáticamente estados/alertas cuando Lectura por Voz está activa.
   const announce = useCallback((message, priority = 'polite') => {
     if (announceTimerRef.current) {
       clearTimeout(announceTimerRef.current);
@@ -86,6 +89,10 @@ export const AccessibilityProvider = ({ children }) => {
     announceTimerRef.current = setTimeout(() => {
       setAnnouncement(message);
     }, 50);
+
+    if (voiceReaderRef.current && message) {
+      speak(message, { force: priority === 'assertive' });
+    }
   }, []);
 
   useEffect(() => {
@@ -220,24 +227,27 @@ export const AccessibilityProvider = ({ children }) => {
   }, [readingGuide, announce]);
 
   const toggleVoiceReader = useCallback(() => {
-    const next = !voiceReader;
+    const next = !voiceReaderRef.current;
+    voiceReaderRef.current = next;
     setVoiceReader(next);
     localStorage.setItem('nexo360_voice_reader', String(next));
     if (next) {
-      announce('Lectura por voz activada', 'polite');
-      speak('Lectura por voz activada', { force: true });
+      announce(
+        'Lectura por voz activada. Presiona Escape para silenciar o Alt más V para desactivar',
+        'assertive'
+      );
     } else {
       stopSpeech();
       announce('Lectura por voz desactivada', 'polite');
     }
-  }, [voiceReader, announce]);
+  }, [announce]);
 
   const speakText = useCallback(
     (text, options = {}) => {
-      if (!voiceReader && !options.force) return false;
+      if (!voiceReaderRef.current && !options.force) return false;
       return speak(text, options);
     },
-    [voiceReader]
+    []
   );
 
   const stopSpeaking = useCallback(() => {
@@ -247,12 +257,10 @@ export const AccessibilityProvider = ({ children }) => {
   const getVoiceProps = useCallback(
     (customText) => {
       const handleSpeakEvent = (event) => {
-        if (!voiceReader) return;
+        if (!voiceReaderRef.current) return;
         const target = event?.currentTarget;
-        const resolved =
-          typeof customText === 'function'
-            ? customText(target)
-            : customText || resolveReadableText(target);
+        const rawBaseText = typeof customText === 'function' ? customText(target) : customText;
+        const resolved = resolveReadableText(target, rawBaseText);
         if (resolved) {
           speak(resolved, { element: target });
         }
@@ -264,7 +272,7 @@ export const AccessibilityProvider = ({ children }) => {
         onFocus: handleSpeakEvent,
       };
     },
-    [voiceReader]
+    []
   );
 
   const resetPreferences = useCallback(() => {
@@ -273,6 +281,7 @@ export const AccessibilityProvider = ({ children }) => {
     setDyslexicFont(false);
     setReducedMotion(false);
     setReadingGuide(false);
+    voiceReaderRef.current = false;
     setVoiceReader(false);
     stopSpeech();
     localStorage.removeItem('nexo360_reading_guide');

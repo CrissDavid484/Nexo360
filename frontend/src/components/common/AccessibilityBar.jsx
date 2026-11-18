@@ -4,7 +4,7 @@ import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import {
   Type,
   PauseCircle,
-  SlidersHorizontal,
+  Accessibility,
   RotateCcw,
   X,
   Moon,
@@ -134,7 +134,7 @@ export const AccessibilityBar = () => {
       onToggle: toggleVoiceReader,
       icon: Volume2,
       title: 'Activar Lectura por Voz',
-      description: 'Lee en voz alta botones y textos al pasar el cursor o enfocar',
+      description: 'Lee en voz alta botones, estados y alertas (Atajo: Alt + V)',
       ariaLabel: 'Activar Lectura por Voz',
     },
     {
@@ -169,22 +169,22 @@ export const AccessibilityBar = () => {
     <aside
       id="accessibility-panel"
       ref={containerRef}
-      aria-label="Ajustes de apariencia y lectura"
-      className="fixed bottom-5 right-5 z-50 flex flex-col items-end"
+      aria-label="Ajustes de accesibilidad"
+      className="fixed bottom-5 right-0 z-50 flex flex-col items-end"
     >
       {/* Panel flotante desplegable */}
       {isOpen && (
         <div
           role="dialog"
-          aria-label="Opciones de apariencia y lectura"
-          className="mb-3 w-[320px] sm:w-[350px] bg-white text-slate-900 rounded-2xl border border-slate-300 shadow-[0_20px_50px_rgba(0,43,73,0.2),0_10px_20px_rgba(0,0,0,0.1)] ring-1 ring-slate-900/5 p-5 space-y-4 animate-scale-in origin-bottom-right"
+          aria-label="Ajustes de accesibilidad"
+          className="mr-3 sm:mr-5 mb-3 w-[320px] sm:w-[350px] bg-white text-slate-900 rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] shadow-[0_18px_40px_rgba(0,43,73,0.18)] p-5 space-y-4 animate-scale-in origin-bottom-right"
         >
           {/* Cabecera del panel */}
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-3">
             <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
+              <Accessibility className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
               <h2 className="text-sm font-bold text-slate-900">
-                Ajustes de vista y lectura
+                Ajustes de accesibilidad
               </h2>
             </div>
 
@@ -331,35 +331,47 @@ export const AccessibilityBar = () => {
         </div>
       )}
 
-      {/* Botón flotante principal (FAB) con sombra y borde definidos */}
+      {/* Botón flotante acoplado discretamente a la esquina inferior derecha */}
       <button
         ref={fabRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        aria-label="Abrir ajustes de apariencia y lectura"
-        {...getVoiceProps('Abrir ajustes de apariencia y lectura')}
-        className={`a11y-fab-btn min-h-[46px] px-4 py-2.5 rounded-full flex items-center gap-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 border ${
+        aria-label="Ajustes de accesibilidad"
+        {...getVoiceProps('Ajustes de accesibilidad')}
+        className={`a11y-fab-btn group min-h-[46px] py-2.5 rounded-l-full border border-r-0 flex items-center text-xs sm:text-sm font-bold transition-all duration-300 ease-out cursor-pointer ${
+          isOpen
+            ? 'pl-3 pr-4'
+            : 'pl-3 pr-2.5 hover:pl-3 hover:pr-4 focus-visible:pl-3 focus-visible:pr-4'
+        } ${
           isOpen || hasActivePreferences
-            ? 'bg-[#002B49] text-white border-[#002B49] shadow-xl'
-            : 'bg-white text-slate-800 hover:bg-slate-50 border-slate-300 shadow-[0_10px_28px_-4px_rgba(0,43,73,0.22),0_4px_10px_-2px_rgba(0,0,0,0.08)] hover:shadow-[0_14px_34px_-4px_rgba(0,43,73,0.3)] ring-1 ring-slate-900/5'
+            ? 'bg-[#002B49] text-white border-[#002B49] shadow-lg'
+            : 'bg-white text-[#002B49] hover:bg-slate-50 border-slate-300 shadow-[0_6px_18px_rgba(0,43,73,0.16)]'
         }`}
       >
         <div
-          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
+          className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0 ${
             isOpen || hasActivePreferences
-              ? 'bg-white/10 text-[#FFB81C]'
-              : 'bg-slate-100 text-[#002B49] border border-slate-200/80'
+              ? 'bg-white/15 text-[#FFB81C]'
+              : 'bg-slate-100 text-[#002B49] border border-slate-200'
           }`}
           aria-hidden="true"
         >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
+          <Accessibility className="w-4 h-4" />
         </div>
-        <span>Ajustes</span>
+        <span
+          className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${
+            isOpen
+              ? 'max-w-[240px] opacity-100 pl-2.5'
+              : 'max-w-0 opacity-0 group-hover:max-w-[240px] group-hover:opacity-100 group-hover:pl-2.5 group-focus-visible:max-w-[240px] group-focus-visible:opacity-100 group-focus-visible:pl-2.5'
+          }`}
+        >
+          Ajustes de accesibilidad
+        </span>
         {hasActivePreferences && (
           <span
-            className="a11y-fab-badge w-5 h-5 rounded-full bg-[#FFB81C] text-slate-950 text-[11px] font-extrabold flex items-center justify-center shadow-xs"
+            className="a11y-fab-badge ml-1.5 w-5 h-5 rounded-full bg-[#FFB81C] text-slate-950 text-[11px] font-extrabold flex items-center justify-center shrink-0"
             aria-label={`${activeCount} ajustes activos`}
           >
             {activeCount}

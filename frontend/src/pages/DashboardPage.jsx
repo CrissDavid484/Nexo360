@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { DUOC_CATEGORIES, INTENT_SHORTCUTS } from '../data/duocModulesData';
 import { DEFAULT_CAMPUS, getStudentDisplayName } from '../utils/studentUtils';
 import { PURPOSE_GROUPS, analyzeDashboardSearch } from '../utils/dashboardSearchUtils';
+import { lazyLoad } from '../utils/lazyLoad';
 import { ModuleCard } from '../components/dashboard/ModuleCard';
 import { ModuleModal } from '../components/dashboard/ModuleModal';
 import { SearchBar } from '../components/dashboard/SearchBar';
@@ -28,17 +29,6 @@ import {
   Layers,
   Package,
 } from 'lucide-react';
-
-function lazyLoad(importer, exportName) {
-  return lazy(() =>
-    importer()
-      .then((module) => ({ default: module[exportName] }))
-      .catch((error) => {
-        console.error(`[DashboardPage] Error cargando vista "${exportName}":`, error);
-        throw error;
-      })
-  );
-}
 
 // Vistas complementarias con Code-Splitting (React.lazy)
 const BibliotecaView = lazyLoad(
@@ -210,10 +200,10 @@ export const DashboardPage = () => {
       >
         {activeTab === 'centro-ayuda' && (
           <div className="space-y-8 animate-fade-in-up">
-            {/* BIENVENIDA + BUSCADOR INTEGRADO (Baja sobrecarga sensorial, diseño limpio y humano) */}
+            {/* BIENVENIDA + BUSCADOR INTEGRADO (Baja sobrecarga sensorial, diseño limpio institucional) */}
             <section
               aria-labelledby="main-summary-heading"
-              className="bg-white rounded-3xl p-6 sm:p-9 border border-slate-200 shadow-sm sm:shadow-md ring-1 ring-slate-900/[0.03]"
+              className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-300 border-t-4 border-t-[#002B49] shadow-xs"
             >
               <div className="max-w-3xl">
                 <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 mb-2">
@@ -780,7 +770,7 @@ export const DashboardPage = () => {
               <div
                 role="alert"
                 aria-live="assertive"
-                className="max-w-2xl mx-auto my-12 p-8 bg-white border-2 border-amber-300 rounded-3xl shadow-lg text-center space-y-5 animate-fade-in-up"
+                className="max-w-2xl mx-auto my-12 p-8 bg-white border border-slate-300 border-t-4 border-t-[#FFB81C] rounded-2xl shadow-sm text-center space-y-5 animate-fade-in-up"
               >
                 <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
                   <ShieldAlert className="w-8 h-8" aria-hidden="true" />

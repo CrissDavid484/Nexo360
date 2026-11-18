@@ -1,23 +1,13 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { lazyLoad } from './utils/lazyLoad';
 import { SkipLink } from './components/common/SkipLink';
 import { LiveAnnouncer } from './components/common/LiveAnnouncer';
 import { ReadingGuideOverlay } from './components/common/ReadingGuideOverlay';
 import { ThemeCurtainOverlay } from './components/common/ThemeCurtainOverlay';
 import { VoiceReaderObserver } from './components/common/VoiceReaderObserver';
 import { LoginPage } from './pages/LoginPage';
-
-function lazyLoad(importer, exportName) {
-  return lazy(() =>
-    importer()
-      .then((module) => ({ default: module[exportName] }))
-      .catch((error) => {
-        console.error(`[App] Error cargando módulo diferido "${exportName}":`, error);
-        throw error;
-      })
-  );
-}
 
 // Code-Splitting para optimización extrema de carga y rendimiento de red
 const DashboardPage = lazyLoad(() => import('./pages/DashboardPage'), 'DashboardPage');

@@ -48,12 +48,33 @@ function speakElementIfUnmanaged(element) {
 
 /**
  * Observador global WCAG para lectura por voz en elementos interactivos,
- * encabezados y tarjetas cuando `voiceReader` está activo.
+ * encabezados y tarjetas cuando `voiceReader` está activo, además del atajo Alt + V.
  * Respeta elementos con `data-voice-managed="true"` para evitar doble lectura.
  */
 export const VoiceReaderObserver = () => {
-  const { voiceReader } = useAccessibility();
+  const { voiceReader, toggleVoiceReader } = useAccessibility();
   const lastHoveredRef = useRef(null);
+
+  // Atajo global accesible (Alt + V) para activar o desactivar Lectura por Voz desde cualquier pantalla
+  useEffect(() => {
+    const handleShortcutKeyDown = (event) => {
+      const isAltV =
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        (event.key?.toLowerCase() === 'v' || event.code === 'KeyV');
+
+      if (isAltV) {
+        event.preventDefault();
+        toggleVoiceReader();
+      }
+    };
+
+    document.addEventListener('keydown', handleShortcutKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleShortcutKeyDown);
+    };
+  }, [toggleVoiceReader]);
 
   useEffect(() => {
     if (!voiceReader) {

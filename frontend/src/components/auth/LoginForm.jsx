@@ -108,14 +108,14 @@ export const LoginForm = ({ onDirectSuccess }) => {
 
   return (
     <section aria-labelledby="login-form-title" className="w-full max-w-[420px] mx-auto">
-      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-md p-6 sm:p-8 space-y-4">
+      <div className="bg-white border border-slate-300 border-t-4 border-t-[#002B49] rounded-2xl shadow-sm p-6 sm:p-8 space-y-4">
         {/* Encabezado Sobrio */}
         <div className="text-center pb-1">
           <h1 id="login-form-title" className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Iniciar Sesión
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Ingresa a tu cuenta institucional Duoc UC - Sede Alameda
+          <p className="text-xs font-medium text-slate-600 mt-1">
+            Accede con tu cuenta institucional Duoc UC • Sede Alameda
           </p>
         </div>
 
@@ -236,7 +236,7 @@ export const LoginForm = ({ onDirectSuccess }) => {
             disabled={isLoading || isSsoLoading}
             aria-busy={isLoading}
             {...getVoiceProps('Ingresar al portal institucional')}
-            className="w-full min-h-[44px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001f35] text-white font-bold text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer disabled:opacity-60"
+            className="w-full min-h-[44px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB81C] cursor-pointer disabled:opacity-60"
           >
             {isLoading ? (
               <>

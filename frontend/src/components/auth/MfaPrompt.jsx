@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Smartphone, CheckCircle2, AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Smartphone, CheckCircle2, AlertTriangle, ArrowLeft, Loader2, Volume2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
+
+const BASE_MAX_POLL_COUNT = 150; // 5 minutos (150 intentos × 2 segundos)
+const MAX_CONSECUTIVE_ERRORS = 3;
 
 export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
   const { sessionId, initialMfaCode, email } = sessionInfo;
   const [currentCode, setCurrentCode] = useState(initialMfaCode || '..');
   const [isApproved, setIsApproved] = useState(false);
   const [pollError, setPollError] = useState(null);
-  const { announce, getVoiceProps } = useAccessibility();
+  const { announce, getVoiceProps, voiceReader, speakText } = useAccessibility();
+
+  const MAX_POLL_COUNT = voiceReader ? BASE_MAX_POLL_COUNT * 2 : BASE_MAX_POLL_COUNT;
 
   const pollIntervalRef = useRef(null);
   const redirectTimeoutRef = useRef(null);
@@ -16,8 +21,14 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
   const consecutiveErrorsRef = useRef(0);
   const isPollingInFlightRef = useRef(false);
   const currentCodeRef = useRef(initialMfaCode || '..');
-  const MAX_POLL_COUNT = 150; // 5 minutos (150 intentos × 2 segundos)
-  const MAX_CONSECUTIVE_ERRORS = 3;
+  const maxPollCountRef = useRef(MAX_POLL_COUNT);
+  maxPollCountRef.current = MAX_POLL_COUNT;
+
+  const handleRepeatCode = () => {
+    const message = `Código de aprobación para Microsoft Authenticator: ${currentCode}`;
+    announce(message, 'assertive');
+    speakText(message, { force: true });
+  };
 
   // A11y: Anuncio por voz accesible al montar el componente
   useEffect(() => {
@@ -61,7 +72,7 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
         consecutiveErrorsRef.current = 0;
         pollCountRef.current += 1;
 
-        if (pollCountRef.current >= MAX_POLL_COUNT) {
+        if (pollCountRef.current >= maxPollCountRef.current) {
           failPolling('La sesión de aprobación expiró. Por favor vuelve a iniciar sesión.');
           return;
         }
@@ -119,16 +130,16 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
     // A11y: Uso de etiqueta semántica <section> con etiquetado accesible para lectores de pantalla
     <section
       aria-labelledby="mfa-heading"
-      className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-2xl border-2 border-amber-400 p-8 sm:p-10 transition-all text-center"
+      className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-sm border border-slate-300 border-t-4 border-t-[#002B49] p-8 sm:p-10 transition-all text-center"
     >
       {/* Icono de Teléfono / Authenticator */}
-      <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-50 text-[#002B49] mb-6 border-4 border-[#FFB81C] animate-pulse">
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-100 text-[#002B49] mb-5 border border-slate-200">
         {/* A11y: Icono decorativo marcado con aria-hidden="true" */}
-        <Smartphone className="w-10 h-10" aria-hidden="true" />
+        <Smartphone className="w-8 h-8" aria-hidden="true" />
       </div>
 
       {/* A11y: Título único asociado a la sección */}
-      <h1 id="mfa-heading" className="text-3xl font-black text-slate-900 tracking-tight">
+      <h1 id="mfa-heading" className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
         Aprobación Requerida
       </h1>
 
@@ -136,31 +147,47 @@ export const MfaPrompt = ({ sessionInfo, onApproved, onCancel }) => {
         Hemos enviado una notificación a la aplicación <strong className="text-slate-950 font-black">Microsoft Authenticator</strong> vinculada a tu cuenta institucional Duoc UC:
       </p>
 
-      <p className="text-sm font-black text-[#002B49] bg-slate-100 py-2 px-4 rounded-lg inline-block mt-3 border border-slate-300">
+      <p className="text-sm font-bold text-[#002B49] bg-slate-100 py-2 px-4 rounded-lg inline-block mt-3 border border-slate-300">
         {email}
       </p>
 
-      {/* A11y: Caja de alta visibilidad para el número de autenticación con rol de estado */}
+      {/* A11y: Caja de alta visibilidad para el número de autenticación con botón interactivo accesible */}
       <div
         role="region"
-        tabIndex={0}
         aria-label="Número de confirmación en dos pasos"
         {...getVoiceProps(`Número de confirmación en dos pasos: ${currentCode}`)}
-        className="my-8 p-6 bg-slate-950 text-[#FFB81C] rounded-2xl border-4 border-[#FFB81C] shadow-inner focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+        className="my-7 p-6 bg-[#001D33] text-[#FFB81C] rounded-2xl border-2 border-[#002B49] ring-2 ring-[#FFB81C]/70"
       >
-        <span className="block text-xs uppercase tracking-widest text-slate-300 font-bold mb-2">
+        <span className="block text-xs uppercase tracking-widest text-slate-200 font-bold mb-2">
           Número para marcar en tu teléfono
         </span>
         <div
           aria-live="polite"
           aria-atomic="true"
-          className="text-7xl sm:text-8xl font-black font-mono tracking-widest select-all text-[#FFB81C]"
+          className="text-6xl sm:text-7xl font-black font-mono tracking-widest select-all text-[#FFB81C]"
         >
           {currentCode}
         </div>
         <p className="mt-3 text-xs text-slate-200 font-medium">
           Abre la aplicación en tu celular y pulsa este número para verificar tu identidad.
         </p>
+        {voiceReader && (
+          <p className="mt-1.5 text-[11px] font-semibold text-[#FFB81C]">
+            Tiempo de espera extendido (10 minutos) activo para Lectura por Voz.
+          </p>
+        )}
+
+        <div className="mt-4 pt-4 border-t border-white/15 flex justify-center">
+          <button
+            type="button"
+            onClick={handleRepeatCode}
+            {...getVoiceProps('Escuchar código nuevamente')}
+            className="min-h-[44px] px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/25 rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Volume2 className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+            <span>Escuchar código nuevamente</span>
+          </button>
+        </div>
       </div>
 
       {/* A11y: Estado dinámico con notificaciones para tecnologías asistivas */}

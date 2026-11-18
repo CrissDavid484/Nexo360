@@ -225,12 +225,39 @@ function resolveFallbackText(el) {
   return rawText;
 }
 
-/**
- * Resuelve el texto legible de un elemento DOM siguiendo la prioridad WCAG:
- * data-speak / data-voice-text > aria-label > aria-labelledby > <label>+valor/placeholder > texto limpio.
- */
-export function resolveReadableText(el) {
-  if (!el || el.nodeType !== 1) return '';
+const ARIA_STATE_MAPPINGS = [
+  { attr: 'aria-expanded', values: { true: 'expandido', false: 'contraído' } },
+  { attr: 'aria-pressed', values: { true: 'activado', false: 'desactivado' } },
+];
+
+function resolveControlStateTokens(el, baseText) {
+  if (!el || el.nodeType !== 1 || typeof el.getAttribute !== 'function') return [];
+
+  const tokens = [];
+  for (const { attr, values } of ARIA_STATE_MAPPINGS) {
+    const rawVal = el.getAttribute(attr);
+    if (rawVal && values[rawVal]) {
+      tokens.push(values[rawVal]);
+    }
+  }
+
+  if (Boolean(el.disabled) || el.getAttribute('aria-disabled') === 'true') {
+    tokens.push('deshabilitado');
+  }
+
+  const existingWords = new Set(
+    normalizeWhitespace(baseText)
+      .toLowerCase()
+      .split(/[\s,.;:!?()[\]{}"']+/)
+      .filter(Boolean)
+  );
+
+  return tokens.filter((token) => !existingWords.has(token.toLowerCase()));
+}
+
+function resolveBaseText(el, customBaseText) {
+  const custom = normalizeWhitespace(customBaseText);
+  if (custom) return custom;
 
   const directSpeak = normalizeWhitespace(
     el.getAttribute('data-speak') || el.getAttribute('data-voice-text')
@@ -247,4 +274,21 @@ export function resolveReadableText(el) {
   if (controlText) return controlText;
 
   return resolveFallbackText(el);
+}
+
+/**
+ * Resuelve el texto legible de un elemento DOM siguiendo la prioridad WCAG:
+ * customBaseText / data-speak / data-voice-text > aria-label > aria-labelledby > <label>+valor/placeholder > texto limpio,
+ * añadiendo el estado semántico (expandido/contraído, activado/desactivado, deshabilitado) al final.
+ */
+export function resolveReadableText(el, customBaseText = '') {
+  if (!el || el.nodeType !== 1) {
+    return normalizeWhitespace(customBaseText);
+  }
+
+  const baseText = resolveBaseText(el, customBaseText);
+  if (!baseText) return '';
+
+  const stateTokens = resolveControlStateTokens(el, baseText);
+  return [baseText, ...stateTokens].join(', ');
 }

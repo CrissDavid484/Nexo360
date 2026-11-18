@@ -52,7 +52,7 @@ export const LoginPage = () => {
                 aspectRatio: '1024 / 307'
               }}
             />
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-2.5">
+            <p className="text-xs sm:text-sm text-slate-600 font-semibold mt-2.5">
               Centro de Ayuda y Servicios • Duoc UC - Sede Alameda
             </p>
           </div>
@@ -74,7 +74,7 @@ export const LoginPage = () => {
           )}
         </div>
 
-        <footer className="mt-8 text-center">
+        <footer className="mt-8 pt-4 border-t border-slate-300/70 w-full max-w-[460px] text-center">
           <nav aria-label="Enlaces institucionales y legales">
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500">
               <a

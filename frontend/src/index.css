@@ -318,11 +318,16 @@ html.high-contrast .hover\:bg-\[\#002B49\]:hover * {
   color: #05080F !important;
 }
 
-/* Estilos dedicados para el botón flotante de Ajustes y sus opciones en modo oscuro */
+/* Estilos dedicados para el botón flotante de Ajustes de accesibilidad y sus opciones en modo oscuro */
+.a11y-fab-btn:focus-visible {
+  border-radius: 9999px 0 0 9999px !important;
+}
+
 html.high-contrast .a11y-fab-btn {
   background-color: #1E293B !important;
   color: #FFFFFF !important;
   border: 1.5px solid #FFB81C !important;
+  border-right-width: 0 !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7) !important;
 }
 

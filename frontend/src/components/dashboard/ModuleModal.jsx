@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, Suspense, lazy } from 'react';
+import React, { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import {
   X,
   ArrowLeft,
@@ -13,14 +13,11 @@ import {
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
+import { lazyLoad } from '../../utils/lazyLoad';
 
-const TomaRamosSimulator = lazy(() =>
-  import('../simulation/TomaRamosSimulator')
-    .then((m) => ({ default: m.TomaRamosSimulator }))
-    .catch((error) => {
-      console.error('[ModuleModal] Error cargando TomaRamosSimulator:', error);
-      throw error;
-    })
+const TomaRamosSimulator = lazyLoad(
+  () => import('../simulation/TomaRamosSimulator'),
+  'TomaRamosSimulator'
 );
 
 function resolveModalHeader(category, activeTramite, activeArticle) {
@@ -129,12 +126,12 @@ export const ModuleModal = ({
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] my-auto animate-scale-in"
+        className="relative w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-300 border-t-4 border-t-[#002B49] overflow-hidden flex flex-col max-h-[92vh] my-auto animate-scale-in"
       >
-        {/* Cabecera limpia y calmada */}
-        <header className="bg-white text-slate-900 px-6 sm:px-8 py-5 flex items-start justify-between border-b border-slate-100 shrink-0">
+        {/* Cabecera institucional limpia y calmada */}
+        <header className="bg-white text-slate-900 px-6 sm:px-8 py-5 flex items-start justify-between border-b border-slate-200 shrink-0">
           <div className="pr-2">
-            <span className="text-xs font-semibold text-[#002B49] block mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#002B49] block mb-1">
               {eyebrow}
             </span>
             <h2

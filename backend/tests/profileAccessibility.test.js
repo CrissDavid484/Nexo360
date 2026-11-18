@@ -194,4 +194,48 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
       assert.equal(meRes.body?.user?.accessibilityPreferences?.fontSize, 'xlarge');
     }
   );
+
+  await t.test(
+    '7. Rediseño FAB oculto en esquina, Autonomía No Videntes (Alt+V, announce TTS, estados ARIA) y MFA accesible',
+    () => {
+      const readFrontendFile = (relPath) =>
+        fs.readFileSync(path.resolve(__dirname, '../../frontend/src', relPath), 'utf8');
+
+      // 1. AccessibilityBar.jsx: FAB oculto en esquina inferior derecha con ícono universal Accessibility
+      const a11yBar = readFrontendFile('components/common/AccessibilityBar.jsx');
+      assert.ok(a11yBar.includes('Accessibility,') || a11yBar.includes('Accessibility\n'));
+      assert.ok(!a11yBar.includes('SlidersHorizontal'));
+      assert.ok(a11yBar.includes('Ajustes de accesibilidad'));
+      assert.ok(a11yBar.includes('fixed bottom-5 right-0 z-50'));
+      assert.ok(a11yBar.includes('rounded-l-full border border-r-0'));
+      assert.ok(a11yBar.includes('max-w-0 opacity-0'));
+      assert.ok(a11yBar.includes('max-w-[240px] opacity-100'));
+
+      // 2. AccessibilityContext.jsx: locución automática en announce y anuncio del atajo Alt + V
+      const a11yContext = readFrontendFile('context/AccessibilityContext.jsx');
+      assert.ok(a11yContext.includes('speak(message, { force: priority === \'assertive\' })'));
+      assert.ok(
+        a11yContext.includes(
+          'Lectura por voz activada. Presiona Escape para silenciar o Alt más V para desactivar'
+        )
+      );
+
+      // 3. VoiceReaderObserver.jsx: atajo global Alt + V
+      const voiceObserver = readFrontendFile('components/common/VoiceReaderObserver.jsx');
+      assert.ok(voiceObserver.includes("event.code === 'KeyV'"));
+      assert.ok(voiceObserver.includes('toggleVoiceReader()'));
+
+      // 4. speechService.js: lectura enriquecida con estados semánticos
+      const speechService = readFrontendFile('utils/speechService.js');
+      assert.ok(speechService.includes("'expandido'") && speechService.includes("'contraído'"));
+      assert.ok(speechService.includes("'activado'") && speechService.includes("'desactivado'"));
+      assert.ok(speechService.includes("'deshabilitado'"));
+
+      // 5. MfaPrompt.jsx: timeout extendido, botón escuchar nuevamente y cero tabIndex en region no interactiva
+      const mfaPrompt = readFrontendFile('components/auth/MfaPrompt.jsx');
+      assert.ok(mfaPrompt.includes('BASE_MAX_POLL_COUNT * 2'));
+      assert.ok(mfaPrompt.includes('Escuchar código nuevamente'));
+      assert.ok(!mfaPrompt.includes('tabIndex={0}'));
+    }
+  );
 });
