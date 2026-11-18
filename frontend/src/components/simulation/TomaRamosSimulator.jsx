@@ -1063,13 +1063,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
         </div>
       </div>
 
-      {/* 2. CONTENEDOR DEL SIMULADOR SAP SICOL */}
-      <div
-        ref={simulatorContainerRef}
-        role="region"
-        aria-label="Simulador Oficial de Toma de Ramos Duoc UC - Sede Alameda (SAP WebDynpro SICOL)"
-        className="relative min-h-[780px] rounded-2xl overflow-hidden border border-slate-300 shadow-xl bg-[#EEF3F8] text-slate-900 flex flex-col font-sans select-none"
-      >
+      {/* 2. CONTENEDOR DEL SIMULADOR SAP SICOL + HOJA DE RUTA LATERAL */}
+      <div className="flex flex-col lg:flex-row items-start gap-4">
+        <div
+          ref={simulatorContainerRef}
+          role="region"
+          aria-label="Simulador Oficial de Toma de Ramos Duoc UC - Sede Alameda (SAP WebDynpro SICOL)"
+          className="relative flex-1 min-w-0 w-full min-h-[780px] rounded-2xl overflow-hidden border border-slate-300 shadow-xl bg-[#EEF3F8] text-slate-900 flex flex-col font-sans select-none"
+        >
         <div
           className={`flex-1 flex flex-col transition-all duration-300 ${
             isPreFlowActive
@@ -2968,159 +2969,171 @@ export const TomaRamosSimulator = ({ onExit }) => {
             </div>
           </div>
         )}
-      </div>
+        </div>
 
-      {/* 3. HOJA DE RUTA / PAQUETE OBJETIVO */}
-      {!isPreFlowActive && selectedTargetPackage && step === 'inscripcion' && (
-        <aside
-          role="region"
-          aria-label="Hoja de referencia del paquete objetivo"
-          className="bg-white border-2 border-[#002B49] rounded-2xl shadow-lg overflow-hidden"
-        >
-          <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 bg-slate-50 border-b border-slate-200">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#002B49] text-white flex items-center justify-center font-bold text-xs">
-                <FileText className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+        {/* 3. PANEL LATERAL DERECHO: HOJA DE RUTA / PAQUETE OBJETIVO */}
+        {!isPreFlowActive && selectedTargetPackage && step !== 'boletin' && (
+          <aside
+            role="region"
+            aria-label="Hoja de referencia del paquete objetivo"
+            className="w-full lg:w-[350px] xl:w-[380px] shrink-0 lg:sticky lg:top-20 bg-white border-2 border-[#002B49] rounded-2xl shadow-lg overflow-hidden transition-all"
+          >
+            {/* Cabecera compacta + progreso */}
+            <div className="px-3.5 py-3 bg-slate-50 border-b border-slate-200 space-y-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-[#002B49] text-white flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-black text-slate-900 block leading-snug">
+                      {selectedTargetPackage.name}
+                    </span>
+                    <span className="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200">
+                      {processType === 'modificacion' ? 'Modificación' : 'Toma de Ramos'} •{' '}
+                      {simulationMode === 'asistido' ? 'Modo Guiado' : 'Modo Realista'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  aria-expanded={isReferenceSheetExpanded}
+                  onClick={() => setIsReferenceSheetExpanded((prev) => !prev)}
+                  {...getVoiceProps(
+                    isReferenceSheetExpanded
+                      ? 'Ocultar lista del paquete objetivo'
+                      : 'Ver lista del paquete objetivo'
+                  )}
+                  className="min-h-[32px] px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 shrink-0 cursor-pointer"
+                >
+                  <span>{isReferenceSheetExpanded ? 'Ocultar' : 'Ver Lista'}</span>
+                  {isReferenceSheetExpanded ? (
+                    <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                  )}
+                </button>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-slate-900">
-                    {selectedTargetPackage.name}
+
+              <p className="text-[11px] text-slate-600 leading-snug">
+                Hoja de Ruta de Referencia • Logra las secciones indicadas para alcanzar el 100%
+              </p>
+
+              <div className="flex items-center justify-between gap-2.5 pt-0.5">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="flex-1 bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        completionPercentage === 100
+                          ? 'bg-emerald-500'
+                          : completionPercentage >= 60
+                          ? 'bg-blue-600'
+                          : 'bg-amber-500'
+                      }`}
+                      style={{ width: `${completionPercentage}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-black text-slate-900 shrink-0">
+                    {completionPercentage}%
                   </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200">
-                    {processType === 'modificacion' ? 'Modificación' : 'Toma de Ramos'} •{' '}
-                    {simulationMode === 'asistido' ? 'Modo Guiado' : 'Modo Realista'}
+                  <span className="text-[11px] font-semibold text-slate-600 shrink-0">
+                    ({matchedCount}/{totalTargetCount})
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  Hoja de Ruta de Referencia • Logra las secciones indicadas para alcanzar el 100%
-                </p>
+
+                <div className="flex items-center gap-1 text-xs font-bold text-slate-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+                  <span>{liveScore} pts</span>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 sm:gap-5">
-              <div className="flex items-center gap-2">
-                <div className="w-24 sm:w-32 bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 rounded-full ${
-                      completionPercentage === 100
-                        ? 'bg-emerald-500'
-                        : completionPercentage >= 60
-                        ? 'bg-blue-600'
-                        : 'bg-amber-500'
-                    }`}
-                    style={{ width: `${completionPercentage}%` }}
-                  />
-                </div>
-                <span className="text-xs font-black text-slate-900">{completionPercentage}%</span>
-                <span className="text-[11px] text-slate-500 hidden md:inline">
-                  ({matchedCount}/{totalTargetCount} ramos)
-                </span>
-              </div>
+            {isReferenceSheetExpanded && (
+              <div className="p-2.5 bg-slate-100/70">
+                <div className="rounded-lg border-2 border-black overflow-hidden bg-white">
+                  <div className="bg-[#1b5e20] text-white px-3 py-1.5 flex items-center justify-between gap-2 font-mono font-black text-[11px] border-b-2 border-emerald-950">
+                    <span className="shrink-0">{carreraInfo.codigo || '1446114-6-D'}</span>
+                    <span className="text-right">{selectedTargetPackage.name}</span>
+                  </div>
+                  <div className="bg-[#FFB81C] text-slate-950 px-3 py-1 grid grid-cols-12 items-center font-black text-[11px] border-b border-black">
+                    <div className="col-span-3 border-r border-black pr-1.5">Sigla:</div>
+                    <div className="col-span-5 px-2">Nom. Asignatura:</div>
+                    <div className="col-span-4 text-right">Estado</div>
+                  </div>
+                  <div className="divide-y divide-black text-xs font-mono max-h-[60vh] lg:max-h-[calc(100vh-15rem)] overflow-y-auto">
+                    {targetCourses.map((tc) => {
+                      const hasExactMatch = allCurrentCourses.some(
+                        (c) => c.sigla === tc.sigla && c.seccion === tc.seccion
+                      );
+                      const hasWrongSection = allCurrentCourses.some(
+                        (c) => c.sigla === tc.sigla && c.seccion !== tc.seccion
+                      );
+                      const currentSelected = allCurrentCourses.find((c) => c.sigla === tc.sigla);
+                      const isOptativo = tc.tipo === 'optativo' || tc.tipo === 'practica';
 
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
-                <span>{liveScore} pts</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsReferenceSheetExpanded((prev) => !prev)}
-                {...getVoiceProps(
-                  isReferenceSheetExpanded
-                    ? 'Ocultar lista del paquete objetivo'
-                    : 'Ver lista del paquete objetivo'
-                )}
-                className="min-h-[32px] px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer"
-              >
-                <span>{isReferenceSheetExpanded ? 'Ocultar' : 'Ver Lista'}</span>
-                {isReferenceSheetExpanded ? (
-                  <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
-                ) : (
-                  <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {isReferenceSheetExpanded && (
-            <div className="p-3 bg-slate-100/70">
-              <div className="max-w-4xl mx-auto rounded-lg border-2 border-black overflow-hidden bg-white">
-                <div className="bg-[#1b5e20] text-white px-4 py-1.5 flex items-center justify-between font-mono font-black text-xs border-b-2 border-emerald-950">
-                  <span>{carreraInfo.codigo || '1446114-6-D'}</span>
-                  <span>{selectedTargetPackage.name}</span>
-                </div>
-                <div className="bg-[#FFB81C] text-slate-950 px-4 py-1 grid grid-cols-12 font-black text-xs border-b border-black">
-                  <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">Sigla:</div>
-                  <div className="col-span-5 sm:col-span-6 px-2">Nom. Asignatura:</div>
-                  <div className="col-span-4 sm:col-span-4 text-right">Estado</div>
-                </div>
-                <div className="divide-y divide-black text-xs font-mono">
-                  {targetCourses.map((tc) => {
-                    const hasExactMatch = allCurrentCourses.some(
-                      (c) => c.sigla === tc.sigla && c.seccion === tc.seccion
-                    );
-                    const hasWrongSection = allCurrentCourses.some(
-                      (c) => c.sigla === tc.sigla && c.seccion !== tc.seccion
-                    );
-                    const currentSelected = allCurrentCourses.find((c) => c.sigla === tc.sigla);
-                    const isOptativo = tc.tipo === 'optativo' || tc.tipo === 'practica';
-
-                    return (
-                      <div
-                        key={tc.sigla}
-                        {...getVoiceProps(
-                          `Meta ${tc.sigla} ${tc.nombre}, sección ${tc.seccion}, ${
-                            hasExactMatch
-                              ? 'meta lograda'
-                              : hasWrongSection
-                              ? `cambiar de sección ${currentSelected?.seccion} a ${tc.seccion}`
-                              : 'pendiente'
-                          }`
-                        )}
-                        className={`px-4 py-1.5 grid grid-cols-12 items-center ${
-                          hasExactMatch
-                            ? 'bg-emerald-50'
-                            : isOptativo
-                            ? 'bg-[#bbdefb]'
-                            : 'bg-white'
-                        }`}
-                      >
-                        <div className="col-span-3 sm:col-span-2 font-bold text-slate-900 border-r border-black pr-2 truncate">
-                          {tc.sigla}
-                        </div>
-                        <div className="col-span-5 sm:col-span-6 px-2">
-                          <span className="font-bold text-slate-900 uppercase block truncate">
-                            {tc.nombre}
-                          </span>
-                          <span className="text-[10px] text-slate-600 font-sans block truncate">
-                            Meta: {tc.seccion} • {tc.horarioTexto}
-                          </span>
-                        </div>
-                        <div className="col-span-4 sm:col-span-4 flex items-center justify-end text-right font-sans">
-                          {hasExactMatch ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
-                              ✓ Meta lograda
-                            </span>
-                          ) : hasWrongSection ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white">
-                              Cambiar Secc. {currentSelected?.seccion} → {tc.seccion}
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-700">
-                              Pendiente ({tc.seccion})
-                            </span>
+                      return (
+                        <div
+                          key={tc.sigla}
+                          {...getVoiceProps(
+                            `Meta ${tc.sigla} ${tc.nombre}, sección ${tc.seccion}, ${
+                              hasExactMatch
+                                ? 'meta lograda'
+                                : hasWrongSection
+                                ? `cambiar de sección ${currentSelected?.seccion} a ${tc.seccion}`
+                                : 'pendiente'
+                            }`
                           )}
+                          className={`px-3 py-2 flex flex-col gap-1.5 ${
+                            hasExactMatch
+                              ? 'bg-emerald-50'
+                              : isOptativo
+                              ? 'bg-[#bbdefb]'
+                              : 'bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-bold text-slate-950 text-xs">{tc.sigla}</span>
+                              <span className="text-[10px] font-sans font-bold px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800">
+                                Secc. {tc.seccion}
+                              </span>
+                            </div>
+
+                            <div className="shrink-0 font-sans text-right">
+                              {hasExactMatch ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
+                                  ✓ Meta lograda
+                                </span>
+                              ) : hasWrongSection ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white">
+                                  Cambiar {currentSelected?.seccion} → {tc.seccion}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-800">
+                                  Pendiente ({tc.seccion})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="font-bold text-slate-900 uppercase text-[11px] leading-snug break-words">
+                            {tc.nombre}
+                          </div>
+
+                          <div className="text-[11px] text-slate-700 font-sans leading-snug">
+                            Meta: <strong>{tc.seccion}</strong> • {tc.horarioTexto}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </aside>
-      )}
+            )}
+          </aside>
+        )}
+      </div>
     </section>
   );
 };

@@ -196,7 +196,9 @@ export const DashboardPage = () => {
       {/* 3. Contenido Principal */}
       <main
         id="main-content"
-        className="flex-1 mx-auto py-6 sm:py-8 w-full max-w-7xl px-4 sm:px-6 lg:px-8"
+        className={`flex-1 mx-auto py-6 sm:py-8 w-full px-4 sm:px-6 lg:px-8 ${
+          activeTab === 'toma-ramos' ? 'max-w-[1480px]' : 'max-w-7xl'
+        }`}
       >
         {activeTab === 'centro-ayuda' && (
           <div className="space-y-8 animate-fade-in-up">
