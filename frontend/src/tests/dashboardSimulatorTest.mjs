@@ -43,7 +43,6 @@ assert.ok(
 console.log('✓ Test 3: Dashboard greeting and simulator access control modal verified');
 
 // 4. tomaRamosData.js imports and functions test
-const tomaDataPath = path.join(rootDir, 'frontend/src/data/tomaRamosData.js');
 const {
   DIFFICULTY_LEVELS,
   getBoletinSemesterTitle,

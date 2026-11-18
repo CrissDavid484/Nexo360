@@ -138,54 +138,46 @@ export const AccessibilityProvider = ({ children }) => {
 
   // Controles de tamaño de fuente memoizados
   const increaseFontSize = useCallback(() => {
-    setFontSize((prev) => {
-      if (prev === 'normal') {
-        announce('Tamaño de texto aumentado a grande');
-        return 'large';
-      }
-      if (prev === 'large') {
-        announce('Tamaño de texto aumentado a extra grande');
-        return 'xlarge';
-      }
-      return prev;
-    });
-  }, [announce]);
+    if (fontSize === 'normal') {
+      setFontSize('large');
+      announce('Tamaño de texto aumentado a grande');
+      return;
+    }
+    if (fontSize === 'large') {
+      setFontSize('xlarge');
+      announce('Tamaño de texto aumentado a extra grande');
+    }
+  }, [fontSize, announce]);
 
   const decreaseFontSize = useCallback(() => {
-    setFontSize((prev) => {
-      if (prev === 'xlarge') {
-        announce('Tamaño de texto reducido a grande');
-        return 'large';
-      }
-      if (prev === 'large') {
-        announce('Tamaño de texto restablecido a tamaño normal');
-        return 'normal';
-      }
-      return prev;
-    });
-  }, [announce]);
+    if (fontSize === 'xlarge') {
+      setFontSize('large');
+      announce('Tamaño de texto reducido a grande');
+      return;
+    }
+    if (fontSize === 'large') {
+      setFontSize('normal');
+      announce('Tamaño de texto restablecido a tamaño normal');
+    }
+  }, [fontSize, announce]);
 
   const toggleHighContrast = useCallback(() => {
+    const next = !highContrast;
+    const applyChange = () => {
+      setHighContrast(next);
+      announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
+    };
+
     // Si el usuario tiene activo movimiento reducido, cambio instantáneo
     if (reducedMotion) {
-      setHighContrast((prev) => {
-        const next = !prev;
-        announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
-        return next;
-      });
+      applyChange();
       return;
     }
 
     // Cortina de transición elegante (View Transition API nativa o fallback)
     if (typeof document !== 'undefined' && document.startViewTransition) {
       setIsCurtainAnimating(true);
-      const transition = document.startViewTransition(() => {
-        setHighContrast((prev) => {
-          const next = !prev;
-          announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
-          return next;
-        });
-      });
+      const transition = document.startViewTransition(applyChange);
       transition.finished
         .catch((error) => console.error('Error en transición de accesibilidad:', error))
         .finally(() => {
@@ -196,63 +188,49 @@ export const AccessibilityProvider = ({ children }) => {
       if (curtainEndTimerRef.current) clearTimeout(curtainEndTimerRef.current);
 
       setIsCurtainAnimating(true);
-      curtainToggleTimerRef.current = setTimeout(() => {
-        setHighContrast((prev) => {
-          const next = !prev;
-          announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
-          return next;
-        });
-      }, 200);
+      curtainToggleTimerRef.current = setTimeout(applyChange, 200);
       curtainEndTimerRef.current = setTimeout(() => {
         setIsCurtainAnimating(false);
       }, 500);
     }
-  }, [reducedMotion, announce]);
+  }, [highContrast, reducedMotion, announce]);
 
   const toggleDyslexicFont = useCallback(() => {
-    setDyslexicFont((prev) => {
-      const next = !prev;
-      announce(next ? 'Fuente de alta legibilidad activada' : 'Fuente estándar activada');
-      return next;
-    });
-  }, [announce]);
+    const next = !dyslexicFont;
+    setDyslexicFont(next);
+    announce(next ? 'Fuente de alta legibilidad activada' : 'Fuente estándar activada');
+  }, [dyslexicFont, announce]);
 
   const toggleReducedMotion = useCallback(() => {
-    setReducedMotion((prev) => {
-      const next = !prev;
-      announce(next ? 'Animaciones reducidas activadas' : 'Animaciones activadas');
-      return next;
-    });
-  }, [announce]);
+    const next = !reducedMotion;
+    setReducedMotion(next);
+    announce(next ? 'Animaciones reducidas activadas' : 'Animaciones activadas');
+  }, [reducedMotion, announce]);
 
   const toggleReadingGuide = useCallback(() => {
-    setReadingGuide((prev) => {
-      const next = !prev;
-      localStorage.setItem('nexo360_reading_guide', String(next));
-      announce(
-        next
-          ? 'Guía de lectura activada. Una regla visual resaltará la línea bajo el cursor.'
-          : 'Guía de lectura desactivada.',
-        'polite'
-      );
-      return next;
-    });
-  }, [announce]);
+    const next = !readingGuide;
+    setReadingGuide(next);
+    localStorage.setItem('nexo360_reading_guide', String(next));
+    announce(
+      next
+        ? 'Guía de lectura activada. Una regla visual resaltará la línea bajo el cursor.'
+        : 'Guía de lectura desactivada.',
+      'polite'
+    );
+  }, [readingGuide, announce]);
 
   const toggleVoiceReader = useCallback(() => {
-    setVoiceReader((prev) => {
-      const next = !prev;
-      localStorage.setItem('nexo360_voice_reader', String(next));
-      if (next) {
-        announce('Lectura por voz activada', 'polite');
-        speak('Lectura por voz activada', { force: true });
-      } else {
-        stopSpeech();
-        announce('Lectura por voz desactivada', 'polite');
-      }
-      return next;
-    });
-  }, [announce]);
+    const next = !voiceReader;
+    setVoiceReader(next);
+    localStorage.setItem('nexo360_voice_reader', String(next));
+    if (next) {
+      announce('Lectura por voz activada', 'polite');
+      speak('Lectura por voz activada', { force: true });
+    } else {
+      stopSpeech();
+      announce('Lectura por voz desactivada', 'polite');
+    }
+  }, [voiceReader, announce]);
 
   const speakText = useCallback(
     (text, options = {}) => {
