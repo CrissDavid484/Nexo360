@@ -26,3 +26,16 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Archivos locales de Graphify
+graphify-out/
+.graphifyignore
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+
+# Ponytail local
+*ponytail*
+
+# Antigravity y herramientas locales de agentes
+.agents/
+.gitattributes
