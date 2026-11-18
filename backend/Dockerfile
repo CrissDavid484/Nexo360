@@ -20,6 +20,7 @@ COPY --chown=node:node models ./models
 COPY --chown=node:node routes ./routes
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node services ./services
+COPY --chown=node:node utils ./utils
 
 # Seguridad: Ejecutar el contenedor con usuario no-root
 USER node

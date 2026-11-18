@@ -1,24 +1,23 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const mongoose = require('mongoose');
 
 const app = require('../server');
 const authService = require('../services/authService');
 const UserProfile = require('../models/UserProfile');
+const { request, setBaseUrl } = require('./testHelper');
 
 const EXPECTED_OAUTH_URL =
   'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize?client_id=674913e2-e170-4787-833f-e307f87db6e5&nonce=23077c7bfb49e35770b10965bcbb9df5&redirect_uri=https%3A%2F%2Fexperienciavivo.duoc.cl%2Fauth%2Fopenidc%2Fcallback&response_type=code&scope=openid+profile+email+offline_access+api%3A%2F%2F674913e2-e170-4787-833f-e307f87db6e5%2Faccess&state=181261858bac94807f59900cdd53d715&sso_reload=true';
 
 let server;
-let baseUrl;
 
 test.before(async () => {
   await new Promise((resolve) => {
     server = http.createServer(app);
     server.listen(0, '127.0.0.1', () => {
-      const port = server.address().port;
-      baseUrl = `http://127.0.0.1:${port}`;
+      const { port } = server.address();
+      setBaseUrl(`http://127.0.0.1:${port}`);
       resolve();
     });
   });
@@ -29,20 +28,6 @@ test.after(async () => {
     await new Promise((resolve) => server.close(resolve));
   }
 });
-
-const request = async (path, { method = 'GET', headers = {}, body } = {}) => {
-  const res = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const contentType = res.headers.get('content-type') || '';
-  const data = contentType.includes('application/json') ? await res.json() : await res.text();
-  return { status: res.status, body: data, headers: res.headers };
-};
 
 test('AUDITORÍA AUTH-NATIVO: Microsoft OAuth, Cohesión MongoDB, Control Acceso & Ley N° 21.719', async (t) => {
   await t.test('1. [OAuth Vivo Duoc] Redirección y enlace oficial con parámetros nonce y state exactos', async () => {

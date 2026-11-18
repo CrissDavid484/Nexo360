@@ -62,9 +62,9 @@
       {
         "id": "semana-cero",
         "title": "Semana Cero",
-        "description": "Inducción institucional presencial y virtual para nuevos integrantes de la comunidad Duoc UC.",
+        "description": "Inducción institucional presencial y virtual para nuevos integrantes de la comunidad Duoc UC Sede Alameda.",
         "directUrl": "https://experienciavivo.duoc.cl/semana-cero",
-        "paedisTip": "Recorrido de accesibilidad guiado por la sede y reconocimiento de rampas, ascensores y salas accesibles."
+        "paedisTip": "Recorrido de accesibilidad guiado por Sede Alameda y reconocimiento de rampas, ascensores y salas accesibles."
       },
       {
         "id": "semestre-cero",
@@ -91,7 +91,7 @@
     "faqs": [
       {
         "question": "¿Es obligatoria la asistencia a la Semana Cero?",
-        "answer": "Es altamente recomendada ya que conocerás a tu director de carrera, tutores PAR y la infraestructura de tu sede.",
+        "answer": "Es altamente recomendada ya que conocerás a tu director de carrera, tutores PAR y la infraestructura de Duoc UC Sede Alameda.",
         "tags": [
           "induccion",
           "semana cero"
@@ -337,13 +337,13 @@
       {
         "id": "correo-institucional",
         "title": "Correo Institucional",
-        "description": "Bandeja de entrada oficial de Microsoft Outlook para avisos de docentes y sede.",
+        "description": "Bandeja de entrada oficial de Microsoft Outlook para avisos de docentes y Duoc UC Sede Alameda.",
         "directUrl": "https://outlook.office.com/"
       },
       {
         "id": "wifi-duoc",
         "title": "Wifi Institucional",
-        "description": "Guía de conexión a la red inalámbrica segura para estudiantes en sedes Duoc UC.",
+        "description": "Guía de conexión a la red inalámbrica segura para estudiantes en Duoc UC Sede Alameda.",
         "directUrl": "https://experienciavivo.duoc.cl/wifi"
       },
       {

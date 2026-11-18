@@ -1,28 +1,89 @@
-const mongoose = require('mongoose');
-const UserProfile = require('../models/UserProfile');
 const authService = require('../services/authService');
-
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]{1,64}@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/i;
-const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const VALID_FONT_SIZES = ['normal', 'large', 'xlarge'];
-
-const sanitizeString = (val, maxLen = 120) =>
-  typeof val === 'string' ? val.trim().slice(0, maxLen) : undefined;
+const {
+  EMAIL_REGEX,
+  UUID_V4_REGEX,
+  sanitizeString,
+  normalizeInstitutionalEmail,
+  sanitizeAccessibilityPreferences,
+} = require('../utils/validationUtils');
 
 /**
- * Helper para obtener o crear el perfil del estudiante autenticado en MongoDB
+ * Valida y normaliza un correo institucional del cuerpo de la solicitud.
  */
-const getOrCreateActiveUserProfile = async (reqUser) => {
+function parseInstitutionalEmailOrReply(rawEmail, res, missingMsg) {
+  if (typeof rawEmail !== 'string' || !rawEmail.trim()) {
+    res.status(400).json({ success: false, message: missingMsg });
+    return null;
+  }
+
+  if (rawEmail.length > 120) {
+    res.status(400).json({
+      success: false,
+      message: 'El correo excede la longitud máxima permitida.',
+    });
+    return null;
+  }
+
+  const cleanEmail = normalizeInstitutionalEmail(rawEmail);
+  if (!cleanEmail) {
+    res.status(400).json({
+      success: false,
+      message:
+        'El correo debe pertenecer al dominio institucional (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).',
+    });
+    return null;
+  }
+
+  return cleanEmail;
+}
+
+/**
+ * Valida y retorna el correo institucional del usuario autenticado o responde 401.
+ */
+function requireAuthenticatedEmail(req, res) {
+  const targetEmail = String(req.user?.email || '').trim().toLowerCase();
+  if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
+    res.status(401).json({
+      success: false,
+      message: 'Usuario no autenticado o correo institucional inválido.',
+    });
+    return null;
+  }
+  return targetEmail;
+}
+
+/**
+ * Bloquea el acceso al Simulador de Toma de Ramos si la cuenta no está registrada en BD.
+ */
+function ensureRegisteredForSimulator(req, res) {
+  if (req.user && req.user.isRegisteredInDb === false) {
+    res.status(403).json({
+      success: false,
+      isRegisteredInDb: false,
+      message:
+        'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
+      code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
+    });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Helper para obtener o crear el perfil del estudiante autenticado.
+ */
+async function getOrCreateActiveUserProfile(reqUser) {
   if (!reqUser || !reqUser.email) {
-    throw new Error('Usuario no autenticado');
+    const err = new Error('Usuario no autenticado');
+    err.statusCode = 401;
+    throw err;
   }
   const user = await authService.findOrCreateUserProfile(reqUser.email);
   return authService.formatUserResponse(user);
-};
+}
 
 /**
  * GET /api/auth/users
- * Obtiene el catálogo de usuarios institucionales de la Base de Datos Nexo360
  */
 exports.getInstitutionalUsers = async (req, res) => {
   try {
@@ -44,33 +105,15 @@ exports.getInstitutionalUsers = async (req, res) => {
 
 /**
  * POST /api/auth/sso-login
- * Inicio de sesión institucional instantáneo vía Microsoft SSO contra MongoDB
  */
 exports.ssoLogin = async (req, res) => {
   try {
-    const { email } = req.body || {};
-
-    if (typeof email !== 'string' || !email.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Por favor ingrese o seleccione su correo institucional de Duoc UC.',
-      });
-    }
-
-    if (email.length > 120) {
-      return res.status(400).json({
-        success: false,
-        message: 'El correo excede la longitud máxima permitida.',
-      });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-    if (!EMAIL_REGEX.test(cleanEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: 'El correo debe pertenecer al dominio institucional (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).',
-      });
-    }
+    const cleanEmail = parseInstitutionalEmailOrReply(
+      req.body?.email,
+      res,
+      'Por favor ingrese o seleccione su correo institucional de Duoc UC.'
+    );
+    if (!cleanEmail) return;
 
     const ssoResult = await authService.completeSsoLogin(cleanEmail);
 
@@ -94,38 +137,31 @@ exports.ssoLogin = async (req, res) => {
 
 /**
  * POST /api/auth/login
- * Inicio de sesión institucional nativo contra MongoDB con contraseñas cifradas (bcrypt)
  */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body || {};
 
-    if (
-      typeof email !== 'string' ||
-      typeof password !== 'string' ||
-      !email.trim() ||
-      !password
-    ) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
       return res.status(400).json({
         success: false,
         message: 'Por favor ingrese su correo institucional y contraseña.',
       });
     }
 
-    if (email.length > 120 || password.length > 256) {
+    if (password.length > 256) {
       return res.status(400).json({
         success: false,
         message: 'Las credenciales exceden la longitud máxima permitida.',
       });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    if (!EMAIL_REGEX.test(cleanEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: 'El correo debe pertenecer al dominio institucional (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).',
-      });
-    }
+    const cleanEmail = parseInstitutionalEmailOrReply(
+      email,
+      res,
+      'Por favor ingrese su correo institucional y contraseña.'
+    );
+    if (!cleanEmail) return;
 
     const result = await authService.loginWithPassword(cleanEmail, password);
 
@@ -156,59 +192,45 @@ exports.login = async (req, res) => {
 /**
  * GET /api/auth/mfa-status/:sessionId
  */
-exports.getMfaStatus = async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    if (!sessionId || !UUID_V4_REGEX.test(sessionId)) {
-      return res.status(400).json({
-        success: false,
-        status: 'FAILED',
-        errorMessage: 'Identificador de sesión MFA inválido.',
-      });
-    }
-
-    return res.status(404).json({
+exports.getMfaStatus = (req, res) => {
+  const { sessionId } = req.params;
+  if (!sessionId || !UUID_V4_REGEX.test(sessionId)) {
+    return res.status(400).json({
       success: false,
       status: 'FAILED',
-      errorMessage: 'La sesión de autenticación no existe o ha expirado.',
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      status: 'FAILED',
-      errorMessage: 'Error al verificar el estado de autenticación.',
+      errorMessage: 'Identificador de sesión MFA inválido.',
     });
   }
+
+  return res.status(404).json({
+    success: false,
+    status: 'FAILED',
+    errorMessage: 'La sesión de autenticación no existe o ha expirado.',
+  });
 };
 
 /**
  * POST /api/auth/simulator-log
- * Registra interacción con el Simulador de Toma de Ramos en MongoDB
  */
 exports.recordSimulatorUsage = async (req, res) => {
   try {
-    if (req.user && req.user.isRegisteredInDb === false) {
-      return res.status(403).json({
-        success: false,
-        isRegisteredInDb: false,
-        message:
-          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
-        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
-      });
-    }
+    if (!ensureRegisteredForSimulator(req, res)) return;
     await authService.recordSimulatorUsage(req.user);
     return res.status(200).json({
       success: true,
       message: 'Uso del simulador registrado en la base de datos.',
     });
   } catch (error) {
-    return res.status(200).json({ success: true });
+    console.error('[AuthController] Error registrando uso del simulador:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudo registrar el uso del simulador.',
+    });
   }
 };
 
 /**
  * GET /api/auth/me
- * Obtiene el perfil del usuario autenticado
  */
 exports.getProfile = async (req, res) => {
   try {
@@ -218,16 +240,16 @@ exports.getProfile = async (req, res) => {
       user,
     });
   } catch (error) {
-    return res.status(200).json({
-      success: true,
-      user: authService.formatUserResponse(req.user || {}),
+    console.error('[AuthController] Error obteniendo perfil:', error.message);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode === 401 ? error.message : 'No se pudo obtener el perfil de usuario.',
     });
   }
 };
 
 /**
  * PUT /api/auth/accessibility
- * Guarda preferencias de accesibilidad en MongoDB
  */
 exports.updateAccessibility = async (req, res) => {
   try {
@@ -239,57 +261,31 @@ exports.updateAccessibility = async (req, res) => {
       });
     }
 
-    const sanitizedPreferences = {
-      fontSize: VALID_FONT_SIZES.includes(rawPrefs.fontSize) ? rawPrefs.fontSize : 'normal',
-      highContrast: Boolean(rawPrefs.highContrast),
-      dyslexicFont: Boolean(rawPrefs.dyslexicFont),
-      reducedMotion: Boolean(rawPrefs.reducedMotion),
-      readingGuide: Boolean(rawPrefs.readingGuide),
-      screenReaderOptimized:
-        typeof rawPrefs.screenReaderOptimized === 'boolean' ? rawPrefs.screenReaderOptimized : true,
-    };
+    const targetEmail = requireAuthenticatedEmail(req, res);
+    if (!targetEmail) return;
 
-    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
-    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario no autenticado o correo institucional inválido.',
-      });
-    }
-
-    if (mongoose.connection.readyState === 1) {
-      const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: { $eq: targetEmail } },
-        { $set: { accessibilityPreferences: sanitizedPreferences } },
-        { new: true, upsert: true, runValidators: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: 'Preferencias de accesibilidad guardadas en MongoDB.',
-        accessibilityPreferences: updatedUser
-          ? updatedUser.accessibilityPreferences
-          : sanitizedPreferences,
-      });
-    }
+    const sanitizedPreferences = sanitizeAccessibilityPreferences(rawPrefs);
+    const { persistedInDb, accessibilityPreferences } =
+      await authService.updateAccessibilityPreferences(targetEmail, sanitizedPreferences);
 
     return res.status(200).json({
       success: true,
-      message: 'Preferencias de accesibilidad aplicadas en sesión.',
-      accessibilityPreferences: sanitizedPreferences,
+      message: persistedInDb
+        ? 'Preferencias de accesibilidad guardadas en MongoDB.'
+        : 'Preferencias de accesibilidad aplicadas en sesión.',
+      accessibilityPreferences,
     });
   } catch (error) {
-    return res.status(200).json({
-      success: true,
-      message: 'Preferencias aplicadas en la sesión actual.',
-      accessibilityPreferences: req.body?.preferences,
+    console.error('[AuthController] Error actualizando preferencias de accesibilidad:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudieron actualizar las preferencias de accesibilidad.',
     });
   }
 };
 
 /**
  * PUT /api/auth/profile
- * Actualiza los datos de perfil y contacto en MongoDB
  */
 exports.updateProfile = async (req, res) => {
   try {
@@ -325,32 +321,20 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
-    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario no autenticado o correo institucional inválido.',
-      });
-    }
+    const targetEmail = requireAuthenticatedEmail(req, res);
+    if (!targetEmail) return;
 
-    if (mongoose.connection.readyState === 1) {
-      const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: { $eq: targetEmail } },
-        { $set: updateFields },
-        { new: true, upsert: true, runValidators: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: 'Datos de contacto actualizados en MongoDB.',
-        user: authService.formatUserResponse(updatedUser),
-      });
-    }
+    const { persistedInDb, user } = await authService.updateProfileFields(targetEmail, updateFields);
+    const responseUser = authService.formatUserResponse(
+      user || { ...req.user, email: targetEmail, ...updateFields }
+    );
 
     return res.status(200).json({
       success: true,
-      message: 'Datos de contacto actualizados en sesión.',
-      user: authService.formatUserResponse({ ...req.user, ...updateFields }),
+      message: persistedInDb
+        ? 'Datos de contacto actualizados en MongoDB.'
+        : 'Datos de contacto actualizados en sesión.',
+      user: responseUser,
     });
   } catch (error) {
     console.error('[AuthController] Error actualizando perfil:', error.message);
@@ -363,7 +347,6 @@ exports.updateProfile = async (req, res) => {
 
 /**
  * PUT /api/auth/profile/photo
- * Actualiza la fotografía de perfil del estudiante en MongoDB
  */
 exports.updatePhoto = async (req, res) => {
   try {
@@ -375,35 +358,24 @@ exports.updatePhoto = async (req, res) => {
       });
     }
 
+    const targetEmail = requireAuthenticatedEmail(req, res);
+    if (!targetEmail) return;
+
     const cleanPhoto = photo.trim();
-    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
-    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario no autenticado o correo institucional inválido.',
-      });
-    }
-
-    if (mongoose.connection.readyState === 1) {
-      const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: { $eq: targetEmail } },
-        { $set: { photo: cleanPhoto } },
-        { new: true, upsert: true, runValidators: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: 'Fotografía de perfil guardada exitosamente en MongoDB.',
-        photo: updatedUser ? updatedUser.photo : cleanPhoto,
-        user: authService.formatUserResponse(updatedUser),
-      });
-    }
+    const { persistedInDb, user } = await authService.updateProfileFields(targetEmail, {
+      photo: cleanPhoto,
+    });
+    const formattedUser = authService.formatUserResponse(
+      user || { ...req.user, email: targetEmail, photo: cleanPhoto }
+    );
 
     return res.status(200).json({
       success: true,
-      message: 'Fotografía de perfil actualizada en sesión.',
-      photo: cleanPhoto,
-      user: authService.formatUserResponse({ ...req.user, photo: cleanPhoto }),
+      message: persistedInDb
+        ? 'Fotografía de perfil guardada exitosamente en MongoDB.'
+        : 'Fotografía de perfil actualizada en sesión.',
+      photo: formattedUser.photo,
+      user: formattedUser,
     });
   } catch (error) {
     console.error('[AuthController] Error actualizando fotografía de perfil:', error.message);
@@ -416,20 +388,10 @@ exports.updatePhoto = async (req, res) => {
 
 /**
  * GET /api/auth/toma-ramos
- * Obtiene las asignaturas inscritas del estudiante en MongoDB
  */
 exports.getTomaRamos = async (req, res) => {
   try {
-    if (req.user && req.user.isRegisteredInDb === false) {
-      return res.status(403).json({
-        success: false,
-        isRegisteredInDb: false,
-        message:
-          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
-        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
-      });
-    }
-
+    if (!ensureRegisteredForSimulator(req, res)) return;
     const user = await getOrCreateActiveUserProfile(req.user);
     return res.status(200).json({
       success: true,
@@ -437,34 +399,26 @@ exports.getTomaRamos = async (req, res) => {
     });
   } catch (error) {
     console.error('[AuthController] Error obteniendo toma de ramos:', error.message);
-    return res.status(200).json({
-      success: true,
-      enrolledCourses: [],
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: 'Error al consultar las asignaturas inscritas.',
     });
   }
 };
 
 /**
  * POST /api/auth/toma-ramos
- * Guarda las asignaturas inscritas en el perfil del estudiante en MongoDB
  */
 exports.saveTomaRamos = async (req, res) => {
   try {
-    if (req.user && req.user.isRegisteredInDb === false) {
-      return res.status(403).json({
-        success: false,
-        isRegisteredInDb: false,
-        message:
-          'Para acceder al Simulador de Toma de Ramos debes acercarte a coordinación o administración para registrar tu cuenta oficial en Nexo360.',
-        code: 'SIMULATOR_ACCESS_DENIED_NOT_REGISTERED',
-      });
-    }
+    if (!ensureRegisteredForSimulator(req, res)) return;
 
     const { enrolledCourses } = req.body || {};
     if (!Array.isArray(enrolledCourses) || enrolledCourses.length > 20) {
       return res.status(400).json({
         success: false,
-        message: 'El listado de asignaturas inscritas debe ser un arreglo válido (máximo 20 ramos).',
+        message:
+          'El listado de asignaturas inscritas debe ser un arreglo válido (máximo 20 ramos).',
       });
     }
 
@@ -489,28 +443,20 @@ exports.saveTomaRamos = async (req, res) => {
           : [],
       }));
 
-    const targetEmail = String(req.user?.email || '').trim().toLowerCase();
-    if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario no autenticado o correo institucional inválido.',
-      });
-    }
+    const targetEmail = requireAuthenticatedEmail(req, res);
+    if (!targetEmail) return;
 
-    if (mongoose.connection.readyState === 1) {
-      const updatedUser = await UserProfile.findOneAndUpdate(
-        { email: { $eq: targetEmail } },
-        {
-          $set: {
-            enrolledCourses: sanitizedCourses,
-            hasUsedSimulator: true,
-            lastSimulatorUsage: new Date(),
-          },
-          $inc: { simulatorUsageCount: 1 },
-        },
-        { new: true, upsert: true, runValidators: true }
-      );
+    const { persistedInDb, user } = await authService.updateProfileFields(
+      targetEmail,
+      {
+        enrolledCourses: sanitizedCourses,
+        hasUsedSimulator: true,
+        lastSimulatorUsage: new Date(),
+      },
+      { simulatorUsageCount: 1 }
+    );
 
+    if (persistedInDb) {
       await authService.logActivity({
         userId: req.user._id || req.user.id,
         userEmail: req.user.email,
@@ -519,18 +465,14 @@ exports.saveTomaRamos = async (req, res) => {
         action: 'saved_toma_ramos',
         details: `El estudiante guardó ${sanitizedCourses.length} asignaturas en el Simulador de Toma de Ramos.`,
       });
-
-      return res.status(200).json({
-        success: true,
-        message: 'Carga académica grabada y respaldada en MongoDB correctamente.',
-        enrolledCourses: updatedUser ? updatedUser.enrolledCourses : sanitizedCourses,
-      });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Carga académica grabada en sesión.',
-      enrolledCourses: sanitizedCourses,
+      message: persistedInDb
+        ? 'Carga académica grabada y respaldada en MongoDB correctamente.'
+        : 'Carga académica grabada en sesión.',
+      enrolledCourses: user ? user.enrolledCourses : sanitizedCourses,
     });
   } catch (error) {
     console.error('[AuthController] Error guardando toma de ramos:', error.message);
@@ -543,10 +485,10 @@ exports.saveTomaRamos = async (req, res) => {
 
 /**
  * GET /api/auth/ley21719
- * Información de cumplimiento con la Ley N° 21.719 de Protección de Datos Personales
+ * Información de cumplimiento con la Ley N° 21.719 de Protección de Datos Personales.
  */
-exports.getLey21719Info = async (req, res) => {
-  return res.status(200).json({
+exports.getLey21719Info = (req, res) =>
+  res.status(200).json({
     success: true,
     law: 'Ley N° 21.719 de Protección de Datos Personales de Chile',
     compliance: {
@@ -566,4 +508,3 @@ exports.getLey21719Info = async (req, res) => {
       },
     },
   });
-};

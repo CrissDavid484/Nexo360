@@ -4,21 +4,28 @@ const mongoose = require('mongoose');
 const UserProfile = require('../models/UserProfile');
 const ActivityLog = require('../models/ActivityLog');
 const { getJwtSecret } = require('../middleware/authMiddleware');
-const { SEED_USERS, DEFAULT_SEED_PASSWORD } = require('../data/seedUsers');
+const SEED_USERS = require('../data/seedUsers.json');
+const {
+  DEFAULT_SEDE,
+  createDeterministicRut,
+  sanitizeAccessibilityPreferences,
+} = require('../utils/validationUtils');
 
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]{1,64}@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/i;
+const DEFAULT_SEED_PASSWORD = `Duoc${new Date().getFullYear()}!`;
 
 function buildOfficialVivoDuocAuthUrl() {
   if (process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL) {
     return process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL;
   }
-  const baseUrl = 'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize';
+  const baseUrl =
+    'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize';
   const params = new URLSearchParams({
     client_id: process.env.VIVO_DUOC_CLIENT_ID || '674913e2-e170-4787-833f-e307f87db6e5',
     nonce: '23077c7bfb49e35770b10965bcbb9df5',
     redirect_uri: 'https://experienciavivo.duoc.cl/auth/openidc/callback',
     response_type: 'code',
-    scope: 'openid profile email offline_access api://674913e2-e170-4787-833f-e307f87db6e5/access',
+    scope:
+      'openid profile email offline_access api://674913e2-e170-4787-833f-e307f87db6e5/access',
     state: '181261858bac94807f59900cdd53d715',
     sso_reload: 'true',
   });
@@ -39,46 +46,45 @@ for (const seedUser of SEED_USERS) {
 }
 
 /**
- * Algoritmo compacto Módulo 11 para cálculo de dígito verificador chileno
+ * Derivación de nombre legible a partir del correo institucional Duoc UC.
  */
-const computeModulo11Dv = (rutDigits) => {
-  const digits = String(rutDigits).replace(/\D/g, '').split('').reverse();
-  const total = digits.reduce((sum, char, idx) => sum + Number(char) * ((idx % 6) + 2), 0);
-  const rem = 11 - (total % 11);
-  if (rem === 11) return '0';
-  if (rem === 10) return 'K';
-  return String(rem);
-};
-
-/**
- * Generador determinista de RUT estudiantil mediante hashing de correo
- */
-const createDeterministicRut = (email = '') => {
-  const clean = String(email || '').trim().toLowerCase();
-  let seed = 0;
-  for (let i = 0; i < clean.length; i++) {
-    seed = Math.trunc(((seed << 5) - seed) + clean.charCodeAt(i));
-  }
-  const baseNum = 20000000 + (Math.abs(seed) % 2500000);
-  const dv = computeModulo11Dv(baseNum);
-  const s = String(baseNum);
-  return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}-${dv}`;
-};
-
-/**
- * Derivación de nombre legible a partir del correo institucional Duoc UC
- */
-const resolveNameFromEmail = (email = '') => {
+function resolveNameFromEmail(email = '') {
   const [localPart] = String(email || '').trim().toLowerCase().split('@');
   if (!localPart) return 'Estudiante Duoc UC';
   if (localPart === 'c.guzman' || localPart === 'cri.guzmang') return 'Cristian Guzmán';
   if (localPart === 'an.ordenesd') return 'Angelo Órdenes';
 
   const segments = localPart.split(/[._-]/).filter(Boolean);
-  return segments
-    .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
-    .join(' ');
-};
+  return segments.map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1)).join(' ');
+}
+
+/**
+ * Construye plantilla unificada de perfil por defecto para nuevos correos institucionales.
+ */
+function buildDefaultStudentProfile(cleanEmail, overrides = {}) {
+  const derivedName = resolveNameFromEmail(cleanEmail);
+  return {
+    email: cleanEmail,
+    fullName: derivedName,
+    nombre: derivedName,
+    rut: createDeterministicRut(cleanEmail),
+    role: 'estudiante',
+    roleLabel: 'Estudiante Regular Duoc UC',
+    isPaedis: false,
+    academicStatus: 'activo',
+    statusReason: 'Estudiante regular activo',
+    attendanceRate: 88.9,
+    hasUsedSimulator: false,
+    simulatorUsageCount: 0,
+    career: 'Ingeniería en Informática',
+    carrera: 'Ingeniería en Informática',
+    campus: DEFAULT_SEDE,
+    sede: DEFAULT_SEDE,
+    accessibilityPreferences: sanitizeAccessibilityPreferences({}),
+    isRegisteredInDb: false,
+    ...overrides,
+  };
+}
 
 class AuthService {
   getOfficialLoginUrl(email = '') {
@@ -88,7 +94,7 @@ class AuthService {
   }
 
   /**
-   * Sembrar usuarios institucionales iniciales directamente en MongoDB
+   * Sembrar usuarios institucionales iniciales directamente en MongoDB.
    */
   async seedInstitutionalUsers() {
     if (mongoose.connection.readyState !== 1) {
@@ -102,7 +108,10 @@ class AuthService {
         const existing = await UserProfile.findOne({ email: cleanEmail });
         if (!existing) {
           const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash(seedUser.password || DEFAULT_SEED_PASSWORD, salt);
+          const hashedPassword = await bcrypt.hash(
+            seedUser.password || DEFAULT_SEED_PASSWORD,
+            salt
+          );
 
           await UserProfile.create({
             ...seedUser,
@@ -111,8 +120,11 @@ class AuthService {
             nombre: seedUser.fullName,
             career: seedUser.career,
             carrera: seedUser.career,
-            campus: seedUser.campus,
-            sede: seedUser.campus,
+            campus: seedUser.campus || DEFAULT_SEDE,
+            sede: seedUser.campus || DEFAULT_SEDE,
+            accessibilityPreferences: sanitizeAccessibilityPreferences(
+              seedUser.accessibilityPreferences
+            ),
             isRegisteredInDb: true,
           });
           console.log(`[AuthService] Usuario institucional sembrado en MongoDB: ${cleanEmail}`);
@@ -133,7 +145,7 @@ class AuthService {
   }
 
   /**
-   * Buscar o crear perfil de usuario directamente en MongoDB
+   * Buscar o crear perfil de usuario directamente en MongoDB (con respaldo en memoria).
    */
   async findOrCreateUserProfile(email) {
     const cleanEmail = (email || '').trim().toLowerCase();
@@ -141,9 +153,9 @@ class AuthService {
 
     if (mongoose.connection.readyState === 1) {
       try {
-        let user = await UserProfile.findOne({ email: cleanEmail });
-        if (user) {
-          return user;
+        const existingUser = await UserProfile.findOne({ email: cleanEmail });
+        if (existingUser) {
+          return existingUser;
         }
 
         const seedMatch = SEED_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
@@ -153,7 +165,6 @@ class AuthService {
           salt
         );
 
-        const derivedName = resolveNameFromEmail(cleanEmail);
         const newUserData = seedMatch
           ? {
               ...seedMatch,
@@ -161,68 +172,99 @@ class AuthService {
               email: cleanEmail,
               nombre: seedMatch.fullName,
               carrera: seedMatch.career,
-              sede: seedMatch.campus,
+              sede: seedMatch.campus || DEFAULT_SEDE,
+              accessibilityPreferences: sanitizeAccessibilityPreferences(
+                seedMatch.accessibilityPreferences
+              ),
               isRegisteredInDb: true,
             }
-          : {
-              email: cleanEmail,
-              password: hashedPassword,
-              fullName: derivedName,
-              nombre: derivedName,
-              rut: createDeterministicRut(cleanEmail),
-              role: 'estudiante',
-              roleLabel: 'Estudiante Regular Duoc UC',
-              isPaedis: false,
-              academicStatus: 'activo',
-              statusReason: 'Estudiante regular activo',
-              attendanceRate: 88.9,
-              hasUsedSimulator: false,
-              simulatorUsageCount: 0,
-              career: 'Ingeniería en Informática',
-              carrera: 'Ingeniería en Informática',
-              campus: 'Sede Alameda',
-              sede: 'Sede Alameda',
-              isRegisteredInDb: false,
-            };
+          : buildDefaultStudentProfile(cleanEmail, { password: hashedPassword });
 
-        user = await UserProfile.create(newUserData);
-        return user;
+        return await UserProfile.create(newUserData);
       } catch (err) {
         console.warn('[AuthService] Error buscando/creando en MongoDB:', err.message);
       }
     }
 
-    // Fallback de memoria si MongoDB no está conectado
     let mem = inMemoryUsers.get(cleanEmail);
     if (!mem) {
-      const derivedName = resolveNameFromEmail(cleanEmail);
-      mem = {
-        _id: `temp_${Date.now()}`,
-        email: cleanEmail,
-        fullName: derivedName,
-        nombre: derivedName,
-        rut: createDeterministicRut(cleanEmail),
-        role: 'estudiante',
-        roleLabel: 'Estudiante Regular Duoc UC',
-        isPaedis: false,
-        academicStatus: 'activo',
-        statusReason: 'Estudiante regular activo',
-        attendanceRate: 88.9,
-        hasUsedSimulator: false,
-        simulatorUsageCount: 0,
-        career: 'Ingeniería en Informática',
-        carrera: 'Ingeniería en Informática',
-        campus: 'Sede Alameda',
-        sede: 'Sede Alameda',
-        isRegisteredInDb: false,
-      };
+      mem = buildDefaultStudentProfile(cleanEmail, { _id: `temp_${Date.now()}` });
       inMemoryUsers.set(cleanEmail, mem);
     }
     return mem;
   }
 
   /**
-   * Inicio de sesión directo con contraseña institucional cifrada (bcryptjs)
+   * Actualiza y persiste preferencias de accesibilidad en MongoDB y memoria local.
+   */
+  async updateAccessibilityPreferences(email, sanitizedPreferences) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const normalizedPrefs = sanitizeAccessibilityPreferences(sanitizedPreferences);
+
+    const existingMem = inMemoryUsers.get(cleanEmail);
+    if (existingMem) {
+      existingMem.accessibilityPreferences = normalizedPrefs;
+    } else {
+      inMemoryUsers.set(
+        cleanEmail,
+        buildDefaultStudentProfile(cleanEmail, {
+          _id: `temp_${Date.now()}`,
+          accessibilityPreferences: normalizedPrefs,
+        })
+      );
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      const updatedUser = await UserProfile.findOneAndUpdate(
+        { email: { $eq: cleanEmail } },
+        { $set: { accessibilityPreferences: normalizedPrefs } },
+        { new: true, upsert: true, runValidators: true }
+      );
+
+      return {
+        persistedInDb: true,
+        accessibilityPreferences: sanitizeAccessibilityPreferences(
+          updatedUser?.accessibilityPreferences?.toObject?.() ||
+            updatedUser?.accessibilityPreferences ||
+            normalizedPrefs
+        ),
+      };
+    }
+
+    return {
+      persistedInDb: false,
+      accessibilityPreferences: normalizedPrefs,
+    };
+  }
+
+  /**
+   * Actualiza campos de perfil en MongoDB y mantiene sincronizada la caché en memoria.
+   */
+  async updateProfileFields(email, updateFields, incFields = null) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const mem = inMemoryUsers.get(cleanEmail);
+    if (mem) {
+      Object.assign(mem, updateFields);
+      if (incFields && typeof incFields.simulatorUsageCount === 'number') {
+        mem.simulatorUsageCount = (mem.simulatorUsageCount || 0) + incFields.simulatorUsageCount;
+      }
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      const updateOp = incFields ? { $set: updateFields, $inc: incFields } : { $set: updateFields };
+      const updatedUser = await UserProfile.findOneAndUpdate(
+        { email: { $eq: cleanEmail } },
+        updateOp,
+        { new: true, upsert: true, runValidators: true }
+      );
+      return { persistedInDb: true, user: updatedUser };
+    }
+
+    return { persistedInDb: false, user: mem || null };
+  }
+
+  /**
+   * Inicio de sesión directo con contraseña institucional cifrada (bcryptjs).
    */
   async loginWithPassword(email, password) {
     const cleanEmail = (email || '').trim().toLowerCase();
@@ -252,21 +294,7 @@ class AuthService {
       isNewlyCreated = true;
     }
 
-    let isPasswordValid = false;
-    if (isNewlyCreated) {
-      isPasswordValid = true;
-    } else if (userDoc.password) {
-      if (typeof userDoc.comparePassword === 'function') {
-        isPasswordValid = await userDoc.comparePassword(password);
-      } else if (userDoc.password.startsWith('$2a$') || userDoc.password.startsWith('$2b$')) {
-        isPasswordValid = await bcrypt.compare(password, userDoc.password);
-      } else {
-        isPasswordValid = userDoc.password === password;
-      }
-    } else {
-      isPasswordValid = password === DEFAULT_SEED_PASSWORD;
-    }
-
+    const isPasswordValid = await this.verifyUserPassword(userDoc, password, isNewlyCreated);
     if (!isPasswordValid) {
       const err = new Error('Credenciales inválidas. Verifique su correo institucional y contraseña.');
       err.statusCode = 401;
@@ -274,8 +302,12 @@ class AuthService {
     }
 
     if (mongoose.connection.readyState === 1 && userDoc._id && typeof userDoc.save === 'function') {
-      userDoc.lastLogin = new Date();
-      await userDoc.save();
+      try {
+        userDoc.lastLogin = new Date();
+        await userDoc.save();
+      } catch (saveErr) {
+        console.warn('[AuthService] No se pudo actualizar lastLogin en MongoDB:', saveErr.message);
+      }
     }
 
     const formatted = this.formatUserResponse(userDoc);
@@ -298,9 +330,20 @@ class AuthService {
     };
   }
 
+  async verifyUserPassword(userDoc, password, isNewlyCreated) {
+    if (isNewlyCreated) return true;
+    if (!userDoc.password) return password === DEFAULT_SEED_PASSWORD;
+    if (typeof userDoc.comparePassword === 'function') {
+      return userDoc.comparePassword(password);
+    }
+    if (userDoc.password.startsWith('$2a$') || userDoc.password.startsWith('$2b$')) {
+      return bcrypt.compare(password, userDoc.password);
+    }
+    return userDoc.password === password;
+  }
+
   /**
-   * Inicio de sesión institucional instantáneo (SSO Microsoft Directo)
-   * Consulta directamente la base de datos sin procesos de bot ni demoras
+   * Inicio de sesión institucional instantáneo (SSO Microsoft Directo).
    */
   async completeSsoLogin(email) {
     const cleanEmail = (email || '').trim().toLowerCase();
@@ -330,7 +373,7 @@ class AuthService {
   }
 
   /**
-   * Registrar interacción del estudiante con el Simulador de Toma de Ramos
+   * Registrar interacción del estudiante con el Simulador de Toma de Ramos.
    */
   async recordSimulatorUsage(user) {
     if (!user || !user.email) return;
@@ -368,7 +411,7 @@ class AuthService {
   }
 
   /**
-   * Registrar auditoría en la colección ActivityLog de MongoDB
+   * Registrar auditoría en la colección ActivityLog de MongoDB.
    */
   async logActivity({ userId, userEmail, userName, userRole, action, details, metadata = {} }) {
     const logEntry = {
@@ -399,7 +442,7 @@ class AuthService {
   }
 
   /**
-   * Obtener todos los usuarios registrados directamente desde MongoDB
+   * Obtener todos los usuarios registrados directamente desde MongoDB (con respaldo en memoria).
    */
   async getAllUsers() {
     if (mongoose.connection.readyState === 1) {
@@ -417,7 +460,7 @@ class AuthService {
   }
 
   /**
-   * Formateo coherente 1:1 de los campos del usuario institucional
+   * Formateo coherente 1:1 de los campos del usuario institucional.
    */
   formatUserResponse(userProfile = {}) {
     const raw = typeof userProfile.toObject === 'function' ? userProfile.toObject() : userProfile;
@@ -425,63 +468,45 @@ class AuthService {
 
     const id = raw._id ? String(raw._id) : raw.id || `user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const fullName = raw.fullName || raw.nombre || email || 'Estudiante Duoc UC';
-    const nombre = fullName;
     const rut = raw.rut || createDeterministicRut(email);
     const role = raw.role || 'estudiante';
-    const rol = role;
     const roleLabel = raw.roleLabel || 'Estudiante Regular Duoc UC';
     const isPaedis = raw.isPaedis === true || role === 'estudiante_paedis';
     const career = raw.career || raw.carrera || 'Ingeniería en Informática';
-    const carrera = career;
-    const campus = raw.campus || raw.sede || 'Sede Alameda';
-    const sede = campus;
-    const academicStatus = raw.academicStatus || 'activo';
-    const statusReason = raw.statusReason || 'Estudiante regular activo';
-    const attendanceRate = Number(raw.attendanceRate ?? 88.9);
-    const hasUsedSimulator = Boolean(raw.hasUsedSimulator);
-    const simulatorUsageCount = Number(raw.simulatorUsageCount || 0);
-
-    const accessibilityPreferences = raw.accessibilityPreferences || {
-      fontSize: 'normal',
-      highContrast: false,
-      dyslexicFont: false,
-      reducedMotion: false,
-      readingGuide: false,
-      screenReaderOptimized: true,
-    };
-
-    const enrolledCourses = Array.isArray(raw.enrolledCourses) ? raw.enrolledCourses : [];
-    const isRegisteredInDb = raw.isRegisteredInDb !== false;
+    const campus = raw.campus || raw.sede || DEFAULT_SEDE;
     const address = raw.address || raw.direccion || 'Por actualizar';
-    const direccion = address;
     const phone = raw.phone || raw.telefonoPersonal || '+56 9 0000 0000';
-    const telefonoPersonal = phone;
     const personalEmail = raw.personalEmail || raw.emailPersonal || email;
-    const emailPersonal = personalEmail;
+
+    const rawA11y =
+      raw.accessibilityPreferences && typeof raw.accessibilityPreferences.toObject === 'function'
+        ? raw.accessibilityPreferences.toObject()
+        : raw.accessibilityPreferences;
+    const accessibilityPreferences = sanitizeAccessibilityPreferences(rawA11y || {});
 
     return {
       id,
       _id: id,
       email,
       fullName,
-      nombre,
+      nombre: fullName,
       rut,
       role,
-      rol,
+      rol: role,
       roleLabel,
       isPaedis,
       career,
-      carrera,
+      carrera: career,
       campus,
-      sede,
-      academicStatus,
-      statusReason,
-      attendanceRate,
-      hasUsedSimulator,
-      simulatorUsageCount,
+      sede: campus,
+      academicStatus: raw.academicStatus || 'activo',
+      statusReason: raw.statusReason || 'Estudiante regular activo',
+      attendanceRate: Number(raw.attendanceRate ?? 88.9),
+      hasUsedSimulator: Boolean(raw.hasUsedSimulator),
+      simulatorUsageCount: Number(raw.simulatorUsageCount || 0),
       lastSimulatorUsage: raw.lastSimulatorUsage || null,
       accessibilityPreferences,
-      enrolledCourses,
+      enrolledCourses: Array.isArray(raw.enrolledCourses) ? raw.enrolledCourses : [],
       courseAttendance: Array.isArray(raw.courseAttendance) ? raw.courseAttendance : [],
       satIntervention: raw.satIntervention || {
         riskLevel: 'NONE',
@@ -493,30 +518,38 @@ class AuthService {
       },
       photo: raw.photo || '',
       address,
-      direccion,
+      direccion: address,
       personalEmail,
-      emailPersonal,
+      emailPersonal: personalEmail,
       phone,
-      telefonoPersonal,
+      telefonoPersonal: phone,
       emergencyContact: raw.emergencyContact || 'Contacto Familiar',
       emergencyPhone: raw.emergencyPhone || '+56 9 1234 5678',
-      tutorParAsignado: raw.tutorParAsignado || (isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado'),
+      tutorParAsignado:
+        raw.tutorParAsignado || (isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado'),
       diagnosticoDeclarado: raw.diagnosticoDeclarado || '',
       ajustesAprobados: Array.isArray(raw.ajustesAprobados) ? raw.ajustesAprobados : [],
-      isRegisteredInDb,
+      isRegisteredInDb: raw.isRegisteredInDb !== false,
       lastLogin: raw.lastLogin || new Date(),
       consentimientoLey21719: raw.consentimientoLey21719 || {
         aceptado: true,
         fechaAceptacion: new Date(),
-        finalidadTratamiento: 'Tratamiento de datos personales para gestión académica conforme a Ley N° 21.719',
+        finalidadTratamiento:
+          'Tratamiento de datos personales para gestión académica conforme a Ley N° 21.719',
       },
       consentMetadata: raw.consentMetadata || {
         consentGiven: true,
         consentDate: new Date(),
         consentVersion: '1.0 - Ley N° 21.719',
         law: 'Ley N° 21.719 de Protección de Datos Personales de Chile',
-        purpose: ['gestion_academica', 'apoyo_paedis_inclusion', 'simulador_toma_ramos', 'seguimiento_asistencia'],
-        dataRetentionPolicy: 'Conservación durante el periodo académico activo conforme al Art. 12 de la Ley N° 21.719',
+        purpose: [
+          'gestion_academica',
+          'apoyo_paedis_inclusion',
+          'simulador_toma_ramos',
+          'seguimiento_asistencia',
+        ],
+        dataRetentionPolicy:
+          'Conservación durante el periodo académico activo conforme al Art. 12 de la Ley N° 21.719',
         arcoRightsNotice: 'Derechos ARCO garantizados por Duoc UC',
       },
     };

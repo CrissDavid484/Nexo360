@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { EMAIL_REGEX, DEFAULT_SEDE } = require('../utils/validationUtils');
 
 const ScheduleBlockSchema = new mongoose.Schema(
   {
@@ -99,7 +100,7 @@ const UserProfileSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       match: [
-        /^[a-zA-Z0-9._%+-]+@(duocuc\.cl|profesor\.duoc\.cl|duoc\.cl)$/,
+        EMAIL_REGEX,
         'Por favor ingrese un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl)',
       ],
     },
@@ -205,7 +206,7 @@ const UserProfileSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 80,
-      default: 'Sede Alameda',
+      default: DEFAULT_SEDE,
     },
     sede: {
       type: String,
@@ -279,6 +280,10 @@ const UserProfileSchema = new mongoose.Schema(
         default: false,
       },
       readingGuide: {
+        type: Boolean,
+        default: false,
+      },
+      voiceReader: {
         type: Boolean,
         default: false,
       },

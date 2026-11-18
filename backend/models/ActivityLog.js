@@ -35,6 +35,8 @@ const ActivityLogSchema = new mongoose.Schema(
         'status_changed_by_admin',
         'student_registered_by_admin',
         'student_updated_by_admin',
+        'sat_weekly_cut_simulated',
+        'sat_intervention_updated',
         'IMPORT',
         'CLEAR',
         'SEED',

@@ -76,7 +76,8 @@ app.get('/api/health', (req, res) => {
 
   res.status(200).json({
     status: 'OK',
-    service: 'Nexo360 Backend API • Duoc UC Sede Alameda',
+    service: 'Nexo360 Backend API • Duoc UC - Sede Alameda (Piloto Oficial)',
+    pilotCampus: 'Duoc UC - Sede Alameda',
     database: {
       engine: 'MongoDB',
       status: mongoState,
@@ -124,15 +125,25 @@ app.use((err, req, res, next) => {
   });
 });
 
-if (require.main === module) {
-  connectDB().catch((err) => {
+async function startServer() {
+  try {
+    await connectDB();
+  } catch (err) {
     console.error('[MongoDB Error] Fallo al conectar en inicio:', err.message);
+  }
+
+  return app.listen(PORT, '0.0.0.0', () => {
+    console.log(`=========================================================`);
+    console.log(`🚀 Nexo360 Backend (Duoc UC - Sede Alameda) en http://0.0.0.0:${PORT}`);
+    console.log(`🔒 Autenticación Cifrada Ley N° 21.719 & WCAG 2.2 AA/AAA`);
+    console.log(`=========================================================`);
   });
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`=========================================================`);
-    console.log(`🚀 Nexo360 Backend corriendo en http://0.0.0.0:${PORT}`);
-    console.log(`🔒 Zero-Knowledge Credentials & WCAG 2.2 AA/AAA Activos`);
-    console.log(`=========================================================`);
+}
+
+if (require.main === module) {
+  startServer().catch((err) => {
+    console.error('[Server Fatal]:', err.message);
+    process.exitCode = 1;
   });
 }
 

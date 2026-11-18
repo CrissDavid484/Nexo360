@@ -1,33 +1,36 @@
 const mongoose = require('mongoose');
 const CourseOffering = require('../models/CourseOffering');
 const excelParserService = require('./excelParserService');
+const { escapeRegex } = require('../utils/validationUtils');
 const {
-  STANDARD_BLOCKS,
-  toMinutes,
   parseDuocSchedule,
-  normalizeHeaderKey,
   normalizeRowToOffering,
+  mergeUniqueBlocks,
 } = require('../utils/courseScheduleUtils');
-
-const escapeRegex = (str) => {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 100);
-};
 
 let alamedaSeedData = null;
 try {
   alamedaSeedData = require('../data/alameda2026Seed.json');
-} catch (e) {
+} catch {
   alamedaSeedData = null;
 }
 
-const SEED_ROWS_RAW = require('../data/seedCourseRows.json');
+/**
+ * Carga síncrona del catálogo semilla oficial Alameda 2026-002 (con fallback lazy si no existiera).
+ */
+function loadDefaultSeedOfferings() {
+  if (Array.isArray(alamedaSeedData) && alamedaSeedData.length > 0) {
+    return [...alamedaSeedData];
+  }
+  const fallbackRows = require('../data/seedCourseRows.json');
+  return fallbackRows.map((row) => normalizeRowToOffering(row));
+}
 
-// Almacén en memoria fallback (en caso de que MongoDB no esté conectado)
-let inMemoryCourses = [];
+// Almacén en memoria inicializado síncronamente sin promesas flotantes al importar el módulo
+let inMemoryCourses = loadDefaultSeedOfferings();
 
 /**
- * Agrupa una lista de ofertas planas (secciones) en la estructura jerárquica esperada por el Simulador SAP
+ * Agrupa una lista de ofertas planas (secciones) en la estructura jerárquica esperada por el Simulador SAP.
  */
 function groupOfferingsIntoCourses(offerings) {
   const map = new Map();
@@ -54,12 +57,7 @@ function groupOfferingsIntoCourses(offerings) {
     const existingSec = course.secciones.find((s) => s.seccion === item.seccion);
 
     if (existingSec) {
-      // Combinar bloques adicionales si la sección aparece en varias filas (ej. Lunes y Viernes)
-      for (const blk of item.bloques || []) {
-        if (!existingSec.bloques.some((b) => b.dia === blk.dia && b.bloqueId === blk.bloqueId)) {
-          existingSec.bloques.push(blk);
-        }
-      }
+      mergeUniqueBlocks(existingSec.bloques, item.bloques);
     } else {
       course.secciones.push({
         seccion: item.seccion,
@@ -68,7 +66,7 @@ function groupOfferingsIntoCourses(offerings) {
         sala: item.modalidad || 'ONLINE SINCRONA',
         profesor: item.docente || 'Docente Duoc UC',
         horarioTexto: item.horarioRaw || 'Por definir',
-        bloques: item.bloques || [],
+        bloques: [...(item.bloques || [])],
       });
     }
   }
@@ -77,35 +75,149 @@ function groupOfferingsIntoCourses(offerings) {
 }
 
 /**
- * Servicio Central de Asignaturas y Oferta Académica
+ * Consulta ofertas filtradas desde MongoDB o desde el respaldo en memoria (DRY).
  */
+async function fetchMatchingOfferings({ carrera, periodo = '2026 - 002', jornada } = {}) {
+  let items = inMemoryCourses;
+  const safeCarrera = typeof carrera === 'string' ? escapeRegex(carrera.trim()) : '';
+  const safePeriodo = typeof periodo === 'string' ? periodo.trim().slice(0, 50) : '2026 - 002';
+  const safeJornada = typeof jornada === 'string' ? escapeRegex(jornada.trim()) : '';
+
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const query = {};
+      if (safeCarrera) query.carrera = { $regex: safeCarrera, $options: 'i' };
+      if (safePeriodo) query.periodo = { $eq: safePeriodo };
+      if (safeJornada) query.jornada = { $regex: safeJornada, $options: 'i' };
+      items = await CourseOffering.find(query).lean();
+    } catch (err) {
+      console.warn('[courseService] Fallback a memoria consultando asignaturas:', err.message);
+    }
+  }
+
+  if (carrera) {
+    const careerLower = carrera.toLowerCase();
+    items = items.filter((it) => (it.carrera || '').toLowerCase().includes(careerLower));
+  }
+
+  return items;
+}
+
+/**
+ * Extrae filas de entrada para importación masiva desde JSON, Markdown o Excel.
+ */
+async function extractImportPayload(input, periodo) {
+  if (Array.isArray(input)) {
+    return { rowsToProcess: input, sourceFormat: 'JSON', replace: undefined, periodo };
+  }
+
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return {
+          rowsToProcess: Array.isArray(parsed) ? parsed : parsed.rows || [],
+          sourceFormat: 'JSON',
+          replace: undefined,
+          periodo,
+        };
+      } catch {
+        const mdRes = excelParserService.parseMarkdownTable(trimmed, { periodo });
+        return { rowsToProcess: mdRes.offerings, sourceFormat: 'MARKDOWN', replace: undefined, periodo };
+      }
+    }
+    const mdRes = excelParserService.parseMarkdownTable(trimmed, { periodo });
+    return { rowsToProcess: mdRes.offerings, sourceFormat: 'MARKDOWN', replace: undefined, periodo };
+  }
+
+  if (Buffer.isBuffer(input)) {
+    const uploadRes = await excelParserService.processCatalogUpload({
+      buffer: input,
+      filename: 'upload.xlsx',
+      replace: false,
+      periodo,
+    });
+    return { rowsToProcess: uploadRes.offerings, sourceFormat: 'XLSX', replace: undefined, periodo };
+  }
+
+  if (input && typeof input === 'object') {
+    const effectivePeriodo = input.periodo || periodo;
+    const effectiveReplace = input.replace !== undefined ? Boolean(input.replace) : undefined;
+
+    if (input.markdown || input.md || input.textContent) {
+      const mdText = input.markdown || input.md || input.textContent;
+      const mdRes = excelParserService.parseMarkdownTable(mdText, { periodo: effectivePeriodo });
+      return {
+        rowsToProcess: mdRes.offerings,
+        sourceFormat: 'MARKDOWN',
+        replace: effectiveReplace,
+        periodo: effectivePeriodo,
+      };
+    }
+
+    if (input.base64 || input.fileBase64) {
+      const buf = Buffer.from(input.base64 || input.fileBase64, 'base64');
+      const filename = input.filename || 'upload.xlsx';
+      const uploadRes = await excelParserService.processCatalogUpload({
+        buffer: buf,
+        filename,
+        replace: false,
+        periodo: effectivePeriodo,
+      });
+      return {
+        rowsToProcess: uploadRes.offerings,
+        sourceFormat: filename.endsWith('.md') ? 'MARKDOWN' : 'XLSX',
+        replace: effectiveReplace,
+        periodo: effectivePeriodo,
+      };
+    }
+
+    if (Array.isArray(input.rows)) {
+      return {
+        rowsToProcess: input.rows,
+        sourceFormat: 'JSON',
+        replace: effectiveReplace,
+        periodo: effectivePeriodo,
+      };
+    }
+  }
+
+  return { rowsToProcess: [], sourceFormat: 'JSON', replace: undefined, periodo };
+}
+
+/**
+ * Inserta ofertas en lotes de 1000 documentos para optimizar memoria BSON en MongoDB.
+ */
+async function insertOfferingsInChunks(items) {
+  for (let i = 0; i < items.length; i += 1000) {
+    const chunk = items.slice(i, i + 1000);
+    await CourseOffering.insertMany(chunk, { ordered: false });
+  }
+}
+
 const courseService = {
   /**
-   * Inicializa la base de datos o almacén en memoria con las filas semilla oficiales
-   * Carga prioritariamente el catálogo Alameda 2026 completo (7,174 ofertas)
+   * Inicializa la base de datos o almacén en memoria con el catálogo semilla oficial.
    */
   async seedInitialCourses({ force = false } = {}) {
     try {
-      const seedItems = Array.isArray(alamedaSeedData) && alamedaSeedData.length > 0
-        ? alamedaSeedData
-        : SEED_ROWS_RAW.map((row) => normalizeRowToOffering(row));
-
-      inMemoryCourses = [...seedItems];
+      const seedItems = loadDefaultSeedOfferings();
+      inMemoryCourses = seedItems;
 
       if (mongoose.connection.readyState === 1) {
         const count = await CourseOffering.countDocuments();
         if (count === 0 || force) {
           if (force) {
-            await CourseOffering.deleteMany({});
+            await excelParserService.wipeAllData();
           }
-          // Inserción en bloques de 1000 para optimizar rendimiento y memoria BSON
-          for (let i = 0; i < seedItems.length; i += 1000) {
-            const chunk = seedItems.slice(i, i + 1000);
-            await CourseOffering.insertMany(chunk, { ordered: false });
-          }
-          console.log(`[courseService] Sembradas ${seedItems.length} secciones oficiales de Alameda 2026 en MongoDB`);
+          await insertOfferingsInChunks(seedItems);
+          console.log(
+            `[courseService] Sembradas ${seedItems.length} secciones oficiales de Alameda 2026 en MongoDB`
+          );
         }
       }
+
       return {
         success: true,
         count: inMemoryCourses.length,
@@ -118,15 +230,15 @@ const courseService = {
   },
 
   /**
-   * Retorna todas las carreras disponibles con conteos
+   * Retorna todas las carreras disponibles con conteos.
    */
   async getCareersSummary() {
     let all = inMemoryCourses;
     if (mongoose.connection.readyState === 1) {
       try {
         all = await CourseOffering.find({}).lean();
-      } catch (e) {
-        // Fallback a inMemory
+      } catch (err) {
+        console.warn('[courseService] Fallback a memoria para resumen de carreras:', err.message);
       }
     }
 
@@ -159,156 +271,73 @@ const courseService = {
   },
 
   /**
-   * Obtiene la lista de asignaturas para el simulador
-   * Si random=true, baraja y selecciona un subconjunto dinámico (5 a 8) de la carrera
+   * Obtiene la lista de asignaturas para el simulador.
    */
-  async getCoursesForSimulation({ carrera, periodo = '2026 - 002', jornada, random = false, limit = 8 }) {
-    let items = inMemoryCourses;
-    const safeCarrera = typeof carrera === 'string' ? escapeRegex(carrera.trim()) : '';
-    const safePeriodo = typeof periodo === 'string' ? periodo.trim().slice(0, 50) : '2026 - 002';
-    const safeJornada = typeof jornada === 'string' ? escapeRegex(jornada.trim()) : '';
-
-    if (mongoose.connection.readyState === 1) {
-      try {
-        const query = {};
-        if (safeCarrera) query.carrera = { $regex: safeCarrera, $options: 'i' };
-        if (safePeriodo) query.periodo = { $eq: safePeriodo };
-        if (safeJornada) query.jornada = { $regex: safeJornada, $options: 'i' };
-        items = await CourseOffering.find(query).lean();
-      } catch (e) {
-        // fallback
-      }
-    }
-
-    if (carrera) {
-      items = items.filter((it) => it.carrera.toLowerCase().includes(carrera.toLowerCase()));
-    }
-
-    // Agrupar en cursos
+  async getCoursesForSimulation({
+    carrera,
+    periodo = '2026 - 002',
+    jornada,
+    random = false,
+    limit = 8,
+  }) {
+    const items = await fetchMatchingOfferings({ carrera, periodo, jornada });
     let grouped = groupOfferingsIntoCourses(items);
 
     if (grouped.length === 0) {
-      // Fallback a todos los ramos en memoria si la carrera no tiene asignaturas cargadas aún
       grouped = groupOfferingsIntoCourses(inMemoryCourses);
     }
 
     if (random && grouped.length > 0) {
-      // Barajar cursos con algoritmo Fisher-Yates
       const shuffled = [...grouped];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
 
-      // Asegurar que haya entre 5 y 8 ramos
       const takeCount = Math.min(Math.max(limit, 6), shuffled.length);
-      grouped = shuffled.slice(0, takeCount);
-
-      // En el simulador oficial SAP, marcar 1 ramo al azar como ya inscrito para realismo
-      if (grouped.length > 0) {
-        grouped = grouped.map((g, idx) => ({
-          ...g,
-          yaInscrito: idx === 0,
-          seccionInscrita: idx === 0 && g.secciones[0] ? g.secciones[0].seccion : undefined,
-        }));
-      }
+      grouped = shuffled.slice(0, takeCount).map((g, idx) => ({
+        ...g,
+        yaInscrito: idx === 0,
+        seccionInscrita: idx === 0 && g.secciones[0] ? g.secciones[0].seccion : undefined,
+      }));
     }
 
     return grouped;
   },
 
   /**
-   * Importación masiva desde datos parseados de Excel (.xlsx / .csv), Markdown (.md) o JSON
-   * Soporta payloads con { rows, markdown, md, base64, buffer, replace: true }
+   * Importación masiva desde datos parseados de Excel (.xlsx / .csv), Markdown (.md) o JSON.
    */
   async bulkImport(input, { replace = false, periodo = '2026 - 002' } = {}) {
-    let rowsToProcess = [];
-    let sourceFormat = 'JSON';
-
-    if (Array.isArray(input)) {
-      rowsToProcess = input;
-    } else if (typeof input === 'string') {
-      const trimmed = input.trim();
-      if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(trimmed);
-          rowsToProcess = Array.isArray(parsed) ? parsed : (parsed.rows || []);
-        } catch {
-          const mdRes = excelParserService.parseMarkdownTable(trimmed, { periodo });
-          rowsToProcess = mdRes.offerings;
-          sourceFormat = 'MARKDOWN';
-        }
-      } else {
-        const mdRes = excelParserService.parseMarkdownTable(trimmed, { periodo });
-        rowsToProcess = mdRes.offerings;
-        sourceFormat = 'MARKDOWN';
-      }
-    } else if (Buffer.isBuffer(input)) {
-      const uploadRes = await excelParserService.processCatalogUpload({
-        buffer: input,
-        filename: 'upload.xlsx',
-        replace: false,
-        periodo,
-      });
-      rowsToProcess = uploadRes.offerings;
-      sourceFormat = 'XLSX';
-    } else if (input && typeof input === 'object') {
-      if (input.markdown || input.md || input.textContent) {
-        const mdText = input.markdown || input.md || input.textContent;
-        const mdRes = excelParserService.parseMarkdownTable(mdText, { periodo: input.periodo || periodo });
-        rowsToProcess = mdRes.offerings;
-        sourceFormat = 'MARKDOWN';
-      } else if (input.base64 || input.fileBase64) {
-        const buf = Buffer.from(input.base64 || input.fileBase64, 'base64');
-        const filename = input.filename || 'upload.xlsx';
-        const uploadRes = await excelParserService.processCatalogUpload({
-          buffer: buf,
-          filename,
-          replace: false,
-          periodo: input.periodo || periodo,
-        });
-        rowsToProcess = uploadRes.offerings;
-        sourceFormat = filename.endsWith('.md') ? 'MARKDOWN' : 'XLSX';
-      } else if (Array.isArray(input.rows)) {
-        rowsToProcess = input.rows;
-      }
-      if (input.replace !== undefined) {
-        replace = Boolean(input.replace);
-      }
-      if (input.periodo) {
-        periodo = input.periodo;
-      }
-    }
+    const extracted = await extractImportPayload(input, periodo);
+    const rowsToProcess = extracted.rowsToProcess;
+    const sourceFormat = extracted.sourceFormat;
+    const effectiveReplace = extracted.replace !== undefined ? extracted.replace : replace;
+    const effectivePeriodo = extracted.periodo || periodo;
 
     if (!Array.isArray(rowsToProcess) || rowsToProcess.length === 0) {
       throw new Error('No se recibieron filas válidas para importar.');
     }
 
     const normalized = rowsToProcess
-      .map((r) => excelParserService.normalizeRow(r, periodo))
+      .map((r) => excelParserService.normalizeRow(r, effectivePeriodo))
       .filter((r) => r.sigla && r.nombre);
 
     if (normalized.length === 0) {
       throw new Error('Ninguna fila contiene sigla y nombre de asignatura válidos.');
     }
 
-    if (replace) {
-      inMemoryCourses = [...normalized];
-    } else {
-      inMemoryCourses = [...inMemoryCourses, ...normalized];
-    }
+    inMemoryCourses = effectiveReplace ? [...normalized] : [...inMemoryCourses, ...normalized];
 
-    const safePeriodo = typeof periodo === 'string' ? periodo.trim().slice(0, 50) : '2026 - 002';
+    const safePeriodo =
+      typeof effectivePeriodo === 'string' ? effectivePeriodo.trim().slice(0, 50) : '2026 - 002';
+
     if (mongoose.connection.readyState === 1) {
       try {
-        if (replace) {
-          // Limpia asignaturas del período (o todo) para evitar duplicados entre años
-          await CourseOffering.deleteMany({ periodo: { $eq: safePeriodo } });
+        if (effectiveReplace) {
+          await excelParserService.wipePeriodData(safePeriodo);
         }
-        for (let i = 0; i < normalized.length; i += 1000) {
-          const chunk = normalized.slice(i, i + 1000);
-          await CourseOffering.insertMany(chunk, { ordered: false });
-        }
+        await insertOfferingsInChunks(normalized);
       } catch (err) {
         console.warn('[courseService] Advertencia al persistir en MongoDB:', err.message);
       }
@@ -325,29 +354,15 @@ const courseService = {
       asignaturasUnicas: uniqueSiglas.size,
       carrerasDetectadas: Array.from(uniqueCarreras),
       periodo: safePeriodo,
-      reemplazado: replace,
+      reemplazado: effectiveReplace,
     };
   },
 
   /**
-   * Genera una representación en formato Markdown (.md) de los cursos disponibles
+   * Genera una representación en formato Markdown (.md) de los cursos disponibles.
    */
   async exportToMarkdown({ carrera, periodo = '2026 - 002' } = {}) {
-    let items = inMemoryCourses;
-    const safeCarrera = typeof carrera === 'string' ? escapeRegex(carrera.trim()) : '';
-    const safePeriodo = typeof periodo === 'string' ? periodo.trim().slice(0, 50) : '2026 - 002';
-
-    if (mongoose.connection.readyState === 1) {
-      try {
-        const q = {};
-        if (safeCarrera) q.carrera = { $regex: safeCarrera, $options: 'i' };
-        if (safePeriodo) q.periodo = { $eq: safePeriodo };
-        items = await CourseOffering.find(q).lean();
-      } catch (e) {}
-    }
-    if (carrera) {
-      items = items.filter((it) => it.carrera.toLowerCase().includes(carrera.toLowerCase()));
-    }
+    const items = await fetchMatchingOfferings({ carrera, periodo });
     const headers = [
       'Sede',
       'Carrera',
@@ -371,22 +386,15 @@ const courseService = {
   },
 
   /**
-   * Limpia o reinicia las asignaturas registradas
+   * Limpia las asignaturas registradas en memoria y en MongoDB.
    */
   async clearAll() {
     inMemoryCourses = [];
-    if (mongoose.connection.readyState === 1) {
-      await CourseOffering.deleteMany({});
-    }
+    await excelParserService.wipeAllData();
     return { success: true };
   },
 
   parseDuocSchedule,
 };
-
-// Inicializar semilla al cargar el módulo
-courseService.seedInitialCourses().catch((err) => {
-  console.warn('[courseService] Falló inicialización inicial de cursos:', err.message);
-});
 
 module.exports = courseService;

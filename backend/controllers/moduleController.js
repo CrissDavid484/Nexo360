@@ -1,10 +1,10 @@
-const { INSTITUTIONAL_MODULES } = require('../data/institutionalModules');
+const INSTITUTIONAL_MODULES = require('../data/institutionalModules.json');
 
 /**
- * CONTROLADOR DE MÓDULOS Y CATEGORÍAS INSTITUCIONALES DUOC UC
+ * CONTROLADOR DE MÓDULOS Y CATEGORÍAS INSTITUCIONALES DUOC UC SEDE ALAMEDA
  * Servidos directamente para la navegación del Centro de Ayuda de Nexo360
  */
-exports.getModules = async (req, res) => {
+exports.getModules = (req, res) => {
   try {
     const { q } = req.query;
 
@@ -48,7 +48,7 @@ exports.getModules = async (req, res) => {
   }
 };
 
-exports.getModuleByKey = async (req, res) => {
+exports.getModuleByKey = (req, res) => {
   try {
     const { key } = req.params;
     const category = INSTITUTIONAL_MODULES.find((m) => m.categoryKey === key);

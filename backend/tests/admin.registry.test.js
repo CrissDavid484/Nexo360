@@ -141,7 +141,11 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     const listRes = await request('/api/admin/sedes', { headers: adminHeaders });
     assert.equal(listRes.status, 200);
     assert.ok(Array.isArray(listRes.body?.sedes));
-    assert.ok(listRes.body.sedes.length >= 15);
+    assert.ok(listRes.body.sedes.length >= 1);
+    assert.ok(
+      listRes.body.sedes.some((s) => s.name === 'Sede Alameda'),
+      'Debe incluir Sede Alameda como sede piloto'
+    );
 
     // Crear sede
     const newSedeName = `Sede Antártica Chilena ${Date.now()}`;

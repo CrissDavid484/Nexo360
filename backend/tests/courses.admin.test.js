@@ -1,40 +1,29 @@
-const { test, describe, before } = require('node:test');
+const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 const jwt = require('jsonwebtoken');
 const app = require('../server');
 const { getJwtSecret } = require('../middleware/authMiddleware');
-const ActivityLog = require('../models/ActivityLog');
+const { request, setBaseUrl } = require('./testHelper');
 
-const request = async (path, { method = 'GET', headers = {}, body = null } = {}) => {
-  const server = app.listen(0);
-  const { port } = server.address();
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const contentType = res.headers.get('content-type') || '';
-    let resBody = null;
-    if (contentType.includes('application/json')) {
-      resBody = await res.json();
-    } else {
-      resBody = await res.text();
-    }
-    return {
-      status: res.status,
-      headers: res.headers,
-      body: resBody,
-    };
-  } finally {
-    server.close();
-  }
-};
+let server;
 
 describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría ActivityLog', () => {
+  before(async () => {
+    await new Promise((resolve) => {
+      server = http.createServer(app);
+      server.listen(0, '127.0.0.1', () => {
+        setBaseUrl(`http://127.0.0.1:${server.address().port}`);
+        resolve();
+      });
+    });
+  });
+
+  after(async () => {
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
   const adminToken = jwt.sign(
     { id: 'admin_test_1', email: 'c.guzman@duocuc.cl', role: 'admin' },
     getJwtSecret(),
@@ -177,9 +166,11 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
     assert.equal(clearRes.body?.success, true);
 
     // Re-sembrar para dejar el entorno limpio con Alameda 2026
-    await request('/api/admin/courses/seed', {
+    const reseedRes = await request('/api/admin/courses/seed', {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
     });
+    assert.equal(reseedRes.status, 200);
+    assert.equal(reseedRes.body?.success, true);
   });
 });

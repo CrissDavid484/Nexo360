@@ -2,6 +2,15 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const UserProfile = require('../models/UserProfile');
 
+const DEMO_ADMIN_USER = Object.freeze({
+  _id: 'seed_admin_c_guzman',
+  id: 'seed_admin_c_guzman',
+  email: 'c.guzman@duocuc.cl',
+  fullName: 'Cristian Guzmán',
+  role: 'admin',
+  roleLabel: 'Administrador del Sistema Nexo360',
+});
+
 const getJwtSecret = () => {
   if (process.env.JWT_SECRET) {
     return process.env.JWT_SECRET;
@@ -16,48 +25,56 @@ const isDemoTokenAllowed = (token) =>
   token === 'demo-token-cristian' && process.env.NODE_ENV !== 'production';
 
 /**
- * Middleware para validar el JWT de Nexo360 en rutas protegidas
+ * Resuelve la identidad del usuario a partir de la cabecera Authorization Bearer.
+ */
+async function resolveUserFromHeader(authHeader) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { status: 'missing', user: null };
+  }
+
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return { status: 'missing', user: null };
+  }
+
+  if (isDemoTokenAllowed(token)) {
+    return { status: 'ok', user: { ...DEMO_ADMIN_USER } };
+  }
+
+  const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
+
+  if (decoded.id && mongoose.connection.readyState === 1) {
+    try {
+      const user = await UserProfile.findById(decoded.id).lean();
+      return { status: 'ok', user: user || decoded };
+    } catch (dbError) {
+      console.warn('[AuthMiddleware] Error consultando UserProfile en MongoDB:', dbError.message);
+      return { status: 'ok', user: decoded };
+    }
+  }
+
+  return { status: 'ok', user: decoded };
+}
+
+/**
+ * Middleware para validar el JWT de Nexo360 en rutas protegidas.
  */
 const verifyToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const resolved = await resolveUserFromHeader(req.headers.authorization);
+    if (resolved.status === 'missing') {
       return res.status(401).json({
         success: false,
         message: 'No autorizado: Token de autenticación no proporcionado',
       });
     }
 
-    const token = authHeader.split(' ')[1];
-
-    // Soporte controlado para sesión Demo exclusivamente fuera de producción
-    if (isDemoTokenAllowed(token)) {
-      req.user = {
-        _id: 'seed_admin_c_guzman',
-        id: 'seed_admin_c_guzman',
-        email: 'c.guzman@duocuc.cl',
-        fullName: 'Cristian Guzmán',
-        role: 'admin',
-        roleLabel: 'Administrador del Sistema Nexo360',
-      };
-      return next();
-    }
-
-    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
-
-    if (decoded.id && mongoose.connection.readyState === 1) {
-      try {
-        const user = await UserProfile.findById(decoded.id).lean();
-        req.user = user || decoded;
-      } catch {
-        req.user = decoded;
-      }
-    } else {
-      req.user = decoded;
-    }
-
-    next();
+    req.user = resolved.user;
+    return next();
   } catch (error) {
+    if (error.name !== 'JsonWebTokenError' && error.name !== 'TokenExpiredError') {
+      console.warn('[AuthMiddleware] Error validando sesión JWT:', error.message);
+    }
     return res.status(401).json({
       success: false,
       message: 'Token expirado o inválido. Por favor inicie sesión nuevamente.',
@@ -66,65 +83,50 @@ const verifyToken = async (req, res, next) => {
 };
 
 /**
- * Middleware para restringir acceso exclusivo a Administradores
+ * Middleware para restringir acceso exclusivo a Administradores.
  */
 const requireAdmin = (req, res, next) => {
   const allowed = ['admin', 'administrador'];
   if (!req.user || !allowed.includes(req.user.role)) {
     return res.status(403).json({
       success: false,
-      message: 'Acceso restringido: Se requieren privilegios de Administrador para acceder a este módulo.',
+      message:
+        'Acceso restringido: Se requieren privilegios de Administrador para acceder a este módulo.',
     });
   }
-  next();
+  return next();
 };
 
 /**
- * Middleware para restringir acceso a Administradores y Coordinadores PAEDIS
- * Exclusivo para gestión, importación, reseteo y borrado de catálogos de cursos
+ * Middleware para restringir acceso a Administradores y Coordinadores PAEDIS.
  */
 const requireAdminOrCoordinator = (req, res, next) => {
   const allowed = ['admin', 'administrador', 'coordinador_paedis'];
   if (!req.user || !allowed.includes(req.user.role)) {
     return res.status(403).json({
       success: false,
-      message: 'Acceso restringido: Se requieren privilegios de Administrador o Coordinador PAEDIS para acceder a este módulo.',
+      message:
+        'Acceso restringido: Se requieren privilegios de Administrador o Coordinador PAEDIS para acceder a este módulo.',
     });
   }
-  next();
+  return next();
 };
 
 /**
- * Middleware opcional: si hay token válido adjunta el usuario
+ * Middleware opcional: si hay token válido adjunta el usuario; ante token inválido continúa anónimo.
  */
 const optionalToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      if (isDemoTokenAllowed(token)) {
-        req.user = {
-          _id: 'seed_admin_c_guzman',
-          id: 'seed_admin_c_guzman',
-          email: 'c.guzman@duocuc.cl',
-          fullName: 'Cristian Guzmán',
-          role: 'admin',
-          roleLabel: 'Administrador del Sistema Nexo360',
-        };
-        return next();
-      }
-      const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
-      if (decoded.id && mongoose.connection.readyState === 1) {
-        const user = await UserProfile.findById(decoded.id).lean().catch(() => null);
-        req.user = user || decoded;
-      } else {
-        req.user = decoded;
-      }
+    const resolved = await resolveUserFromHeader(req.headers.authorization);
+    if (resolved.status === 'ok') {
+      req.user = resolved.user;
     }
-  } catch {
-    // Continuar sin usuario autenticado
+  } catch (error) {
+    if (error.name !== 'JsonWebTokenError' && error.name !== 'TokenExpiredError') {
+      console.warn('[AuthMiddleware] Error inesperado en optionalToken:', error.message);
+    }
   }
-  next();
+  return next();
 };
 
 module.exports = {

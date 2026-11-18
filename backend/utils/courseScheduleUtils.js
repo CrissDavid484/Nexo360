@@ -216,6 +216,17 @@ function normalizeRowToOffering(rawRow, defaultPeriodo = '2026 - 002') {
   };
 }
 
+/**
+ * Combina bloques horarios evitando duplicados por día y bloqueId.
+ */
+function mergeUniqueBlocks(targetBlocks, incomingBlocks = []) {
+  for (const blk of incomingBlocks || []) {
+    if (!targetBlocks.some((b) => b.dia === blk.dia && b.bloqueId === blk.bloqueId)) {
+      targetBlocks.push(blk);
+    }
+  }
+}
+
 module.exports = {
   STANDARD_BLOCKS,
   toMinutes,
@@ -224,4 +235,5 @@ module.exports = {
   sanitizeCell,
   normalizeRowToOffering,
   normalizeRow: normalizeRowToOffering,
+  mergeUniqueBlocks,
 };

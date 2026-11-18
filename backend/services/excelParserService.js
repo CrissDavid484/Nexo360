@@ -1,5 +1,5 @@
 /**
- * Servicio de Ingesta, Conversión y Parseo de Asignaturas Duoc UC (Excel / Markdown)
+ * Servicio de Ingesta, Conversión y Parseo de Asignaturas Duoc UC (Excel / Markdown).
  * Soporta archivos .xlsx, .xls y .md con tablas estándar o segmentadas horizontalmente.
  */
 
@@ -7,17 +7,16 @@ const nodeXlsx = require('node-xlsx');
 const mongoose = require('mongoose');
 const CourseOffering = require('../models/CourseOffering');
 const {
-  STANDARD_BLOCKS,
-  toMinutes,
   parseDuocSchedule,
   normalizeHeaderKey,
   normalizeRowToOffering,
+  mergeUniqueBlocks,
 } = require('../utils/courseScheduleUtils');
 
 const normalizeRow = normalizeRowToOffering;
 
 /**
- * Agrupa y consolida filas por sección combinando sus bloques de horario
+ * Agrupa y consolida filas por sección combinando sus bloques de horario.
  */
 function consolidateSections(offerings) {
   const map = new Map();
@@ -38,11 +37,7 @@ function consolidateSections(offerings) {
         existing.horarios.push(item.horarioRaw);
         existing.horarioRaw = existing.horarios.join(' / ');
       }
-      for (const blk of item.bloques || []) {
-        if (!existing.bloques.some((b) => b.dia === blk.dia && b.bloqueId === blk.bloqueId)) {
-          existing.bloques.push(blk);
-        }
-      }
+      mergeUniqueBlocks(existing.bloques, item.bloques);
     }
   }
 
@@ -50,7 +45,7 @@ function consolidateSections(offerings) {
 }
 
 /**
- * Convierte un libro de Excel (.xlsx / .xls) o Buffer a una tabla Markdown
+ * Convierte un libro de Excel (.xlsx / .xls) o Buffer a una tabla Markdown.
  */
 function xlsxToMarkdown(bufferOrPath, options = {}) {
   const sheets = nodeXlsx.parse(bufferOrPath);
@@ -74,7 +69,9 @@ function xlsxToMarkdown(bufferOrPath, options = {}) {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (!row || row.every((cell) => cell === '' || cell === null || cell === undefined)) continue;
-    const formatted = headers.map((_, colIdx) => String(row[colIdx] || '').replace(/\|/g, '\\|').trim());
+    const formatted = headers.map((_, colIdx) =>
+      String(row[colIdx] || '').replace(/\|/g, '\\|').trim()
+    );
     rows.push(`| ${formatted.join(' | ')} |`);
   }
 
@@ -82,7 +79,7 @@ function xlsxToMarkdown(bufferOrPath, options = {}) {
 }
 
 /**
- * Parsea un buffer o archivo Excel directamente a filas normalizadas
+ * Parsea un buffer o archivo Excel directamente a filas normalizadas.
  */
 function parseXlsxBuffer(buffer, options = {}) {
   const sheets = nodeXlsx.parse(buffer);
@@ -101,12 +98,7 @@ function parseXlsxBuffer(buffer, options = {}) {
 
   const data = worksheet.data || [];
   if (data.length === 0) {
-    return {
-      sheetName,
-      totalRows: 0,
-      offerings: [],
-      consolidated: [],
-    };
+    return { sheetName, totalRows: 0, offerings: [], consolidated: [] };
   }
 
   const [headerRow = [], ...dataRows] = data;
@@ -133,7 +125,7 @@ function parseXlsxBuffer(buffer, options = {}) {
 }
 
 /**
- * Limpia y extrae celdas de una línea de tabla Markdown
+ * Limpia y extrae celdas de una línea de tabla Markdown.
  */
 function parseMdRow(line) {
   if (!line || !line.trim().startsWith('|')) return null;
@@ -147,148 +139,141 @@ function parseMdRow(line) {
 }
 
 /**
- * Parsea un contenido Markdown con tablas simples o segmentadas horizontalmente
+ * Extrae filas limpias de tabla Markdown dentro de un rango de líneas.
  */
-function parseMarkdownTable(markdownContent, options = {}) {
-  const defaultPeriodo = options.periodo || '2026 - 002';
-  const lines = markdownContent.split(/\r?\n/);
+function extractCleanMdRows(lines, start, end) {
+  const rows = [];
+  for (let i = start; i < end; i++) {
+    const parts = parseMdRow(lines[i]);
+    if (parts && !parts[0].includes('**')) {
+      rows.push(parts);
+    }
+  }
+  return rows;
+}
 
-  // Detectar chunks segmentados o tablas convencionales
-  // Buscamos patrones de cabecera como **Sede**, **Nombre Asignatura**, **Horario**
-  const headerLocations = [];
+const SEGMENT_MARKERS = [
+  { key: 'p2_start', min: 20000, max: 25000, includes: ['**Sede**', '**Sigla'] },
+  { key: 'p2_col2', min: 29000, max: 32000, includes: ['**Nombre', '**Sección'] },
+  { key: 'p2_col3', min: 36000, max: 39000, includes: ['**Horario**', '**Docente'] },
+  { key: 'p3_start', min: 44000, max: Infinity, includes: ['**Sede**', '**Sigla**'] },
+  { key: 'p3_col2', min: 44000, max: Infinity, includes: ['**Asignatura**', '**Nivel**'] },
+  { key: 'p3_col3', min: 44000, max: Infinity, includes: ['**Sección**', '**Horario**'] },
+  { key: 'p3_col4', min: 44000, max: Infinity, includes: ['**ASIGNATURA VIRTUAL SINCRONICA**'] },
+];
+
+/**
+ * Localiza los índices clave de bloques segmentados horizontalmente en el Markdown oficial.
+ */
+function locateSegmentedHeaderIndices(lines) {
+  const indices = {
+    p2_start: -1,
+    p2_col2: -1,
+    p2_col3: -1,
+    p3_start: -1,
+    p3_col2: -1,
+    p3_col3: -1,
+    p3_col4: -1,
+  };
+
   for (let i = 0; i < lines.length; i++) {
-    const l = lines[i].trim();
-    if (l.startsWith('|') && (l.includes('**Sede**') || l.includes('**Nombre') || l.includes('**Horario**') || l.includes('**Sección**') || l.includes('**Asignatura**'))) {
-      headerLocations.push({ lineIndex: i, text: l });
+    const line = lines[i].trim();
+    const matched = SEGMENT_MARKERS.find(
+      (marker) =>
+        i >= marker.min &&
+        i < marker.max &&
+        marker.includes.every((token) => line.includes(token))
+    );
+    if (matched) {
+      indices[matched.key] = i + 1;
     }
   }
 
-  // Si encontramos la estructura multi-chunk como en Alameda 2026
-  // (Part 2: Sede..Sigla en ~23149, Nombre..Sección en ~30261, Horario..Modalidad en ~37373)
-  const isHorizontallySegmented = headerLocations.length >= 3;
-
-  if (isHorizontallySegmented) {
-    return parseSegmentedMarkdown(lines, defaultPeriodo);
-  }
-
-  // Fallback: tabla Markdown estándar única
-  return parseStandardMarkdown(lines, defaultPeriodo);
+  return indices;
 }
 
 /**
- * Parsea archivos Markdown con chunks segmentados horizontalmente
+ * Combina segmentos horizontales alineados y los normaliza en CourseOffering.
+ */
+function zipSegmentedColumns(columns, mapRowFn, defaultPeriodo) {
+  if (columns.some((col) => col.length === 0)) return [];
+  const minLen = Math.min(...columns.map((col) => col.length));
+  const offerings = [];
+
+  for (let i = 0; i < minLen; i++) {
+    const raw = mapRowFn(columns.map((col) => col[i]), defaultPeriodo);
+    const norm = normalizeRow(raw, defaultPeriodo);
+    if (norm.sigla && norm.nombre) {
+      offerings.push(norm);
+    }
+  }
+
+  return offerings;
+}
+
+/**
+ * Parsea archivos Markdown con chunks segmentados horizontalmente.
  */
 function parseSegmentedMarkdown(lines, defaultPeriodo) {
+  const idx = locateSegmentedHeaderIndices(lines);
   const allOfferings = [];
 
-  // Helper para extraer filas limpias de un rango
-  const getCleanRows = (start, end) => {
-    const rows = [];
-    for (let i = start; i < end; i++) {
-      const parts = parseMdRow(lines[i]);
-      if (parts && !parts[0].includes('**')) {
-        rows.push(parts);
-      }
-    }
-    return rows;
-  };
-
-  // Localizar índices clave
-  let p2_start = -1;
-  let p2_col2 = -1;
-  let p2_col3 = -1;
-  let p3_start = -1;
-  let p3_col2 = -1;
-  let p3_col3 = -1;
-  let p3_col4 = -1;
-
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i].trim();
-    if (i >= 20000 && i < 25000 && l.includes('**Sede**') && l.includes('**Sigla')) {
-      p2_start = i + 1;
-    } else if (i >= 29000 && i < 32000 && l.includes('**Nombre') && l.includes('**Sección')) {
-      p2_col2 = i + 1;
-    } else if (i >= 36000 && i < 39000 && l.includes('**Horario**') && l.includes('**Docente')) {
-      p2_col3 = i + 1;
-    } else if (i >= 44000 && l.includes('**Sede**') && l.includes('**Sigla**')) {
-      p3_start = i + 1;
-    } else if (i >= 44000 && l.includes('**Asignatura**') && l.includes('**Nivel**')) {
-      p3_col2 = i + 1;
-    } else if (i >= 44000 && l.includes('**Sección**') && l.includes('**Horario**')) {
-      p3_col3 = i + 1;
-    } else if (i >= 44000 && l.includes('**ASIGNATURA VIRTUAL SINCRONICA**')) {
-      p3_col4 = i + 1;
-    }
+  if (idx.p2_start !== -1 && idx.p2_col2 !== -1 && idx.p2_col3 !== -1) {
+    const p2End = idx.p3_start !== -1 ? idx.p3_start : lines.length;
+    const p2Columns = [
+      extractCleanMdRows(lines, idx.p2_start, idx.p2_col2),
+      extractCleanMdRows(lines, idx.p2_col2, idx.p2_col3),
+      extractCleanMdRows(lines, idx.p2_col3, p2End),
+    ];
+    allOfferings.push(
+      ...zipSegmentedColumns(
+        p2Columns,
+        ([r1, r2, r3], periodo) => ({
+          sede: r1[0],
+          carrera: r1[1],
+          plan: r1[2],
+          jornada: r1[3],
+          sigla: r1[4],
+          nombre: r2[0],
+          nivel: r2[1],
+          seccion: r2[2],
+          horario: r3[0],
+          docente: r3[1],
+          modalidad: r3[2] || 'ONLINE SINCRONA',
+          periodo,
+        }),
+        defaultPeriodo
+      )
+    );
   }
 
-  // 1. Reconstruir Oferta Central Alameda (Part 2: 7,087 filas alineadas)
-  if (p2_start !== -1 && p2_col2 !== -1 && p2_col3 !== -1) {
-    const c1 = getCleanRows(p2_start, p2_col2);
-    const c2 = getCleanRows(p2_col2, p2_col3);
-    const c3 = getCleanRows(p2_col3, p3_start !== -1 ? p3_start : lines.length);
-
-    const minLen = Math.min(c1.length, c2.length, c3.length);
-    for (let i = 0; i < minLen; i++) {
-      const r1 = c1[i];
-      const r2 = c2[i];
-      const r3 = c3[i];
-
-      const raw = {
-        sede: r1[0],
-        carrera: r1[1],
-        plan: r1[2],
-        jornada: r1[3],
-        sigla: r1[4],
-        nombre: r2[0],
-        nivel: r2[1],
-        seccion: r2[2],
-        horario: r3[0],
-        docente: r3[1],
-        modalidad: r3[2] || 'ONLINE SINCRONA',
-        periodo: defaultPeriodo,
-      };
-
-      const norm = normalizeRow(raw, defaultPeriodo);
-      if (norm.sigla && norm.nombre) {
-        allOfferings.push(norm);
-      }
-    }
-  }
-
-  // 2. Reconstruir Oferta Electivos Virtuales (Part 3: 87 filas alineadas)
-  if (p3_start !== -1 && p3_col2 !== -1 && p3_col3 !== -1 && p3_col4 !== -1) {
-    const p3_c1 = getCleanRows(p3_start, p3_col2);
-    const p3_c2 = getCleanRows(p3_col2, p3_col3);
-    const p3_c3 = getCleanRows(p3_col3, p3_col4);
-    const p3_c4 = getCleanRows(p3_col4, lines.length);
-
-    const minLen3 = Math.min(p3_c1.length, p3_c2.length, p3_c3.length, p3_c4.length);
-    for (let i = 0; i < minLen3; i++) {
-      const r1 = p3_c1[i];
-      const r2 = p3_c2[i];
-      const r3 = p3_c3[i];
-      const r4 = p3_c4[i];
-
-      const raw = {
-        sede: r1[0],
-        carrera: r1[1],
-        plan: r1[2],
-        jornada: r1[3],
-        sigla: r1[4],
-        nombre: r2[0],
-        nivel: r2[1],
-        seccion: r3[0],
-        horario: r3[1],
-        docente: r3[2],
-        modalidad: r4[0] || 'ONLINE',
-        periodo: defaultPeriodo,
-      };
-
-      const norm = normalizeRow(raw, defaultPeriodo);
-      if (norm.sigla && norm.nombre) {
-        allOfferings.push(norm);
-      }
-    }
+  if (idx.p3_start !== -1 && idx.p3_col2 !== -1 && idx.p3_col3 !== -1 && idx.p3_col4 !== -1) {
+    const p3Columns = [
+      extractCleanMdRows(lines, idx.p3_start, idx.p3_col2),
+      extractCleanMdRows(lines, idx.p3_col2, idx.p3_col3),
+      extractCleanMdRows(lines, idx.p3_col3, idx.p3_col4),
+      extractCleanMdRows(lines, idx.p3_col4, lines.length),
+    ];
+    allOfferings.push(
+      ...zipSegmentedColumns(
+        p3Columns,
+        ([r1, r2, r3, r4], periodo) => ({
+          sede: r1[0],
+          carrera: r1[1],
+          plan: r1[2],
+          jornada: r1[3],
+          sigla: r1[4],
+          nombre: r2[0],
+          nivel: r2[1],
+          seccion: r3[0],
+          horario: r3[1],
+          docente: r3[2],
+          modalidad: r4[0] || 'ONLINE',
+          periodo,
+        }),
+        defaultPeriodo
+      )
+    );
   }
 
   return {
@@ -299,7 +284,7 @@ function parseSegmentedMarkdown(lines, defaultPeriodo) {
 }
 
 /**
- * Parsea tablas Markdown estándar con una sola cabecera unificada
+ * Parsea tablas Markdown estándar con una sola cabecera unificada.
  */
 function parseStandardMarkdown(lines, defaultPeriodo) {
   const offerings = [];
@@ -310,7 +295,6 @@ function parseStandardMarkdown(lines, defaultPeriodo) {
     if (!parts) continue;
 
     if (!headers) {
-      // Primera fila es el encabezado
       headers = parts.map((part) => normalizeHeaderKey(part));
       continue;
     }
@@ -334,7 +318,27 @@ function parseStandardMarkdown(lines, defaultPeriodo) {
 }
 
 /**
- * Limpia asignaturas de un período específico en MongoDB (para evitar duplicados entre años)
+ * Parsea un contenido Markdown con tablas simples o segmentadas horizontalmente.
+ */
+function parseMarkdownTable(markdownContent, options = {}) {
+  const defaultPeriodo = options.periodo || '2026 - 002';
+  const lines = markdownContent.split(/\r?\n/);
+
+  const headerTokens = ['**Sede**', '**Nombre', '**Horario**', '**Sección**', '**Asignatura**'];
+  const headerLocations = lines.filter((line) => {
+    const trimmed = line.trim();
+    return trimmed.startsWith('|') && headerTokens.some((tok) => trimmed.includes(tok));
+  });
+
+  if (headerLocations.length >= 3) {
+    return parseSegmentedMarkdown(lines, defaultPeriodo);
+  }
+
+  return parseStandardMarkdown(lines, defaultPeriodo);
+}
+
+/**
+ * Limpia asignaturas de un período específico en MongoDB (para evitar duplicados entre años).
  */
 async function wipePeriodData(periodo) {
   if (mongoose.connection.readyState === 1) {
@@ -354,22 +358,29 @@ async function wipePeriodData(periodo) {
 }
 
 /**
- * Limpia la totalidad del catálogo oficial
+ * Limpia la totalidad del catálogo oficial.
  */
 async function wipeAllData() {
   if (mongoose.connection.readyState === 1) {
     const result = await CourseOffering.deleteMany({});
-    console.log(`[excelParserService] Catálogo completo vaciado (${result.deletedCount} registros eliminados)`);
+    console.log(
+      `[excelParserService] Catálogo completo vaciado (${result.deletedCount} registros eliminados)`
+    );
     return result;
   }
   return { deletedCount: 0, inMemoryOnly: true };
 }
 
 /**
- * Procesa un archivo o buffer subido (.xlsx, .xls, .md, .json)
- * Con soporte para reemplazo automático de períodos ('replace: true')
+ * Procesa un archivo o buffer subido (.xlsx, .xls, .md, .json).
  */
-async function processCatalogUpload({ buffer, filename, textContent, replace = false, periodo = '2026 - 002' }) {
+async function processCatalogUpload({
+  buffer,
+  filename,
+  textContent,
+  replace = false,
+  periodo = '2026 - 002',
+}) {
   const isXlsx = filename && (filename.endsWith('.xlsx') || filename.endsWith('.xls'));
   const isMd = filename && (filename.endsWith('.md') || filename.endsWith('.markdown'));
   const isJson = filename && filename.endsWith('.json');
@@ -384,7 +395,9 @@ async function processCatalogUpload({ buffer, filename, textContent, replace = f
   } else if (isJson) {
     const jsonStr = textContent || (buffer ? buffer.toString('utf8') : '[]');
     const jsonList = JSON.parse(jsonStr);
-    const normalized = jsonList.map((r) => normalizeRow(r, periodo)).filter((r) => r.sigla && r.nombre);
+    const normalized = jsonList
+      .map((r) => normalizeRow(r, periodo))
+      .filter((r) => r.sigla && r.nombre);
     parsedResult = {
       totalRows: normalized.length,
       offerings: normalized,
@@ -402,8 +415,6 @@ async function processCatalogUpload({ buffer, filename, textContent, replace = f
 }
 
 module.exports = {
-  STANDARD_BLOCKS,
-  toMinutes,
   parseDuocSchedule,
   normalizeHeaderKey,
   normalizeRow,
