@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, Suspense, lazy } from 'react';
+import React, { useEffect, useRef, useState, useCallback, Suspense, lazy } from 'react';
 import {
   X,
   ArrowLeft,
@@ -12,13 +12,38 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useAccessibleModal } from '../../hooks/useAccessibleModal';
 
 const TomaRamosSimulator = lazy(() =>
-  import('../simulation/TomaRamosSimulator').then((m) => ({ default: m.TomaRamosSimulator }))
+  import('../simulation/TomaRamosSimulator')
+    .then((m) => ({ default: m.TomaRamosSimulator }))
+    .catch((error) => {
+      console.error('[ModuleModal] Error cargando TomaRamosSimulator:', error);
+      throw error;
+    })
 );
 
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+function resolveModalHeader(category, activeTramite, activeArticle) {
+  if (activeArticle) {
+    return {
+      eyebrow: `${category.title} • ${activeTramite?.title || 'Guía'}`,
+      title: activeArticle.title,
+      description: 'Guía oficial del Centro de Ayuda Duoc UC - Sede Alameda para consulta inmediata.',
+    };
+  }
+  if (activeTramite) {
+    return {
+      eyebrow: category.title,
+      title: activeTramite.title,
+      description: activeTramite.description,
+    };
+  }
+  return {
+    eyebrow: 'Categoría de ayuda • Sede Alameda',
+    title: category.title,
+    description: category.description,
+  };
+}
 
 export const ModuleModal = ({
   category,
@@ -26,10 +51,9 @@ export const ModuleModal = ({
   initialArticle = null,
   onClose,
 }) => {
-  const { announce } = useAccessibility();
+  const { announce, getVoiceProps } = useAccessibility();
   const modalRef = useRef(null);
   const closeButtonRef = useRef(null);
-  const previousFocusRef = useRef(null);
 
   const [activeTramite, setActiveTramite] = useState(initialSubmodule);
   const [activeArticle, setActiveArticle] = useState(initialArticle);
@@ -41,68 +65,45 @@ export const ModuleModal = ({
   }, [initialSubmodule, initialArticle, category]);
 
   useEffect(() => {
-    previousFocusRef.current = document.activeElement;
-    if (category) {
-      const targetTitle = activeArticle
-        ? activeArticle.title
-        : activeTramite
-        ? activeTramite.title
-        : category.title;
-      announce(`Abriendo información de ${targetTitle}. Presiona Escape para regresar o cerrar.`, 'polite');
-      const timer = setTimeout(() => {
-        closeButtonRef.current?.focus();
-      }, 50);
-      return () => {
-        clearTimeout(timer);
-        if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
-          previousFocusRef.current.focus();
-        }
-      };
-    }
+    if (!category) return;
+    const targetTitle =
+      initialArticle?.title || initialSubmodule?.title || category.title;
+    announce(
+      `Abriendo información de ${targetTitle}. Presiona Escape para regresar o cerrar.`,
+      'polite'
+    );
   }, [category, initialSubmodule, initialArticle, announce]);
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        if (showSimulator) {
-          setShowSimulator(false);
-          announce('Cerrando simulador y regresando al trámite', 'polite');
-        } else if (activeArticle) {
-          setActiveArticle(null);
-          announce('Regresando a los artículos del tema', 'polite');
-        } else if (activeTramite) {
-          setActiveTramite(null);
-          announce('Regresando a la lista de temas', 'polite');
-        } else {
-          onClose();
-          announce('Ventana cerrada', 'polite');
-        }
-        return;
-      }
+  const handleModalEscape = useCallback(() => {
+    if (showSimulator) {
+      setShowSimulator(false);
+      announce('Cerrando simulador y regresando al trámite', 'polite');
+    } else if (activeArticle) {
+      setActiveArticle(null);
+      announce('Regresando a los artículos del tema', 'polite');
+    } else if (activeTramite) {
+      setActiveTramite(null);
+      announce('Regresando a la lista de temas', 'polite');
+    } else {
+      onClose();
+      announce('Ventana cerrada', 'polite');
+    }
+  }, [showSimulator, activeArticle, activeTramite, onClose, announce]);
 
-      if (e.key === 'Tab' && modalRef.current) {
-        const focusableElements = Array.from(modalRef.current.querySelectorAll(FOCUSABLE_SELECTOR));
-        if (focusableElements.length === 0) return;
-
-        const firstEl = focusableElements[0];
-        const lastEl = focusableElements[focusableElements.length - 1];
-
-        if (e.shiftKey && document.activeElement === firstEl) {
-          e.preventDefault();
-          lastEl.focus();
-        } else if (!e.shiftKey && document.activeElement === lastEl) {
-          e.preventDefault();
-          firstEl.focus();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeArticle, activeTramite, showSimulator, onClose, announce]);
+  useAccessibleModal({
+    isOpen: Boolean(category),
+    onClose: handleModalEscape,
+    containerRef: modalRef,
+    initialFocusRef: closeButtonRef,
+  });
 
   if (!category) return null;
+
+  const { eyebrow, title, description } = resolveModalHeader(
+    category,
+    activeTramite,
+    activeArticle
+  );
 
   const handleSelectTramite = (sub) => {
     setActiveTramite(sub);
@@ -134,25 +135,17 @@ export const ModuleModal = ({
         <header className="bg-white text-slate-900 px-6 sm:px-8 py-5 flex items-start justify-between border-b border-slate-100 shrink-0">
           <div className="pr-2">
             <span className="text-xs font-semibold text-[#002B49] block mb-1">
-              {activeArticle
-                ? `${category.title} • ${activeTramite?.title || 'Guía'}`
-                : activeTramite
-                ? category.title
-                : 'Categoría de ayuda'}
+              {eyebrow}
             </span>
-            <h2 id="modal-title" className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-snug">
-              {activeArticle
-                ? activeArticle.title
-                : activeTramite
-                ? activeTramite.title
-                : category.title}
+            <h2
+              id="modal-title"
+              {...getVoiceProps(`${title}. ${description}`)}
+              className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-snug"
+            >
+              {title}
             </h2>
             <p id="modal-description" className="text-slate-600 text-xs sm:text-sm mt-1 leading-relaxed">
-              {activeArticle
-                ? 'Guía oficial extraída del Centro de Ayuda Duoc UC para consulta inmediata.'
-                : activeTramite
-                ? activeTramite.description
-                : category.description}
+              {description}
             </p>
           </div>
 
@@ -161,6 +154,7 @@ export const ModuleModal = ({
             type="button"
             onClick={onClose}
             aria-label="Cerrar ventana"
+            {...getVoiceProps('Cerrar ventana')}
             className="min-h-[40px] min-w-[40px] p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors ml-4 shrink-0 flex items-center justify-center"
           >
             <X className="w-5 h-5" aria-hidden="true" />
@@ -190,6 +184,7 @@ export const ModuleModal = ({
               <button
                 type="button"
                 onClick={() => setActiveArticle(null)}
+                {...getVoiceProps(`Volver a ${activeTramite ? activeTramite.title : 'artículos'}`)}
                 className="min-h-[38px] inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#002B49] hover:text-[#001D33] rounded-lg px-2 -ml-2 hover:bg-slate-100 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -201,6 +196,7 @@ export const ModuleModal = ({
                   href={activeTramite.link}
                   target="_blank"
                   rel="noopener noreferrer"
+                  {...getVoiceProps(activeTramite.actionLabel || 'Ir al portal del trámite')}
                   className="min-h-[36px] px-3.5 py-1.5 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 transition-colors shadow-2xs"
                 >
                   <span>{activeTramite.actionLabel || 'Ir al portal del trámite'}</span>
@@ -221,9 +217,12 @@ export const ModuleModal = ({
                   </div>
                   <div>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 inline-block mb-0.5">
-                      Guía Oficial • Centro de Ayuda Duoc UC
+                      Guía Oficial • Centro de Ayuda Duoc UC - Sede Alameda
                     </span>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                    <h3
+                      {...getVoiceProps(activeArticle.title)}
+                      className="text-base sm:text-lg font-bold text-slate-900 leading-snug"
+                    >
                       {activeArticle.title}
                     </h3>
                   </div>
@@ -260,6 +259,7 @@ export const ModuleModal = ({
                       href={activeArticle.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      {...getVoiceProps('Abrir guía original en centroayuda.duoc.cl')}
                       className="font-semibold text-[#002B49] hover:text-[#001D33] underline inline-flex items-center gap-1.5 break-all"
                     >
                       <span>{activeArticle.url}</span>
@@ -267,7 +267,7 @@ export const ModuleModal = ({
                     </a>
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    Centro de Ayuda Oficial de Duoc UC (centroayuda.duoc.cl).
+                    Centro de Ayuda Oficial de Duoc UC (centroayuda.duoc.cl) • Sede Alameda.
                   </p>
                 </div>
               </div>
@@ -275,7 +275,10 @@ export const ModuleModal = ({
               {/* Otras guías relacionadas de este apartado si existen */}
               {activeTramite?.articles && activeTramite.articles.length > 1 && (
                 <div className="space-y-3 pt-2">
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <h4
+                    {...getVoiceProps(`Otras guías de ${activeTramite.title}`)}
+                    className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"
+                  >
                     <FileText className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
                     <span>Otras guías de {activeTramite.title}</span>
                   </h4>
@@ -288,6 +291,7 @@ export const ModuleModal = ({
                           key={art.id || art.title}
                           type="button"
                           onClick={() => handleOpenArticle(art)}
+                          {...getVoiceProps(`Leer guía relacionada: ${art.title}`)}
                           className="p-3 text-left bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-colors flex items-center justify-between gap-2 group cursor-pointer"
                         >
                           <span className="text-xs font-semibold text-slate-800 group-hover:text-[#002B49] line-clamp-1">
@@ -309,6 +313,7 @@ export const ModuleModal = ({
             <button
               type="button"
               onClick={() => setActiveTramite(null)}
+              {...getVoiceProps(`Ver todos los temas de ${category.title}`)}
               className="min-h-[38px] inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-[#002B49] rounded-lg px-2 -ml-2 hover:bg-slate-50 transition-colors"
             >
               <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -325,13 +330,14 @@ export const ModuleModal = ({
                         Portal Oficial • Toma de Ramos y Modificación de Asignaturas
                       </span>
                       <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed font-normal">
-                        Accede directamente al portal oficial SICOL WebDynpro de Duoc UC para realizar tu inscripción o modificación real de asignaturas.
+                        Accede directamente al portal oficial SICOL WebDynpro de Duoc UC para realizar tu inscripción o modificación real de asignaturas en Sede Alameda.
                       </p>
                     </div>
                     <a
                       href="https://portalinsc.duoc.cl/webdynpro/dispatcher/duoc.com.student/sicol/StudentSicol?inportal=xi#"
                       target="_blank"
                       rel="noopener noreferrer"
+                      {...getVoiceProps('Ir a Toma de Ramos Oficial en SICOL')}
                       className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-medium text-xs sm:text-sm rounded-xl shrink-0 flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
                     >
                       <span>Ir a Toma de Ramos Oficial</span>
@@ -354,6 +360,7 @@ export const ModuleModal = ({
                         setShowSimulator(true);
                         announce('Abriendo simulador de Toma de Ramos y Modificación de Asignaturas', 'polite');
                       }}
+                      {...getVoiceProps('Practicar en el simulador de Toma de Ramos')}
                       className="min-h-[40px] px-4 py-2 bg-[#FFB81C] hover:bg-amber-400 text-slate-950 font-medium text-xs sm:text-sm rounded-xl shrink-0 flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
                     >
                       <Package className="w-4 h-4 text-slate-950" aria-hidden="true" />
@@ -364,7 +371,15 @@ export const ModuleModal = ({
               )}
 
               {/* Pasos a seguir */}
-              <div className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl border border-slate-200/80 space-y-4">
+              <div
+                {...getVoiceProps(
+                  `Cómo realizar este trámite. ${
+                    activeTramite.instructions ||
+                    'Ingresa con tu correo institucional al portal de Duoc UC y sigue los pasos indicados en la sección correspondiente.'
+                  }`
+                )}
+                className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl border border-slate-200/80 space-y-4"
+              >
                 <div className="flex items-center gap-2.5">
                   <div
                     className="w-9 h-9 rounded-xl bg-[#002B49] text-[#FFB81C] flex items-center justify-center shrink-0"
@@ -385,7 +400,7 @@ export const ModuleModal = ({
                 <div className="pt-2 border-t border-slate-200/70 flex items-start gap-2.5 text-xs text-slate-600">
                   <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
                   <span>
-                    Recuerda tener tu sesión iniciada con tu cuenta institucional (@duocuc.cl).
+                    Recuerda tener tu sesión iniciada con tu cuenta institucional (@duocuc.cl) de Sede Alameda.
                   </span>
                 </div>
               </div>
@@ -394,7 +409,10 @@ export const ModuleModal = ({
               {Array.isArray(activeTramite.articles) && activeTramite.articles.length > 0 && (
                 <div className="space-y-3 pt-1">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <h4
+                      {...getVoiceProps(`Artículos de ayuda relacionados: ${activeTramite.articles.length}`)}
+                      className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"
+                    >
                       <FileText className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
                       <span>Artículos de ayuda relacionados ({activeTramite.articles.length})</span>
                     </h4>
@@ -413,6 +431,7 @@ export const ModuleModal = ({
                           <button
                             type="button"
                             onClick={() => handleOpenArticle(art)}
+                            {...getVoiceProps(`Leer guía: ${art.title}`)}
                             className="text-left font-semibold text-slate-900 text-xs sm:text-sm hover:text-[#002B49] hover:underline cursor-pointer"
                           >
                             {art.title}
@@ -429,6 +448,7 @@ export const ModuleModal = ({
                           type="button"
                           onClick={() => handleOpenArticle(art)}
                           aria-label={`Leer guía: ${art.title}`}
+                          {...getVoiceProps(`Leer guía: ${art.title}`)}
                           className="min-h-[38px] px-3.5 py-1.5 bg-slate-100 hover:bg-[#002B49] text-slate-800 hover:text-white font-semibold text-xs rounded-xl shrink-0 inline-flex items-center gap-1.5 transition-colors self-start sm:self-center cursor-pointer shadow-2xs"
                         >
                           <BookOpen className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -446,6 +466,7 @@ export const ModuleModal = ({
                   href={activeTramite.link || activeTramite.directUrl || 'https://www.duoc.cl'}
                   target="_blank"
                   rel="noopener noreferrer"
+                  {...getVoiceProps(activeTramite.actionLabel || 'Ir al portal oficial para este trámite')}
                   className="min-h-[46px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                 >
                   <span>{activeTramite.actionLabel || 'Ir al portal oficial para este trámite'}</span>
@@ -455,6 +476,7 @@ export const ModuleModal = ({
                 <button
                   type="button"
                   onClick={() => setActiveTramite(null)}
+                  {...getVoiceProps('Ver otros trámites')}
                   className="min-h-[46px] px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-colors"
                 >
                   Ver otros trámites
@@ -468,42 +490,52 @@ export const ModuleModal = ({
              ========================================================= */
           <div className="overflow-y-auto p-6 sm:p-8 space-y-4 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {category.submodules.map((sub, index) => (
-                <article
-                  key={sub.id || index}
-                  className="bg-slate-50/70 hover:bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-md group"
-                >
-                  <div>
-                    <h3 className="font-bold text-base text-slate-900 group-hover:text-[#002B49] transition-colors mb-1.5">
-                      {sub.title}
-                    </h3>
+              {category.submodules.map((sub) => {
+                const subVoiceProps = getVoiceProps(`${sub.title}. ${sub.description}`);
+                return (
+                  <article
+                    key={sub.id}
+                    {...subVoiceProps}
+                    onFocus={(event) => {
+                      if (event.target === event.currentTarget) {
+                        subVoiceProps.onFocus(event);
+                      }
+                    }}
+                    className="bg-slate-50/70 hover:bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-md group"
+                  >
+                    <div>
+                      <h3 className="font-bold text-base text-slate-900 group-hover:text-[#002B49] transition-colors mb-1.5">
+                        {sub.title}
+                      </h3>
 
-                    <p className="text-xs sm:text-sm text-slate-600 mb-3 leading-relaxed">
-                      {sub.description}
-                    </p>
+                      <p className="text-xs sm:text-sm text-slate-600 mb-3 leading-relaxed">
+                        {sub.description}
+                      </p>
 
-                    {sub.articles && sub.articles.length > 0 && (
-                      <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full inline-block mb-2">
-                        {sub.articles.length} {sub.articles.length === 1 ? 'guía oficial' : 'guías oficiales'}
-                      </span>
-                    )}
-                  </div>
+                      {sub.articles && sub.articles.length > 0 && (
+                        <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full inline-block mb-2">
+                          {sub.articles.length} {sub.articles.length === 1 ? 'guía oficial' : 'guías oficiales'}
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="pt-3 border-t border-slate-200/60 mt-2 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectTramite(sub)}
-                      className="w-full min-h-[40px] py-2 px-4 bg-white group-hover:bg-[#002B49] text-slate-800 group-hover:text-white border border-slate-200/90 group-hover:border-[#002B49] rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-between gap-2 transition-all duration-200 active:scale-[0.98] cursor-pointer"
-                    >
-                      <span>Ver guías e instrucciones</span>
-                      <ArrowRight
-                        className="w-4 h-4 text-slate-400 group-hover:text-[#FFB81C] group-hover:translate-x-0.5 transition-all"
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    <div className="pt-3 border-t border-slate-200/60 mt-2 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTramite(sub)}
+                        {...getVoiceProps(`Ver guías e instrucciones de ${sub.title}`)}
+                        className="w-full min-h-[40px] py-2 px-4 bg-white group-hover:bg-[#002B49] text-slate-800 group-hover:text-white border border-slate-200/90 group-hover:border-[#002B49] rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-between gap-2 transition-all duration-200 active:scale-[0.98] cursor-pointer"
+                      >
+                        <span>Ver guías e instrucciones</span>
+                        <ArrowRight
+                          className="w-4 h-4 text-slate-400 group-hover:text-[#FFB81C] group-hover:translate-x-0.5 transition-all"
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </div>
         )}
@@ -512,7 +544,7 @@ export const ModuleModal = ({
         <footer className="bg-slate-50 px-6 sm:px-8 py-3.5 border-t border-slate-200/80 flex items-center justify-between gap-4 text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-            <span>Centro de Ayuda • Duoc UC</span>
+            <span>Centro de Ayuda • Duoc UC - Sede Alameda</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -520,6 +552,7 @@ export const ModuleModal = ({
               <button
                 type="button"
                 onClick={() => setActiveArticle(null)}
+                {...getVoiceProps('Volver a guías')}
                 className="min-h-[38px] px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200/90 transition-colors cursor-pointer"
               >
                 Volver a guías
@@ -528,6 +561,7 @@ export const ModuleModal = ({
             <button
               type="button"
               onClick={onClose}
+              {...getVoiceProps('Cerrar')}
               className="min-h-[38px] px-4 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200/90 transition-colors cursor-pointer"
             >
               Cerrar

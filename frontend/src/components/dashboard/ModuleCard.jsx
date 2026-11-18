@@ -13,6 +13,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
+import { useAccessibility } from '../../context/AccessibilityContext';
 
 const ICON_MAP = {
   GraduationCap,
@@ -27,17 +28,27 @@ const ICON_MAP = {
 };
 
 /**
- * Tarjeta de Categoría del Centro de Ayuda
+ * Tarjeta de Categoría del Centro de Ayuda (Duoc UC - Sede Alameda)
  * Diseño limpio, estructurado como lista editorial de temas para evitar sobrecarga sensorial.
  */
 export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
+  const { getVoiceProps } = useAccessibility();
   const IconComponent = ICON_MAP[category.iconName] || BookOpen;
   const previewSubmodules = category.submodules.slice(0, 4);
   const remainingCount = Math.max(0, category.submodules.length - previewSubmodules.length);
+  const cardVoiceProps = getVoiceProps(
+    `${category.title}. ${category.description} Incluye ${category.submodules.length} trámites.`
+  );
 
   return (
     <article
       aria-labelledby={`cat-heading-${category.id}`}
+      {...cardVoiceProps}
+      onFocus={(event) => {
+        if (event.target === event.currentTarget) {
+          cardVoiceProps.onFocus(event);
+        }
+      }}
       className="group w-full flex flex-col justify-between rounded-2xl bg-white p-6 text-left border border-slate-200/80 hover:border-slate-300 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
     >
       <div className="w-full">
@@ -63,6 +74,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
           <button
             type="button"
             onClick={() => onSelect(category)}
+            {...getVoiceProps(`Abrir categoría ${category.title}`)}
             className="text-left hover:text-[#002B49] transition-colors rounded-md"
           >
             {category.title}
@@ -85,6 +97,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
                     onSelectSubmodule ? onSelectSubmodule(category, sub) : onSelect(category)
                   }
                   aria-label={`Ver ${sub.title} en ${category.title}`}
+                  {...getVoiceProps(`${sub.title}, en ${category.title}`)}
                   className="w-full min-h-[38px] py-2 px-2 -mx-2 rounded-lg text-left text-xs sm:text-sm font-medium text-slate-700 hover:text-[#002B49] hover:bg-slate-50 flex items-center justify-between gap-2 transition-colors group/row"
                 >
                   <span className="truncate">{sub.title}</span>
@@ -106,6 +119,11 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
           onClick={() => onSelect(category)}
           aria-haspopup="dialog"
           aria-label={`Ver todos los apartados de ${category.title}`}
+          {...getVoiceProps(
+            remainingCount > 0
+              ? `Ver todos los ${category.submodules.length} trámites de ${category.title}`
+              : `Explorar categoría ${category.title}`
+          )}
           className="min-h-[40px] flex-1 bg-slate-50 hover:bg-[#002B49] text-slate-700 hover:text-white px-4 py-2 rounded-xl font-medium text-xs sm:text-sm flex items-center justify-between gap-2 border border-slate-200/80 hover:border-[#002B49] transition-all duration-200 group/btn active:scale-[0.98]"
         >
           <span>
@@ -126,6 +144,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
             rel="noopener noreferrer"
             title={`Abrir ${category.title} en centroayuda.duoc.cl`}
             aria-label={`Abrir ${category.title} en el sitio web oficial (nueva pestaña)`}
+            {...getVoiceProps(`Abrir ${category.title} en centroayuda.duoc.cl`)}
             className="min-h-[42px] min-w-[42px] p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-[#002B49] border border-slate-200/80 flex items-center justify-center transition-colors"
           >
             <ExternalLink className="w-4 h-4" aria-hidden="true" />

@@ -15,7 +15,7 @@ const QUICK_FILTERS = [
 ];
 
 /**
- * Buscador Principal del Centro de Ayuda
+ * Buscador Principal del Centro de Ayuda (Piloto Duoc UC - Sede Alameda)
  * Diseño limpio, calmado y centrado en el usuario sin sobrecarga de etiquetas técnicas.
  */
 export const SearchBar = ({
@@ -25,7 +25,7 @@ export const SearchBar = ({
   matchedSectionsCount = 0,
   matchedArticlesCount = 0,
 }) => {
-  const { announce } = useAccessibility();
+  const { announce, getVoiceProps } = useAccessibility();
 
   const handleClear = () => {
     onSearchChange('');
@@ -46,11 +46,11 @@ export const SearchBar = ({
   return (
     <search
       role="search"
-      aria-label="Buscar trámites, beneficios o respuestas en el Centro de Ayuda"
+      aria-label="Buscar trámites, beneficios o respuestas en el Centro de Ayuda Duoc UC - Sede Alameda"
       className="w-full"
     >
       <label htmlFor="dashboard-search" className="sr-only">
-        Buscar trámites, dudas o servicios estudiantiles
+        Buscar trámites, dudas o servicios estudiantiles en Duoc UC Sede Alameda
       </label>
 
       {/* Campo de búsqueda principal */}
@@ -70,6 +70,9 @@ export const SearchBar = ({
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Busca un trámite o tema (ej. inasistencia, TNE, gratuidad, congelar...)"
+          {...getVoiceProps(
+            `Buscador de trámites Sede Alameda${searchTerm ? `, texto actual: ${searchTerm}` : ', escribe para buscar'}`
+          )}
           className="w-full min-h-[54px] pl-12 pr-12 py-3.5 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-2xl text-slate-900 text-sm sm:text-base font-medium placeholder:text-slate-400 shadow-xs focus:shadow-md transition-all duration-200 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
         />
 
@@ -78,6 +81,7 @@ export const SearchBar = ({
             type="button"
             onClick={handleClear}
             aria-label="Limpiar búsqueda"
+            {...getVoiceProps('Limpiar búsqueda')}
             className="absolute right-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
           >
             <X className="w-5 h-5" aria-hidden="true" />
@@ -87,7 +91,10 @@ export const SearchBar = ({
 
       {/* Sugerencias rápidas y amigables */}
       <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
-        <span className="text-xs font-medium text-slate-500 mr-1">
+        <span
+          {...getVoiceProps('Temas frecuentes')}
+          className="text-xs font-medium text-slate-500 mr-1"
+        >
           Temas frecuentes:
         </span>
         {QUICK_FILTERS.map((chip) => {
@@ -98,6 +105,9 @@ export const SearchBar = ({
               type="button"
               onClick={() => handleChipClick(chip)}
               aria-pressed={isActive}
+              {...getVoiceProps(
+                `Tema frecuente: ${chip.label}${isActive ? ', filtro activo' : ''}`
+              )}
               className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-full border transition-all duration-200 active:scale-[0.97] ${
                 isActive
                   ? 'bg-[#002B49] text-white border-[#002B49] shadow-2xs'
@@ -116,7 +126,11 @@ export const SearchBar = ({
           className="mt-4 px-4 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700 animate-fade-in"
           aria-live="polite"
         >
-          <span>
+          <span
+            {...getVoiceProps(
+              `Mostrando ${matchedSectionsCount} trámites, ${matchedArticlesCount} guías y ${resultsCount} categorías para ${searchTerm}`
+            )}
+          >
             Mostrando <strong>{matchedSectionsCount}</strong>{' '}
             {matchedSectionsCount === 1 ? 'trámite' : 'trámites'},{' '}
             <strong>{matchedArticlesCount}</strong>{' '}
@@ -128,6 +142,7 @@ export const SearchBar = ({
           <button
             type="button"
             onClick={handleClear}
+            {...getVoiceProps('Limpiar filtro de búsqueda')}
             className="text-[#002B49] hover:underline font-semibold px-1.5 py-0.5 rounded"
           >
             Limpiar filtro

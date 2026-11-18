@@ -5,26 +5,22 @@ import {
   GraduationCap,
   Clock,
   Compass,
-  ArrowRight,
-  Play,
   FileText,
   MapPin,
   Briefcase,
   HelpCircle,
-  Calendar,
-  Layers,
   Award,
   DollarSign,
   Scroll,
   Heart,
   ChevronRight,
-  BookOpen,
   Info,
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { DEFAULT_CAMPUS } from '../../utils/studentUtils';
 
 /**
- * Experiencia Vivo Duoc • Manual Interactivo de Instrucciones y Servicios Oficiales
+ * Experiencia Vivo Duoc • Manual Interactivo de Instrucciones y Servicios Oficiales (Piloto Sede Alameda)
  * Cumple estrictamente con WCAG 2.2 AAA:
  * - Contraste de color superior a 7:1 en todos los textos legibles.
  * - Elementos de foco visible con 4px de grosor y desplazamiento.
@@ -32,7 +28,7 @@ import { useAccessibility } from '../../context/AccessibilityContext';
  * - Etiquetas y roles semánticos aria-label y live announcer.
  */
 export const VivoDuocSummaryView = () => {
-  const { announce } = useAccessibility();
+  const { announce, getVoiceProps } = useAccessibility();
 
   // Servicio seleccionado para ver en detalle el manual
   const [selectedServiceId, setSelectedServiceId] = useState('horarios');
@@ -45,7 +41,7 @@ export const VivoDuocSummaryView = () => {
       icon: Clock,
       badge: 'Semana a Semana',
       queHace:
-        'Permite consultar el cronograma semanal completo con los bloques horarios oficiales (08:31 a 22:30), números de salas en Sede Alameda, laboratorios especializados asignados y nombres de los docentes de cada asignatura.',
+        `Permite consultar el cronograma semanal completo con los bloques horarios oficiales (08:31 a 22:30), números de salas en ${DEFAULT_CAMPUS}, laboratorios especializados asignados y nombres de los docentes de cada asignatura.`,
       dondeEncontrarlo:
         'En el menú lateral de Experiencia Vivo, selecciona la opción "Horarios de clases" para visualizar el calendario interactivo semana a semana.',
       requisitos:
@@ -87,7 +83,7 @@ export const VivoDuocSummaryView = () => {
       icon: Compass,
       badge: 'Avance Curricular',
       queHace:
-        'Muestra la malla interactiva de tu carrera (Ingeniería en Informática), con el estado de avance semestral, asignaturas aprobadas (en verde), asignaturas en curso y los prerrequisitos necesarios para futuros semestres.',
+        'Muestra la malla interactiva de tu carrera en Sede Alameda, con el estado de avance semestral, asignaturas aprobadas (en verde), asignaturas en curso y los prerrequisitos necesarios para futuros semestres.',
       dondeEncontrarlo:
         'En el menú lateral, selecciona "Progreso académico" o "Mi Malla Curricular".',
       requisitos:
@@ -143,11 +139,11 @@ export const VivoDuocSummaryView = () => {
       icon: Heart,
       badge: 'Vida Comunitaria & Deportes',
       queHace:
-        'Conoce los talleres deportivos (Ajedrez, Fútbol, Karate, Fitness), selecciones de sede, misiones solidarias, voluntariados y actividades de pastoral y punto estudiantil en Sede Alameda.',
+        `Conoce los talleres deportivos (Ajedrez, Fútbol, Karate, Fitness), selecciones, misiones solidarias, voluntariados y actividades de pastoral y punto estudiantil en ${DEFAULT_CAMPUS}.`,
       dondeEncontrarlo:
         'Accede a la sección "Actividades punto estudiantil y pastoral" en Experiencia Vivo.',
       requisitos:
-        'Inscripción gratuita para todos los estudiantes regulares de Duoc UC.',
+        `Inscripción gratuita para todos los estudiantes regulares de Duoc UC - ${DEFAULT_CAMPUS}.`,
       link: 'https://experienciavivo.duoc.cl/alumnos/actividades/posts',
       btnText: 'Ir a Actividades en Vivo Duoc',
     },
@@ -176,16 +172,17 @@ export const VivoDuocSummaryView = () => {
       <header className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200 shadow-sm">
         <div>
           <span className="text-xs font-black tracking-wider uppercase text-[#002B49] block mb-1">
-            Experiencia Vivo Duoc • Manual Institucional de Uso
+            Experiencia Vivo Duoc • {DEFAULT_CAMPUS} • Manual Institucional
           </span>
           <h2
             id="vivoduoc-view-title"
+            {...getVoiceProps(`Guía y Manual de Botones de Experiencia Vivo para Duoc UC ${DEFAULT_CAMPUS}`)}
             className="text-2xl sm:text-3xl font-black tracking-tight text-[#002B49]"
           >
             Guía y Manual de Botones de Experiencia Vivo
           </h2>
           <p className="text-xs sm:text-sm text-slate-700 font-medium mt-1.5 max-w-2xl leading-relaxed">
-            Conoce con exactitud qué realiza cada botón del portal oficial de Duoc UC, dónde encontrarlo en tu menú de alumno y cómo realizar tus trámites académicos sin contratiempos.
+            Conoce con exactitud qué realiza cada botón del portal oficial de Duoc UC - {DEFAULT_CAMPUS}, dónde encontrarlo en tu menú de alumno y cómo realizar tus trámites académicos sin contratiempos.
           </p>
         </div>
 
@@ -195,6 +192,7 @@ export const VivoDuocSummaryView = () => {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Abrir portal oficial Experiencia Vivo Duoc (abre en nueva pestaña)"
+            {...getVoiceProps('Ir a Experiencia Vivo Duoc')}
             className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs sm:text-sm inline-flex items-center gap-2 shadow-xs transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
           >
             <span>Ir a Experiencia Vivo</span>
@@ -203,12 +201,13 @@ export const VivoDuocSummaryView = () => {
         </div>
       </header>
 
-      {/* 2. Manual Interactivo de Botones y Servicios (Visible primero, prioritario) */}
+      {/* 2. Manual Interactivo de Botones y Servicios */}
       <section aria-labelledby="manual-servicios-heading" className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div>
             <h3
               id="manual-servicios-heading"
+              {...getVoiceProps('Manual de Botones: ¿Qué hace cada opción?')}
               className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight"
             >
               Manual de Botones: ¿Qué hace cada opción?
@@ -240,6 +239,7 @@ export const VivoDuocSummaryView = () => {
                       announce(`Mostrando manual para ${srv.title}`, 'polite');
                     }}
                     aria-pressed={isSelected}
+                    {...getVoiceProps(`${srv.title}. ${srv.badge}`)}
                     className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
                       isSelected
                         ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
@@ -286,19 +286,25 @@ export const VivoDuocSummaryView = () => {
             <header className="border-b border-slate-100 pb-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase text-amber-800 tracking-wide">
-                  Ficha Técnica Institucional
+                  Ficha Técnica Institucional • {DEFAULT_CAMPUS}
                 </span>
                 <span className="px-2.5 py-0.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-full font-semibold text-xs">
                   {activeService.badge}
                 </span>
               </div>
-              <h4 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
+              <h4
+                {...getVoiceProps(activeService.title)}
+                className="text-xl sm:text-2xl font-bold text-slate-900 mt-1"
+              >
                 {activeService.title}
               </h4>
             </header>
 
             {/* ¿Qué hace este botón? */}
-            <div className="space-y-2">
+            <div
+              {...getVoiceProps(`¿Qué hace exactamente este botón? ${activeService.queHace}`)}
+              className="space-y-2"
+            >
               <h5 className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
                 <HelpCircle className="w-4 h-4 text-blue-900" aria-hidden="true" />
                 <span>¿Qué hace exactamente este botón?</span>
@@ -309,7 +315,10 @@ export const VivoDuocSummaryView = () => {
             </div>
 
             {/* ¿Dónde encontrarlo en el portal? */}
-            <div className="space-y-2">
+            <div
+              {...getVoiceProps(`¿Dónde encontrarlo en Experiencia Vivo? ${activeService.dondeEncontrarlo}`)}
+              className="space-y-2"
+            >
               <h5 className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-amber-700" aria-hidden="true" />
                 <span>¿Dónde encontrarlo en Experiencia Vivo?</span>
@@ -320,7 +329,10 @@ export const VivoDuocSummaryView = () => {
             </div>
 
             {/* Requisitos y reglamentación */}
-            <div className="space-y-2">
+            <div
+              {...getVoiceProps(`Requisitos importantes y normativa: ${activeService.requisitos}`)}
+              className="space-y-2"
+            >
               <h5 className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-emerald-800" aria-hidden="true" />
                 <span>Requisitos importantes y normativa:</span>
@@ -333,12 +345,13 @@ export const VivoDuocSummaryView = () => {
             {/* Botón de acceso directo al servicio oficial */}
             <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <span className="text-[11px] text-slate-600 font-medium">
-                Enlace validado con los servidores oficiales de Duoc UC.
+                Enlace validado con los servidores oficiales de Duoc UC (Piloto {DEFAULT_CAMPUS}).
               </span>
               <a
                 href={activeService.link}
                 target="_blank"
                 rel="noopener noreferrer"
+                {...getVoiceProps(activeService.btnText)}
                 className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-blue-950 text-white font-black text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 shadow-xs transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
               >
                 <span>{activeService.btnText}</span>
@@ -356,7 +369,10 @@ export const VivoDuocSummaryView = () => {
             <span className="text-[10px] font-black uppercase text-amber-400 block tracking-wider">
               Material Audiovisual Complementario
             </span>
-            <h4 className="text-sm sm:text-base font-bold text-white mt-0.5">
+            <h4
+              {...getVoiceProps('Tutorial Oficial: Experiencia Vivo Duoc')}
+              className="text-sm sm:text-base font-bold text-white mt-0.5"
+            >
               Tutorial Oficial: Experiencia Vivo Duoc
             </h4>
           </div>
@@ -365,6 +381,7 @@ export const VivoDuocSummaryView = () => {
             href="https://www.youtube.com/watch?v=lQUsG0XCyRg"
             target="_blank"
             rel="noopener noreferrer"
+            {...getVoiceProps('Ver tutorial de Experiencia Vivo en YouTube')}
             className="min-h-[34px] px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 self-start sm:self-auto transition-colors"
           >
             <span>Ver en YouTube</span>
@@ -386,7 +403,7 @@ export const VivoDuocSummaryView = () => {
         </div>
 
         <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <span>Video oficial Duoc UC para estudiantes y comunidad académica.</span>
+          <span>Video oficial Duoc UC para estudiantes de {DEFAULT_CAMPUS}.</span>
           <span className="font-semibold text-[#002B49]">Subtítulos disponibles en el reproductor</span>
         </div>
       </article>
@@ -409,6 +426,7 @@ export const VivoDuocSummaryView = () => {
           href="https://mesadeservicios.duoc.cl"
           target="_blank"
           rel="noopener noreferrer"
+          {...getVoiceProps('Abrir Mesa de Servicios Digitales Duoc UC')}
           className="min-h-[44px] px-5 py-2 bg-[#FFB81C] hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl inline-flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white"
           aria-label="Abrir Mesa de Servicios Digitales Duoc UC (abre en nueva pestaña)"
         >
