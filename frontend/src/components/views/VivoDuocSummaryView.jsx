@@ -167,7 +167,7 @@ export const VivoDuocSummaryView = () => {
   const activeService = serviciosVivo.find((s) => s.id === selectedServiceId) || serviciosVivo[0];
 
   return (
-    <section aria-labelledby="vivoduoc-view-title" className="space-y-6">
+    <section aria-labelledby="vivoduoc-view-title" className="space-y-6 w-full max-w-full overflow-x-clip">
       {/* 1. Encabezado Oficial Accesible (WCAG 2.2 AAA: Contraste >= 7:1) */}
       <header className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200 shadow-sm">
         <div>
@@ -382,7 +382,7 @@ export const VivoDuocSummaryView = () => {
             target="_blank"
             rel="noopener noreferrer"
             {...getVoiceProps('Ver tutorial de Experiencia Vivo en YouTube')}
-            className="min-h-[34px] px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 self-start sm:self-auto transition-colors"
+            className="min-h-[44px] px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 self-start sm:self-auto transition-colors"
           >
             <span>Ver en YouTube</span>
             <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />

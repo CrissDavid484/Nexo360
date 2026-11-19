@@ -939,7 +939,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
   return (
     <section
       aria-label="Guía oficial y Simulador de Toma de Ramos y Modificación de Asignaturas"
-      className="space-y-6 pb-10"
+      className="space-y-6 pb-10 w-full max-w-full overflow-x-clip"
     >
       {/* 1. SECCIÓN SUPERIOR FIJA: VIDEO A LA IZQUIERDA + INSTRUCCIONES DERECHA */}
       <div
@@ -966,7 +966,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 type="button"
                 onClick={() => handleRepeatSimulation(simulationMode, false)}
                 {...getVoiceProps('Cambiar modo o dificultad del simulador')}
-                className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold text-xs flex items-center gap-2 border border-slate-200 transition-colors cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold text-xs flex items-center gap-2 border border-slate-200 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
                 <span>Cambiar Modo / Dificultad</span>
@@ -978,7 +978,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
               target="_blank"
               rel="noopener noreferrer"
               {...getVoiceProps('Ir a Toma de Ramos Oficial en nueva pestaña')}
-              className="min-h-[42px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all active:scale-[0.98]"
+              className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all active:scale-[0.98]"
             >
               <span>Ir a Toma de Ramos Oficial</span>
               <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
@@ -1562,7 +1562,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           <div className="space-y-2">
                             <div className="bg-white border border-[#91B1CC]">
                               <div className="overflow-x-auto max-h-[390px]">
-                                <table className="w-full text-left border-collapse">
+                                <table className="w-full text-left border-collapse min-w-[500px]">
                                   <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold sticky top-0 z-10 text-[10px]">
                                     <tr>
                                       <th scope="col" className="p-1 border-r border-[#A8C2D8] w-7 text-center" />
@@ -1744,7 +1744,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             </div>
 
                             <div className="border border-[#A8C2D8] overflow-x-auto">
-                              <table className="w-full text-left border-collapse">
+                              <table className="w-full text-left border-collapse min-w-[500px]">
                                 <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px]">
                                   <tr>
                                     <th scope="col" className="p-1 border-r border-[#A8C2D8] w-7 text-center" />
@@ -1854,7 +1854,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           </div>
 
                           <div className="bg-white border border-[#90AFC9] overflow-x-auto max-h-[245px]">
-                            <table className="w-full text-center text-[10px] border-collapse">
+                            <table className="w-full text-center text-[10px] border-collapse min-w-[540px]">
                               <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold sticky top-0 z-10">
                                 <tr>
                                   <th scope="col" className="p-1 border-r border-[#A8C2D8] w-20 text-left">
@@ -1915,7 +1915,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           </div>
 
                           <div className="bg-white border border-[#90AFC9] overflow-x-auto min-h-[140px] max-h-[180px]">
-                            <table className="w-full text-left border-collapse">
+                            <table className="w-full text-left border-collapse min-w-[480px]">
                               <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px] sticky top-0 z-10">
                                 <tr>
                                   <th scope="col" className="p-1 border-r border-[#A8C2D8] w-7 text-center" />
@@ -2013,7 +2013,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             Malla Alumno
                           </div>
 
-                          <table className="w-full text-center border-collapse text-[10px]">
+                          <table className="w-full text-center border-collapse text-[10px] min-w-[540px]">
                             <thead className="bg-[#DFE8F2] border-b border-[#98B2CC] text-slate-900 font-bold">
                               <tr>
                                 {mallaAlumnoGrid.map((col) => (
@@ -2087,7 +2087,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       </div>
 
                       <div className="lg:col-span-5 border border-[#7E9BB8] bg-white overflow-x-auto">
-                        <table className="w-full text-center text-[10px] border-collapse">
+                        <table className="w-full text-center text-[10px] border-collapse min-w-[480px]">
                           <thead className="bg-[#DFE8F2] border-b border-[#98B2CC] text-slate-900 font-bold">
                             <tr>
                               <th scope="col" className="p-1 border-r border-[#A8C2D8] text-left w-20">
@@ -2250,7 +2250,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     type="button"
                     onClick={triggerPrintToast}
                     {...getVoiceProps('Imprimir boletín oficial')}
-                    className="min-h-[34px] px-3.5 py-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[44px] px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-4 h-4" aria-hidden="true" />
                     <span>Imprimir</span>
@@ -2260,7 +2260,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     type="button"
                     onClick={triggerPrintToast}
                     {...getVoiceProps('Descargar boletín oficial en PDF')}
-                    className="min-h-[34px] px-3.5 py-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[44px] px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
                   >
                     <Download className="w-4 h-4" aria-hidden="true" />
                     <span>Descargar</span>
@@ -2270,7 +2270,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     type="button"
                     onClick={() => setStep('confirmado')}
                     {...getVoiceProps('Volver al portal SICOL')}
-                    className="min-h-[34px] px-3.5 py-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center gap-1 cursor-pointer"
+                    className="min-h-[44px] px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl flex items-center gap-1 cursor-pointer"
                   >
                     <span>Volver al Portal</span>
                   </button>
@@ -2279,7 +2279,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     type="button"
                     onClick={() => handleRepeatSimulation('asistido', false)}
                     {...getVoiceProps('Nueva práctica desde cero')}
-                    className="min-h-[34px] px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded flex items-center gap-1 shadow-2xs cursor-pointer"
+                    className="min-h-[44px] px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>Nueva Práctica (Desde 0)</span>
@@ -2289,7 +2289,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     type="button"
                     onClick={handleExitSimulator}
                     {...getVoiceProps('Salir del simulador')}
-                    className="min-h-[34px] px-3.5 py-1 bg-rose-700 hover:bg-rose-800 text-white font-bold rounded flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    className="min-h-[44px] px-3.5 py-2 bg-rose-700 hover:bg-rose-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>Salir</span>
@@ -2389,7 +2389,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
                   return (
                     <div className="border border-black overflow-x-auto">
-                      <table className="w-full text-center text-xs border-collapse">
+                      <table className="w-full text-center text-xs border-collapse min-w-[600px]">
                         <thead>
                           <tr className="border-b border-black font-bold text-[11px] bg-white">
                             <th scope="col" className="p-1 border-r border-black w-24 text-center">
@@ -2480,7 +2480,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             {portafolioCourse.seccion} - {portafolioCourse.nombre}&quot; es:
                           </p>
                           <div className="border border-black overflow-x-auto">
-                            <table className="w-full text-left text-xs border-collapse">
+                            <table className="w-full text-left text-xs border-collapse min-w-[480px]">
                               <thead className="border-b border-black font-bold text-[11px] bg-white">
                                 <tr>
                                   <th scope="col" className="p-1.5 border-r border-black w-28 text-center">
@@ -2996,7 +2996,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       type="button"
                       onClick={() => setPreFlowStep(1)}
                       {...getVoiceProps('Volver al Paso 1')}
-                      className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl cursor-pointer"
+                      className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl cursor-pointer"
                     >
                       ← Volver al Paso 1
                     </button>

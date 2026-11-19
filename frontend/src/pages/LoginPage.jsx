@@ -123,12 +123,12 @@ export const LoginPage = ({ initialMode = 'login' }) => {
     : 'Centro de Ayuda y Servicios • Duoc UC - Sede Alameda';
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900">
+    <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900 w-full max-w-full overflow-x-clip">
       <AccessibilityBar />
 
       <main
         id="main-content"
-        className="flex-1 flex flex-col items-center justify-center py-10 px-4 animate-fade-in-up"
+        className="flex-1 flex flex-col items-center justify-center py-8 sm:py-12 px-4 w-full max-w-full animate-fade-in-up"
       >
         {/* Marca institucional oficial (Logo 03: Nexo360 Duoc UC | Ícono N 360 - Responsive tipo SVG) */}
         <header className="mb-7 text-center">
@@ -161,7 +161,7 @@ export const LoginPage = ({ initialMode = 'login' }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 {...getVoiceProps('Términos de uso de Duoc UC')}
-                className="min-h-[38px] inline-flex items-center hover:underline hover:text-[#002B49] rounded px-1.5"
+                className="min-h-[44px] inline-flex items-center hover:underline hover:text-[#002B49] rounded px-2 py-1"
               >
                 Términos de uso
               </a>
@@ -170,11 +170,11 @@ export const LoginPage = ({ initialMode = 'login' }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 {...getVoiceProps('Privacidad Duoc UC')}
-                className="min-h-[38px] inline-flex items-center hover:underline hover:text-[#002B49] rounded px-1.5"
+                className="min-h-[44px] inline-flex items-center hover:underline hover:text-[#002B49] rounded px-2 py-1"
               >
                 Privacidad
               </a>
-              <span className="min-h-[38px] inline-flex items-center text-slate-400">
+              <span className="min-h-[44px] inline-flex items-center text-slate-400 px-1">
                 © 2026 Duoc UC • Sede Alameda
               </span>
             </div>

@@ -1053,3 +1053,19 @@ html.clear-reading-mode article:hover {
 html.clear-reading-mode .uiverse-status-pill {
   box-shadow: none !important;
 }
+
+/* ==========================================================================
+   12. DESPLAZAMIENTO TÁCTIL FLUIDO Y ERGONOMÍA RESPONSIVE (-webkit-overflow-scrolling)
+   ========================================================================== */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+
+@media (max-width: 1024px) {
+  .overflow-x-auto {
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+  }
+}
+

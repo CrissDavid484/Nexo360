@@ -62,7 +62,7 @@ const RootRoute = () => {
 
 export const App = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900 transition-colors duration-200 w-full max-w-full overflow-x-clip">
       {/* 1. Salto de accesibilidad para teclado (WCAG 2.4.1) */}
       <SkipLink />
 

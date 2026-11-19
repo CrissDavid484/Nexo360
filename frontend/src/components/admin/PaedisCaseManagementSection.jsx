@@ -622,7 +622,7 @@ function DocenteSheetModal({
             onClick={onClose}
             aria-label="Cerrar Ficha Docente Confidencial"
             {...getVoiceProps('Cerrar Ficha Docente Confidencial')}
-            className="min-h-[40px] min-w-[40px] p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 bg-white border border-slate-200 shadow-2xs transition-colors cursor-pointer flex items-center justify-center shrink-0"
+            className="min-h-[44px] min-w-[44px] p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 bg-white border border-slate-200 shadow-2xs transition-colors cursor-pointer flex items-center justify-center shrink-0"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
@@ -692,7 +692,7 @@ function DocenteSheetModal({
               </p>
             ) : (
               <div className="border border-slate-200 rounded-xl overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-left text-xs border-collapse min-w-[480px]">
                   <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                     <tr>
                       <th scope="col" className="p-2.5">Sigla</th>
@@ -740,7 +740,7 @@ function DocenteSheetModal({
               type="button"
               onClick={handleDownloadTxt}
               {...getVoiceProps('Exportar Ficha Docente en archivo de texto')}
-              className="min-h-[40px] px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
               <span>Exportar (.txt)</span>
@@ -749,7 +749,7 @@ function DocenteSheetModal({
               type="button"
               onClick={() => window.print()}
               {...getVoiceProps('Imprimir Ficha Docente Confidencial')}
-              className="min-h-[40px] px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Printer className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
               <span>Imprimir</span>
@@ -761,7 +761,7 @@ function DocenteSheetModal({
             disabled={isSaving}
             onClick={onConfirmNotify}
             {...getVoiceProps('Notificar y Emitir Ficha Docente Confidencial')}
-            className="min-h-[42px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="min-h-[44px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <Send className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
             <span>{isSaving ? 'Registrando...' : 'Notificar y Emitir Ficha'}</span>
@@ -937,7 +937,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
   };
 
   return (
-    <section aria-labelledby="paedis-ops-heading" className="space-y-6">
+    <section aria-labelledby="paedis-ops-heading" className="space-y-6 w-full max-w-full overflow-x-clip">
       <div className="bg-white rounded-2xl p-6 border border-slate-300 border-t-4 border-t-[#002B49] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-amber-100 text-[#002B49] border border-amber-300">
@@ -1159,7 +1159,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                   type="button"
                   onClick={() => setIsDocenteModalOpen(true)}
                   {...getVoiceProps('Generar y previsualizar Ficha Docente Confidencial')}
-                  className="min-h-[42px] px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-[#002B49] font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-[#002B49] font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 cursor-pointer"
                 >
                   <FileText className="w-4 h-4" aria-hidden="true" />
                   <span>Generar Ficha Docente</span>

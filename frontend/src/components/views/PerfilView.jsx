@@ -486,7 +486,7 @@ export const PerfilView = () => {
     : null;
 
   return (
-    <section aria-labelledby="perfil-view-heading" className="space-y-6 max-w-4xl mx-auto">
+    <section aria-labelledby="perfil-view-heading" className="space-y-6 max-w-4xl mx-auto w-full overflow-x-clip">
       {mustChangePassword && (
         <div
           role="status"
@@ -660,7 +660,7 @@ export const PerfilView = () => {
                 }}
                 aria-haspopup="dialog"
                 {...getVoiceProps(editButtonLabel)}
-                className="min-h-[42px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+                className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
               >
                 <Pencil className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
                 <span>{editButtonLabel}</span>
@@ -671,7 +671,7 @@ export const PerfilView = () => {
                 onClick={handleOpenPasswordModal}
                 aria-haspopup="dialog"
                 {...getVoiceProps('Cambiar contraseña')}
-                className="min-h-[42px] px-5 py-2.5 bg-white hover:bg-slate-50 text-[#002B49] border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+                className="min-h-[44px] px-5 py-2.5 bg-white hover:bg-slate-50 text-[#002B49] border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
               >
                 <KeyRound className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
                 <span>Cambiar contraseña</span>
@@ -849,7 +849,7 @@ export const PerfilView = () => {
                 onClick={handleCloseModal}
                 aria-label="Cerrar ventana"
                 {...getVoiceProps('Cerrar ventana de edición')}
-                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -979,7 +979,7 @@ export const PerfilView = () => {
                   type="button"
                   onClick={handleCloseModal}
                   {...getVoiceProps('Cancelar edición')}
-                  className="min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -987,7 +987,7 @@ export const PerfilView = () => {
                   type="submit"
                   disabled={isSaving}
                   {...getVoiceProps('Guardar cambios del perfil')}
-                  className="min-h-[40px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 cursor-pointer"
                 >
                   {isSaving ? 'Guardando...' : 'Guardar cambios'}
                 </button>
@@ -1032,7 +1032,7 @@ export const PerfilView = () => {
                 onClick={handleClosePasswordModal}
                 aria-label="Cerrar ventana"
                 {...getVoiceProps('Cerrar ventana de cambio de contraseña')}
-                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -1107,7 +1107,7 @@ export const PerfilView = () => {
                   type="button"
                   onClick={handleClosePasswordModal}
                   {...getVoiceProps('Cancelar cambio de contraseña')}
-                  className="min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1116,7 +1116,7 @@ export const PerfilView = () => {
                   disabled={isChangingPassword}
                   aria-busy={isChangingPassword}
                   {...getVoiceProps('Guardar nueva contraseña')}
-                  className="min-h-[40px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 inline-flex items-center gap-2 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 inline-flex items-center gap-2 cursor-pointer"
                 >
                   {isChangingPassword ? (
                     <>

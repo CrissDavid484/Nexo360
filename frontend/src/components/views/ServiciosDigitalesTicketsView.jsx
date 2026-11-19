@@ -39,7 +39,7 @@ export const ServiciosDigitalesTicketsView = () => {
   ];
 
   return (
-    <section aria-labelledby="tickets-view-title" className="space-y-6">
+    <section aria-labelledby="tickets-view-title" className="space-y-6 w-full max-w-full overflow-x-clip">
       {/* 1. Encabezado limpio y amigable */}
       <div className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200 shadow-sm">
         <div>

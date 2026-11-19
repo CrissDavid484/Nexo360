@@ -442,7 +442,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-x-clip">
       {/* 1. CABECERA INSTITUCIONAL */}
       <section
         aria-labelledby="sat-header-title"
@@ -657,14 +657,14 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrar por nivel SAT">
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full flex-nowrap sm:flex-wrap pb-1" role="group" aria-label="Filtrar por nivel SAT">
             {FILTER_LEVEL_TABS.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterLevel(tab.id)}
                 {...getVoiceProps(`Filtrar alertas SAT por ${tab.label}`)}
-                className={`min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400 ${
+                className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap focus-visible:ring-4 focus-visible:ring-amber-400 ${
                   filterLevel === tab.id
                     ? 'bg-[#002B49] text-white border-[#002B49]'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'

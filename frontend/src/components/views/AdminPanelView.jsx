@@ -850,7 +850,7 @@ export const AdminPanelView = () => {
   ];
 
   return (
-    <div className="space-y-7 animate-fade-in pb-12">
+    <div className="space-y-7 animate-fade-in pb-12 w-full max-w-full overflow-x-clip pt-2 sm:pt-4">
       {/* 1. HERO BANNER INSTITUCIONAL DUOC UC - SEDE ALAMEDA */}
       <section
         aria-labelledby="admin-panel-title"
@@ -939,7 +939,7 @@ export const AdminPanelView = () => {
       {/* Pestañas de Navegación del Panel de Administración */}
       <nav
         aria-label="Secciones del Panel de Administración"
-        className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2"
+        className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto w-full flex-nowrap sm:flex-wrap"
       >
         {ADMIN_SUB_TABS.map((tab) => {
           const TabIcon = tab.icon;
@@ -1323,7 +1323,7 @@ export const AdminPanelView = () => {
                         announce('Mostrando directorio de estudiantes.', 'polite');
                       }}
                       {...getVoiceProps(`Directorio de Estudiantes, ${studentUsers.length} registros`)}
-                      className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
                         directoryMode === 'estudiantes'
                           ? 'bg-[#002B49] text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
@@ -1342,7 +1342,7 @@ export const AdminPanelView = () => {
                       {...getVoiceProps(
                         `Directorio de Administrativos, ${administrativeUsers.length} registros`
                       )}
-                      className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
                         directoryMode === 'administrativos'
                           ? 'bg-[#002B49] text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
@@ -1380,7 +1380,7 @@ export const AdminPanelView = () => {
                       type="button"
                       onClick={() => setFilterStatus(f.id)}
                       {...getVoiceProps(`Filtrar estudiantes por estado: ${f.label}`)}
-                      className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
+                      className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer ${
                         filterStatus === f.id
                           ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
@@ -1402,7 +1402,7 @@ export const AdminPanelView = () => {
                       type="button"
                       onClick={() => setAdminRoleFilter(f.id)}
                       {...getVoiceProps(`Filtrar personal administrativo por rol: ${f.label}`)}
-                      className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
+                      className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer ${
                         adminRoleFilter === f.id
                           ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
@@ -1700,7 +1700,7 @@ export const AdminPanelView = () => {
                               (selectedStudentForDetail.enrolledCourses || student.enrolledCourses).length >
                                 0 ? (
                                 <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                                  <table className="w-full text-left border-collapse text-xs">
+                                  <table className="w-full text-left border-collapse text-xs min-w-[580px]">
                                     <thead className="bg-slate-100 text-slate-700 font-black uppercase text-[11px] border-b border-slate-200">
                                       <tr>
                                         <th className="p-3">Asignatura</th>
@@ -1800,7 +1800,7 @@ export const AdminPanelView = () => {
                                   onClick={() => handleOpenStatusModal(student)}
                                   disabled={!canManageAdmin}
                                   {...getVoiceProps(`Cambiar estado académico de ${student.fullName}`)}
-                                  className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-black rounded-xl border border-amber-400 cursor-pointer shadow-xs disabled:opacity-50"
+                                  className="min-h-[44px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-black rounded-xl border border-amber-400 cursor-pointer shadow-xs disabled:opacity-50"
                                 >
                                   Cambiar Estado Académico
                                 </button>
@@ -1813,7 +1813,7 @@ export const AdminPanelView = () => {
                                   }}
                                   disabled={!canManageAdmin}
                                   {...getVoiceProps(`Eliminar estudiante ${student.fullName}`)}
-                                  className="min-h-[40px] px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-xl border border-rose-200 cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                                  className="min-h-[44px] px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-xl border border-rose-200 cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
                                 >
                                   <Trash2 className="w-4 h-4 text-rose-700" aria-hidden="true" />
                                   <span>Eliminar Estudiante</span>
@@ -1824,7 +1824,7 @@ export const AdminPanelView = () => {
                                 type="button"
                                 onClick={() => setSelectedStudentForDetail(null)}
                                 {...getVoiceProps('Contraer ficha del estudiante')}
-                                className="min-h-[40px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
+                                className="min-h-[44px] px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
                               >
                                 Contraer Ficha
                               </button>
@@ -1965,7 +1965,7 @@ export const AdminPanelView = () => {
                                 type="button"
                                 onClick={() => setSelectedAdminForDetail(null)}
                                 {...getVoiceProps('Contraer ficha administrativa')}
-                                className="min-h-[40px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
+                                className="min-h-[44px] px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
                               >
                                 Contraer Ficha
                               </button>
@@ -2096,7 +2096,7 @@ export const AdminPanelView = () => {
                   type="button"
                   onClick={() => setIsStatusModalOpen(false)}
                   {...getVoiceProps('Cancelar cambio de estado académico')}
-                  className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl"
+                  className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -2104,7 +2104,7 @@ export const AdminPanelView = () => {
                   type="submit"
                   disabled={isSubmitting}
                   {...getVoiceProps('Guardar estado académico')}
-                  className="min-h-[42px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-black rounded-xl border border-amber-400 disabled:opacity-60 flex items-center gap-2"
+                  className="min-h-[44px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-black rounded-xl border border-amber-400 disabled:opacity-60 flex items-center gap-2 cursor-pointer"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin text-[#FFB81C]" />}
                   <span>Guardar Estado</span>

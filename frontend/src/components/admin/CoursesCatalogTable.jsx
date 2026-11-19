@@ -19,7 +19,7 @@ export const CoursesCatalogTable = ({
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs" {...props}>
-      <table className="w-full text-left text-xs" role="table">
+      <table className="w-full text-left text-xs min-w-[620px]" role="table">
         <caption className="sr-only">
           Catálogo actual de asignaturas de Duoc UC - Sede Alameda almacenadas en la base de datos de Nexo360
         </caption>

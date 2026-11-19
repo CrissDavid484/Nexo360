@@ -215,7 +215,7 @@ export const BibliotecaView = () => {
   const currentAccessibleUrl = getLibCalAccessibleUrl(currentCategory.gid);
 
   return (
-    <section aria-labelledby="biblioteca-view-title" className="space-y-6">
+    <section aria-labelledby="biblioteca-view-title" className="space-y-6 w-full max-w-full overflow-x-clip">
       {/* 1. Encabezado Oficial con Acceso a Rutas Oficiales LibCal */}
       <div className="bg-white px-6 sm:px-8 py-6 rounded-3xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-slate-200/90 shadow-xs">
         <div className="space-y-1.5 max-w-3xl">
@@ -251,7 +251,7 @@ export const BibliotecaView = () => {
             rel="noopener noreferrer"
             aria-label="Abrir portal oficial de reserva de espacios en Biblioteca Alameda (nueva pestaña)"
             {...getVoiceProps('Ir a Portal Oficial de Reserva Alameda')}
-            className="min-h-[42px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
+            className="min-h-[44px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
           >
             <span>Portal Oficial Alameda</span>
             <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
@@ -263,7 +263,7 @@ export const BibliotecaView = () => {
             rel="noopener noreferrer"
             aria-label={`Abrir versión accesible oficial para ${currentCategory.name} (nueva pestaña)`}
             {...getVoiceProps(`Abrir versión accesible oficial para ${currentCategory.name}`)}
-            className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-2 border border-slate-300 transition-all active:scale-[0.98]"
+            className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-2 border border-slate-300 transition-all active:scale-[0.98]"
           >
             <span>Modo Accesible Oficial</span>
             <ExternalLink className="w-3.5 h-3.5 text-slate-600 shrink-0" aria-hidden="true" />
@@ -275,7 +275,7 @@ export const BibliotecaView = () => {
             rel="noopener noreferrer"
             aria-label="Abrir pantalla oficial de ingreso y check-in (nueva pestaña)"
             {...getVoiceProps('Abrir pantalla oficial de Check-in')}
-            className="min-h-[42px] px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
+            className="min-h-[44px] px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
           >
             <LogIn className="w-4 h-4 text-emerald-200 shrink-0" aria-hidden="true" />
             <span>Check-in Oficial</span>
@@ -487,7 +487,7 @@ export const BibliotecaView = () => {
             aria-selected={activeTab === 'reserva'}
             onClick={() => setActiveTab('reserva')}
             {...getVoiceProps('Pestaña Consulta y Simulación de Reserva de Espacios')}
-            className={`min-h-[40px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
               activeTab === 'reserva'
                 ? 'bg-[#002B49] text-white shadow-xs'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -503,7 +503,7 @@ export const BibliotecaView = () => {
             aria-selected={activeTab === 'checkin'}
             onClick={() => setActiveTab('checkin')}
             {...getVoiceProps('Pestaña Check-in Oficial y Gestión de Código de Reserva')}
-            className={`min-h-[40px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
               activeTab === 'checkin'
                 ? 'bg-[#002B49] text-white shadow-xs'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -806,7 +806,7 @@ export const BibliotecaView = () => {
 
               {/* Resumen del bloque */}
               <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-left min-w-[500px]">
                   <thead className="bg-slate-100 border-b border-slate-200 text-slate-800 font-bold">
                     <tr>
                       <th className="p-3">Recurso</th>
@@ -827,7 +827,7 @@ export const BibliotecaView = () => {
                           type="button"
                           onClick={() => setReservaStep('grid')}
                           {...getVoiceProps('Cambiar horario y volver a la grilla')}
-                          className="px-3 py-1 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 cursor-pointer"
+                          className="min-h-[38px] px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 cursor-pointer"
                         >
                           Cambiar
                         </button>
@@ -855,7 +855,7 @@ export const BibliotecaView = () => {
                       value={formData.nombre}
                       onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                       {...getVoiceProps(`Nombre, ${formData.nombre}`)}
-                      className="w-full min-h-[42px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                      className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
                       placeholder="Nombre"
                     />
                   </div>
@@ -871,7 +871,7 @@ export const BibliotecaView = () => {
                       value={formData.apellido}
                       onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
                       {...getVoiceProps(`Apellido, ${formData.apellido}`)}
-                      className="w-full min-h-[42px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                      className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
                       placeholder="Apellido"
                     />
                   </div>
@@ -888,7 +888,7 @@ export const BibliotecaView = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     {...getVoiceProps(`Correo institucional, ${formData.email}`)}
-                    className="w-full min-h-[42px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                    className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
                   />
                 </div>
 
@@ -903,7 +903,7 @@ export const BibliotecaView = () => {
                     value={formData.rut}
                     onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
                     {...getVoiceProps(`RUT institucional, ${formData.rut}`)}
-                    className="w-full min-h-[42px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                    className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
                   />
                 </div>
 
