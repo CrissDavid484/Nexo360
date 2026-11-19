@@ -15,7 +15,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.24.10",
+    "mongoose": "^9.12.2",
     "node-xlsx": "^0.25.0",
     "uuid": "^11.0.5"
   },
@@ -23,6 +23,7 @@
     "sift": "^17.1.4",
     "qs": "^6.17.0",
     "picomatch": "^4.0.8",
-    "braces": "^3.0.4"
+    "braces": "^3.0.4",
+    "mongodb": "^7.9.0"
   }
 }
