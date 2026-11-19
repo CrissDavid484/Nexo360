@@ -1,0 +1,41 @@
+# =====================================================================
+# ETAPA 1: Construcción (Multi-stage build) con Node.js 20 Alpine
+# =====================================================================
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copiar manifiestos de dependencias primero para aprovechar caché de Docker
+COPY package*.json ./
+
+# Instalar dependencias limpias bloqueadas sin scripts arbitrarios
+RUN npm ci --ignore-scripts
+
+# Copiar código fuente necesario para la compilación de producción
+COPY index.html vite.config.js ./
+COPY public ./public
+COPY src ./src
+
+# Compilar bundles estáticos de producción optimizados
+RUN npm run build
+
+# =====================================================================
+# ETAPA 2: Servidor Web Ultra-ligero de Producción con Nginx Alpine
+# =====================================================================
+FROM nginx:alpine
+
+# Copiar configuración personalizada de Nginx para SPA y reverse proxy
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copiar artefactos compilados desde la etapa constructora
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Exponer el puerto estándar HTTP
+EXPOSE 80
+
+# Verificación de salud nativa del servidor web Nginx
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1
+
+# Iniciar servidor Nginx en primer plano
+CMD ["nginx", "-g", "daemon off;"]

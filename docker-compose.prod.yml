@@ -1,0 +1,78 @@
+services:
+  # =====================================================================
+  # 1. BASE DE DATOS MONGODB 7 (Optimizada para VPS de bajo consumo de RAM)
+  # =====================================================================
+  mongodb:
+    image: mongo:7
+    container_name: nexo360-mongodb
+    restart: unless-stopped
+    # Seguridad: Sin puertos expuestos públicamente; accesible solo dentro de la red interna
+    volumes:
+      - nexo360_mongodb_data:/data/db
+    networks:
+      - nexo360-net
+    # Límite de caché WiredTiger a 256MB para evitar agotamiento de memoria (OOM) en VPS de 1GB de RAM
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =====================================================================
+  # 2. BACKEND API DE PRODUCCIÓN (Node.js 22 + Express + Mongoose 9)
+  # =====================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexo360-backend
+    restart: unless-stopped
+    # Seguridad: Puerto 5000 privado; tráfico canalizado exclusivamente a través del proxy Nginx
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/nexo360
+      - JWT_SECRET=${JWT_SECRET:?Error: JWT_SECRET es obligatorio en producción}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - APP_PUBLIC_URL=${APP_PUBLIC_URL:-http://localhost}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-Nexo360 Duoc UC <no-reply@duocuc.cl>}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - nexo360-net
+
+  # =====================================================================
+  # 3. FRONTEND DE PRODUCCIÓN (Nginx Alpine + SPA React + Reverse Proxy)
+  # =====================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: nexo360-frontend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nexo360-net
+
+# =====================================================================
+# VOLÚMENES PERSISTENTES Y RED PRIVADA
+# =====================================================================
+volumes:
+  nexo360_mongodb_data:
+    name: nexo360_mongodb_data
+
+networks:
+  nexo360-net:
+    name: nexo360-net
+    driver: bridge
