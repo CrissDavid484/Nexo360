@@ -186,7 +186,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
             </button>
           </div>
 
-          {/* Bloque Central: Navegación + Perfil de Usuario + Salir */}
+          {/* Bloque Central: Navegación + Perfil de Usuario + Cerrar sesión */}
           <div className="flex items-center justify-center justify-self-center">
             <div className="flex items-center gap-2 lg:gap-2.5">
               {/* Navegación Principal */}
@@ -524,43 +524,20 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                         <Check className="w-3.5 h-3.5 text-[#002B49] shrink-0" />
                       )}
                     </button>
-
-                    <div className="h-px bg-slate-100 my-1" />
-
-                    {/* Opción: Cerrar Sesión */}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        logout();
-                      }}
-                      className="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-rose-50 text-rose-700 hover:text-rose-900 transition-colors cursor-pointer"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-rose-100/70 flex items-center justify-center text-rose-600 shrink-0">
-                        <LogOut className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-bold block">Cerrar sesión</span>
-                        <span className="text-[10px] text-rose-500 block">
-                          Finalizar sesión segura en Nexo360
-                        </span>
-                      </div>
-                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Botón Salir Rápido (Escritorio) */}
+              {/* Botón Cerrar Sesión en Letras Rojas (Escritorio) */}
               <button
                 type="button"
                 onClick={logout}
                 {...getVoiceProps('Cerrar sesión')}
-                className="min-h-[38px] flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100/70 hover:bg-slate-200/80 border border-slate-200/70 transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
+                className="min-h-[38px] flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                 aria-label="Cerrar sesión"
               >
-                <LogOut className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                <span>Salir</span>
+                <LogOut className="w-3.5 h-3.5 text-rose-600 shrink-0" aria-hidden="true" />
+                <span>Cerrar sesión</span>
               </button>
             </div>
           </div>
