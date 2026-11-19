@@ -1103,17 +1103,19 @@ export const AdminPanelView = () => {
       )}
 
       {/* RENDERIZADO SEGÚN SUB-PESTAÑA */}
-      {adminSubTab === 'gestion-paedis' ? (
+      {adminSubTab === 'gestion-paedis' && (
         <PaedisCaseManagementSection
           students={students}
           onStudentUpdated={handlePaedisStudentUpdated}
           announce={announce}
         />
-      ) : adminSubTab === 'alerta-temprana' ? (
-        <EarlyWarningSatSection announce={announce} />
-      ) : adminSubTab === 'oferta-ramos' ? (
-        <CoursesAdminSection />
-      ) : adminSubTab === 'carreras-sedes' ? (
+      )}
+
+      {adminSubTab === 'alerta-temprana' && <EarlyWarningSatSection announce={announce} />}
+
+      {adminSubTab === 'oferta-ramos' && <CoursesAdminSection />}
+
+      {adminSubTab === 'carreras-sedes' && (
         <section aria-labelledby="careers-sedes-title" className="space-y-6">
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider text-[#002B49] bg-blue-100">
@@ -1174,7 +1176,9 @@ export const AdminPanelView = () => {
             />
           </div>
         </section>
-      ) : (
+      )}
+
+      {adminSubTab === 'estudiantes' && (
         <>
           {/* 2. TARJETAS KPI EJECUTIVAS */}
           <section aria-labelledby="kpis-heading" className="space-y-3.5">
@@ -2105,7 +2109,6 @@ export const AdminPanelView = () => {
         >
           <div
             ref={statusModalRef}
-            tabIndex={-1}
             className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 my-0 sm:my-4 animate-fade-in focus:outline-none"
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2239,7 +2242,6 @@ export const AdminPanelView = () => {
         >
           <div
             ref={createModalRef}
-            tabIndex={-1}
             className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-xl space-y-5 my-0 sm:my-4 animate-fade-in focus:outline-none"
           >
             <div className="flex items-start justify-between border-b border-slate-100 pb-3">

@@ -104,8 +104,8 @@ export const AccessibilityBar = () => {
 
   const hasActivePreferences = activeCount > 0;
 
-  const fontPercentage =
-    fontSize === 'normal' ? '100%' : fontSize === 'large' ? '115%' : '130%';
+  const fontSizePercentages = { normal: '100%', large: '115%', xlarge: '130%' };
+  const fontPercentage = fontSizePercentages[fontSize] || '130%';
 
   useOnClickOutside(containerRef, () => setIsOpen(false), { enabled: isOpen });
 

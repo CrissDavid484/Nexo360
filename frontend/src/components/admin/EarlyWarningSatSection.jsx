@@ -825,7 +825,6 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
         >
           <div
             ref={interventionModalRef}
-            tabIndex={-1}
             className="bg-white w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-5 focus:outline-none"
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

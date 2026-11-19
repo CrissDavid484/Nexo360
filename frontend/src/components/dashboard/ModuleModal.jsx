@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
+import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import { lazyLoad } from '../../utils/lazyLoad';
 
 const TomaRamosSimulator = lazyLoad(
@@ -94,6 +95,8 @@ export const ModuleModal = ({
     initialFocusRef: closeButtonRef,
   });
 
+  useOnClickOutside(modalRef, onClose, { enabled: Boolean(category) });
+
   if (!category) return null;
 
   const { eyebrow, title, description } = resolveModalHeader(
@@ -119,9 +122,6 @@ export const ModuleModal = ({
       aria-modal="true"
       aria-labelledby="modal-title"
       aria-describedby="modal-description"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in"
     >
       <div

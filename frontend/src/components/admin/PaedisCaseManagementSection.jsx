@@ -20,6 +20,7 @@ import {
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
+import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import { DEFAULT_CAMPUS } from '../../utils/studentUtils';
 
 const BARRIER_OPTIONS = [
@@ -44,6 +45,13 @@ const SUPPORT_STAFF_OPTIONS = [
   'Apoyo UAP / Psicopedagogía',
   'Servicio TransVoz / Transcripción',
   'Sin tutor asignado',
+];
+
+const CASE_FILTERS = [
+  { id: 'all', label: 'Todos' },
+  { id: 'pendiente-ficha', label: 'Ficha Pendiente' },
+  { id: 'sin-ajustes', label: 'Sin Ajustes' },
+  { id: 'riesgo', label: 'Riesgo <75%' },
 ];
 
 const ADJUSTMENT_PRESETS = [
@@ -77,6 +85,15 @@ function resolveStudentKey(student) {
   return student?.id || student?._id || student?.email || '';
 }
 
+function isPaedisStudentRecord(student) {
+  const isFlaggedPaedis = student?.isPaedis === true || student?.role === 'estudiante_paedis';
+  const isStudentRole =
+    student?.role?.startsWith('estudiante') ||
+    student?.role === 'tutor_par' ||
+    student?.email === 'c.guzman@duocuc.cl';
+  return isFlaggedPaedis && isStudentRole;
+}
+
 function inferBarrierCategory(student) {
   if (student?.barreraPaedis) return student.barreraPaedis;
   const diag = String(student?.diagnosticoDeclarado || '').toLowerCase();
@@ -87,28 +104,38 @@ function inferBarrierCategory(student) {
   return 'Visual / Sensorial';
 }
 
-function mergeCourseAcknowledgments(student) {
-  const existingMap = new Map(
-    (Array.isArray(student?.acusesDocentes) ? student.acusesDocentes : []).map((ack) => [
-      String(ack.sigla || '').toUpperCase(),
-      ack,
-    ])
-  );
+function matchesPaedisCaseFilter(student, caseFilter, query) {
+  if (caseFilter === 'sin-ajustes' && (student.ajustesAprobados?.length || 0) > 0) return false;
+  if (caseFilter === 'pendiente-ficha' && student.fichaDocenteNotificada) return false;
+  if (caseFilter === 'riesgo' && Number(student.attendanceRate ?? 100) >= 75) return false;
 
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const fields = [student.fullName || student.nombre, student.rut, student.email, student.career];
+  return fields.some((val) => String(val || '').toLowerCase().includes(q));
+}
+
+function extractSourceCourses(student) {
   const enrolled = Array.isArray(student?.enrolledCourses) ? student.enrolledCourses : [];
-  const attendanceFallback = Array.isArray(student?.courseAttendance)
-    ? student.courseAttendance.map((c) => ({
-        sigla: c.courseCode,
-        nombre: c.courseName,
-        profesor: 'Docente Titular',
-      }))
-    : [];
+  if (enrolled.length > 0) return enrolled;
 
-  const sourceCourses = enrolled.length > 0 ? enrolled : attendanceFallback;
+  const attendance = Array.isArray(student?.courseAttendance) ? student.courseAttendance : [];
+  return attendance.map((c) => ({
+    sigla: c.courseCode,
+    nombre: c.courseName,
+    profesor: 'Docente Titular',
+  }));
+}
+
+function mergeCourseAcknowledgments(student) {
+  const rawAcks = Array.isArray(student?.acusesDocentes) ? student.acusesDocentes : [];
+  const existingMap = new Map(rawAcks.map((ack) => [String(ack.sigla || '').toUpperCase(), ack]));
+
   const seen = new Set();
   const merged = [];
 
-  for (const course of sourceCourses) {
+  for (const course of extractSourceCourses(student)) {
     const sigla = String(course.sigla || course.courseCode || '').trim().toUpperCase();
     const nombre = String(course.nombre || course.courseName || '').trim();
     if (!sigla || !nombre || seen.has(sigla)) continue;
@@ -127,6 +154,17 @@ function mergeCourseAcknowledgments(student) {
   return merged;
 }
 
+function updateSimulatorRiskCounters(student, counters) {
+  const rate = Number(student.attendanceRate ?? 88.9);
+  const isRisk = rate < 75;
+  if (student.hasUsedSimulator) {
+    counters.simAdopted++;
+    if (isRisk) counters.simAtRisk++;
+  } else if (isRisk) {
+    counters.noSimAtRisk++;
+  }
+}
+
 function computePaedisAnalytics(paedisStudents) {
   const total = paedisStudents.length;
   const barrierCounts = {
@@ -137,57 +175,53 @@ function computePaedisAnalytics(paedisStudents) {
     'Psicosocial / Cognitiva': 0,
   };
   const tutorLoadMap = new Map();
-
+  const riskCounters = { simAdopted: 0, simAtRisk: 0, noSimAtRisk: 0 };
   let withAdjustments = 0;
   let notifiedCount = 0;
-  let simAdopted = 0;
-  let simAtRisk = 0;
-  let noSimAtRisk = 0;
 
   for (const s of paedisStudents) {
     const barrier = inferBarrierCategory(s);
     barrierCounts[barrier] = (barrierCounts[barrier] || 0) + 1;
+    if (Array.isArray(s.ajustesAprobados) && s.ajustesAprobados.length > 0) withAdjustments++;
+    if (s.fichaDocenteNotificada) notifiedCount++;
 
-    if (Array.isArray(s.ajustesAprobados) && s.ajustesAprobados.length > 0) {
-      withAdjustments++;
-    }
-    if (s.fichaDocenteNotificada) {
-      notifiedCount++;
-    }
-
-    const rate = Number(s.attendanceRate ?? 88.9);
-    const isRisk = rate < 75;
-    if (s.hasUsedSimulator) {
-      simAdopted++;
-      if (isRisk) simAtRisk++;
-    } else if (isRisk) {
-      noSimAtRisk++;
-    }
+    updateSimulatorRiskCounters(s, riskCounters);
 
     const tutor = s.tutorParAsignado || 'Sin tutor asignado';
     tutorLoadMap.set(tutor, (tutorLoadMap.get(tutor) || 0) + 1);
   }
-
-  const coveragePct = total > 0 ? Math.round((withAdjustments / total) * 100) : 0;
-  const simPct = total > 0 ? Math.round((simAdopted / total) * 100) : 0;
-  const tutorDistribution = Array.from(tutorLoadMap.entries()).sort((a, b) => b[1] - a[1]);
 
   return {
     total,
     barrierCounts,
     withAdjustments,
     notifiedCount,
-    coveragePct,
-    simAdopted,
-    simPct,
-    simAtRisk,
-    noSimAtRisk,
-    tutorDistribution,
+    coveragePct: total > 0 ? Math.round((withAdjustments / total) * 100) : 0,
+    simAdopted: riskCounters.simAdopted,
+    simPct: total > 0 ? Math.round((riskCounters.simAdopted / total) * 100) : 0,
+    simAtRisk: riskCounters.simAtRisk,
+    noSimAtRisk: riskCounters.noSimAtRisk,
+    tutorDistribution: Array.from(tutorLoadMap.entries()).sort((a, b) => b[1] - a[1]),
   };
 }
 
 function buildDocenteConfidentialText(student, adjustments, acknowledgments) {
-  const lines = [
+  const adjustmentLines =
+    adjustments.length > 0
+      ? adjustments.map((a, i) => `  ${i + 1}. ${a.tipo}: ${a.descripcion}`)
+      : ['  - Sin ajustes registrados actualmente.'];
+
+  const ackLines =
+    acknowledgments.length > 0
+      ? acknowledgments.map(
+          (ack) =>
+            `  - ${ack.sigla} | ${ack.nombre} (${ack.profesor}): ${
+              ack.confirmado ? 'ACUSE CONFIRMADO' : 'PENDIENTE DE ACUSE'
+            }`
+        )
+      : ['  - Ficha general aplicable a la carga académica vigente del periodo.'];
+
+  return [
     '====================================================================',
     'FICHA DOCENTE CONFIDENCIAL DE AJUSTES RAZONABLES - PAEDIS DUOC UC',
     `Sede: ${student?.campus || DEFAULT_CAMPUS} | Cumplimiento Ley N° 21.719`,
@@ -202,22 +236,12 @@ function buildDocenteConfidentialText(student, adjustments, acknowledgments) {
     'Este documento detalla únicamente los ajustes pedagógicos aplicables en aula.',
     '',
     'AJUSTES RAZONABLES APROBADOS:',
-    ...(adjustments.length > 0
-      ? adjustments.map((a, i) => `  ${i + 1}. ${a.tipo}: ${a.descripcion}`)
-      : ['  - Sin ajustes registrados actualmente.']),
+    ...adjustmentLines,
     '',
     'TRAZABILIDAD DOCENTE POR ASIGNATURA INSCRITA:',
-    ...(acknowledgments.length > 0
-      ? acknowledgments.map(
-          (ack) =>
-            `  - ${ack.sigla} | ${ack.nombre} (${ack.profesor}): ${
-              ack.confirmado ? 'ACUSE CONFIRMADO' : 'PENDIENTE DE ACUSE'
-            }`
-        )
-      : ['  - Ficha general aplicable a la carga académica vigente del periodo.']),
+    ...ackLines,
     '====================================================================',
-  ];
-  return lines.join('\n');
+  ].join('\n');
 }
 
 function PaedisKpiSummary({ analytics, getVoiceProps }) {
@@ -320,6 +344,205 @@ function PaedisKpiSummary({ analytics, getVoiceProps }) {
   );
 }
 
+function PaedisStudentListSidebar({
+  filteredStudents,
+  selectedStudent,
+  searchQuery,
+  onSearchChange,
+  caseFilter,
+  onCaseFilterChange,
+  onSelectStudent,
+  getVoiceProps,
+}) {
+  return (
+    <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-300 shadow-xs p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-black text-slate-900">
+          Nómina PAEDIS ({filteredStudents.length})
+        </h3>
+        <span className="text-[11px] font-bold text-[#002B49] bg-slate-100 px-2 py-0.5 rounded">
+          {DEFAULT_CAMPUS}
+        </span>
+      </div>
+
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Buscar estudiante, RUT o carrera..."
+          aria-label="Buscar estudiante PAEDIS"
+          {...getVoiceProps('Buscar estudiante PAEDIS por nombre, RUT o carrera')}
+          className="w-full min-h-[40px] pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-slate-50 focus:bg-white"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar casos PAEDIS">
+        {CASE_FILTERS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            aria-pressed={caseFilter === f.id}
+            onClick={() => onCaseFilterChange(f.id)}
+            {...getVoiceProps(`Filtrar casos PAEDIS: ${f.label}`)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+              caseFilter === f.id
+                ? 'bg-[#002B49] text-white border-[#002B49]'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="max-h-[470px] overflow-y-auto space-y-1.5 pr-1">
+        {filteredStudents.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-6">
+            No se encontraron estudiantes PAEDIS con ese filtro.
+          </p>
+        ) : (
+          filteredStudents.map((s) => {
+            const key = resolveStudentKey(s);
+            const isSelected = Boolean(selectedStudent && resolveStudentKey(selectedStudent) === key);
+            const adjustmentsCount = s.ajustesAprobados?.length || 0;
+            const sheetStatus = s.fichaDocenteNotificada ? 'Emitida' : 'Pendiente';
+
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => onSelectStudent(key)}
+                {...getVoiceProps(
+                  `${s.fullName || s.nombre}, ${adjustmentsCount} ajustes aprobados, ficha ${sheetStatus}`
+                )}
+                className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer space-y-1 ${
+                  isSelected
+                    ? 'bg-[#002B49] text-white border-[#002B49] shadow-sm'
+                    : 'bg-slate-50/70 hover:bg-slate-100 text-slate-900 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold truncate">{s.fullName || s.nombre}</span>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                      s.fichaDocenteNotificada
+                        ? 'bg-emerald-100 text-emerald-900'
+                        : 'bg-amber-100 text-amber-950'
+                    }`}
+                  >
+                    {sheetStatus}
+                  </span>
+                </div>
+                <div className={`text-[11px] truncate ${isSelected ? 'text-slate-200' : 'text-slate-600'}`}>
+                  {s.career || s.carrera} • {adjustmentsCount} ajuste(s)
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PaedisAdjustmentsManager({
+  adjustments,
+  newAdjustment,
+  onNewAdjustmentChange,
+  onAddPreset,
+  onAddCustom,
+  onRemoveAdjustment,
+  getVoiceProps,
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+          Ajustes Razonables Aprobados ({adjustments.length})
+        </h4>
+        <span className="text-[11px] text-slate-500">
+          Aprobación rápida con un clic o medida personalizada
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {ADJUSTMENT_PRESETS.map((preset) => (
+          <button
+            key={preset.tipo}
+            type="button"
+            onClick={() => onAddPreset(preset)}
+            {...getVoiceProps(`Agregar ajuste rápido: ${preset.tipo}`)}
+            className="min-h-[34px] px-2.5 py-1 bg-blue-50 hover:bg-[#002B49] text-[#002B49] hover:text-white border border-blue-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <Plus className="w-3 h-3" aria-hidden="true" />
+            <span>{preset.tipo}</span>
+          </button>
+        ))}
+      </div>
+
+      {adjustments.length === 0 ? (
+        <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
+          Sin ajustes aprobados. Selecciona un ajuste rápido o registra una medida abajo.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {adjustments.map((adj) => (
+            <li
+              key={`${adj.tipo}-${adj.descripcion}`}
+              className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3"
+            >
+              <div className="space-y-0.5 text-xs">
+                <strong className="text-[#002B49] block">{adj.tipo}</strong>
+                <p className="text-slate-700">{adj.descripcion}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onRemoveAdjustment(adj)}
+                aria-label={`Revocar ajuste ${adj.tipo}`}
+                {...getVoiceProps(`Revocar ajuste ${adj.tipo}`)}
+                className="min-h-[34px] px-2.5 py-1 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Revocar</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form onSubmit={onAddCustom} className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
+        <input
+          type="text"
+          value={newAdjustment.tipo}
+          onChange={(e) => onNewAdjustmentChange({ ...newAdjustment, tipo: e.target.value })}
+          placeholder="Nombre del ajuste (ej. Pausas sensoriales)"
+          aria-label="Nombre del ajuste personalizado"
+          className="sm:col-span-4 min-h-[40px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
+        />
+        <input
+          type="text"
+          value={newAdjustment.descripcion}
+          onChange={(e) => onNewAdjustmentChange({ ...newAdjustment, descripcion: e.target.value })}
+          placeholder="Descripción pedagógica para el docente en aula..."
+          aria-label="Descripción del ajuste personalizado"
+          className="sm:col-span-6 min-h-[40px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
+        />
+        <button
+          type="submit"
+          {...getVoiceProps('Agregar ajuste razonable personalizado')}
+          className="sm:col-span-2 min-h-[40px] px-3 py-2 bg-slate-800 hover:bg-[#002B49] text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>Añadir</span>
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function DocenteSheetModal({
   isOpen,
   onClose,
@@ -342,6 +565,8 @@ function DocenteSheetModal({
     containerRef: modalRef,
     initialFocusRef: closeBtnRef,
   });
+
+  useOnClickOutside(modalRef, onClose, { enabled: isOpen });
 
   if (!isOpen || !student) return null;
 
@@ -366,15 +591,11 @@ function DocenteSheetModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="docente-sheet-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
       className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
     >
       <div
         ref={modalRef}
-        tabIndex={-1}
-        className="bg-white w-full max-w-3xl rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col focus:outline-none"
+        className="bg-white w-full max-w-3xl rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col"
       >
         <header className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-3 bg-slate-50 shrink-0">
           <div>
@@ -438,9 +659,9 @@ function DocenteSheetModal({
               </p>
             ) : (
               <ul className="space-y-2">
-                {adjustments.map((adj, idx) => (
+                {adjustments.map((adj) => (
                   <li
-                    key={`${adj.tipo}-${idx}`}
+                    key={`${adj.tipo}-${adj.descripcion}`}
                     className="p-3 rounded-xl bg-white border border-slate-200 text-xs flex items-start gap-2.5"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
@@ -547,8 +768,6 @@ function DocenteSheetModal({
 
 /**
  * Centro de Operaciones de Inclusión y Continuidad Académica (PAEDIS • Duoc UC Sede Alameda).
- * Implementa gestión de ciclo de vida de ajustes razonables, carga de tutores pares e intérpretes,
- * KPIs de cobertura e impacto, y emisión de Ficha Docente Confidencial conforme a la Ley N° 21.719.
  */
 export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, announce }) => {
   const { getVoiceProps } = useAccessibility();
@@ -556,13 +775,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
   const paedisStudents = useMemo(
     () =>
       students
-        .filter(
-          (s) =>
-            (s.isPaedis === true || s.role === 'estudiante_paedis') &&
-            (s.role?.startsWith('estudiante') ||
-              s.role === 'tutor_par' ||
-              s.email === 'c.guzman@duocuc.cl')
-        )
+        .filter(isPaedisStudentRecord)
         .sort((a, b) =>
           (a.fullName || a.nombre || '').localeCompare(b.fullName || b.nombre || '', 'es', {
             sensitivity: 'base',
@@ -590,21 +803,10 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
 
   const [newAdjustment, setNewAdjustment] = useState({ tipo: '', descripcion: '' });
 
-  const filteredStudents = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return paedisStudents.filter((s) => {
-      if (caseFilter === 'sin-ajustes' && (s.ajustesAprobados?.length || 0) > 0) return false;
-      if (caseFilter === 'pendiente-ficha' && s.fichaDocenteNotificada) return false;
-      if (caseFilter === 'riesgo' && Number(s.attendanceRate ?? 100) >= 75) return false;
-      if (!q) return true;
-      return (
-        (s.fullName || s.nombre || '').toLowerCase().includes(q) ||
-        (s.rut || '').toLowerCase().includes(q) ||
-        (s.email || '').toLowerCase().includes(q) ||
-        (s.career || '').toLowerCase().includes(q)
-      );
-    });
-  }, [paedisStudents, searchQuery, caseFilter]);
+  const filteredStudents = useMemo(
+    () => paedisStudents.filter((s) => matchesPaedisCaseFilter(s, caseFilter, searchQuery)),
+    [paedisStudents, searchQuery, caseFilter]
+  );
 
   const selectedStudent = useMemo(
     () =>
@@ -633,30 +835,14 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
 
   const analytics = useMemo(() => computePaedisAnalytics(paedisStudents), [paedisStudents]);
 
-  const handleAddPresetAdjustment = (preset) => {
-    const alreadyExists = formState.ajustesAprobados.some(
-      (a) => a.tipo.toLowerCase() === preset.tipo.toLowerCase()
+  const appendAdjustment = (tipo, descripcion) => {
+    const duplicate = formState.ajustesAprobados.some(
+      (a) => a.tipo.toLowerCase() === tipo.toLowerCase() && a.descripcion.toLowerCase() === descripcion.toLowerCase()
     );
-    if (alreadyExists) {
-      announce(`El ajuste ${preset.tipo} ya está aprobado para este estudiante.`, 'polite');
-      return;
+    if (duplicate) {
+      announce(`El ajuste ${tipo} ya está aprobado para este estudiante.`, 'polite');
+      return false;
     }
-    setFormState((prev) => ({
-      ...prev,
-      ajustesAprobados: [
-        ...prev.ajustesAprobados,
-        { tipo: preset.tipo, descripcion: preset.descripcion, fechaAprobacion: new Date().toISOString() },
-      ],
-    }));
-    announce(`Ajuste agregado: ${preset.tipo}`, 'polite');
-  };
-
-  const handleAddCustomAdjustment = (e) => {
-    e.preventDefault();
-    const tipo = newAdjustment.tipo.trim();
-    const descripcion = newAdjustment.descripcion.trim();
-    if (!tipo || !descripcion) return;
-
     setFormState((prev) => ({
       ...prev,
       ajustesAprobados: [
@@ -664,19 +850,28 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
         { tipo, descripcion, fechaAprobacion: new Date().toISOString() },
       ],
     }));
-    setNewAdjustment({ tipo: '', descripcion: '' });
-    announce(`Ajuste razonable agregado: ${tipo}`, 'polite');
+    announce(`Ajuste agregado: ${tipo}`, 'polite');
+    return true;
   };
 
-  const handleRemoveAdjustment = (index) => {
-    const target = formState.ajustesAprobados[index];
+  const handleAddCustomAdjustment = (e) => {
+    e.preventDefault();
+    const tipo = newAdjustment.tipo.trim();
+    const descripcion = newAdjustment.descripcion.trim();
+    if (!tipo || !descripcion) return;
+    if (appendAdjustment(tipo, descripcion)) {
+      setNewAdjustment({ tipo: '', descripcion: '' });
+    }
+  };
+
+  const handleRemoveAdjustment = (targetAdj) => {
     setFormState((prev) => ({
       ...prev,
-      ajustesAprobados: prev.ajustesAprobados.filter((_, idx) => idx !== index),
+      ajustesAprobados: prev.ajustesAprobados.filter(
+        (adj) => adj.tipo !== targetAdj.tipo || adj.descripcion !== targetAdj.descripcion
+      ),
     }));
-    if (target) {
-      announce(`Ajuste revocado: ${target.tipo}`, 'polite');
-    }
+    announce(`Ajuste revocado: ${targetAdj.tipo}`, 'polite');
   };
 
   const handleToggleTeacherAck = (sigla) => {
@@ -696,28 +891,21 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
 
   const persistPaedisCase = async (notifyDocentes = false) => {
     if (!selectedStudent) return;
-    const studentId = resolveStudentKey(selectedStudent);
     setIsSaving(true);
     setStatusFeedback(null);
 
     try {
-      const payload = {
-        ...formState,
-        ...(notifyDocentes ? { fichaDocenteNotificada: true } : {}),
-      };
-      const res = await api.updatePaedisCase(studentId, payload);
+      const payload = { ...formState, ...(notifyDocentes ? { fichaDocenteNotificada: true } : {}) };
+      const res = await api.updatePaedisCase(resolveStudentKey(selectedStudent), payload);
       if (!res?.success) {
         throw new Error(res?.message || 'No se pudo actualizar el expediente PAEDIS.');
       }
-      if (onStudentUpdated && res.student) {
-        onStudentUpdated(res.student);
-      }
+      if (onStudentUpdated && res.student) onStudentUpdated(res.student);
+
       const successMsg = res.message || 'Expediente PAEDIS actualizado correctamente.';
       setStatusFeedback({ type: 'success', text: successMsg });
       announce(successMsg, 'polite');
-      if (notifyDocentes) {
-        setIsDocenteModalOpen(false);
-      }
+      if (notifyDocentes) setIsDocenteModalOpen(false);
     } catch (err) {
       const errorMsg = err?.message || 'Error al guardar el expediente PAEDIS.';
       setStatusFeedback({ type: 'error', text: errorMsg });
@@ -760,108 +948,17 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
       <PaedisKpiSummary analytics={analytics} getVoiceProps={getVoiceProps} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Columna Izquierda: Selector de Estudiantes PAEDIS */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-300 shadow-xs p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">
-              Nómina PAEDIS ({filteredStudents.length})
-            </h3>
-            <span className="text-[11px] font-bold text-[#002B49] bg-slate-100 px-2 py-0.5 rounded">
-              {DEFAULT_CAMPUS}
-            </span>
-          </div>
+        <PaedisStudentListSidebar
+          filteredStudents={filteredStudents}
+          selectedStudent={selectedStudent}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          caseFilter={caseFilter}
+          onCaseFilterChange={setCaseFilter}
+          onSelectStudent={setSelectedKey}
+          getVoiceProps={getVoiceProps}
+        />
 
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar estudiante, RUT o carrera..."
-              aria-label="Buscar estudiante PAEDIS"
-              {...getVoiceProps('Buscar estudiante PAEDIS por nombre, RUT o carrera')}
-              className="w-full min-h-[40px] pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-slate-50 focus:bg-white"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar casos PAEDIS">
-            {[
-              { id: 'all', label: 'Todos' },
-              { id: 'pendiente-ficha', label: 'Ficha Pendiente' },
-              { id: 'sin-ajustes', label: 'Sin Ajustes' },
-              { id: 'riesgo', label: 'Riesgo <75%' },
-            ].map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                aria-pressed={caseFilter === f.id}
-                onClick={() => setCaseFilter(f.id)}
-                {...getVoiceProps(`Filtrar casos PAEDIS: ${f.label}`)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
-                  caseFilter === f.id
-                    ? 'bg-[#002B49] text-white border-[#002B49]'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="max-h-[470px] overflow-y-auto space-y-1.5 pr-1">
-            {filteredStudents.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-6">
-                No se encontraron estudiantes PAEDIS con ese filtro.
-              </p>
-            ) : (
-              filteredStudents.map((s) => {
-                const key = resolveStudentKey(s);
-                const isSelected = selectedStudent && resolveStudentKey(selectedStudent) === key;
-                const adjustmentsCount = s.ajustesAprobados?.length || 0;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => setSelectedKey(key)}
-                    {...getVoiceProps(
-                      `${s.fullName || s.nombre}, ${adjustmentsCount} ajustes aprobados, ${
-                        s.fichaDocenteNotificada ? 'ficha docente emitida' : 'ficha pendiente'
-                      }`
-                    )}
-                    className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer space-y-1 ${
-                      isSelected
-                        ? 'bg-[#002B49] text-white border-[#002B49] shadow-sm'
-                        : 'bg-slate-50/70 hover:bg-slate-100 text-slate-900 border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold truncate">{s.fullName || s.nombre}</span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                          s.fichaDocenteNotificada
-                            ? 'bg-emerald-100 text-emerald-900'
-                            : 'bg-amber-100 text-amber-950'
-                        }`}
-                      >
-                        {s.fichaDocenteNotificada ? 'Emitida' : 'Pendiente'}
-                      </span>
-                    </div>
-                    <div
-                      className={`text-[11px] truncate ${
-                        isSelected ? 'text-slate-200' : 'text-slate-600'
-                      }`}
-                    >
-                      {s.career || s.carrera} • {adjustmentsCount} ajuste(s)
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Columna Derecha: Expediente Confidencial y Ciclo de Vida de Ajustes */}
         <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-300 shadow-xs p-5 sm:p-6 space-y-5">
           {!selectedStudent ? (
             <p className="text-sm text-slate-600 text-center py-10">
@@ -882,17 +979,15 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
-                      Number(selectedStudent.attendanceRate ?? 100) < 75
-                        ? 'bg-rose-50 text-rose-800 border-rose-300'
-                        : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                    }`}
-                  >
-                    Asistencia: {selectedStudent.attendanceRate ?? 88.9}%
-                  </span>
-                </div>
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+                    Number(selectedStudent.attendanceRate ?? 100) < 75
+                      ? 'bg-rose-50 text-rose-800 border-rose-300'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  }`}
+                >
+                  Asistencia: {selectedStudent.attendanceRate ?? 88.9}%
+                </span>
               </div>
 
               {statusFeedback && (
@@ -914,7 +1009,6 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 </div>
               )}
 
-              {/* Datos de Acreditación y Asignación de Apoyos */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                 <div>
                   <label htmlFor="paedis-barrier" className="block text-xs font-bold text-slate-700 mb-1">
@@ -939,9 +1033,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                   <select
                     id="paedis-accreditation"
                     value={formState.acreditacionPaedis}
-                    onChange={(e) =>
-                      setFormState({ ...formState, acreditacionPaedis: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, acreditacionPaedis: e.target.value })}
                     className="w-full min-h-[42px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
                   >
                     {ACCREDITATION_OPTIONS.map((opt) => (
@@ -957,15 +1049,11 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                   <select
                     id="paedis-tutor"
                     value={formState.tutorParAsignado}
-                    onChange={(e) =>
-                      setFormState({ ...formState, tutorParAsignado: e.target.value })
-                    }
+                    onChange={(e) => setFormState({ ...formState, tutorParAsignado: e.target.value })}
                     className="w-full min-h-[42px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
                   >
                     {!SUPPORT_STAFF_OPTIONS.includes(formState.tutorParAsignado) && (
-                      <option value={formState.tutorParAsignado}>
-                        {formState.tutorParAsignado}
-                      </option>
+                      <option value={formState.tutorParAsignado}>{formState.tutorParAsignado}</option>
                     )}
                     {SUPPORT_STAFF_OPTIONS.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
@@ -974,14 +1062,11 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 </div>
               </div>
 
-              {/* Diagnóstico Declarado y Notas Confidenciales */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#002B49] inline-flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>Registro Clínico &amp; Entrevista Inicial (Oculto en Ficha Docente)</span>
-                  </span>
-                </div>
+                <span className="text-xs font-bold text-[#002B49] inline-flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Registro Clínico &amp; Entrevista Inicial (Oculto en Ficha Docente)</span>
+                </span>
 
                 <div>
                   <label htmlFor="paedis-diagnosis" className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1016,91 +1101,15 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 </div>
               </div>
 
-              {/* Gestor de Ajustes Razonables */}
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Ajustes Razonables Aprobados ({formState.ajustesAprobados.length})
-                  </h4>
-                  <span className="text-[11px] text-slate-500">
-                    Aprobación rápida con un clic o medida personalizada
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {ADJUSTMENT_PRESETS.map((preset) => (
-                    <button
-                      key={preset.tipo}
-                      type="button"
-                      onClick={() => handleAddPresetAdjustment(preset)}
-                      {...getVoiceProps(`Agregar ajuste rápido: ${preset.tipo}`)}
-                      className="min-h-[34px] px-2.5 py-1 bg-blue-50 hover:bg-[#002B49] text-[#002B49] hover:text-white border border-blue-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" aria-hidden="true" />
-                      <span>{preset.tipo}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {formState.ajustesAprobados.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    Sin ajustes aprobados. Selecciona un ajuste rápido o registra una medida abajo.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {formState.ajustesAprobados.map((adj, idx) => (
-                      <li
-                        key={`${adj.tipo}-${idx}`}
-                        className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3"
-                      >
-                        <div className="space-y-0.5 text-xs">
-                          <strong className="text-[#002B49] block">{adj.tipo}</strong>
-                          <p className="text-slate-700">{adj.descripcion}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAdjustment(idx)}
-                          aria-label={`Revocar ajuste ${adj.tipo}`}
-                          {...getVoiceProps(`Revocar ajuste ${adj.tipo}`)}
-                          className="min-h-[34px] px-2.5 py-1 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                          <span>Revocar</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <form onSubmit={handleAddCustomAdjustment} className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={newAdjustment.tipo}
-                    onChange={(e) => setNewAdjustment({ ...newAdjustment, tipo: e.target.value })}
-                    placeholder="Nombre del ajuste (ej. Pausas sensoriales)"
-                    aria-label="Nombre del ajuste personalizado"
-                    className="sm:col-span-4 min-h-[40px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
-                  />
-                  <input
-                    type="text"
-                    value={newAdjustment.descripcion}
-                    onChange={(e) =>
-                      setNewAdjustment({ ...newAdjustment, descripcion: e.target.value })
-                    }
-                    placeholder="Descripción pedagógica para el docente en aula..."
-                    aria-label="Descripción del ajuste personalizado"
-                    className="sm:col-span-6 min-h-[40px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
-                  />
-                  <button
-                    type="submit"
-                    {...getVoiceProps('Agregar ajuste razonable personalizado')}
-                    className="sm:col-span-2 min-h-[40px] px-3 py-2 bg-slate-800 hover:bg-[#002B49] text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>Añadir</span>
-                  </button>
-                </form>
-              </div>
+              <PaedisAdjustmentsManager
+                adjustments={formState.ajustesAprobados}
+                newAdjustment={newAdjustment}
+                onNewAdjustmentChange={setNewAdjustment}
+                onAddPreset={(p) => appendAdjustment(p.tipo, p.descripcion)}
+                onAddCustom={handleAddCustomAdjustment}
+                onRemoveAdjustment={handleRemoveAdjustment}
+                getVoiceProps={getVoiceProps}
+              />
 
               <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <button

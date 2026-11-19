@@ -101,9 +101,9 @@ export const CoursesCatalogTable = ({
                     </span>
                   </td>
                   <td className="p-3.5 align-top space-y-1">
-                    {course.secciones?.slice(0, 3).map((sec, sIdx) => (
+                    {course.secciones?.slice(0, 3).map((sec) => (
                       <div
-                        key={sIdx}
+                        key={`${course.sigla}-${sec.seccion}`}
                         className="text-[11px] p-2 rounded-lg bg-slate-50 border border-slate-300"
                       >
                         <div className="flex items-center justify-between gap-2">

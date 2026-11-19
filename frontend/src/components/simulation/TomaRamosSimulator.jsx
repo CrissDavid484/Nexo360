@@ -181,6 +181,50 @@ function getEstadoRowIcon(pendingModification, estaInscrito, estaSeleccionado) {
   );
 }
 
+function getProgressBarColor(pct) {
+  if (pct === 100) return 'bg-emerald-500';
+  if (pct >= 60) return 'bg-blue-600';
+  return 'bg-amber-500';
+}
+
+function getTargetCourseRowBg(hasExactMatch, isOptativo) {
+  if (hasExactMatch) return 'bg-emerald-50';
+  if (isOptativo) return 'bg-[#bbdefb]';
+  return 'bg-white';
+}
+
+function getTargetCourseVoiceLabel(tc, hasExactMatch, hasWrongSection, currentSelected) {
+  let stateLabel = 'pendiente';
+  if (hasExactMatch) {
+    stateLabel = 'meta lograda';
+  } else if (hasWrongSection) {
+    stateLabel = `cambiar de sección ${currentSelected?.seccion} a ${tc.seccion}`;
+  }
+  return `Meta ${tc.sigla} ${tc.nombre}, sección ${tc.seccion}, ${stateLabel}`;
+}
+
+function TargetCourseStatusBadge({ tc, hasExactMatch, hasWrongSection, currentSelected }) {
+  if (hasExactMatch) {
+    return (
+      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
+        ✓ Meta lograda
+      </span>
+    );
+  }
+  if (hasWrongSection) {
+    return (
+      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white">
+        Cambiar {currentSelected?.seccion} → {tc.seccion}
+      </span>
+    );
+  }
+  return (
+    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-800">
+      Pendiente ({tc.seccion})
+    </span>
+  );
+}
+
 export const TomaRamosSimulator = ({ onExit }) => {
   const { announce, readingGuide, toggleReadingGuide, getVoiceProps } = useAccessibility();
   const { user } = useAuth();
@@ -2529,7 +2573,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
           >
             <div
               ref={infoModalRef}
-              tabIndex={-1}
               className="relative w-full max-w-[440px] bg-[#E8EFF6] border-2 border-[#1B5387] shadow-2xl rounded-[2px] overflow-hidden focus:outline-none"
             >
               <div className="bg-gradient-to-b from-[#2A6BA5] to-[#174A7A] text-white px-3 py-1.5 text-xs font-bold flex items-center justify-between">
@@ -2602,7 +2645,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
           >
             <div
               ref={preFlowModalRef}
-              tabIndex={-1}
               className="bg-white rounded-3xl max-w-5xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 space-y-5 my-4 max-h-[94%] overflow-y-auto focus:outline-none"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -3022,13 +3064,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div className="flex-1 bg-slate-200 rounded-full h-2.5 overflow-hidden">
                     <div
-                      className={`h-full transition-all duration-500 rounded-full ${
-                        completionPercentage === 100
-                          ? 'bg-emerald-500'
-                          : completionPercentage >= 60
-                          ? 'bg-blue-600'
-                          : 'bg-amber-500'
-                      }`}
+                      className={`h-full transition-all duration-500 rounded-full ${getProgressBarColor(
+                        completionPercentage
+                      )}`}
                       style={{ width: `${completionPercentage}%` }}
                     />
                   </div>
@@ -3074,21 +3112,17 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <div
                           key={tc.sigla}
                           {...getVoiceProps(
-                            `Meta ${tc.sigla} ${tc.nombre}, sección ${tc.seccion}, ${
-                              hasExactMatch
-                                ? 'meta lograda'
-                                : hasWrongSection
-                                ? `cambiar de sección ${currentSelected?.seccion} a ${tc.seccion}`
-                                : 'pendiente'
-                            }`
+                            getTargetCourseVoiceLabel(
+                              tc,
+                              hasExactMatch,
+                              hasWrongSection,
+                              currentSelected
+                            )
                           )}
-                          className={`px-3 py-2 flex flex-col gap-1.5 ${
-                            hasExactMatch
-                              ? 'bg-emerald-50'
-                              : isOptativo
-                              ? 'bg-[#bbdefb]'
-                              : 'bg-white'
-                          }`}
+                          className={`px-3 py-2 flex flex-col gap-1.5 ${getTargetCourseRowBg(
+                            hasExactMatch,
+                            isOptativo
+                          )}`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0">
@@ -3099,19 +3133,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
                             </div>
 
                             <div className="shrink-0 font-sans text-right">
-                              {hasExactMatch ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
-                                  ✓ Meta lograda
-                                </span>
-                              ) : hasWrongSection ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white">
-                                  Cambiar {currentSelected?.seccion} → {tc.seccion}
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-800">
-                                  Pendiente ({tc.seccion})
-                                </span>
-                              )}
+                              <TargetCourseStatusBadge
+                                tc={tc}
+                                hasExactMatch={hasExactMatch}
+                                hasWrongSection={hasWrongSection}
+                                currentSelected={currentSelected}
+                              />
                             </div>
                           </div>
 

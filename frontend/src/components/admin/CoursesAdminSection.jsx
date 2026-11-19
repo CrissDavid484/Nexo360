@@ -88,7 +88,7 @@ const parseDelimitedCourseRows = (content) => {
     return { error: 'El archivo seleccionado está vacío o no contiene filas legibles.', rows: [] };
   }
 
-  const delimiter = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
+  const delimiter = [';', '\t'].find((sep) => lines[0].includes(sep)) || ',';
   const stripQuotes = (value) => value.replace(/^["']|["']$/g, '').trim();
   const headers = lines[0].split(delimiter).map(stripQuotes);
 
