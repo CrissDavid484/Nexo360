@@ -570,9 +570,13 @@ function DocenteSheetModal({
 
   if (!isOpen || !student) return null;
 
+  const safeTutor = String(tutorParAsignado || '')
+    .replace(/Tania\s+Montes\s*(\(Coordinaci[oó]n\s+PAEDIS\))?/gi, 'Coordinación PAEDIS Duoc UC')
+    .trim() || 'Coordinación PAEDIS Duoc UC';
+
   const handleDownloadTxt = () => {
     const content = buildDocenteConfidentialText(
-      { ...student, tutorParAsignado },
+      { ...student, tutorParAsignado: safeTutor },
       adjustments,
       acknowledgments
     );
@@ -591,22 +595,24 @@ function DocenteSheetModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="docente-sheet-title"
-      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
     >
       <div
         ref={modalRef}
-        className="bg-white w-full max-w-3xl rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col"
+        className="relative bg-white w-full max-w-3xl rounded-3xl border border-slate-300 border-t-4 border-t-[#002B49] shadow-2xl overflow-hidden my-auto max-h-[85vh] flex flex-col"
       >
-        <header className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-3 bg-slate-50 shrink-0">
-          <div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200 mb-1">
-              <Lock className="w-3 h-3" aria-hidden="true" />
-              <span>Ficha Docente Confidencial • Ley N° 21.719</span>
-            </span>
-            <h3 id="docente-sheet-title" className="text-lg sm:text-xl font-black text-slate-900">
+        <header className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-slate-50 shrink-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                <Lock className="w-3 h-3" aria-hidden="true" />
+                <span>Ficha Docente Confidencial • Ley N° 21.719</span>
+              </span>
+            </div>
+            <h3 id="docente-sheet-title" className="text-lg sm:text-xl font-black text-slate-900 truncate">
               Ficha de Ajustes Razonables para Docentes de Aula
             </h3>
-            <p className="text-xs text-slate-600 mt-0.5">
+            <p className="text-xs text-slate-600 mt-0.5 truncate">
               Resumen pedagógico para docentes de {student.fullName || student.nombre} ({student.career})
             </p>
           </div>
@@ -616,7 +622,7 @@ function DocenteSheetModal({
             onClick={onClose}
             aria-label="Cerrar Ficha Docente Confidencial"
             {...getVoiceProps('Cerrar Ficha Docente Confidencial')}
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="min-h-[40px] min-w-[40px] p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 bg-white border border-slate-200 shadow-2xs transition-colors cursor-pointer flex items-center justify-center shrink-0"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
@@ -645,7 +651,7 @@ function DocenteSheetModal({
             </div>
             <div>
               <span className="text-slate-500 font-semibold block">Apoyo PAEDIS Asignado</span>
-              <strong className="text-slate-900">{tutorParAsignado}</strong>
+              <strong className="text-slate-900">{safeTutor}</strong>
             </div>
           </div>
 
@@ -819,12 +825,19 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
 
   useEffect(() => {
     if (!selectedStudent) return;
+    const isVisual =
+      inferBarrierCategory(selectedStudent) === 'Visual / Sensorial' ||
+      /visual|ciego|no vidente|baja visi[oó]n/i.test(selectedStudent.diagnosticoDeclarado || '');
     setFormState({
       barreraPaedis: inferBarrierCategory(selectedStudent),
       acreditacionPaedis: selectedStudent.acreditacionPaedis || 'Credencial RND SENADIS / COMPIN',
       tutorParAsignado: selectedStudent.tutorParAsignado || 'Coordinación PAEDIS Duoc UC',
       diagnosticoDeclarado: selectedStudent.diagnosticoDeclarado || '',
       notasConfidencialesPaedis: selectedStudent.notasConfidencialesPaedis || '',
+      voiceReaderByDefault:
+        typeof selectedStudent.accessibilityPreferences?.voiceReader === 'boolean'
+          ? selectedStudent.accessibilityPreferences.voiceReader
+          : isVisual,
       ajustesAprobados: Array.isArray(selectedStudent.ajustesAprobados)
         ? selectedStudent.ajustesAprobados
         : [],
@@ -895,7 +908,15 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
     setStatusFeedback(null);
 
     try {
-      const payload = { ...formState, ...(notifyDocentes ? { fichaDocenteNotificada: true } : {}) };
+      const payload = {
+        ...formState,
+        ...(notifyDocentes ? { fichaDocenteNotificada: true } : {}),
+        accessibilityPreferences: {
+          ...(selectedStudent.accessibilityPreferences || {}),
+          voiceReader: Boolean(formState.voiceReaderByDefault),
+          screenReaderOptimized: true,
+        },
+      };
       const res = await api.updatePaedisCase(resolveStudentKey(selectedStudent), payload);
       if (!res?.success) {
         throw new Error(res?.message || 'No se pudo actualizar el expediente PAEDIS.');
@@ -1098,6 +1119,28 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                     placeholder="Notas de entrevista de acogida, acuerdos de seguimiento y confidencialidad..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 bg-white"
                   />
+                </div>
+
+                <div className="pt-2 border-t border-slate-200">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="paedis-voice-reader-default"
+                      checked={Boolean(formState.voiceReaderByDefault)}
+                      onChange={(e) =>
+                        setFormState({ ...formState, voiceReaderByDefault: e.target.checked })
+                      }
+                      className="mt-0.5 w-4 h-4 text-[#002B49] rounded border-slate-300 focus:ring-[#002B49]"
+                    />
+                    <span className="text-xs text-slate-800 leading-snug">
+                      <strong className="block text-[#002B49]">
+                        Activar lector de pantalla / voz asistida por defecto en el perfil
+                      </strong>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">
+                        Indispensable para estudiantes no videntes o con baja visión: al iniciar sesión, la plataforma se iniciará en modo lector sonoro de manera automática para no obligarles a buscar visualmente el botón en pantalla.
+                      </span>
+                    </span>
+                  </label>
                 </div>
               </div>
 

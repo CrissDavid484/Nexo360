@@ -1179,6 +1179,15 @@ function buildPaedisCaseUpdates(body) {
       : null;
   }
 
+  if (body.accessibilityPreferences && typeof body.accessibilityPreferences === 'object') {
+    updates.accessibilityPreferences = sanitizeAccessibilityPreferences(body.accessibilityPreferences);
+  } else if (/visual|ciego|no vidente|baja visi[oó]n/i.test(updates.barreraPaedis || '')) {
+    updates.accessibilityPreferences = sanitizeAccessibilityPreferences({
+      voiceReader: true,
+      screenReaderOptimized: true,
+    });
+  }
+
   return updates;
 }
 

@@ -1,8 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../services/api';
 import { useAccessibility } from './AccessibilityContext';
+import { sanitizeInstitutionalDisplayName } from '../utils/studentUtils';
 
 const AuthContext = createContext();
+
+function sanitizeSessionUser(u) {
+  if (!u) return u;
+  return {
+    ...u,
+    fullName: sanitizeInstitutionalDisplayName(u.fullName || u.nombre),
+    nombre: sanitizeInstitutionalDisplayName(u.nombre || u.fullName),
+    email: (u.email || '').replace(/t\.montes/gi, 'coord.paedis'),
+    tutorParAsignado: sanitizeInstitutionalDisplayName(u.tutorParAsignado),
+  };
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -32,9 +44,10 @@ export const AuthProvider = ({ children }) => {
         if (!isActive) return;
 
         if (response?.success && response?.user) {
-          setUser(response.user);
-          loadUserPreferences(response.user.accessibilityPreferences, {
-            disabilityProfile: response.user.disabilityProfile,
+          const safeUser = sanitizeSessionUser(response.user);
+          setUser(safeUser);
+          loadUserPreferences(safeUser.accessibilityPreferences, {
+            disabilityProfile: safeUser.disabilityProfile,
           });
         } else {
           logout();
@@ -61,11 +74,12 @@ export const AuthProvider = ({ children }) => {
     (newToken, newUser) => {
       localStorage.setItem('nexo360_token', newToken);
       setToken(newToken);
-      setUser(newUser);
+      const safeUser = sanitizeSessionUser(newUser);
+      setUser(safeUser);
 
-      if (newUser) {
-        loadUserPreferences(newUser.accessibilityPreferences, {
-          disabilityProfile: newUser.disabilityProfile,
+      if (safeUser) {
+        loadUserPreferences(safeUser.accessibilityPreferences, {
+          disabilityProfile: safeUser.disabilityProfile,
         });
       }
     },
@@ -73,7 +87,7 @@ export const AuthProvider = ({ children }) => {
   );
 
   const updateUser = useCallback((updatedFields) => {
-    setUser((prev) => (prev ? { ...prev, ...updatedFields } : updatedFields));
+    setUser((prev) => (prev ? sanitizeSessionUser({ ...prev, ...updatedFields }) : sanitizeSessionUser(updatedFields)));
   }, []);
 
   const contextValue = useMemo(

@@ -249,6 +249,15 @@ export function parseDuocEmailToName(email = '') {
   return local.charAt(0).toUpperCase() + local.slice(1);
 }
 
+export function sanitizeInstitutionalDisplayName(name = '') {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .replace(/Tania\s+Montes\s*(\(Coordinaci[oó]n\s+PAEDIS\))?/gi, 'Coordinación PAEDIS')
+    .replace(/Tania\s+Montes/gi, 'Coordinación PAEDIS')
+    .replace(/t\.montes/gi, 'coord.paedis')
+    .trim();
+}
+
 /**
  * Obtiene el nombre completo del estudiante directamente desde la base de datos
  */
@@ -259,11 +268,11 @@ export function getStudentDisplayName(user = {}) {
 
   // Si el usuario tiene su nombre guardado en la BD (distinto a email o default), usarlo directamente
   if (rawName && !rawName.includes('@') && rawName !== 'Estudiante Duoc UC') {
-    return rawName;
+    return sanitizeInstitutionalDisplayName(rawName);
   }
 
   if (email) {
-    return parseDuocEmailToName(email);
+    return sanitizeInstitutionalDisplayName(parseDuocEmailToName(email));
   }
 
   return 'Estudiante Duoc UC';

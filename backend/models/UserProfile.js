@@ -476,6 +476,18 @@ function sanitizeSerializedUser(_doc, ret) {
   delete ret.passwordResetTokenHash;
   delete ret.passwordResetExpires;
   delete ret.__v;
+  if (ret.fullName && /Tania Montes/i.test(ret.fullName)) {
+    ret.fullName = 'Coordinación PAEDIS';
+  }
+  if (ret.nombre && /Tania Montes/i.test(ret.nombre)) {
+    ret.nombre = 'Coordinación PAEDIS';
+  }
+  if (ret.tutorParAsignado && /Tania Montes/i.test(ret.tutorParAsignado)) {
+    ret.tutorParAsignado = 'Coordinación PAEDIS Duoc UC';
+  }
+  if (ret.email && /t\.montes/i.test(ret.email)) {
+    ret.email = 'coord.paedis@duoc.cl';
+  }
   return ret;
 }
 

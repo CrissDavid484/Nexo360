@@ -111,6 +111,27 @@ class AuthService {
       return;
     }
 
+    try {
+      await UserProfile.updateMany(
+        { $or: [{ fullName: /Tania/i }, { nombre: /Tania/i }] },
+        { $set: { fullName: 'Coordinación PAEDIS', nombre: 'Coordinación PAEDIS' } }
+      );
+      await UserProfile.updateMany(
+        { email: /t\.montes/i },
+        { $set: { email: 'coord.paedis@duoc.cl' } }
+      );
+      await UserProfile.updateMany(
+        { tutorParAsignado: /Tania/i },
+        { $set: { tutorParAsignado: 'Coordinación PAEDIS Duoc UC' } }
+      );
+      await UserProfile.updateMany(
+        { 'satIntervention.assignedTo': /Tania/i },
+        { $set: { 'satIntervention.assignedTo': 'Coordinación PAEDIS Duoc UC' } }
+      );
+    } catch {
+      // Ignorar si la base de datos se encuentra en modo inicial
+    }
+
     for (const seedUser of SEED_USERS) {
       try {
         const cleanEmail = seedUser.email.toLowerCase();

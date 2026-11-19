@@ -41,6 +41,7 @@ function createInitialFormState(defaultCampus) {
     isPaedis: false,
     disabilityProfile: 'ninguna',
     colorBlindMode: 'deuteranopia',
+    enableVoiceReaderByDefault: true,
     staffRole: 'coordinador_paedis',
     career: '',
     campus: defaultCampus || 'Sede Alameda',
@@ -156,6 +157,22 @@ function buildRegistrationPayload({ form, careerQuery }) {
     if (payload.disabilityProfile !== 'ninguna' && meta?.barrera) {
       payload.barreraPaedis = meta.barrera;
     }
+    const isVisualCondition =
+      payload.disabilityProfile === 'ceguera_total' ||
+      payload.disabilityProfile === 'baja_vision';
+    const voiceReaderDefault =
+      form.enableVoiceReaderByDefault !== undefined
+        ? Boolean(form.enableVoiceReaderByDefault)
+        : isVisualCondition;
+
+    payload.accessibilityPreferences = {
+      ...BASE_ACCESSIBILITY_PREFERENCES,
+      ...(meta?.defaults || {}),
+      voiceReader: voiceReaderDefault,
+      screenReaderOptimized: true,
+      disabilityProfile: payload.disabilityProfile,
+      colorBlindMode: payload.colorBlindMode || meta?.defaults?.colorBlindMode || 'none',
+    };
   }
 
   return payload;
@@ -253,6 +270,7 @@ function PaedisStudentSection({
   onPaedisToggle,
   onDisabilityChange,
   onColorBlindChange,
+  onVoiceReaderDefaultChange,
   getVoiceProps,
 }) {
   const selectedProfileMeta = useMemo(
@@ -378,6 +396,28 @@ function PaedisStudentSection({
                   Filtro activo: {selectedColorBlindMeta.label} — {selectedColorBlindMeta.description}
                 </p>
               )}
+            </div>
+          )}
+
+          {(form.disabilityProfile === 'ceguera_total' || form.disabilityProfile === 'baja_vision') && (
+            <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl space-y-1.5 text-xs">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="create-auto-voice-reader"
+                  checked={form.enableVoiceReaderByDefault ?? true}
+                  onChange={(e) => onVoiceReaderDefaultChange?.(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 text-[#002B49] rounded border-slate-300 focus:ring-[#002B49]"
+                />
+                <span className="text-slate-900 leading-snug">
+                  <strong className="block text-[#002B49]">
+                    Lector de pantalla y voz asistida activa por defecto
+                  </strong>
+                  <span className="text-[11px] text-slate-600 block mt-0.5">
+                    Habilitado automáticamente para personas no videntes o con requerimientos visuales, permitiendo que la plataforma les hable y lea las opciones al ingresar sin requerir interacción visual previa.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
         </div>
@@ -510,9 +550,11 @@ export const RegisterUserModal = ({
   };
 
   const handleDisabilityChange = (nextProfile) => {
+    const isVisual = nextProfile === 'ceguera_total' || nextProfile === 'baja_vision';
     setForm((prev) => ({
       ...prev,
       disabilityProfile: nextProfile,
+      enableVoiceReaderByDefault: isVisual ? true : prev.enableVoiceReaderByDefault,
       colorBlindMode:
         nextProfile === 'daltonismo' && prev.colorBlindMode === 'none'
           ? 'deuteranopia'
@@ -713,6 +755,9 @@ export const RegisterUserModal = ({
                 onDisabilityChange={handleDisabilityChange}
                 onColorBlindChange={(colorBlindMode) =>
                   setForm((prev) => ({ ...prev, colorBlindMode }))
+                }
+                onVoiceReaderDefaultChange={(enableVoiceReaderByDefault) =>
+                  setForm((prev) => ({ ...prev, enableVoiceReaderByDefault }))
                 }
                 getVoiceProps={getVoiceProps}
               />

@@ -108,7 +108,9 @@ function resolveMergedPreferences(prefs, options, current) {
       current.reducedMotion
     ),
     readingGuide: nextReadingGuide,
-    voiceReader: pickBooleanPref(prefs?.voiceReader, overrides.voiceReader, current.voiceReader),
+    voiceReader: (isBlind || resolvedProfile === 'ceguera_total' || resolvedProfile === 'baja_vision' || overrides.voiceReader === true)
+      ? (typeof prefs?.voiceReader === 'boolean' ? prefs.voiceReader : true)
+      : pickBooleanPref(prefs?.voiceReader, overrides.voiceReader, current.voiceReader),
     colorBlindMode: nextColorBlindMode,
     clearReadingMode: pickBooleanPref(
       prefs?.clearReadingMode,
