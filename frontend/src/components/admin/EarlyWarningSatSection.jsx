@@ -446,7 +446,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
       {/* 1. CABECERA INSTITUCIONAL */}
       <section
         aria-labelledby="sat-header-title"
-        className="bg-linear-to-r from-[#002B49] via-[#0A3B66] to-[#002B49] text-white p-6 sm:p-8 rounded-3xl shadow-sm space-y-3"
+        className="bg-[#002B49] text-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200/20 space-y-3 relative overflow-hidden"
       >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
