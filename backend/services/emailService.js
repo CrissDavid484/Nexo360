@@ -39,7 +39,11 @@ function maskEmail(email = '') {
 
 function getAppPublicUrl() {
   const raw = process.env.APP_PUBLIC_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
-  return String(raw).trim().replace(/\/+$/, '');
+  let clean = String(raw).trim();
+  while (clean.endsWith('/')) {
+    clean = clean.slice(0, -1);
+  }
+  return clean;
 }
 
 function buildResetUrl(email, resetToken) {
@@ -101,8 +105,11 @@ function buildSmtpConfig() {
 }
 
 function extractAddressOnly(mailbox = '') {
-  const match = /<([^>]+)>/.exec(mailbox);
-  return stripHeaderNewlines(match ? match[1] : mailbox);
+  const str = String(mailbox || '');
+  const start = str.indexOf('<');
+  const end = str.indexOf('>', start);
+  const addr = start !== -1 && end > start ? str.slice(start + 1, end) : str;
+  return stripHeaderNewlines(addr);
 }
 
 function popSmtpReply(state) {

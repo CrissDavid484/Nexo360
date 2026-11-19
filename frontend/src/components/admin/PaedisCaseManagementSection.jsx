@@ -1122,7 +1122,10 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 </div>
 
                 <div className="pt-2 border-t border-slate-200">
-                  <label className="flex items-start gap-2.5 cursor-pointer">
+                  <label
+                    htmlFor="paedis-voice-reader-default"
+                    className="flex items-start gap-2.5 cursor-pointer"
+                  >
                     <input
                       type="checkbox"
                       id="paedis-voice-reader-default"

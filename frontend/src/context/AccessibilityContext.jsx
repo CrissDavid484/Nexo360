@@ -21,6 +21,18 @@ const AccessibilityContext = createContext();
 
 const VALID_FONT_SIZES = new Set(['normal', 'large', 'xlarge']);
 const COLOR_BLIND_CLASSES = ['cb-protanopia', 'cb-deuteranopia', 'cb-tritanopia'];
+const ALLOWED_COLOR_BLIND_MODES = new Set([
+  'none',
+  'protanopia',
+  'deuteranopia',
+  'tritanopia',
+  'achromatopsia',
+]);
+
+function sanitizeColorBlindStorageValue(val) {
+  const clean = typeof val === 'string' ? val.trim().toLowerCase() : '';
+  return ALLOWED_COLOR_BLIND_MODES.has(clean) ? clean : 'none';
+}
 
 function syncDocumentAccessibilityClasses({
   fontSize,
@@ -373,8 +385,9 @@ export const AccessibilityProvider = ({ children }) => {
   const setColorBlindMode = useCallback(
     (mode) => {
       const normalized = normalizeColorBlindMode(mode);
+      const safeForStorage = sanitizeColorBlindStorageValue(normalized);
       setColorBlindModeState(normalized);
-      localStorage.setItem('nexo360_color_blind_mode', normalized);
+      localStorage.setItem('nexo360_color_blind_mode', safeForStorage);
       const modeMeta = getColorBlindModeMeta(normalized);
       announce(
         normalized === 'none'
@@ -524,7 +537,7 @@ export const AccessibilityProvider = ({ children }) => {
     localStorage.setItem('nexo360_reduced_motion', String(merged.reducedMotion));
     localStorage.setItem('nexo360_reading_guide', String(merged.readingGuide));
     localStorage.setItem('nexo360_voice_reader', String(merged.voiceReader));
-    localStorage.setItem('nexo360_color_blind_mode', merged.colorBlindMode);
+    localStorage.setItem('nexo360_color_blind_mode', sanitizeColorBlindStorageValue(merged.colorBlindMode));
     localStorage.setItem('nexo360_clear_reading_mode', String(merged.clearReadingMode));
     localStorage.setItem('nexo360_disability_profile', merged.disabilityProfile);
   }, []);

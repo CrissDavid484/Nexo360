@@ -401,7 +401,10 @@ function PaedisStudentSection({
 
           {(form.disabilityProfile === 'ceguera_total' || form.disabilityProfile === 'baja_vision') && (
             <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl space-y-1.5 text-xs">
-              <label className="flex items-start gap-2.5 cursor-pointer">
+              <label
+                htmlFor="create-auto-voice-reader"
+                className="flex items-start gap-2.5 cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   id="create-auto-voice-reader"

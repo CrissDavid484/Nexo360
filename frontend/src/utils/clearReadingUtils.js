@@ -46,8 +46,25 @@ function decodeHtmlEntities(input) {
     });
 }
 
+function stripHtmlTags(input) {
+  let result = '';
+  let inTag = false;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '<') {
+      inTag = true;
+      result += ' ';
+    } else if (ch === '>') {
+      inTag = false;
+    } else if (!inTag) {
+      result += ch;
+    }
+  }
+  return result;
+}
+
 function stripTagsAndNormalizeSpaces(input) {
-  return decodeHtmlEntities(input.replace(/<[^>]*>/g, ' '))
+  return decodeHtmlEntities(stripHtmlTags(input))
     .replace(/\u00A0/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -57,7 +74,7 @@ function removeParentheticalClutter(input) {
   return input
     .replace(/\([^()]{1,140}\)/g, ' ')
     .replace(/\[[^[\]]{1,140}\]/g, ' ')
-    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/[ \t]+([,.;:!?])/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -89,8 +106,11 @@ function truncateAtWordBoundary(text, maxChars) {
   const limit = Math.max(10, maxChars - 1);
   const sliced = text.slice(0, limit);
   const lastSpace = sliced.lastIndexOf(' ');
-  const base = lastSpace > Math.floor(limit * 0.5) ? sliced.slice(0, lastSpace) : sliced;
-  return `${base.replace(/[,;:\s]+$/, '')}…`;
+  let base = lastSpace > Math.floor(limit * 0.5) ? sliced.slice(0, lastSpace) : sliced;
+  while (base.length > 0 && ' ,;:.\t\r\n'.includes(base[base.length - 1])) {
+    base = base.slice(0, -1);
+  }
+  return `${base}…`;
 }
 
 /**
