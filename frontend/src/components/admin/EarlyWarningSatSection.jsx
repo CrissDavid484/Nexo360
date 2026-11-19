@@ -125,12 +125,12 @@ function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
       <button
         type="button"
         onClick={() => onSelectCourseForSimulation(course)}
-        {...getVoiceProps(`Simular corte semanal SAP para ${course.courseCode}`)}
+        {...getVoiceProps(`Simular riesgo de inasistencia para ${course.courseCode}`)}
         className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs rounded-xl border border-slate-200 shadow-2xs transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
-        title={`Simular corte para ${course.courseCode}`}
+        title={`Cargar ${course.courseCode} en el simulador de riesgo y corte de inasistencia`}
       >
         <Play className="w-3.5 h-3.5 text-blue-600" aria-hidden="true" />
-        <span>Simular en SAP</span>
+        <span>Simular riesgo</span>
       </button>
     </div>
   );
@@ -187,10 +187,11 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
   const [statusFeedback, setStatusFeedback] = useState(null);
 
   const [interventionForm, setInterventionForm] = useState({
-    assignedTo: 'Tania Montes (Coordinación PAEDIS)',
+    assignedTo: 'Coordinación PAEDIS Duoc UC',
     status: 'IN_PROGRESS',
     notes: '',
     slaDays: '2',
+    tutorPaedisAsignado: 'No',
   });
 
   const [simulationTarget, setSimulationTarget] = useState({
@@ -339,11 +340,15 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
   const handleOpenInterventionModal = (student) => {
     setSelectedStudentForIntervention(student);
     const existing = student.satIntervention || {};
+    const hasTutor =
+      existing.tutorPaedisAsignado ||
+      (student.tutorParAsignado && student.tutorParAsignado !== 'Sin tutor asignado' ? 'Sí' : 'No');
     setInterventionForm({
-      assignedTo: existing.assignedTo || 'Tania Montes (Coordinación PAEDIS)',
+      assignedTo: existing.assignedTo || 'Coordinación PAEDIS Duoc UC',
       status: existing.status || 'IN_PROGRESS',
       notes: existing.notes || '',
       slaDays: '2',
+      tutorPaedisAsignado: hasTutor,
     });
   };
 
@@ -362,6 +367,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
           status: interventionForm.status,
           notes: interventionForm.notes,
           slaDeadline,
+          tutorPaedisAsignado: interventionForm.tutorPaedisAsignado,
         }
       );
 
@@ -801,7 +807,11 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                                 userId: student.id || student._id,
                                 courseCode: c.courseCode,
                               });
-                              announce(`Seleccionado ${c.courseCode} en el simulador`, 'polite');
+                              announce(`Asignatura ${c.courseCode} cargada en el simulador de riesgo SAT`, 'polite');
+                              const simEl = document.getElementById('sat-simulator-title');
+                              if (simEl) {
+                                simEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }
                             }}
                           />
                         ))}
@@ -867,9 +877,13 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                   <strong className="text-slate-900">{selectedStudentForIntervention.phone}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block">Tutor Par / Asignado:</span>
+                  <span className="text-slate-500 block">Tutor PAEDIS Asignado:</span>
                   <strong className="text-slate-900">
-                    {selectedStudentForIntervention.tutorParAsignado}
+                    {selectedStudentForIntervention.tutorPaedisAsignado ||
+                      (selectedStudentForIntervention.tutorParAsignado &&
+                      selectedStudentForIntervention.tutorParAsignado !== 'Sin tutor asignado'
+                        ? 'Sí'
+                        : 'No')}
                   </strong>
                 </div>
               </div>
@@ -896,7 +910,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
               }}
               className="space-y-4"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label htmlFor="sat-assignee" className="text-xs font-bold text-slate-700">
                     Responsable Asignado:
@@ -910,16 +924,37 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                     {...getVoiceProps('Seleccionar responsable asignado para la intervención')}
                     className="w-full min-h-[44px] px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-[#002B49] transition-all"
                   >
-                    <option value="Tania Montes (Coordinación PAEDIS)">
-                      Tania Montes (Coordinación PAEDIS)
+                    <option value="Coordinación PAEDIS Duoc UC">
+                      Coordinación PAEDIS Duoc UC
                     </option>
-                    <option value="Valentina Soto (Tutor Par PAEDIS)">
-                      Valentina Soto (Tutor Par PAEDIS)
+                    <option value="Equipo Tutor PAEDIS Sede Alameda">
+                      Equipo Tutor PAEDIS Sede Alameda
                     </option>
                     <option value="Consejería Académica Sede Alameda">
                       Consejería Académica Sede Alameda
                     </option>
                     <option value="Dirección de Carrera">Dirección de Carrera</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="sat-tutor-paedis" className="text-xs font-bold text-slate-700">
+                    Tutor PAEDIS Asignado:
+                  </label>
+                  <select
+                    id="sat-tutor-paedis"
+                    value={interventionForm.tutorPaedisAsignado}
+                    onChange={(e) =>
+                      setInterventionForm({
+                        ...interventionForm,
+                        tutorPaedisAsignado: e.target.value,
+                      })
+                    }
+                    {...getVoiceProps('Indicar si tiene tutor PAEDIS asignado')}
+                    className="w-full min-h-[44px] px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-[#002B49] transition-all"
+                  >
+                    <option value="No">No</option>
+                    <option value="Sí">Sí</option>
                   </select>
                 </div>
 

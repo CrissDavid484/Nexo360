@@ -101,7 +101,7 @@ export const DISABILITY_PROFILES = [
     summary:
       'Reduce la sobrecarga sensorial con lectura clara resumida por pasos, calma visual y guía de lectura.',
     autoAdaptationHint:
-      'Activa Lectura clara y resumida (TEA), Sin animaciones y Guía de lectura.',
+      'Activa Lectura clara y resumida, Sin animaciones y Guía de lectura.',
     defaults: {
       clearReadingMode: true,
       reducedMotion: true,

@@ -318,26 +318,32 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               <span>Mi Perfil</span>
             </button>
 
-            {/* Opción 5: Panel Admin (Exclusivo Administrador) */}
-            {user?.role === 'admin' && (
+            {/* Opción 5: Panel Admin / Coordinación PAEDIS */}
+            {(user?.role === 'admin' ||
+              user?.role === 'administrador' ||
+              user?.role === 'coordinador_paedis') && (
               <button
                 type="button"
                 onClick={() => onTabChange('admin-panel')}
                 aria-current={activeTab === 'admin-panel' ? 'page' : undefined}
-                {...getVoiceProps('Panel Admin')}
-                className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 active:scale-[0.98] ${
+                {...getVoiceProps(
+                  user?.role === 'coordinador_paedis' ? 'Panel PAEDIS' : 'Panel Admin'
+                )}
+                className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 active:scale-[0.98] ${
                   activeTab === 'admin-panel'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : 'text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300'
+                    ? 'bg-[#002B49] text-white shadow-xs ring-2 ring-amber-400/80 font-black'
+                    : 'text-slate-700 hover:text-[#002B49] hover:bg-slate-100/90 border border-slate-200/80'
                 }`}
               >
                 <ShieldAlert
                   className={`w-4 h-4 shrink-0 transition-colors ${
-                    activeTab === 'admin-panel' ? 'text-slate-950' : 'text-amber-700'
+                    activeTab === 'admin-panel' ? 'text-amber-400' : 'text-amber-600'
                   }`}
                   aria-hidden="true"
                 />
-                <span>Panel Admin</span>
+                <span>
+                  {user?.role === 'coordinador_paedis' ? 'Panel PAEDIS' : 'Panel Admin'}
+                </span>
               </button>
             )}
           </nav>
@@ -537,22 +543,32 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 <span>Mi Perfil ({displayName})</span>
               </button>
 
-              {user?.role === 'admin' && (
+              {(user?.role === 'admin' ||
+                user?.role === 'administrador' ||
+                user?.role === 'coordinador_paedis') && (
                 <button
                   type="button"
                   onClick={() => {
                     onTabChange('admin-panel');
                     setIsMobileMenuOpen(false);
                   }}
-                  {...getVoiceProps('Panel de Administración')}
-                  className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-black text-left transition-colors ${
+                  {...getVoiceProps(
+                    user?.role === 'coordinador_paedis'
+                      ? 'Panel PAEDIS'
+                      : 'Panel de Administración'
+                  )}
+                  className={`w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-left transition-colors ${
                     activeTab === 'admin-panel'
-                      ? 'bg-amber-500 text-slate-950 shadow-xs'
-                      : 'bg-amber-50 text-amber-950 hover:bg-amber-100 border border-amber-300'
+                      ? 'bg-[#002B49] text-white shadow-xs ring-2 ring-amber-400/80 font-black'
+                      : 'bg-slate-50 text-slate-800 hover:bg-slate-100 border border-slate-200'
                   }`}
                 >
-                  <ShieldAlert className="w-4 h-4 shrink-0 text-amber-700" />
-                  <span>Panel de Administración (Admin)</span>
+                  <ShieldAlert className="w-4 h-4 shrink-0 text-amber-500" />
+                  <span>
+                    {user?.role === 'coordinador_paedis'
+                      ? 'Panel Coordinación PAEDIS'
+                      : 'Panel de Administración'}
+                  </span>
                 </button>
               )}
             </div>

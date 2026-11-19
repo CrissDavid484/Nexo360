@@ -62,7 +62,7 @@ const FALLBACK_USERS = [
   ['m.gomez@profesor.duoc.cl', 'Mauricio Gómez Arratia', 'profesor', 'Docente Titular Capstone', false, 'Docente Titular'],
   ['p.valenzuela@duoc.cl', 'Patricia Valenzuela', 'director', 'Directora de Carrera', false, 'Directora'],
   ['r.mendez@duoc.cl', 'Roberto Méndez', 'subdirector', 'Subdirector Académico', false, 'Subdirector'],
-  ['t.montes@duoc.cl', 'Tania Montes', 'coordinador_paedis', 'Coordinadora PAEDIS', true, 'Coord. PAEDIS'],
+  ['coord.paedis@duoc.cl', 'Coordinador PAEDIS', 'coordinador_paedis', 'Coordinación PAEDIS', true, 'Coord. PAEDIS'],
   ['c.herrera@duoc.cl', 'Camila Herrera', 'administrativo', 'Gestión Biblioteca y Financiamiento', false, 'Administrativo'],
   ['admin.nexo360@duoc.cl', 'Administrador Nexo360', 'admin', 'Administrador General', false, 'Admin'],
 ].map(([email, fullName, role, roleLabel, isPaedis, badge, status]) => ({

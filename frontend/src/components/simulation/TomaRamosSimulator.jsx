@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   ClipboardEdit,
   PlusCircle,
+  Lightbulb,
 } from 'lucide-react';
 import {
   PORTAL_INSC_URL,
@@ -1735,6 +1736,13 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               </div>
                             )}
 
+                            <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-950 font-medium">
+                              <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
+                              <span>
+                                <strong>Tip de selección:</strong> La forma más rápida de escoger tu sección es revisar la letra final: <strong>D</strong> para horario <strong>Diurno</strong> y <strong>V</strong> para horario <strong>Vespertino</strong>.
+                              </span>
+                            </div>
+
                             <div className="border border-[#A8C2D8] overflow-x-auto">
                               <table className="w-full text-left border-collapse">
                                 <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px]">
@@ -2931,6 +2939,13 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <span>{selectedTargetPackage.name}</span>
                       </div>
 
+                      <div className="bg-amber-50 px-4 py-2 flex items-center gap-2 border-b border-amber-200 text-xs text-amber-950 font-sans font-medium">
+                        <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
+                        <span>
+                          <strong>Tip institucional:</strong> La forma más fácil de escoger una sección es revisar su letra final: <strong>D</strong> para horario <strong>Diurno</strong> y <strong>V</strong> para horario <strong>Vespertino</strong>.
+                        </span>
+                      </div>
+
                       <div className="bg-[#FFB81C] text-slate-950 px-4 py-1.5 grid grid-cols-12 font-black text-xs border-b border-black">
                         <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">
                           Sección:
@@ -3091,6 +3106,12 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   <div className="bg-[#1b5e20] text-white px-3 py-1.5 flex items-center justify-between gap-2 font-mono font-black text-[11px] border-b-2 border-emerald-950">
                     <span className="shrink-0">{carreraInfo.codigo || '1446114-6-D'}</span>
                     <span className="text-right">{selectedTargetPackage.name}</span>
+                  </div>
+                  <div className="bg-amber-50 px-3 py-1.5 flex items-center gap-1.5 border-b border-amber-200 text-[11px] text-amber-950 font-sans font-medium">
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-600 shrink-0" aria-hidden="true" />
+                    <span>
+                      <strong>Tip:</strong> Revisa la letra final (<strong>D</strong> = Diurno, <strong>V</strong> = Vespertino).
+                    </span>
                   </div>
                   <div className="bg-[#FFB81C] text-slate-950 px-3 py-1 grid grid-cols-12 items-center font-black text-[11px] border-b border-black">
                     <div className="col-span-3 border-r border-black pr-1.5">Sigla:</div>

@@ -379,6 +379,15 @@ export const ASIGNATURAS_DISPONIBLES = [
       'Jueves 08:31 - 09:50',
       dayBlocks('Jueves', ['b1', 'b2'], 'AL-501')
     ),
+    createSection(
+      '003V',
+      35,
+      18,
+      'Sala 501 Alameda',
+      'Mónica Henríquez B.',
+      'Jueves 19:01 - 20:20 (Vespertino)',
+      dayBlocks('Jueves', ['b14', 'b15'], 'AL-501')
+    ),
   ]),
   createCourse('AJEMS', 'AJEDREZ MIXTO SÁBADO', 0, 'optativo', [
     createSection(
@@ -542,6 +551,24 @@ const createPracticaCourse = ({
           periodo,
         },
       }),
+      createSection(
+        '001V',
+        60,
+        cuposDisponibles,
+        sala,
+        profesor,
+        `${horarioTexto} (Vespertino)`,
+        [],
+        {
+          detallePractica: {
+            tipo: tipoDetalle,
+            centroPractica,
+            supervisor,
+            horas,
+            periodo,
+          },
+        }
+      ),
     ],
     { subtipo }
   );
@@ -756,8 +783,11 @@ const addCourseSectionToPackage = (selected, occupiedSlots, course, sec) => {
   (sec.bloques || []).forEach((b) => occupiedSlots.add(`${b.dia}-${b.bloqueId}`));
 };
 
-const addPracticaToPackage = (selected, practicaCourse) => {
-  const sec = practicaCourse.secciones[0] || {};
+const addPracticaToPackage = (selected, practicaCourse, jornada = 'Diurno') => {
+  const sec =
+    (practicaCourse.secciones || []).find((s) => isSectionMatchingJornada(s, jornada)) ||
+    practicaCourse.secciones?.[0] ||
+    {};
   selected.push({
     sigla: practicaCourse.sigla,
     nombre: practicaCourse.nombre,
@@ -772,22 +802,40 @@ const addPracticaToPackage = (selected, practicaCourse) => {
   });
 };
 
-const fillPackageCourses = ({ courses, selected, occupiedSlots, limit, filterBlock }) => {
+export function isSectionMatchingJornada(sec, jornada) {
+  if (!jornada) return true;
+  const cleanSec = String(sec?.seccion || '').trim().toUpperCase();
+  if (jornada === 'Diurno') return cleanSec.endsWith('D');
+  if (jornada === 'Vespertino') return cleanSec.endsWith('V');
+  return true;
+}
+
+const fillPackageCourses = ({ courses, selected, occupiedSlots, limit, filterBlock, jornada }) => {
   for (const course of courses) {
     if (selected.length >= limit) break;
     if (selected.some((s) => s.sigla === course.sigla)) continue;
 
     const validSections = (course.secciones || []).filter(
-      (sec) => !sec.sinCupos && (sec.bloques || []).length > 0
+      (sec) =>
+        !sec.sinCupos &&
+        (sec.bloques || []).length > 0 &&
+        isSectionMatchingJornada(sec, jornada)
     );
 
     const orderedSections = filterBlock
       ? [...validSections].sort((s1, s2) => {
           const m1 = s1.bloques.some((b) => filterBlock(b.bloqueId)) ? 1 : 0;
           const m2 = s2.bloques.some((b) => filterBlock(b.bloqueId)) ? 1 : 0;
-          return m2 - m1;
+          if (m1 !== m2) return m2 - m1;
+          return String(s1.seccion || '').localeCompare(String(s2.seccion || ''), undefined, {
+            numeric: true,
+          });
         })
-      : validSections;
+      : [...validSections].sort((s1, s2) =>
+          String(s1.seccion || '').localeCompare(String(s2.seccion || ''), undefined, {
+            numeric: true,
+          })
+        );
 
     const chosen = orderedSections.find((sec) => !hasBlockConflict(sec.bloques, occupiedSlots));
     if (chosen) {
@@ -859,6 +907,7 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
       occupiedSlots,
       limit: requiredRegularCount,
       filterBlock: cfg.filterBlock,
+      jornada: cfg.jornada,
     });
 
     if (selected.length < requiredRegularCount) {
@@ -867,15 +916,39 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
         selected,
         occupiedSlots,
         limit: requiredRegularCount,
+        jornada: cfg.jornada,
       });
     }
 
+    if (selected.length < requiredRegularCount && cfg.jornada === 'Vespertino') {
+      fillPackageCourses({
+        courses: ASIGNATURAS_DISPONIBLES,
+        selected,
+        occupiedSlots,
+        limit: requiredRegularCount,
+        jornada: cfg.jornada,
+      });
+      if (selected.length < requiredRegularCount) {
+        fillPackageCourses({
+          courses: CATALOGO_INFRAESTRUCTURA_TECNOLOGICA,
+          selected,
+          occupiedSlots,
+          limit: requiredRegularCount,
+          jornada: cfg.jornada,
+        });
+      }
+    }
+
     if (diffConfig.hasPracticaLaboral) {
-      addPracticaToPackage(selected, PRACTICA_LABORAL_COURSE);
+      addPracticaToPackage(selected, PRACTICA_LABORAL_COURSE, cfg.jornada);
     }
     if (diffConfig.hasPracticaProfesional) {
-      addPracticaToPackage(selected, PRACTICA_PROFESIONAL_COURSE);
+      addPracticaToPackage(selected, PRACTICA_PROFESIONAL_COURSE, cfg.jornada);
     }
+
+    selected.sort((a, b) =>
+      String(a.seccion || '').localeCompare(String(b.seccion || ''), undefined, { numeric: true })
+    );
 
     return {
       id: cfg.id,

@@ -327,20 +327,6 @@ const ADMIN_SUB_TABS = [
     showCount: true,
   },
   {
-    id: 'carreras-sedes',
-    label: 'Carreras & Sedes (CRUD)',
-    announceMsg: 'Pestaña de Gestión Dinámica de Carreras y Sedes seleccionada.',
-    icon: Building2,
-    iconColor: 'text-blue-400',
-  },
-  {
-    id: 'oferta-ramos',
-    label: 'Oferta Académica & Simulador (Excel / BD)',
-    announceMsg: 'Pestaña de Oferta Académica y Carga de Ramos seleccionada.',
-    icon: FileSpreadsheet,
-    iconColor: 'text-emerald-400',
-  },
-  {
     id: 'alerta-temprana',
     label: 'Alerta Temprana (SAT)',
     announceMsg: 'Pestaña de Sistema de Alerta Temprana (SAT) seleccionada.',
@@ -353,6 +339,20 @@ const ADMIN_SUB_TABS = [
     announceMsg: 'Pestaña de Gestión PAEDIS y Ajustes Razonables seleccionada.',
     icon: HeartHandshake,
     iconColor: 'text-amber-400',
+  },
+  {
+    id: 'carreras-sedes',
+    label: 'Carreras & Sedes (CRUD)',
+    announceMsg: 'Pestaña de Gestión Dinámica de Carreras y Sedes seleccionada.',
+    icon: Building2,
+    iconColor: 'text-blue-400',
+  },
+  {
+    id: 'oferta-ramos',
+    label: 'Oferta Académica & Simulador (Excel / BD)',
+    announceMsg: 'Pestaña de Oferta Académica y Carga de Ramos seleccionada.',
+    icon: FileSpreadsheet,
+    iconColor: 'text-emerald-400',
   },
 ];
 
@@ -1139,13 +1139,9 @@ export const AdminPanelView = () => {
           >
             <div className="border-b border-slate-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider text-[#002B49] bg-amber-100">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
-                  <span>Modelo Predictivo de Inteligencia Académica • Duoc UC - Sede Alameda</span>
-                </div>
                 <h2
                   id="predictive-analytics-title"
-                  className="text-xl sm:text-2xl font-black text-slate-900 mt-1"
+                  className="text-xl sm:text-2xl font-black text-slate-900"
                 >
                   Semáforo Predictivo de Retención vs. Deserción
                 </h2>
@@ -1313,26 +1309,6 @@ export const AdminPanelView = () => {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider ${
-                      directoryMode === 'estudiantes'
-                        ? 'text-[#002B49] bg-amber-100 border border-amber-300'
-                        : 'text-purple-900 bg-purple-100 border border-purple-300'
-                    }`}
-                  >
-                    {directoryMode === 'estudiantes' ? (
-                      <>
-                        <Users className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
-                        Estudiantes
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="w-3.5 h-3.5 text-purple-700" aria-hidden="true" />
-                        Administrativos
-                      </>
-                    )}
-                  </span>
-
                   <div
                     className="inline-flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200"
                     role="tablist"

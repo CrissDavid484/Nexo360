@@ -40,7 +40,7 @@ const ACCREDITATION_OPTIONS = [
 
 const SUPPORT_STAFF_OPTIONS = [
   'Coordinación PAEDIS Duoc UC',
-  'Valentina Soto (Tutora Par PAEDIS)',
+  'Equipo Tutor PAEDIS Sede Alameda',
   'Intérprete LSCh Institucional',
   'Apoyo UAP / Psicopedagogía',
   'Servicio TransVoz / Transcripción',
@@ -1044,7 +1044,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
 
                 <div>
                   <label htmlFor="paedis-tutor" className="block text-xs font-bold text-slate-700 mb-1">
-                    Tutor Par / Intérprete Asignado
+                    Tutor PAEDIS Asignado
                   </label>
                   <select
                     id="paedis-tutor"

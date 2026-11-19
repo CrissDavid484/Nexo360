@@ -193,9 +193,9 @@ export const AccessibilityBar = () => {
       active: clearReadingMode,
       onToggle: toggleClearReadingMode,
       icon: BookOpen,
-      title: 'Lectura clara y resumida (TEA)',
+      title: 'Lectura clara y resumida',
       description: 'Resume textos largos en viñetas directas y reduce ruido visual',
-      ariaLabel: 'Activar o desactivar lectura clara y resumida para TEA',
+      ariaLabel: 'Activar o desactivar lectura clara y resumida',
     },
     {
       key: 'dyslexicFont',

@@ -31,7 +31,7 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
   );
 
   const coordinadorToken = jwt.sign(
-    { id: 'coord_test_1', email: 't.montes@duoc.cl', role: 'coordinador_paedis' },
+    { id: 'coord_test_1', email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis' },
     getJwtSecret(),
     { algorithm: 'HS256' }
   );

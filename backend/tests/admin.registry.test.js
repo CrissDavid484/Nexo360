@@ -35,7 +35,7 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     { algorithm: 'HS256' }
   );
   const coordinatorToken = jwt.sign(
-    { id: 'seed_coord_t_montes', email: 't.montes@duoc.cl', role: 'coordinador_paedis', fullName: 'Tania Montes' },
+    { id: 'seed_coord_paedis', email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis', fullName: 'Coordinador PAEDIS' },
     getJwtSecret(),
     { algorithm: 'HS256' }
   );
@@ -230,7 +230,7 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
       method: 'PATCH',
       headers: coordinatorHeaders,
       body: {
-        assignedTo: 'Tania Montes (Coordinación PAEDIS)',
+        assignedTo: 'Coordinación PAEDIS',
         status: 'IN_PROGRESS',
         notes: 'Estudiante contactado telefónicamente y derivado a tutor par.',
       },
