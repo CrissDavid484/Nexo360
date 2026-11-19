@@ -72,7 +72,8 @@ function stripTagsAndNormalizeSpaces(input) {
 
 function removeSpacesBeforePunctuation(str) {
   let result = '';
-  for (let i = 0; i < str.length; i++) {
+  let i = 0;
+  while (i < str.length) {
     const ch = str[i];
     if (ch === ' ' || ch === '\t') {
       let j = i;
@@ -80,11 +81,12 @@ function removeSpacesBeforePunctuation(str) {
         j++;
       }
       if (j < str.length && ',.;:!?'.includes(str[j])) {
-        i = j - 1;
+        i = j;
         continue;
       }
     }
     result += ch;
+    i++;
   }
   return result;
 }
