@@ -22,7 +22,9 @@ const DEFAULT_ACCESSIBILITY_PREFERENCES = Object.freeze({
  * Sanitiza un valor de texto recortando espacios y limitando longitud.
  */
 function sanitizeString(val, maxLen = 120) {
-  return typeof val === 'string' ? val.trim().slice(0, maxLen) : undefined;
+  return typeof val === 'string'
+    ? val.replace(/[\r\n\t]+/g, ' ').trim().slice(0, maxLen)
+    : undefined;
 }
 
 /**

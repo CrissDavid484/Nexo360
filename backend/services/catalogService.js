@@ -178,7 +178,7 @@ function createCatalogManager({
       throw createHttpError(400, `El nombre de la ${singularLabel} es obligatorio.`);
     }
 
-    const duplicateMsg = `La ${singularLabel} "${cleanName}" ya se encuentra registrada en el sistema.`;
+    const duplicateMsg = `La ${singularLabel} ingresada ya se encuentra registrada en el sistema.`;
     const nameRegex = new RegExp(`^${escapeRegex(cleanName, 150)}$`, 'i');
     const payload = buildCreatePayload(cleanName, rawBody);
 

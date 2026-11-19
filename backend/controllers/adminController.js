@@ -44,8 +44,8 @@ function createCatalogHandlers({ manager, listKey, itemKey, entityPlural, entity
           count: items.length,
           [listKey]: items,
         });
-      } catch (error) {
-        console.error(`[AdminController] Error al obtener ${entityPlural}:`, error.message);
+      } catch {
+        console.error(`[AdminController] Error interno al listar ${entityPlural}.`);
         return res.status(500).json({
           success: false,
           message: `Error al consultar la lista de ${entityPlural}.`,
@@ -68,7 +68,7 @@ function createCatalogHandlers({ manager, listKey, itemKey, entityPlural, entity
             message: error.message,
           });
         }
-        console.error(`[AdminController] Error al crear ${entitySingular.toLowerCase()}:`, error.message);
+        console.error(`[AdminController] Error interno al crear ${entitySingular.toLowerCase()}.`);
         return res.status(500).json({
           success: false,
           message: `Error al registrar la nueva ${entitySingular.toLowerCase()}.`,
@@ -90,7 +90,7 @@ function createCatalogHandlers({ manager, listKey, itemKey, entityPlural, entity
             message: error.message,
           });
         }
-        console.error(`[AdminController] Error al eliminar ${entitySingular.toLowerCase()}:`, error.message);
+        console.error(`[AdminController] Error interno al eliminar ${entitySingular.toLowerCase()}.`);
         return res.status(500).json({
           success: false,
           message: `Error al eliminar la ${entitySingular.toLowerCase()}.`,

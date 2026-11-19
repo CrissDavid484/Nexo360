@@ -130,6 +130,8 @@ const filterCatalogByName = (sortedItems, search) => {
 const isNumericRutMatch = (rut, searchTerm) =>
   Boolean(searchTerm && /\d/.test(searchTerm) && rut && matchesRutQuery(rut, searchTerm));
 
+const getDirectorySortKey = (u) => (u.fullName || u.nombre || u.email || '').trim();
+
 /**
  * Filtra y ordena alfabéticamente usuarios del directorio institucional reutilizando matchesRutQuery.
  */
@@ -153,9 +155,9 @@ function filterAndSortDirectoryUsers(users, searchTerm, extraPredicate) {
       return matchesSearch && extraPredicate(u);
     })
     .sort((a, b) => {
-      const nameA = (a.fullName || a.nombre || a.email || '').trim();
-      const nameB = (b.fullName || b.nombre || b.email || '').trim();
-      const cmp = nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      const cmp = getDirectorySortKey(a).localeCompare(getDirectorySortKey(b), 'es', {
+        sensitivity: 'base',
+      });
       return cmp !== 0 ? cmp : (a.rut || '').localeCompare(b.rut || '');
     });
 }
@@ -1133,47 +1135,42 @@ export const AdminPanelView = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <CatalogCrudCard
-              kind="careers"
-              items={filteredCareersCrud}
-              totalCount={sortedCareers.length}
-              newInput={catalogState.careers.newInput}
-              searchValue={catalogState.careers.search}
-              onNewInputChange={(val) => updateCatalogField('careers', { newInput: val })}
-              onSearchChange={(val) => updateCatalogField('careers', { search: val })}
-              onAddSubmit={(e) => {
-                handleCatalogAdd('careers', e).catch((err) => {
-                  console.error('[AdminPanelView] Error agregando carrera:', err);
-                });
-              }}
-              onDeleteItem={(item) => {
-                handleCatalogDelete('careers', item).catch((err) => {
-                  console.error('[AdminPanelView] Error eliminando carrera:', err);
-                });
-              }}
-              getVoiceProps={getVoiceProps}
-            />
-
-            <CatalogCrudCard
-              kind="sedes"
-              items={filteredSedesCrud}
-              totalCount={sortedSedes.length}
-              newInput={catalogState.sedes.newInput}
-              searchValue={catalogState.sedes.search}
-              onNewInputChange={(val) => updateCatalogField('sedes', { newInput: val })}
-              onSearchChange={(val) => updateCatalogField('sedes', { search: val })}
-              onAddSubmit={(e) => {
-                handleCatalogAdd('sedes', e).catch((err) => {
-                  console.error('[AdminPanelView] Error agregando sede:', err);
-                });
-              }}
-              onDeleteItem={(item) => {
-                handleCatalogDelete('sedes', item).catch((err) => {
-                  console.error('[AdminPanelView] Error eliminando sede:', err);
-                });
-              }}
-              getVoiceProps={getVoiceProps}
-            />
+            {[
+              {
+                kind: 'careers',
+                label: 'carrera',
+                items: filteredCareersCrud,
+                totalCount: sortedCareers.length,
+              },
+              {
+                kind: 'sedes',
+                label: 'sede',
+                items: filteredSedesCrud,
+                totalCount: sortedSedes.length,
+              },
+            ].map(({ kind, label, items, totalCount }) => (
+              <CatalogCrudCard
+                key={kind}
+                kind={kind}
+                items={items}
+                totalCount={totalCount}
+                newInput={catalogState[kind].newInput}
+                searchValue={catalogState[kind].search}
+                onNewInputChange={(val) => updateCatalogField(kind, { newInput: val })}
+                onSearchChange={(val) => updateCatalogField(kind, { search: val })}
+                onAddSubmit={(e) => {
+                  handleCatalogAdd(kind, e).catch((err) => {
+                    console.error(`[AdminPanelView] Error agregando ${label}:`, err);
+                  });
+                }}
+                onDeleteItem={(item) => {
+                  handleCatalogDelete(kind, item).catch((err) => {
+                    console.error(`[AdminPanelView] Error eliminando ${label}:`, err);
+                  });
+                }}
+                getVoiceProps={getVoiceProps}
+              />
+            ))}
           </div>
         </section>
       )}

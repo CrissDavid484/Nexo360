@@ -135,25 +135,10 @@ export const CARRERAS_DUOC = CAREER_DEFINITIONS.map((def) => ({
   ...def,
 }));
 
-const BLOQUE_RANGES = [
-  ['b1', '08:31', '09:10'],
-  ['b2', '09:11', '09:50'],
-  ['b3', '10:01', '10:40'],
-  ['b4', '10:41', '11:20'],
-  ['b5', '11:31', '12:10'],
-  ['b6', '12:11', '12:50'],
-  ['b7', '13:01', '13:40'],
-  ['b8', '14:31', '15:10'],
-  ['b9', '15:11', '15:50'],
-  ['b10', '16:01', '16:40'],
-  ['b11', '16:41', '17:20'],
-  ['b12', '17:31', '18:10'],
-  ['b13', '18:11', '18:50'],
-  ['b14', '19:01', '19:40'],
-  ['b15', '19:41', '20:20'],
-  ['b16', '20:31', '21:10'],
-  ['b17', '21:11', '21:50'],
-];
+const BLOQUE_RANGES =
+  'b1,08:31,09:10|b2,09:11,09:50|b3,10:01,10:40|b4,10:41,11:20|b5,11:31,12:10|b6,12:11,12:50|b7,13:01,13:40|b8,14:31,15:10|b9,15:11,15:50|b10,16:01,16:40|b11,16:41,17:20|b12,17:31,18:10|b13,18:11,18:50|b14,19:01,19:40|b15,19:41,20:20|b16,20:31,21:10|b17,21:11,21:50'
+    .split('|')
+    .map((row) => row.split(','));
 
 export const BLOQUES_HORARIOS_TOMA = BLOQUE_RANGES.map(([id, start, end]) => ({
   id,
@@ -469,22 +454,17 @@ export const ASIGNATURAS_DISPONIBLES = [
   ),
 ];
 
-const SCHEDULE_DAY_MAP = {
-  lu: 'Lunes',
-  ma: 'Martes',
-  mi: 'Miércoles',
-  ju: 'Jueves',
-  vi: 'Viernes',
-  sa: 'Sábado',
-  do: 'Domingo',
-  lunes: 'Lunes',
-  martes: 'Martes',
-  miercoles: 'Miércoles',
-  miércoles: 'Miércoles',
-  jueves: 'Jueves',
-  viernes: 'Viernes',
-  sabado: 'Sábado',
-  sábado: 'Sábado',
+const DAY_PREFIXES = ['lu', 'ma', 'mi', 'ju', 'vi', 'sa', 'do'];
+const DAY_LABELS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+const resolveScheduleDay = (rawDay) => {
+  const normalized = (rawDay || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .slice(0, 2);
+  const idx = DAY_PREFIXES.indexOf(normalized);
+  return idx >= 0 ? DAY_LABELS[idx] : 'Lunes';
 };
 
 const toMinutes = (timeStr) => {
@@ -504,7 +484,7 @@ export function parseDuocSchedule(scheduleStr, sala = 'ONLINE') {
 
   if (!match) return [];
 
-  const day = SCHEDULE_DAY_MAP[match[1].toLowerCase()] || 'Lunes';
+  const day = resolveScheduleDay(match[1]);
   const startMin = toMinutes(match[2]);
   const endMin = toMinutes(match[3]);
   const targetSala = sala || 'ONLINE';
@@ -816,48 +796,26 @@ const fillPackageCourses = ({ courses, selected, occupiedSlots, limit, filterBlo
   }
 };
 
-const PACKAGE_SHIFT_CONFIGS = [
-  {
-    id: 'pkg-manana',
-    name: 'Paquete 1: Bloque Diurno Mañana',
-    badge: 'Jornada Mañana',
-    jornada: 'Diurno',
-    color: 'emerald',
-    buildDesc: (diffBadge) =>
-      `Cursos en horario matutino (08:31 - 12:50 hrs). ${diffBadge} coordinados sin topes.`,
-    filterBlock: (bId) => ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'].includes(bId),
-  },
-  {
-    id: 'pkg-media-tarde',
-    name: 'Paquete 2: Bloque Media Tarde',
-    badge: 'Media Tarde',
-    jornada: 'Diurno',
-    color: 'blue',
-    buildDesc: () =>
-      'Cursos planificados entre 13:01 y 16:40 hrs. Diseñado para evitar traslados matutinos.',
-    filterBlock: (bId) => ['b7', 'b8', 'b9', 'b10'].includes(bId),
-  },
-  {
-    id: 'pkg-tarde',
-    name: 'Paquete 3: Bloque Tarde',
-    badge: 'Jornada Tarde',
-    jornada: 'Diurno',
-    color: 'amber',
-    buildDesc: () =>
-      'Cursos en la segunda mitad de la tarde (16:41 - 19:40 hrs). Ideal para liberar mañanas.',
-    filterBlock: (bId) => ['b11', 'b12', 'b13', 'b14'].includes(bId),
-  },
-  {
-    id: 'pkg-vespertino',
-    name: 'Paquete 4: Bloque Vespertino',
-    badge: 'Jornada Vespertina',
-    jornada: 'Vespertino',
-    color: 'purple',
-    buildDesc: () =>
-      'Asignaturas en horario vespertino (19:01 - 21:50 hrs). Compatibilidad laboral garantizada.',
-    filterBlock: (bId) => ['b14', 'b15', 'b16', 'b17'].includes(bId),
-  },
+const PACKAGE_SHIFT_RAW = [
+  'pkg-manana|Paquete 1: Bloque Diurno Mañana|Jornada Mañana|Diurno|emerald|b1,b2,b3,b4,b5,b6|Cursos en horario matutino (08:31 - 12:50 hrs). {DIFF} coordinados sin topes.',
+  'pkg-media-tarde|Paquete 2: Bloque Media Tarde|Media Tarde|Diurno|blue|b7,b8,b9,b10|Cursos planificados entre 13:01 y 16:40 hrs. Diseñado para evitar traslados matutinos.',
+  'pkg-tarde|Paquete 3: Bloque Tarde|Jornada Tarde|Diurno|amber|b11,b12,b13,b14|Cursos en la segunda mitad de la tarde (16:41 - 19:40 hrs). Ideal para liberar mañanas.',
+  'pkg-vespertino|Paquete 4: Bloque Vespertino|Jornada Vespertina|Vespertino|purple|b14,b15,b16,b17|Asignaturas en horario vespertino (19:01 - 21:50 hrs). Compatibilidad laboral garantizada.',
 ];
+
+const PACKAGE_SHIFT_CONFIGS = PACKAGE_SHIFT_RAW.map((entry) => {
+  const [id, name, badge, jornada, color, blocksCsv, descTemplate] = entry.split('|');
+  const allowedBlocks = new Set(blocksCsv.split(','));
+  return {
+    id,
+    name,
+    badge,
+    jornada,
+    color,
+    buildDesc: (diffBadge) => descTemplate.replace('{DIFF}', diffBadge),
+    filterBlock: (bId) => allowedBlocks.has(bId),
+  };
+});
 
 /**
  * Genera los paquetes objetivos predefinidos (Mañana, Media Tarde, Tarde y Vespertino)
