@@ -1,5 +1,5 @@
-# Imagen ligera y segura basada en Alpine Linux
-FROM node:20-alpine
+# Imagen ligera y segura basada en Alpine Linux (Node >= 20.19 requerido por Mongoose 9 / MongoDB 7.9)
+FROM node:22-alpine
 
 # Directorio de trabajo de la aplicación
 WORKDIR /app

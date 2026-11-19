@@ -20,7 +20,7 @@ services:
       start_period: 10s
 
   # =====================================================================
-  # 2. CONTENEDOR DE BACKEND API (Node.js + Express + Mongoose)
+  # 2. CONTENEDOR DE BACKEND API (Node.js 22 + Express + Mongoose 9)
   # =====================================================================
   backend:
     build:
@@ -35,7 +35,6 @@ services:
       - PORT=5000
       - MONGODB_URI=mongodb://mongodb:27017/nexo360
       - JWT_SECRET=${JWT_SECRET:-nexo360_duoc_paedis_secret_key_wcag_2026}
-      - MOCK_PUPPETEER=true
       - FRONTEND_URL=http://localhost:5173
     volumes:
       - ./backend:/app

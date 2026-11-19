@@ -30,7 +30,8 @@ Thumbs.db
 # Archivos locales de Graphify
 graphify-out/
 .graphifyignore
-# Playwright CLI output (may contain credentials)
+# Playwright CLI & output (may contain credentials/traces)
+.playwright/
 .playwright-cli/
 
 # Ponytail local

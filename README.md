@@ -1,77 +1,112 @@
-# Nexo360 • Plataforma One-Stop-Shop Duoc UC - Sede Alameda (PAEDIS)
+# Nexo360 • Duoc UC - Sede Alameda (PAEDIS)
 
-> **Proyecto Oficial Capstone 2026 • Plataforma Institucional: Duoc UC - Sede Alameda**  
-> Plataforma web centralizada, accesible (**WCAG 2.2 AA / AAA**) y conforme a la **Ley N° 21.719 de Protección de Datos Personales**, diseñada para estudiantes y comunidad del **Programa de Apoyo a Estudiantes con Discapacidad (PAEDIS)** de **Duoc UC - Sede Alameda**.
+Plataforma One-Stop-Shop institucional para **Duoc UC - Sede Alameda**, orientada a estudiantes del **Programa de Apoyo a Estudiantes con Discapacidad (PAEDIS)**, coordinación de inclusión y administración académica. Implementa accesibilidad **WCAG 2.2 AA / AAA**, protección de datos personales conforme a la **Ley N° 21.719** y una arquitectura modular **DRY / SRP**.
 
 ---
 
-## 📁 Estructura del Proyecto
+## Stack Tecnológico
+
+- **Backend:** Node.js (`>= 20.19`, Docker `node:22-alpine`), Express 4, Mongoose 9 (`9.12.2`), MongoDB 7 (driver `7.9.0`), `bcryptjs`, `jsonwebtoken` (HS256), `node-xlsx`.
+- **Frontend:** React 18, Vite 6, React Router 7, Tailwind CSS 3, Lucide React.
+- **Calidad y Testing:** `node --test` (60 tests backend + 10 tests simulador frontend), SonarQube (`sonar-project.properties`), Docker Compose.
+
+---
+
+## Estructura del Proyecto
 
 ```text
 Nexo360/
-├── docker-compose.yml            # Orquestación Docker (MongoDB 7, Backend, Frontend)
-├── README.md                     # Guía general y puesta en marcha
-├── NEXO360_ARCHITECTURE.md       # Especificación arquitectónica, WCAG 2.2 y DRY/SRP
+├── docker-compose.yml              # Orquestación MongoDB 7 + Backend + Frontend
+├── sonar-project.properties        # Configuración de análisis estático y exclusiones
+├── README.md                       # Documentación general, arquitectura y operación
 │
-├── backend/                      # API REST Node.js + Express + Mongoose (MongoDB)
-│   ├── config/
-│   │   └── db.js                 # Conexión resiliente a MongoDB y sembrado inicial
-│   ├── controllers/
-│   │   ├── adminController.js    # Gestión estudiantil, métricas, cursos y alertas SAT
-│   │   ├── authController.js     # Login cifrado, SSO, perfil, accesibilidad y toma de ramos
-│   │   └── moduleController.js   # Consulta de módulos institucionales Sede Alameda
+├── backend/                        # API REST Node.js + Express + Mongoose 9
+│   ├── server.js                   # Punto de entrada, cabeceras OWASP, CORS y /api/health
+│   ├── Dockerfile                  # Imagen Node 22 Alpine (usuario no-root + healthcheck)
+│   ├── config/db.js                # Conexión resiliente a MongoDB + sembrado inicial con await
+│   ├── controllers/                # adminController, authController, moduleController
 │   ├── data/
-│   │   ├── alameda2026Seed.json  # Catálogo oficial Alameda 2026-002 (7.174 ofertas)
-│   │   ├── alameda2026Summary.json
-│   │   ├── institutionalModules.json # 9 categorías institucionales y apoyos PAEDIS
-│   │   ├── seedCourseRows.json   # Respaldo liviano de oferta académica
-│   │   └── seedUsers.json        # Perfiles semilla institucionales (Sede Alameda)
-│   ├── middleware/
-│   │   ├── authMiddleware.js     # Verificación JWT HS256 y control de roles RBAC
-│   │   └── rateLimitMiddleware.js# Limitación de tasa en memoria (OWASP A04)
-│   ├── models/
-│   │   ├── ActivityLog.js        # Auditoría de acciones y eventos SAT
-│   │   ├── Career.js             # Catálogo dinámico de carreras Duoc UC
-│   │   ├── CourseOffering.js     # Oferta de secciones y bloques horarios
-│   │   ├── Sede.js               # Catálogo dinámico de sedes (semilla: Sede Alameda)
-│   │   └── UserProfile.js        # Perfil, ajustes PAEDIS, Ley 21.719 y accesibilidad
-│   ├── routes/
-│   │   ├── adminRoutes.js        # /api/admin
-│   │   ├── authRoutes.js         # /api/auth
-│   │   ├── courseRoutes.js       # /api/courses
-│   │   └── moduleRoutes.js       # /api/modules
-│   ├── scripts/
-│   │   ├── parseAlamedaMd.js     # Reconstructor de catálogo Alameda 2026-002 desde MD
-│   │   └── syncPasswords.js      # Sincronización segura de hashes bcrypt en BD
-│   ├── services/
-│   │   ├── authService.js        # Autenticación bcrypt, SSO Microsoft y sesiones
-│   │   ├── catalogService.js     # Factoría CRUD DRY para Carreras y Sedes
-│   │   ├── courseService.js      # Consulta, agrupación e importación de cursos
-│   │   ├── excelParserService.js # Ingesta XLSX / Markdown / JSON de oferta académica
-│   │   ├── predictiveRiskService.js # Motor predictivo de retención vs. deserción
-│   │   └── satAlertService.js    # Sistema de Alerta Temprana (SAT) y Ficha 360
-│   ├── utils/
-│   │   ├── courseScheduleUtils.js# Bloques horarios oficiales Duoc UC (b1-b18)
-│   │   └── validationUtils.js    # Validadores, sanitización, RUT y defaults A11y
-│   └── tests/                    # Suite de pruebas automatizadas (node --test)
+│   │   ├── alameda2026Seed.json    # Catálogo oficial Alameda 2026-002 (7.174 ofertas)
+│   │   ├── alameda2026Summary.json # Resumen estadístico de carreras y secciones
+│   │   ├── institutionalModules.json # 9 categorías de ayuda y apoyos PAEDIS
+│   │   ├── seedCourseRows.json     # Respaldo liviano de oferta académica
+│   │   └── seedUsers.json          # 14 perfiles semilla Sede Alameda (estudiantes, PAEDIS y staff)
+│   ├── middleware/                 # authMiddleware (JWT/RBAC), rateLimitMiddleware (OWASP A04)
+│   ├── models/                     # UserProfile, CourseOffering, Career, Sede, ActivityLog
+│   ├── routes/                     # /api/auth, /api/admin, /api/courses, /api/modules
+│   ├── scripts/                    # parseAlamedaMd.js, syncPasswords.js
+│   ├── services/                   # authService, catalogService, courseService, excelParserService,
+│   │                               # predictiveRiskService, satAlertService
+│   ├── utils/                      # validationUtils (XSS/NoSQL/RUT/A11y), courseScheduleUtils (b1-b18)
+│   └── tests/                      # 7 suites automatizadas (node --test)
 │
-└── frontend/                     # Aplicación React 18 + Vite + Tailwind CSS WCAG 2.2
-    ├── index.html                # Documento accesible con soporte OpenDyslexic
+└── frontend/                       # SPA React 18 + Vite 6 + Tailwind CSS
+    ├── Dockerfile                  # Imagen Node 20 Alpine (Vite dev server)
+    ├── index.html                  # Soporte tipográfico OpenDyslexic
     └── src/
-        ├── components/           # Auth, Common (AccessibilityBar, VoiceReaderObserver), Dashboard, Admin, Simulador y Vistas
-        ├── context/              # AccessibilityContext (incluye Lectura por Voz TTS) y AuthContext
-        ├── hooks/                # Hooks reutilizables (useAccessibleModal, useOnClickOutside)
-        ├── pages/                # LoginPage, DashboardPage, NotFoundPage
-        ├── data/                 # Módulos Duoc UC Sede Alameda y datos del Simulador
-        ├── services/             # Cliente HTTP API (/api)
-        └── utils/                # speechService (Web Speech API), satUtils, studentUtils y parser MD
+        ├── App.jsx                 # Enrutamiento protegido, lazy loading y VoiceReaderObserver
+        ├── context/                # AuthContext, AccessibilityContext (TTS, contraste, fuente, guía)
+        ├── hooks/                  # useAccessibleModal, useOnClickOutside
+        ├── pages/                  # LoginPage, DashboardPage, NotFoundPage
+        ├── data/                   # duocModulesData, infrastructureCatalog.json, tomaRamosData
+        ├── services/api.js         # Cliente HTTP (/api)
+        ├── utils/                  # speechService, satUtils, studentUtils, dashboardSearchUtils,
+        │                           # lazyLoad, markdownScheduleParser
+        ├── components/
+        │   ├── admin/              # PaedisCaseManagementSection, EarlyWarningSatSection,
+        │   │                       # CoursesAdminSection, CoursesCatalogTable, MarkdownPreviewModal
+        │   ├── auth/               # LoginForm, DemoAccountsSelector, MfaPrompt
+        │   ├── common/             # UnifiedNavbar, AccessibilityBar, VoiceReaderObserver,
+        │   │                       # ReadingGuideOverlay, ThemeCurtainOverlay, LiveAnnouncer,
+        │   │                       # SkipLink, ErrorBoundary
+        │   ├── dashboard/          # SearchBar, ModuleCard, ModuleModal
+        │   ├── simulation/         # TomaRamosSimulator, SapSelectBoxIcon
+        │   └── views/              # AdminPanelView, PerfilView, BibliotecaView,
+        │                           # VivoDuocSummaryView, ServiciosDigitalesTicketsView
+        └── tests/                  # dashboardSimulatorTest.mjs (10 verificaciones)
 ```
 
 ---
 
-## 🚀 Cómo Ejecutar
+## Funcionalidades Clave
 
-### Opción A: Docker Compose (Entorno Completo)
+### 1. Simulador de Toma de Ramos (SAP SICOL)
+- Alimentado por la oferta oficial **Alameda 2026-002** (`7.174` ofertas consolidables en `2.389` secciones y bloques `b1`–`b18`).
+- Soporta **Modo Guiado** y **Modo Realista** en 4 niveles de dificultad (`Fácil`, `Intermedio`, `Difícil`, `Muy Difícil`), con panel lateral derecho fijo (**Hoja de Ruta de Referencia**) y emisión de **Boletín Oficial** imprimible.
+- Control de acceso mediante `isRegisteredInDb`: usuarios no registrados en BD reciben `403 SIMULATOR_ACCESS_DENIED_NOT_REGISTERED` al intentar operar el simulador.
+
+### 2. Panel Administrativo, SAT y Centro de Operaciones PAEDIS
+- **Directorio Unificado:** selector compacto entre **Estudiantes** y **Administrativos**, con filtro de búsqueda por nombre, RUT o sede y orden alfabético.
+- **Gestión PAEDIS & Ajustes Razonables (`PaedisCaseManagementSection`):** ciclo de vida completo de casos (barrera, acreditación RND/COMPIN, tutor par, notas confidenciales y ajustes aprobados) y emisión trazable de **Ficha Docente Confidencial** con acuses de recibo conforme a la Ley N° 21.719.
+- **Sistema de Alerta Temprana (`EarlyWarningSatSection`) y Semáforo Predictivo:** evaluación por asignatura (`< 70% RI / Alto Riesgo`, `70-75% Moderado`, `> 75% Bajo Riesgo`), simulación de cortes semanales SAP y registro de intervenciones Ficha 360.
+- **Catálogos Dinámicos:** CRUD de Carreras y Sedes (`catalogService`) e ingesta masiva de oferta académica desde archivos `.xlsx` y `.md` (`excelParserService`).
+
+### 3. Accesibilidad WCAG 2.2 AA/AAA y Autonomía No Vidente
+- **Botón Flotante Retráctil (`AccessibilityBar`):** acoplado en la esquina inferior derecha (`Ajustes de accesibilidad`) con despliegue suave por hover, foco o estado abierto.
+- **Lectura en Voz Alta (`voiceReader`):** síntesis de voz en español (`Web Speech API`) disparada en `onFocus` y `onMouseEnter`, lectura automática de anuncios `announce()`, sufijos semánticos ARIA (`VoiceReaderObserver`), atajo global `Alt + V` y cancelación con `Escape`.
+- **MFA Accesible (`MfaPrompt`):** extiende el tiempo de espera cuando `voiceReader` está activo e incluye botón para repetir el código en voz alta.
+- **Preferencias Persistentes (`PUT /api/auth/accessibility`):** `fontSize`, `highContrast`, `dyslexicFont` (OpenDyslexic), `reducedMotion`, `readingGuide` (`ReadingGuideOverlay` en `z-[9999]`), `voiceReader` y `screenReaderOptimized`.
+
+---
+
+## Seguridad, Cumplimiento Ley N° 21.719 y API REST
+
+- **Protección de Datos y Autenticación:** contraseñas cifradas con `bcryptjs` mediante hook `pre('save')` en Mongoose 9, eliminación de `password` y `__v` en `toJSON`/`toObject`, metadatos de consentimiento ARCO y limitación de finalidad (`purposeLimitation`).
+- **Hardening API:** JWT `HS256`, RBAC (`requireAdmin`, `requireAdminOrCoordinator`), `rateLimitMiddleware` en login/MFA, cabeceras de seguridad OWASP, sanitización XSS/NoSQL/ReDoS y prevención de **Log Injection** en controladores.
+
+| Recurso | Rutas principales | Acceso |
+| :--- | :--- | :--- |
+| Salud API | `GET /api/health` | Público |
+| Autenticación y Perfil | `POST /api/auth/login`, `POST /api/auth/sso-login`, `GET /api/auth/me`, `PUT /api/auth/accessibility`, `GET/POST/PUT /api/auth/toma-ramos` | Público / JWT |
+| Módulos Institucionales | `GET /api/modules`, `GET /api/modules/:key` | Público (caché MongoDB) |
+| Oferta Académica | `GET /api/courses`, `GET /api/courses/careers`, `POST /api/courses/import` | Token opcional / Admin-Coord |
+| Administración, SAT y PAEDIS | `GET /api/admin/metrics`, CRUD `/students`, `/courses/*`, `/careers`, `/sedes`, `/sat-alerts/*`, `PATCH /api/admin/paedis/:id/case` | JWT + Admin o Coord. PAEDIS |
+
+---
+
+## Ejecución y Pruebas
+
+### Opción A: Docker Compose
 ```bash
 docker compose up -d --build
 ```
@@ -80,34 +115,22 @@ docker compose up -d --build
 - **MongoDB:** `localhost:27017/nexo360`
 
 ### Opción B: Ejecución Local
-
-#### 1. Iniciar el Backend
 ```bash
-cd backend
-npm ci --ignore-scripts
-npm start
+# Backend (puerto 5000, con fallback en memoria si MongoDB no está activo)
+cd backend && npm ci --ignore-scripts && npm start
+
+# Frontend (puerto 5173)
+cd frontend && npm ci --ignore-scripts && npm run dev
 ```
-*El servidor corre en `http://localhost:5000` con respaldo en memoria si MongoDB no está activo.*
 
-#### 2. Iniciar el Frontend
+### Validación Automatizada y Build
 ```bash
-cd frontend
-npm ci --ignore-scripts
-npm run dev
-```
-*La aplicación queda disponible en `http://localhost:5173`.*
-
-### 3. Ejecutar Pruebas Backend
-```bash
+# Suite Backend (60 pruebas en 7 archivos)
 npm test --prefix backend
+
+# Verificación del Simulador Frontend (10 pruebas)
+node frontend/src/tests/dashboardSimulatorTest.mjs
+
+# Build de producción Frontend
+npm run build --prefix frontend
 ```
-
----
-
-## ♿ Características Principales y Cumplimiento
-
-- **Plataforma Oficial Duoc UC - Sede Alameda**: Perfiles iniciales, oferta académica oficial Alameda 2026-002 (incluyendo optativos virtuales sincrónicos), biblioteca accesible, guías y endpoints alineados a Sede Alameda.
-- **Modo Lectura por Voz (TTS WCAG 2.2)**: Nuevo toggle persistente `voiceReader` (`accessibilityPreferences.voiceReader` en MongoDB + Web Speech API en español en frontend) con lectura asistida al enfocar (`onFocus`) o pasar el cursor (`onMouseEnter`) sobre controles, tarjetas y textos clave, más silenciamiento rápido con `Escape`.
-- **WCAG 2.2 AA / AAA**: Foco visible reforzado, modo Alto Contraste, fuente OpenDyslexic, reducción de movimiento, guía de lectura (`ReadingGuideOverlay`) y región en vivo ARIA (`aria-live`).
-- **Seguridad y Ley N° 21.719**: Autenticación nativa con contraseñas cifradas (`bcryptjs`), tokens JWT HS256, flujo directo SSO institucional, limitación de finalidad, metadatos de consentimiento y eliminación de credenciales en serialización (`toJSON`/`toObject`).
-- **Arquitectura Modular DRY / SRP**: Lógica de negocio desacoplada en servicios especializados (`predictiveRiskService`, `catalogService`, `satAlertService`, `courseService`, `excelParserService`) y utilidades compartidas (`validationUtils`, `courseScheduleUtils`).
