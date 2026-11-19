@@ -307,4 +307,71 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.ok(adminViewCode.includes('PaedisCaseManagementSection'));
     assert.ok(adminViewCode.includes('Gestión PAEDIS & Ajustes'));
   });
+
+  test('9. Registro Institucional: Nombres separados, Contraseña inicial (RUT + inicial apellido), Dominio institucional, Perfil PAEDIS automático y Correo de bienvenida', async () => {
+    const emailService = require('../services/emailService');
+    const prevOutboxCount = emailService.getOutbox().length;
+
+    // 1. Registro de estudiante PAEDIS con nombres separados y dominio @duocuc.cl
+    const studentRes = await request('/api/admin/students', {
+      method: 'POST',
+      headers: adminHeaders,
+      body: {
+        firstName: 'Valentina',
+        paternalLastName: 'Salazar',
+        maternalLastName: 'Rojas',
+        emailLocal: 'v.salazar',
+        emailDomain: 'duocuc.cl',
+        rut: '20.654.321-K',
+        career: 'Ingeniería en Informática',
+        campus: 'Sede Alameda',
+        isPaedis: true,
+        disabilityProfile: 'baja_vision',
+      },
+    });
+
+    assert.equal(studentRes.status, 201);
+    assert.equal(studentRes.body?.success, true);
+    assert.equal(studentRes.body?.user?.fullName, 'Valentina Salazar Rojas');
+    assert.equal(studentRes.body?.user?.email, 'v.salazar@duocuc.cl');
+    assert.equal(studentRes.body?.user?.isPaedis, true);
+    assert.equal(studentRes.body?.user?.disabilityProfile, 'baja_vision');
+    assert.equal(studentRes.body?.user?.accessibilityPreferences?.highContrast, true);
+
+    // 2. Verificar que se envió correo de bienvenida y se registró en outbox
+    const currentOutbox = emailService.getOutbox();
+    assert.ok(currentOutbox.length > prevOutboxCount, 'Debe registrarse correo de bienvenida en outbox');
+    const latestMail = currentOutbox[currentOutbox.length - 1];
+    assert.ok(latestMail.subject.includes('Bienvenido/a a Nexo360'));
+
+    // 3. Login con contraseña inicial autogenerada: 20654321ks (RUT limpio + 's' de Salazar)
+    const loginRes = await request('/api/auth/login', {
+      method: 'POST',
+      body: {
+        email: 'v.salazar@duocuc.cl',
+        password: '20654321ks',
+      },
+    });
+    assert.equal(loginRes.status, 200);
+    assert.equal(loginRes.body?.user?.email, 'v.salazar@duocuc.cl');
+    assert.equal(loginRes.body?.user?.mustChangePassword, true);
+
+    // 4. Registro de funcionario (@profesor.duoc.cl) sin carrera obligatoria
+    const staffRes = await request('/api/admin/students', {
+      method: 'POST',
+      headers: adminHeaders,
+      body: {
+        firstName: 'Andrés',
+        paternalLastName: 'Navarro',
+        emailLocal: 'a.navarro',
+        emailDomain: 'profesor.duoc.cl',
+        rut: '16.789.012-3',
+        role: 'coordinador_paedis',
+        campus: 'Sede Alameda',
+      },
+    });
+    assert.equal(staffRes.status, 201);
+    assert.equal(staffRes.body?.user?.role, 'coordinador_paedis');
+    assert.equal(staffRes.body?.user?.career || '', '');
+  });
 });

@@ -645,3 +645,357 @@ html.reduced-motion *::after {
   white-space: normal;
   z-index: 9999;
 }
+
+/* ==========================================================================
+   10. MODOS DE DALTONISMO (PALETAS SEGURAS OKABE-ITO + INDICADORES DE BORDE)
+   ========================================================================== */
+
+/* 10.1 Protanopia (déficit rojo): Rojo -> Vermilion/Naranjo punteado; Verde -> Azul sólido; Ámbar -> Amarillo alto contraste */
+html.cb-protanopia .bg-red-50,
+html.cb-protanopia .bg-red-100 {
+  background-color: #FFF1E6 !important;
+  color: #9A3412 !important;
+  border-color: #D55E00 !important;
+  border-style: dashed !important;
+  border-width: 2px !important;
+}
+
+html.cb-protanopia .bg-red-600 {
+  background-color: #D55E00 !important;
+}
+
+html.cb-protanopia .text-red-600,
+html.cb-protanopia .text-red-700,
+html.cb-protanopia .text-red-800,
+html.cb-protanopia .text-red-900 {
+  color: #9A3412 !important;
+}
+
+html.cb-protanopia .border-red-200,
+html.cb-protanopia .border-red-300 {
+  border-color: #D55E00 !important;
+  border-style: dashed !important;
+}
+
+html.cb-protanopia .bg-emerald-50,
+html.cb-protanopia .bg-emerald-50\/80,
+html.cb-protanopia .bg-emerald-100 {
+  background-color: #E6F2FA !important;
+  color: #004473 !important;
+  border-color: #0072B2 !important;
+  border-style: solid !important;
+}
+
+html.cb-protanopia .bg-emerald-600 {
+  background-color: #0072B2 !important;
+}
+
+html.cb-protanopia .text-emerald-600,
+html.cb-protanopia .text-emerald-700,
+html.cb-protanopia .text-emerald-800,
+html.cb-protanopia .text-emerald-900 {
+  color: #004473 !important;
+}
+
+html.cb-protanopia .border-emerald-200,
+html.cb-protanopia .border-emerald-300 {
+  border-color: #0072B2 !important;
+  border-style: solid !important;
+}
+
+html.cb-protanopia .bg-amber-50,
+html.cb-protanopia .bg-amber-50\/70,
+html.cb-protanopia .bg-amber-100 {
+  background-color: #FEF9C3 !important;
+  color: #713F12 !important;
+  border-color: #B45309 !important;
+  border-style: dotted !important;
+  border-width: 2px !important;
+}
+
+html.cb-protanopia .bg-amber-500 {
+  background-color: #E69F00 !important;
+}
+
+html.cb-protanopia .text-amber-600,
+html.cb-protanopia .text-amber-700,
+html.cb-protanopia .text-amber-800,
+html.cb-protanopia .text-amber-900 {
+  color: #713F12 !important;
+}
+
+/* 10.2 Deuteranopia (déficit verde): Rojo -> Vermilion guionado; Verde -> Azul sólido; Ámbar -> Dorado doble borde; Info -> Índigo */
+html.cb-deuteranopia .bg-red-50,
+html.cb-deuteranopia .bg-red-100 {
+  background-color: #FFF0E5 !important;
+  color: #9A3412 !important;
+  border-color: #D55E00 !important;
+  border-style: dashed !important;
+  border-width: 2px !important;
+}
+
+html.cb-deuteranopia .bg-red-600 {
+  background-color: #D55E00 !important;
+}
+
+html.cb-deuteranopia .text-red-600,
+html.cb-deuteranopia .text-red-700,
+html.cb-deuteranopia .text-red-800,
+html.cb-deuteranopia .text-red-900 {
+  color: #9A3412 !important;
+}
+
+html.cb-deuteranopia .border-red-200,
+html.cb-deuteranopia .border-red-300 {
+  border-color: #D55E00 !important;
+  border-style: dashed !important;
+}
+
+html.cb-deuteranopia .bg-emerald-50,
+html.cb-deuteranopia .bg-emerald-50\/80,
+html.cb-deuteranopia .bg-emerald-100 {
+  background-color: #E5F3FC !important;
+  color: #003F6B !important;
+  border-color: #0072B2 !important;
+  border-style: solid !important;
+  border-width: 2px !important;
+}
+
+html.cb-deuteranopia .bg-emerald-600 {
+  background-color: #0072B2 !important;
+}
+
+html.cb-deuteranopia .text-emerald-600,
+html.cb-deuteranopia .text-emerald-700,
+html.cb-deuteranopia .text-emerald-800,
+html.cb-deuteranopia .text-emerald-900 {
+  color: #003F6B !important;
+}
+
+html.cb-deuteranopia .border-emerald-200,
+html.cb-deuteranopia .border-emerald-300 {
+  border-color: #0072B2 !important;
+  border-style: solid !important;
+}
+
+html.cb-deuteranopia .bg-amber-50,
+html.cb-deuteranopia .bg-amber-50\/70,
+html.cb-deuteranopia .bg-amber-100 {
+  background-color: #FEF3C7 !important;
+  color: #78350F !important;
+  border-color: #B45309 !important;
+  border-style: double !important;
+  border-width: 3px !important;
+}
+
+html.cb-deuteranopia .bg-amber-500 {
+  background-color: #E69F00 !important;
+}
+
+html.cb-deuteranopia .text-amber-600,
+html.cb-deuteranopia .text-amber-700,
+html.cb-deuteranopia .text-amber-800,
+html.cb-deuteranopia .text-amber-900 {
+  color: #78350F !important;
+}
+
+html.cb-deuteranopia .bg-sky-50,
+html.cb-deuteranopia .bg-sky-100,
+html.cb-deuteranopia .bg-blue-50,
+html.cb-deuteranopia .bg-blue-100 {
+  background-color: #EEF2FF !important;
+  color: #312E81 !important;
+  border-color: #4F46E5 !important;
+}
+
+/* 10.3 Tritanopia (déficit azul-amarillo): Rojo -> Magenta guionado; Verde -> Cian profundo sólido; Ámbar -> Coral punteado; Azul -> Pizarra oscura */
+html.cb-tritanopia .bg-red-50,
+html.cb-tritanopia .bg-red-100 {
+  background-color: #FCE7F3 !important;
+  color: #831843 !important;
+  border-color: #BE185D !important;
+  border-style: dashed !important;
+  border-width: 2px !important;
+}
+
+html.cb-tritanopia .bg-red-600 {
+  background-color: #BE185D !important;
+}
+
+html.cb-tritanopia .text-red-600,
+html.cb-tritanopia .text-red-700,
+html.cb-tritanopia .text-red-800,
+html.cb-tritanopia .text-red-900 {
+  color: #831843 !important;
+}
+
+html.cb-tritanopia .border-red-200,
+html.cb-tritanopia .border-red-300 {
+  border-color: #BE185D !important;
+  border-style: dashed !important;
+}
+
+html.cb-tritanopia .bg-emerald-50,
+html.cb-tritanopia .bg-emerald-50\/80,
+html.cb-tritanopia .bg-emerald-100 {
+  background-color: #CCFBF1 !important;
+  color: #115E59 !important;
+  border-color: #0F766E !important;
+  border-style: solid !important;
+}
+
+html.cb-tritanopia .bg-emerald-600 {
+  background-color: #0F766E !important;
+}
+
+html.cb-tritanopia .text-emerald-600,
+html.cb-tritanopia .text-emerald-700,
+html.cb-tritanopia .text-emerald-800,
+html.cb-tritanopia .text-emerald-900 {
+  color: #115E59 !important;
+}
+
+html.cb-tritanopia .border-emerald-200,
+html.cb-tritanopia .border-emerald-300 {
+  border-color: #0F766E !important;
+  border-style: solid !important;
+}
+
+html.cb-tritanopia .bg-amber-50,
+html.cb-tritanopia .bg-amber-50\/70,
+html.cb-tritanopia .bg-amber-100 {
+  background-color: #FFEDD5 !important;
+  color: #9A3412 !important;
+  border-color: #D55E00 !important;
+  border-style: dotted !important;
+  border-width: 2px !important;
+}
+
+html.cb-tritanopia .bg-amber-500 {
+  background-color: #D55E00 !important;
+}
+
+html.cb-tritanopia .text-amber-600,
+html.cb-tritanopia .text-amber-700,
+html.cb-tritanopia .text-amber-800,
+html.cb-tritanopia .text-amber-900 {
+  color: #9A3412 !important;
+}
+
+html.cb-tritanopia .bg-sky-50,
+html.cb-tritanopia .bg-sky-100,
+html.cb-tritanopia .bg-blue-50,
+html.cb-tritanopia .bg-blue-100 {
+  background-color: #E2E8F0 !important;
+  color: #0F172A !important;
+  border-color: #334155 !important;
+}
+
+html.cb-tritanopia .bg-sky-500 {
+  background-color: #0E7490 !important;
+}
+
+html.cb-tritanopia .text-sky-700,
+html.cb-tritanopia .text-sky-900,
+html.cb-tritanopia .text-blue-700 {
+  color: #0F172A !important;
+}
+
+/* 10.4 Coexistencia limpia Alto Contraste + Modos de Daltonismo */
+html.high-contrast.cb-protanopia .bg-red-50,
+html.high-contrast.cb-protanopia .bg-red-100,
+html.high-contrast.cb-deuteranopia .bg-red-50,
+html.high-contrast.cb-deuteranopia .bg-red-100 {
+  background-color: #1E293B !important;
+  color: #FF9F68 !important;
+  border-color: #FF9F68 !important;
+  border-style: dashed !important;
+}
+
+html.high-contrast.cb-protanopia .text-red-600,
+html.high-contrast.cb-protanopia .text-red-700,
+html.high-contrast.cb-deuteranopia .text-red-600,
+html.high-contrast.cb-deuteranopia .text-red-700 {
+  color: #FF9F68 !important;
+}
+
+html.high-contrast.cb-protanopia .bg-emerald-50,
+html.high-contrast.cb-protanopia .bg-emerald-100,
+html.high-contrast.cb-deuteranopia .bg-emerald-50,
+html.high-contrast.cb-deuteranopia .bg-emerald-100 {
+  background-color: #1E293B !important;
+  color: #7DD3FC !important;
+  border-color: #7DD3FC !important;
+  border-style: solid !important;
+}
+
+html.high-contrast.cb-protanopia .text-emerald-600,
+html.high-contrast.cb-protanopia .text-emerald-700,
+html.high-contrast.cb-deuteranopia .text-emerald-600,
+html.high-contrast.cb-deuteranopia .text-emerald-700 {
+  color: #7DD3FC !important;
+}
+
+html.high-contrast.cb-protanopia .bg-amber-50,
+html.high-contrast.cb-protanopia .bg-amber-100,
+html.high-contrast.cb-deuteranopia .bg-amber-50,
+html.high-contrast.cb-deuteranopia .bg-amber-100 {
+  background-color: #1E293B !important;
+  color: #FDE047 !important;
+  border-color: #FDE047 !important;
+  border-style: dotted !important;
+}
+
+html.high-contrast.cb-tritanopia .bg-red-50,
+html.high-contrast.cb-tritanopia .bg-red-100 {
+  background-color: #1E293B !important;
+  color: #F472B6 !important;
+  border-color: #F472B6 !important;
+  border-style: dashed !important;
+}
+
+html.high-contrast.cb-tritanopia .bg-emerald-50,
+html.high-contrast.cb-tritanopia .bg-emerald-100 {
+  background-color: #1E293B !important;
+  color: #5EEAD4 !important;
+  border-color: #5EEAD4 !important;
+  border-style: solid !important;
+}
+
+html.high-contrast.cb-tritanopia .bg-amber-50,
+html.high-contrast.cb-tritanopia .bg-amber-100 {
+  background-color: #1E293B !important;
+  color: #FDBA74 !important;
+  border-color: #FDBA74 !important;
+  border-style: dotted !important;
+}
+
+/* ==========================================================================
+   11. LECTURA CLARA Y RESUMIDA (TEA / W3C COGA)
+   ========================================================================== */
+html.clear-reading-mode body {
+  letter-spacing: 0.015em;
+  line-height: 1.75;
+}
+
+html.clear-reading-mode p,
+html.clear-reading-mode li {
+  line-height: 1.8 !important;
+  margin-bottom: 0.55rem;
+}
+
+html.clear-reading-mode .uiverse-bento-card,
+html.clear-reading-mode article {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.clear-reading-mode .uiverse-bento-card:hover,
+html.clear-reading-mode article:hover {
+  transform: none !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+}
+
+html.clear-reading-mode .uiverse-status-pill {
+  box-shadow: none !important;
+}

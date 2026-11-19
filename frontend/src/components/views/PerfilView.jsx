@@ -7,11 +7,17 @@ import {
   AlertCircle,
   HeartHandshake,
   Pencil,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
 import { api } from '../../services/api';
+import { getDisabilityProfileMeta } from '../../utils/accessibilityProfiles';
 import {
   DEFAULT_CAMPUS,
   SEDES_DUOC,
@@ -22,6 +28,51 @@ import {
 
 const VALID_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+const STAFF_ROLES_WITHOUT_CAREER = new Set(['admin', 'administrador', 'coordinador_paedis']);
+const PASSWORD_LETTER_REGEX = /[a-zA-Z]/;
+const PASSWORD_DIGIT_REGEX = /\d/;
+
+function isStaffRoleWithoutCareer(rawUser) {
+  const role = String(rawUser?.role || '').toLowerCase().trim();
+  return STAFF_ROLES_WITHOUT_CAREER.has(role);
+}
+
+function validatePasswordChange({ currentPassword, newPassword, confirmNewPassword }) {
+  if (!currentPassword) {
+    return 'Ingresa tu contraseña actual.';
+  }
+  if (!newPassword || newPassword.length < 8) {
+    return 'La nueva contraseña debe tener al menos 8 caracteres.';
+  }
+  if (!PASSWORD_LETTER_REGEX.test(newPassword) || !PASSWORD_DIGIT_REGEX.test(newPassword)) {
+    return 'La nueva contraseña debe incluir al menos una letra y un número.';
+  }
+  if (newPassword === currentPassword) {
+    return 'La nueva contraseña debe ser diferente a la contraseña actual.';
+  }
+  if (newPassword !== confirmNewPassword) {
+    return 'La confirmación no coincide con la nueva contraseña.';
+  }
+  return '';
+}
+
+function getProfileSubtitle({ hideCareer, clearReadingMode, roleLabel, careerLabel, campusLabel }) {
+  if (hideCareer) {
+    return clearReadingMode ? roleLabel : `${roleLabel} • Duoc UC - ${campusLabel}`;
+  }
+  return clearReadingMode ? careerLabel : `${careerLabel} • Duoc UC - ${campusLabel}`;
+}
+
+function getEditModalSubtitle(hideCareer, clearReadingMode, campusLabel) {
+  if (hideCareer) {
+    return clearReadingMode
+      ? 'Actualiza tus datos institucionales.'
+      : `Actualiza tus datos de contacto y sede en ${campusLabel}.`;
+  }
+  return clearReadingMode
+    ? 'Actualiza tus datos y carrera.'
+    : `Actualiza tus datos para personalizar las simulaciones académicas en ${campusLabel}.`;
+}
 
 /**
  * Clasificador estricto de rol institucional para la vista de perfil
@@ -42,7 +93,8 @@ function getInstitutionalRoleLabel(profile) {
 
 function buildPerfilState(rawUser, fallbackPhoto = '') {
   const normalized = normalizeStudentProfile(rawUser || {});
-  const career = normalized.career || 'Ingeniería en Informática';
+  const omitCareer = isStaffRoleWithoutCareer(normalized);
+  const career = omitCareer ? '' : normalized.career || 'Ingeniería en Informática';
   const address = normalized.address || normalized.direccion || 'Por actualizar';
   const phone = normalized.phone || normalized.telefonoPersonal || '+56 9 0000 0000';
   const personalEmail = normalized.personalEmail || normalized.emailPersonal || '';
@@ -63,6 +115,8 @@ function buildPerfilState(rawUser, fallbackPhoto = '') {
     emailPersonal: personalEmail,
     personalEmail,
     photo: normalized.photo || fallbackPhoto || '',
+    disabilityProfile: normalized.disabilityProfile || rawUser?.disabilityProfile || 'ninguna',
+    mustChangePassword: Boolean(rawUser?.mustChangePassword ?? normalized.mustChangePassword),
   };
 }
 
@@ -70,7 +124,7 @@ function toEditFormValues(perfil) {
   return {
     fullName: perfil.nombre || perfil.fullName,
     rut: perfil.rut,
-    career: perfil.career || perfil.carrera,
+    career: perfil.career || perfil.carrera || CARRERAS_DUOC_LIST[0] || '',
     campus: perfil.campus || perfil.sede || DEFAULT_CAMPUS,
     direccion: perfil.direccion || perfil.address,
     telefonoPersonal: perfil.telefonoPersonal || perfil.phone,
@@ -78,8 +132,61 @@ function toEditFormValues(perfil) {
   };
 }
 
+const PasswordInputRow = ({
+  id,
+  label,
+  value,
+  onChange,
+  showValue,
+  onToggleShow,
+  autoComplete,
+  placeholder,
+  inputRef,
+  hint,
+  hintId,
+  voiceLabel,
+}) => (
+  <div>
+    <label htmlFor={id} className="block text-xs font-semibold text-slate-700 mb-1.5">
+      {label}
+    </label>
+    <div className="relative">
+      <input
+        ref={inputRef}
+        id={id}
+        type={showValue ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        aria-describedby={hintId}
+        aria-label={voiceLabel}
+        required
+        className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 pr-10 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+      />
+      <button
+        type="button"
+        onClick={onToggleShow}
+        aria-label={showValue ? `Ocultar ${label.toLowerCase()}` : `Ver ${label.toLowerCase()}`}
+        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-700 cursor-pointer"
+      >
+        {showValue ? (
+          <EyeOff className="w-4 h-4" aria-hidden="true" />
+        ) : (
+          <Eye className="w-4 h-4" aria-hidden="true" />
+        )}
+      </button>
+    </div>
+    {hint && (
+      <p id={hintId} className="text-[11px] text-slate-500 mt-1">
+        {hint}
+      </p>
+    )}
+  </div>
+);
+
 export const PerfilView = () => {
-  const { announce, getVoiceProps } = useAccessibility();
+  const { announce, getVoiceProps, clearReadingMode } = useAccessibility();
   const { user, updateUser } = useAuth();
 
   const [profile, setProfile] = useState(() => buildPerfilState(user));
@@ -91,11 +198,25 @@ export const PerfilView = () => {
   const [photoSuccessAlert, setPhotoSuccessAlert] = useState(false);
   const [photoError, setPhotoError] = useState('');
 
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccessAlert, setPasswordSuccessAlert] = useState(false);
+
   const editButtonRef = useRef(null);
   const modalRef = useRef(null);
   const firstInputRef = useRef(null);
+  const passwordModalRef = useRef(null);
+  const currentPasswordInputRef = useRef(null);
   const saveAlertTimerRef = useRef(null);
   const photoAlertTimerRef = useRef(null);
+  const passwordAlertTimerRef = useRef(null);
   const photoAbortRef = useRef(null);
   const isMountedRef = useRef(true);
 
@@ -105,6 +226,7 @@ export const PerfilView = () => {
       isMountedRef.current = false;
       if (saveAlertTimerRef.current) clearTimeout(saveAlertTimerRef.current);
       if (photoAlertTimerRef.current) clearTimeout(photoAlertTimerRef.current);
+      if (passwordAlertTimerRef.current) clearTimeout(passwordAlertTimerRef.current);
       photoAbortRef.current?.abort();
     };
   }, []);
@@ -123,6 +245,12 @@ export const PerfilView = () => {
     announce('Edición cancelada', 'polite');
   }, [announce]);
 
+  const handleClosePasswordModal = useCallback(() => {
+    setIsPasswordModalOpen(false);
+    setPasswordError('');
+    announce('Cambio de contraseña cancelado', 'polite');
+  }, [announce]);
+
   useAccessibleModal({
     isOpen: isEditing,
     onClose: handleCloseModal,
@@ -131,11 +259,82 @@ export const PerfilView = () => {
     restoreFocus: true,
   });
 
+  useAccessibleModal({
+    isOpen: isPasswordModalOpen,
+    onClose: handleClosePasswordModal,
+    containerRef: passwordModalRef,
+    initialFocusRef: currentPasswordInputRef,
+    restoreFocus: true,
+  });
+
   const scheduleAlertReset = (timerRef, setter) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       if (isMountedRef.current) setter(false);
     }, 4000);
+  };
+
+  const handleOpenPasswordModal = () => {
+    setIsEditing(false);
+    setPasswordError('');
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setShowCurrentPwd(false);
+    setShowNewPwd(false);
+    setShowConfirmPwd(false);
+    setIsPasswordModalOpen(true);
+    announce('Ventana para cambiar contraseña abierta.', 'polite');
+  };
+
+  const handleChangePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+
+    const validationError = validatePasswordChange({
+      currentPassword,
+      newPassword,
+      confirmNewPassword,
+    });
+    if (validationError) {
+      setPasswordError(validationError);
+      announce(validationError, 'assertive');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    announce('Actualizando contraseña institucional...', 'polite');
+
+    try {
+      const res = await api.changePassword({ currentPassword, newPassword });
+      if (!isMountedRef.current) return;
+
+      if (res?.success) {
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmNewPassword('');
+        setIsPasswordModalOpen(false);
+        setProfile((prev) => ({ ...prev, mustChangePassword: false }));
+        updateUser({ mustChangePassword: false });
+        setPasswordSuccessAlert(true);
+        announce('Contraseña actualizada correctamente.', 'polite');
+        scheduleAlertReset(passwordAlertTimerRef, setPasswordSuccessAlert);
+      } else {
+        const msg =
+          res?.message || 'No se pudo cambiar la contraseña. Verifica tu contraseña actual.';
+        setPasswordError(msg);
+        announce(msg, 'assertive');
+      }
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      const msg = err?.message || 'Error de conexión al actualizar la contraseña.';
+      setPasswordError(msg);
+      announce(msg, 'assertive');
+    } finally {
+      if (isMountedRef.current) {
+        setIsChangingPassword(false);
+      }
+    }
   };
 
   const showPhotoSuccessMessage = (message) => {
@@ -147,13 +346,13 @@ export const PerfilView = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+    const omitCareer = isStaffRoleWithoutCareer(user) || isStaffRoleWithoutCareer(profile);
 
     const updatedData = {
       fullName: editForm.fullName.trim(),
       nombre: editForm.fullName.trim(),
       rut: editForm.rut.trim(),
-      career: editForm.career.trim(),
-      carrera: editForm.career.trim(),
+      ...(omitCareer ? {} : { career: editForm.career.trim(), carrera: editForm.career.trim() }),
       campus: editForm.campus.trim() || DEFAULT_CAMPUS,
       sede: editForm.campus.trim() || DEFAULT_CAMPUS,
       direccion: editForm.direccion.trim(),
@@ -258,9 +457,61 @@ export const PerfilView = () => {
   };
 
   const roleLabel = getInstitutionalRoleLabel(profile);
+  const hideCareer = isStaffRoleWithoutCareer(user) || isStaffRoleWithoutCareer(profile);
+  const campusLabel = profile.campus || profile.sede || DEFAULT_CAMPUS;
+  const careerLabel = profile.career || profile.carrera || 'Ingeniería en Informática';
+  const headingVoiceText = hideCareer
+    ? `${profile.nombre}, ${roleLabel}, Duoc UC ${campusLabel}`
+    : `${profile.nombre}, ${roleLabel}, ${careerLabel}, Duoc UC ${campusLabel}`;
+  const profileSubtitle = getProfileSubtitle({
+    hideCareer,
+    clearReadingMode,
+    roleLabel,
+    careerLabel,
+    campusLabel,
+  });
+  const editButtonLabel = hideCareer
+    ? 'Editar datos del perfil y sede'
+    : 'Editar datos del perfil, carrera y sede';
+  const editModalTitle = hideCareer
+    ? 'Editar perfil y sede'
+    : 'Editar perfil, carrera y sede';
+  const editModalSubtitle = getEditModalSubtitle(hideCareer, clearReadingMode, campusLabel);
+  const mustChangePassword = Boolean(user?.mustChangePassword || profile.mustChangePassword);
+  const hasDisabilityProfile = Boolean(
+    profile.disabilityProfile && profile.disabilityProfile !== 'ninguna'
+  );
+  const disabilityMeta = hasDisabilityProfile
+    ? getDisabilityProfileMeta(profile.disabilityProfile)
+    : null;
 
   return (
     <section aria-labelledby="perfil-view-heading" className="space-y-6 max-w-4xl mx-auto">
+      {mustChangePassword && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="p-4 bg-amber-50 border border-amber-300 text-amber-950 rounded-2xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-fade-in"
+        >
+          <div className="flex items-start gap-2.5">
+            <KeyRound className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
+            <span>
+              {clearReadingMode
+                ? 'Estás usando tu contraseña inicial. Cámbiala cuando puedas.'
+                : 'Tu cuenta aún utiliza la contraseña inicial asignada al registrarse. Te recomendamos actualizarla para mayor seguridad.'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenPasswordModal}
+            {...getVoiceProps('Actualizar contraseña inicial')}
+            className="min-h-[38px] px-3.5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs rounded-xl shrink-0 transition-colors cursor-pointer"
+          >
+            Cambiar contraseña
+          </button>
+        </div>
+      )}
+
       {saveAlert && (
         <div
           role="status"
@@ -269,6 +520,17 @@ export const PerfilView = () => {
         >
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
           <span>Datos de contacto actualizados correctamente.</span>
+        </div>
+      )}
+
+      {passwordSuccessAlert && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs sm:text-sm font-semibold flex items-center gap-3 shadow-2xs animate-fade-in"
+        >
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
+          <span>Contraseña actualizada correctamente.</span>
         </div>
       )}
 
@@ -304,15 +566,13 @@ export const PerfilView = () => {
               </span>
               <h2
                 id="perfil-view-heading"
-                {...getVoiceProps(
-                  `${profile.nombre}, ${roleLabel}, ${profile.career || 'Ingeniería en Informática'}, Duoc UC ${DEFAULT_CAMPUS}`
-                )}
+                {...getVoiceProps(headingVoiceText)}
                 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight"
               >
                 {profile.nombre}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                {profile.career || profile.carrera || 'Ingeniería en Informática'} • Duoc UC - {profile.campus || profile.sede || DEFAULT_CAMPUS}
+                {profileSubtitle}
               </p>
             </div>
 
@@ -337,23 +597,25 @@ export const PerfilView = () => {
                 </span>
               </div>
 
-              <div
-                {...getVoiceProps(`Carrera: ${profile.career || profile.carrera}`)}
-                className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
-              >
-                <span className="text-slate-500 font-medium block text-xs">Carrera</span>
-                <span className="text-slate-900 font-semibold text-sm block mt-0.5 truncate">
-                  {profile.career || profile.carrera}
-                </span>
-              </div>
+              {!hideCareer && (
+                <div
+                  {...getVoiceProps(`Carrera: ${careerLabel}`)}
+                  className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
+                >
+                  <span className="text-slate-500 font-medium block text-xs">Carrera</span>
+                  <span className="text-slate-900 font-semibold text-sm block mt-0.5 truncate">
+                    {careerLabel}
+                  </span>
+                </div>
+              )}
 
               <div
-                {...getVoiceProps(`Sede institucional: Duoc UC ${profile.campus || profile.sede || DEFAULT_CAMPUS}`)}
+                {...getVoiceProps(`Sede institucional: Duoc UC ${campusLabel}`)}
                 className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
               >
                 <span className="text-slate-500 font-medium block text-xs">Sede institucional</span>
                 <span className="text-slate-900 font-semibold text-sm block mt-0.5">
-                  Duoc UC - {profile.campus || profile.sede || DEFAULT_CAMPUS}
+                  Duoc UC - {campusLabel}
                 </span>
               </div>
 
@@ -388,17 +650,31 @@ export const PerfilView = () => {
               </div>
             </div>
 
-            <div>
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 ref={editButtonRef}
                 type="button"
-                onClick={() => setIsEditing(true)}
+                onClick={() => {
+                  setIsPasswordModalOpen(false);
+                  setIsEditing(true);
+                }}
                 aria-haspopup="dialog"
-                {...getVoiceProps('Editar datos del perfil, carrera y sede')}
-                className="min-h-[42px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98]"
+                {...getVoiceProps(editButtonLabel)}
+                className="min-h-[42px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
               >
                 <Pencil className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
-                <span>Editar datos del perfil, carrera y sede</span>
+                <span>{editButtonLabel}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenPasswordModal}
+                aria-haspopup="dialog"
+                {...getVoiceProps('Cambiar contraseña')}
+                className="min-h-[42px] px-5 py-2.5 bg-white hover:bg-slate-50 text-[#002B49] border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
+                <span>Cambiar contraseña</span>
               </button>
             </div>
           </div>
@@ -459,13 +735,15 @@ export const PerfilView = () => {
             </div>
             <div>
               <h3
-                {...getVoiceProps(`Acompañamiento e inclusión académica PAEDIS en ${DEFAULT_CAMPUS}`)}
+                {...getVoiceProps(`Acompañamiento e inclusión académica PAEDIS en ${campusLabel}`)}
                 className="text-lg font-bold text-slate-900"
               >
                 Acompañamiento e inclusión académica (PAEDIS)
               </h3>
               <p className="text-xs text-slate-500">
-                Estado de apoyos registrados en {DEFAULT_CAMPUS} para el periodo académico vigente.
+                {clearReadingMode
+                  ? `Apoyos PAEDIS activos en ${campusLabel}.`
+                  : `Estado de apoyos registrados en ${campusLabel} para el periodo académico vigente.`}
               </p>
             </div>
           </div>
@@ -483,13 +761,38 @@ export const PerfilView = () => {
             </p>
           </div>
 
+          {hasDisabilityProfile && disabilityMeta && (
+            <div
+              {...getVoiceProps(`Perfil PAEDIS: ${disabilityMeta.label}. ${disabilityMeta.summary}`)}
+              className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/80 space-y-2"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-[#002B49] flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+                  <span>Perfil de accesibilidad PAEDIS</span>
+                </span>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white text-[#002B49] border border-sky-200">
+                  {disabilityMeta.barrera}
+                </span>
+              </div>
+              <p className="text-sm font-bold text-slate-900">{disabilityMeta.label}</p>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                {clearReadingMode
+                  ? disabilityMeta.summary
+                  : `${disabilityMeta.summary} ${disabilityMeta.autoAdaptationHint}`}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-3 pt-1">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
               Ajustes académicos registrados
             </span>
             {Array.isArray(profile.ajustesAprobados) && profile.ajustesAprobados.length === 0 ? (
               <div className="p-4 bg-slate-50/70 border border-slate-200/70 rounded-xl text-xs text-slate-600">
-                No registras ajustes individuales en este momento. Puedes utilizar las preferencias de lectura en la barra superior cuando lo necesites.
+                {clearReadingMode
+                  ? 'Sin ajustes individuales registrados. Usa el menú de accesibilidad cuando lo necesites.'
+                  : 'No registras ajustes individuales en este momento. Puedes utilizar las preferencias de lectura en la barra superior cuando lo necesites.'}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -513,7 +816,7 @@ export const PerfilView = () => {
         </article>
       )}
 
-      {/* MODAL PARA EDITAR DATOS DE PERFIL, CARRERA Y SEDE */}
+      {/* MODAL PARA EDITAR DATOS DE PERFIL Y SEDE */}
       {isEditing && (
         <div
           role="dialog"
@@ -532,13 +835,13 @@ export const PerfilView = () => {
               <div>
                 <h3
                   id="modal-edit-profile-title"
-                  {...getVoiceProps(`Editar perfil, carrera y sede para Duoc UC ${DEFAULT_CAMPUS}`)}
+                  {...getVoiceProps(`${editModalTitle} para Duoc UC ${campusLabel}`)}
                   className="text-lg font-bold text-slate-900"
                 >
-                  Editar perfil, carrera y sede
+                  {editModalTitle}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Actualiza tus datos para personalizar las simulaciones académicas en {DEFAULT_CAMPUS}.
+                  {editModalSubtitle}
                 </p>
               </div>
               <button
@@ -546,7 +849,7 @@ export const PerfilView = () => {
                 onClick={handleCloseModal}
                 aria-label="Cerrar ventana"
                 {...getVoiceProps('Cerrar ventana de edición')}
-                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -571,37 +874,39 @@ export const PerfilView = () => {
 
               <div>
                 <label htmlFor="edit-rut" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  RUT del estudiante (ej. 21.987.654-3)
+                  RUT institucional (ej. 21.987.654-3)
                 </label>
                 <input
                   id="edit-rut"
                   type="text"
                   value={editForm.rut}
                   onChange={(e) => setEditForm({ ...editForm, rut: e.target.value })}
-                  {...getVoiceProps(`RUT del estudiante, ${editForm.rut}`)}
+                  {...getVoiceProps(`RUT institucional, ${editForm.rut}`)}
                   className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="edit-career" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Carrera
-                  </label>
-                  <select
-                    id="edit-career"
-                    value={editForm.career}
-                    onChange={(e) => setEditForm({ ...editForm, career: e.target.value })}
-                    {...getVoiceProps(`Carrera seleccionada: ${editForm.career}`)}
-                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                    required
-                  >
-                    {CARRERAS_DUOC_LIST.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className={hideCareer ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
+                {!hideCareer && (
+                  <div>
+                    <label htmlFor="edit-career" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Carrera
+                    </label>
+                    <select
+                      id="edit-career"
+                      value={editForm.career}
+                      onChange={(e) => setEditForm({ ...editForm, career: e.target.value })}
+                      {...getVoiceProps(`Carrera seleccionada: ${editForm.career}`)}
+                      className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                      required
+                    >
+                      {CARRERAS_DUOC_LIST.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="edit-campus" className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -674,7 +979,7 @@ export const PerfilView = () => {
                   type="button"
                   onClick={handleCloseModal}
                   {...getVoiceProps('Cancelar edición')}
-                  className="min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -682,9 +987,145 @@ export const PerfilView = () => {
                   type="submit"
                   disabled={isSaving}
                   {...getVoiceProps('Guardar cambios del perfil')}
-                  className="min-h-[40px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60"
+                  className="min-h-[40px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 cursor-pointer"
                 >
                   {isSaving ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA CAMBIAR CONTRASEÑA */}
+      {isPasswordModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-change-password-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClosePasswordModal();
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in"
+        >
+          <div
+            ref={passwordModalRef}
+            className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-200 animate-scale-in max-h-[90vh] flex flex-col"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4 shrink-0">
+              <div>
+                <h3
+                  id="modal-change-password-title"
+                  {...getVoiceProps('Cambiar contraseña de acceso institucional')}
+                  className="text-lg font-bold text-slate-900"
+                >
+                  Cambiar contraseña
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {clearReadingMode
+                    ? 'Define una nueva contraseña de acceso.'
+                    : 'Ingresa tu contraseña actual y define una nueva clave segura.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClosePasswordModal}
+                aria-label="Cerrar ventana"
+                {...getVoiceProps('Cerrar ventana de cambio de contraseña')}
+                className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            {passwordError && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mb-4 p-3 bg-red-50 border-l-4 border-red-600 rounded-xl text-red-900 text-xs font-semibold flex items-start gap-2"
+              >
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePasswordSubmit} noValidate className="space-y-4 overflow-y-auto pr-1">
+              <PasswordInputRow
+                id="change-current-password"
+                label="Contraseña actual"
+                value={currentPassword}
+                onChange={(e) => {
+                  setCurrentPassword(e.target.value);
+                  setPasswordError('');
+                }}
+                showValue={showCurrentPwd}
+                onToggleShow={() => setShowCurrentPwd((prev) => !prev)}
+                autoComplete="current-password"
+                placeholder="Ingresa tu contraseña actual"
+                inputRef={currentPasswordInputRef}
+                voiceLabel="Contraseña actual"
+              />
+
+              <PasswordInputRow
+                id="change-new-password"
+                label="Nueva contraseña"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  setPasswordError('');
+                }}
+                showValue={showNewPwd}
+                onToggleShow={() => setShowNewPwd((prev) => !prev)}
+                autoComplete="new-password"
+                placeholder="Mínimo 8 caracteres"
+                hint={
+                  clearReadingMode
+                    ? 'Mínimo 8 caracteres, letra y número.'
+                    : 'Debe tener al menos 8 caracteres, una letra y un número.'
+                }
+                hintId="change-password-hint"
+                voiceLabel="Nueva contraseña"
+              />
+
+              <PasswordInputRow
+                id="change-confirm-password"
+                label="Confirmar nueva contraseña"
+                value={confirmNewPassword}
+                onChange={(e) => {
+                  setConfirmNewPassword(e.target.value);
+                  setPasswordError('');
+                }}
+                showValue={showConfirmPwd}
+                onToggleShow={() => setShowConfirmPwd((prev) => !prev)}
+                autoComplete="new-password"
+                placeholder="Repite la nueva contraseña"
+                voiceLabel="Confirmar nueva contraseña"
+              />
+
+              <div className="pt-4 flex justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleClosePasswordModal}
+                  {...getVoiceProps('Cancelar cambio de contraseña')}
+                  className="min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  aria-busy={isChangingPassword}
+                  {...getVoiceProps('Guardar nueva contraseña')}
+                  className="min-h-[40px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 inline-flex items-center gap-2 cursor-pointer"
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-400" aria-hidden="true" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <span>Actualizar contraseña</span>
+                  )}
                 </button>
               </div>
             </form>

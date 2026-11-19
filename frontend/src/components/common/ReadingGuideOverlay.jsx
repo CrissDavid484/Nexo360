@@ -16,12 +16,13 @@ import { useAccessibility } from '../../context/AccessibilityContext';
  * - Desactivable con un clic en la barra de accesibilidad.
  */
 export const ReadingGuideOverlay = () => {
-  const { readingGuide } = useAccessibility();
+  const { readingGuide, isBlindMode } = useAccessibility();
+  const activeGuide = readingGuide && !isBlindMode;
   const [mouseY, setMouseY] = useState(-100);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (!readingGuide) {
+    if (!activeGuide) {
       setIsVisible(false);
       return;
     }
@@ -47,9 +48,9 @@ export const ReadingGuideOverlay = () => {
       document.removeEventListener('mouseleave', handleMouseLeave);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [readingGuide]);
+  }, [activeGuide]);
 
-  if (!readingGuide || !isVisible || mouseY < 0) {
+  if (!activeGuide || !isVisible || mouseY < 0) {
     return null;
   }
 

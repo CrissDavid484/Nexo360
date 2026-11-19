@@ -1,15 +1,24 @@
+const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const UserProfile = require('../models/UserProfile');
 const ActivityLog = require('../models/ActivityLog');
+const emailService = require('./emailService');
 const { getJwtSecret } = require('../middleware/authMiddleware');
 const SEED_USERS = require('../data/seedUsers.json');
 const {
   DEFAULT_SEDE,
   createDeterministicRut,
   sanitizeAccessibilityPreferences,
+  validatePasswordStrength,
 } = require('../utils/validationUtils');
+
+function createAuthError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
 
 const DEFAULT_SEED_PASSWORD = `Duoc${new Date().getFullYear()}!`;
 
@@ -127,7 +136,7 @@ class AuthService {
             ),
             isRegisteredInDb: true,
           });
-          console.log(`[AuthService] Usuario institucional sembrado en MongoDB: ${cleanEmail}`);
+          console.log('[AuthService] Usuario institucional sembrado en MongoDB.');
         } else if (!existing.courseAttendance || existing.courseAttendance.length === 0) {
           if (Array.isArray(seedUser.courseAttendance) && seedUser.courseAttendance.length > 0) {
             existing.courseAttendance = seedUser.courseAttendance;
@@ -135,11 +144,11 @@ class AuthService {
               existing.satIntervention = seedUser.satIntervention;
             }
             await existing.save();
-            console.log(`[AuthService] Actualizada asistencia SAT en MongoDB para: ${cleanEmail}`);
+            console.log('[AuthService] Asistencia SAT actualizada en MongoDB.');
           }
         }
-      } catch (err) {
-        console.warn(`[AuthService] Aviso sembrando usuario ${seedUser.email}:`, err.message);
+      } catch {
+        console.warn('[AuthService] Aviso sembrando usuario institucional en MongoDB.');
       }
     }
   }
@@ -181,8 +190,8 @@ class AuthService {
           : buildDefaultStudentProfile(cleanEmail, { password: hashedPassword });
 
         return await UserProfile.create(newUserData);
-      } catch (err) {
-        console.warn('[AuthService] Error buscando/creando en MongoDB:', err.message);
+      } catch {
+        console.warn('[AuthService] Error buscando o creando usuario en MongoDB.');
       }
     }
 
@@ -192,6 +201,54 @@ class AuthService {
       inMemoryUsers.set(cleanEmail, mem);
     }
     return mem;
+  }
+
+  /**
+   * Busca un usuario registrado sin auto-crearlo (incluye campos sensibles cuando se solicita).
+   */
+  async findRegisteredUser(cleanEmail, includeSecrets = false) {
+    if (!cleanEmail) return null;
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const query = UserProfile.findOne({ email: { $eq: cleanEmail } });
+        if (includeSecrets) {
+          query.select('+password +passwordResetTokenHash +passwordResetExpires');
+        }
+        const dbUser = await query;
+        if (dbUser) return dbUser;
+      } catch {
+        console.warn('[AuthService] Error consultando usuario registrado en MongoDB.');
+      }
+    }
+
+    return inMemoryUsers.get(cleanEmail) || null;
+  }
+
+  /**
+   * Persiste una nueva contraseña cifrada en MongoDB y memoria local.
+   */
+  async persistPasswordUpdate(cleanEmail, hashedPassword, clearResetFields = false) {
+    const fields = {
+      password: hashedPassword,
+      mustChangePassword: false,
+      ...(clearResetFields
+        ? { passwordResetTokenHash: '', passwordResetExpires: null }
+        : {}),
+    };
+
+    const mem = inMemoryUsers.get(cleanEmail);
+    if (mem) {
+      Object.assign(mem, fields);
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      await UserProfile.findOneAndUpdate(
+        { email: { $eq: cleanEmail } },
+        { $set: fields },
+        { returnDocument: 'after' }
+      );
+    }
   }
 
   /**
@@ -218,7 +275,7 @@ class AuthService {
       const updatedUser = await UserProfile.findOneAndUpdate(
         { email: { $eq: cleanEmail } },
         { $set: { accessibilityPreferences: normalizedPrefs } },
-        { new: true, upsert: true, runValidators: true }
+        { returnDocument: 'after', upsert: true, runValidators: true }
       );
 
       return {
@@ -255,7 +312,7 @@ class AuthService {
       const updatedUser = await UserProfile.findOneAndUpdate(
         { email: { $eq: cleanEmail } },
         updateOp,
-        { new: true, upsert: true, runValidators: true }
+        { returnDocument: 'after', upsert: true, runValidators: true }
       );
       return { persistedInDb: true, user: updatedUser };
     }
@@ -264,14 +321,182 @@ class AuthService {
   }
 
   /**
+   * Genera un token criptográfico de recuperación (30 min) y guarda su hash SHA-256.
+   */
+  async createPasswordResetToken(email) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      throw createAuthError(400, 'Correo institucional inválido.');
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    const mem = inMemoryUsers.get(cleanEmail);
+    if (mem) {
+      mem.passwordResetTokenHash = tokenHash;
+      mem.passwordResetExpires = expiresAt;
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      await UserProfile.findOneAndUpdate(
+        { email: { $eq: cleanEmail } },
+        {
+          $set: {
+            passwordResetTokenHash: tokenHash,
+            passwordResetExpires: expiresAt,
+          },
+        },
+        { returnDocument: 'after' }
+      );
+    }
+
+    return rawToken;
+  }
+
+  /**
+   * Inicia flujo de recuperación de contraseña sin enumeración de usuarios.
+   */
+  async requestPasswordReset(email) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const userDoc = await this.findRegisteredUser(cleanEmail, false);
+    if (!userDoc) {
+      return { delivered: false, deliveryMode: 'none', devPreview: null };
+    }
+
+    const resetToken = await this.createPasswordResetToken(cleanEmail);
+    const fullName = userDoc.fullName || userDoc.nombre || cleanEmail;
+    const emailResult = await emailService.sendPasswordResetEmail({
+      to: cleanEmail,
+      fullName,
+      resetToken,
+    });
+
+    await this.logActivity({
+      userId: userDoc._id || userDoc.id,
+      userEmail: cleanEmail,
+      userName: fullName,
+      userRole: userDoc.role || 'estudiante',
+      action: 'password_reset_requested',
+      details: 'Solicitud de restablecimiento de contraseña registrada.',
+    });
+
+    const isNonProdFallback =
+      process.env.NODE_ENV !== 'production' && emailResult.deliveryMode === 'fallback';
+    return {
+      delivered: emailResult.delivered,
+      deliveryMode: emailResult.deliveryMode,
+      devPreview: isNonProdFallback ? emailResult.devPreview : null,
+    };
+  }
+
+  /**
+   * Valida token de recuperación en tiempo constante y actualiza la contraseña cifrada.
+   */
+  async resetPasswordWithToken(email, token, newPassword) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanToken = typeof token === 'string' ? token.trim() : '';
+
+    if (!cleanEmail || !cleanToken) {
+      throw createAuthError(400, 'Debe proporcionar su correo institucional y el código de recuperación.');
+    }
+
+    if (!validatePasswordStrength(newPassword)) {
+      throw createAuthError(
+        400,
+        'La nueva contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra y un número.'
+      );
+    }
+
+    const userDoc = await this.findRegisteredUser(cleanEmail, true);
+    if (!userDoc || !userDoc.passwordResetTokenHash || !userDoc.passwordResetExpires) {
+      throw createAuthError(400, 'El enlace o código de recuperación es inválido o ha expirado.');
+    }
+
+    if (new Date(userDoc.passwordResetExpires).getTime() <= Date.now()) {
+      throw createAuthError(400, 'El enlace o código de recuperación ha expirado. Solicita uno nuevo.');
+    }
+
+    const candidateHash = crypto.createHash('sha256').update(cleanToken).digest('hex');
+    const storedBuf = Buffer.from(String(userDoc.passwordResetTokenHash), 'utf8');
+    const candidateBuf = Buffer.from(candidateHash, 'utf8');
+    if (
+      storedBuf.length !== candidateBuf.length ||
+      !crypto.timingSafeEqual(storedBuf, candidateBuf)
+    ) {
+      throw createAuthError(400, 'El enlace o código de recuperación es inválido o ha expirado.');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    await this.persistPasswordUpdate(cleanEmail, hashedPassword, true);
+
+    await this.logActivity({
+      userId: userDoc._id || userDoc.id,
+      userEmail: cleanEmail,
+      userName: userDoc.fullName || userDoc.nombre || cleanEmail,
+      userRole: userDoc.role || 'estudiante',
+      action: 'password_reset_completed',
+      details: 'Contraseña restablecida exitosamente mediante token de recuperación.',
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Cambia la contraseña de un usuario autenticado verificando su contraseña actual.
+   */
+  async changeUserPassword(email, currentPassword, newPassword) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail || typeof currentPassword !== 'string' || !currentPassword) {
+      throw createAuthError(400, 'Debe ingresar su contraseña actual y la nueva contraseña.');
+    }
+
+    if (!validatePasswordStrength(newPassword)) {
+      throw createAuthError(
+        400,
+        'La nueva contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra y un número.'
+      );
+    }
+
+    if (newPassword === currentPassword) {
+      throw createAuthError(400, 'La nueva contraseña debe ser diferente a la contraseña actual.');
+    }
+
+    const userDoc = await this.findRegisteredUser(cleanEmail, true);
+    if (!userDoc) {
+      throw createAuthError(404, 'Usuario no encontrado.');
+    }
+
+    const isCurrentValid = await this.verifyUserPassword(userDoc, currentPassword, false);
+    if (!isCurrentValid) {
+      throw createAuthError(401, 'La contraseña actual es incorrecta.');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    await this.persistPasswordUpdate(cleanEmail, hashedPassword, false);
+
+    await this.logActivity({
+      userId: userDoc._id || userDoc.id,
+      userEmail: cleanEmail,
+      userName: userDoc.fullName || userDoc.nombre || cleanEmail,
+      userRole: userDoc.role || 'estudiante',
+      action: 'password_changed',
+      details: 'El usuario actualizó su contraseña desde su perfil.',
+    });
+
+    return { success: true };
+  }
+
+  /**
    * Inicio de sesión directo con contraseña institucional cifrada (bcryptjs).
    */
   async loginWithPassword(email, password) {
     const cleanEmail = (email || '').trim().toLowerCase();
     if (!cleanEmail || !password) {
-      const err = new Error('Por favor ingrese su correo institucional y contraseña.');
-      err.statusCode = 400;
-      throw err;
+      throw createAuthError(400, 'Por favor ingrese su correo institucional y contraseña.');
     }
 
     let userDoc = null;
@@ -280,8 +505,8 @@ class AuthService {
     if (mongoose.connection.readyState === 1) {
       try {
         userDoc = await UserProfile.findOne({ email: cleanEmail }).select('+password');
-      } catch (err) {
-        console.warn('[AuthService] Error consultando credenciales en MongoDB:', err.message);
+      } catch {
+        console.warn('[AuthService] Error consultando credenciales en MongoDB.');
       }
     }
 
@@ -296,17 +521,18 @@ class AuthService {
 
     const isPasswordValid = await this.verifyUserPassword(userDoc, password, isNewlyCreated);
     if (!isPasswordValid) {
-      const err = new Error('Credenciales inválidas. Verifique su correo institucional y contraseña.');
-      err.statusCode = 401;
-      throw err;
+      throw createAuthError(
+        401,
+        'Credenciales inválidas. Verifique su correo institucional y contraseña.'
+      );
     }
 
     if (mongoose.connection.readyState === 1 && userDoc._id && typeof userDoc.save === 'function') {
       try {
         userDoc.lastLogin = new Date();
         await userDoc.save();
-      } catch (saveErr) {
-        console.warn('[AuthService] No se pudo actualizar lastLogin en MongoDB:', saveErr.message);
+      } catch {
+        console.warn('[AuthService] No se pudo actualizar lastLogin en MongoDB.');
       }
     }
 
@@ -388,8 +614,8 @@ class AuthService {
             $inc: { simulatorUsageCount: 1 },
           }
         );
-      } catch (err) {
-        console.warn('[AuthService] Error actualizando uso de simulador:', err.message);
+      } catch {
+        console.warn('[AuthService] Error actualizando uso de simulador.');
       }
     }
 
@@ -431,8 +657,8 @@ class AuthService {
     if (mongoose.connection.readyState === 1) {
       try {
         await ActivityLog.create(logEntry);
-      } catch (err) {
-        console.warn('[AuthService] Error guardando log en MongoDB:', err.message);
+      } catch {
+        console.warn('[AuthService] Error guardando log en MongoDB.');
       }
     }
   }
@@ -451,8 +677,8 @@ class AuthService {
         if (docs && docs.length > 0) {
           return docs.map((d) => this.formatUserResponse(d));
         }
-      } catch (err) {
-        console.warn('[AuthService] Error consultando usuarios en MongoDB:', err.message);
+      } catch {
+        console.warn('[AuthService] Error consultando usuarios en MongoDB.');
       }
     }
 
@@ -472,7 +698,10 @@ class AuthService {
     const role = raw.role || 'estudiante';
     const roleLabel = raw.roleLabel || 'Estudiante Regular Duoc UC';
     const isPaedis = raw.isPaedis === true || role === 'estudiante_paedis';
-    const career = raw.career || raw.carrera || 'Ingeniería en Informática';
+    const isStaffRole =
+      role === 'admin' || role === 'administrador' || role === 'coordinador_paedis';
+    const fallbackCareer = isStaffRole ? '' : 'Ingeniería en Informática';
+    const career = raw.career || raw.carrera || fallbackCareer;
     const campus = raw.campus || raw.sede || DEFAULT_SEDE;
     const address = raw.address || raw.direccion || 'Por actualizar';
     const phone = raw.phone || raw.telefonoPersonal || '+56 9 0000 0000';
@@ -488,6 +717,9 @@ class AuthService {
       id,
       _id: id,
       email,
+      firstName: raw.firstName || '',
+      paternalLastName: raw.paternalLastName || '',
+      maternalLastName: raw.maternalLastName || '',
       fullName,
       nombre: fullName,
       rut,
@@ -495,6 +727,8 @@ class AuthService {
       rol: role,
       roleLabel,
       isPaedis,
+      disabilityProfile: raw.disabilityProfile || 'ninguna',
+      mustChangePassword: Boolean(raw.mustChangePassword),
       career,
       carrera: career,
       campus,

@@ -22,14 +22,11 @@ import {
   BookOpen,
   Plus,
   Shield,
-  Check,
-  ChevronDown,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
-import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import {
   SEDES_DUOC,
   CARRERAS_DUOC_LIST,
@@ -47,6 +44,7 @@ import {
 import { CoursesAdminSection } from '../admin/CoursesAdminSection';
 import { EarlyWarningSatSection } from '../admin/EarlyWarningSatSection';
 import { PaedisCaseManagementSection } from '../admin/PaedisCaseManagementSection';
+import { RegisterUserModal } from '../admin/RegisterUserModal';
 
 const INITIAL_CAREERS_CATALOG = CARRERAS_DUOC_LIST.map((name, idx) => ({
   id: `career-${idx}`,
@@ -110,6 +108,11 @@ const getStaffRoleBadge = (role) => {
   if (r === 'administrador') return STAFF_ROLE_BADGES.admin;
   if (r === 'subdirector') return STAFF_ROLE_BADGES.director;
   return STAFF_ROLE_BADGES[r] || STAFF_ROLE_BADGES.default;
+};
+
+const TRAFFIC_LIGHT_COLOR_MAP = {
+  rojo: 'red',
+  amarillo: 'yellow',
 };
 
 const ACADEMIC_STATUS_BADGE_MAP = {
@@ -410,28 +413,10 @@ export const AdminPanelView = () => {
   const [statusForm, setStatusForm] = useState({ academicStatus: 'activo', statusReason: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState(null);
-  const [consentAccepted, setConsentAccepted] = useState(true);
   const [modalError, setModalError] = useState('');
 
-  const currentYear = new Date().getFullYear();
-  const dynamicInitialPassword = `Duoc${currentYear}!`;
-
-  const [newUserForm, setNewUserForm] = useState({
-    fullName: '',
-    email: '',
-    password: dynamicInitialPassword,
-    rut: '',
-    role: '',
-    career: '',
-    campus: DEFAULT_CAMPUS,
-  });
-
-  const [careerQuery, setCareerQuery] = useState('');
-  const [isCareerDropdownOpen, setIsCareerDropdownOpen] = useState(false);
-  const careerDropdownRef = useRef(null);
   const statusModalRef = useRef(null);
   const statusCloseBtnRef = useRef(null);
-  const createModalRef = useRef(null);
   const createCloseBtnRef = useRef(null);
   const isMountedRef = useRef(true);
 
@@ -442,25 +427,11 @@ export const AdminPanelView = () => {
     };
   }, []);
 
-  useOnClickOutside(careerDropdownRef, () => setIsCareerDropdownOpen(false), {
-    enabled: isCareerDropdownOpen,
-  });
-
   useAccessibleModal({
     isOpen: isStatusModalOpen && Boolean(selectedStudentForStatus),
     onClose: () => setIsStatusModalOpen(false),
     containerRef: statusModalRef,
     initialFocusRef: statusCloseBtnRef,
-  });
-
-  useAccessibleModal({
-    isOpen: isCreateModalOpen,
-    onClose: () => {
-      setIsCreateModalOpen(false);
-      setIsCareerDropdownOpen(false);
-    },
-    containerRef: createModalRef,
-    initialFocusRef: createCloseBtnRef,
   });
 
   const loadAdminData = useCallback(async () => {
@@ -570,10 +541,6 @@ export const AdminPanelView = () => {
     [catalogState.sedes.items]
   );
 
-  const filteredCareersForCombobox = useMemo(
-    () => filterCatalogByName(sortedCareers, careerQuery),
-    [sortedCareers, careerQuery]
-  );
   const filteredCareersCrud = useMemo(
     () => filterCatalogByName(sortedCareers, catalogState.careers.search),
     [sortedCareers, catalogState.careers.search]
@@ -690,99 +657,34 @@ export const AdminPanelView = () => {
     announce(errText, 'assertive');
   };
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
+  const handleCreateUser = async (payload) => {
     setModalError('');
-
-    if (!consentAccepted) {
-      failCreateModalValidation(
-        'Debe aceptar la declaración de consentimiento y tratamiento de datos personales conforme a la Ley N° 21.719.'
-      );
-      return;
-    }
-
-    if (!newUserForm.fullName.trim()) {
-      failCreateModalValidation('Por favor, ingresa el nombre completo.');
-      return;
-    }
-
-    if (!newUserForm.email.trim() || !newUserForm.email.includes('@')) {
-      failCreateModalValidation(
-        'Debe ingresar un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).'
-      );
-      return;
-    }
-
-    if (!newUserForm.rut.trim()) {
-      failCreateModalValidation('Por favor, ingresa el RUT del estudiante.');
-      return;
-    }
-
-    if (!newUserForm.role) {
-      failCreateModalValidation('Por favor, selecciona un rol institucional.');
-      return;
-    }
-
-    const effectiveCareer = (newUserForm.career || careerQuery || '').trim();
-    if (!effectiveCareer) {
-      failCreateModalValidation('Por favor, selecciona o escribe una carrera.');
-      return;
-    }
-
-    if (!newUserForm.campus.trim()) {
-      failCreateModalValidation('Por favor, selecciona una sede.');
-      return;
-    }
-
-    if ((newUserForm.role === 'admin' || newUserForm.role === 'administrador') && !isAdmin) {
-      failCreateModalValidation(
-        'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.'
-      );
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const payload = {
-        fullName: newUserForm.fullName.trim(),
-        email: newUserForm.email.trim(),
-        password: newUserForm.password.trim() || dynamicInitialPassword,
-        rut: newUserForm.rut.trim(),
-        role: newUserForm.role,
-        career: effectiveCareer,
-        campus: newUserForm.campus.trim(),
-        isPaedis: newUserForm.role === 'estudiante_paedis',
-        consentimientoLey21719: {
-          aceptado: true,
-          fechaAceptacion: new Date(),
-          finalidadTratamiento:
-            'Gestión académica, acompañamiento PAEDIS y prevención de deserción estudiantil según Ley N° 21.719 de Chile',
-        },
-      };
-
       const res = await api.createAdminStudent(payload);
       if (!isMountedRef.current) return;
 
       if (res?.success) {
+        const emailStatusNote =
+          res.emailSent === false
+            ? ' (aviso: no se pudo confirmar el envío del correo de bienvenida)'
+            : ' Se envió el correo de bienvenida con su contraseña inicial y enlace de acceso.';
+        const previewUrl =
+          typeof res.emailPreview === 'string'
+            ? res.emailPreview
+            : res.emailPreview?.resetUrl || '';
+        const previewToken =
+          typeof res.emailPreview === 'object' ? res.emailPreview?.resetToken || '' : '';
+
         setFeedbackMessage({
           type: 'success',
-          text: `Usuario ${newUserForm.fullName} registrado exitosamente con contraseña inicial institucional.`,
+          text: `Usuario ${payload.fullName} registrado exitosamente.${emailStatusNote}`,
+          previewUrl,
+          previewToken,
         });
-        announce(`Usuario ${newUserForm.fullName} registrado exitosamente.`, 'polite');
+        announce(`Usuario ${payload.fullName} registrado exitosamente.`, 'polite');
         setIsCreateModalOpen(false);
-        setIsCareerDropdownOpen(false);
-        setNewUserForm({
-          fullName: '',
-          email: '',
-          password: dynamicInitialPassword,
-          rut: '',
-          role: '',
-          career: '',
-          campus: DEFAULT_CAMPUS,
-        });
-        setCareerQuery('');
         setModalError('');
-        setConsentAccepted(true);
         await loadAdminData();
       } else {
         failCreateModalValidation(res?.message || 'Error al registrar usuario.');
@@ -947,8 +849,6 @@ export const AdminPanelView = () => {
     },
   ];
 
-  const careerInputVoiceProps = getVoiceProps('Carrera Duoc UC. Escribe o selecciona una carrera');
-
   return (
     <div className="space-y-7 animate-fade-in pb-12">
       {/* 1. HERO BANNER INSTITUCIONAL DUOC UC - SEDE ALAMEDA */}
@@ -1014,7 +914,6 @@ export const AdminPanelView = () => {
                 }
                 setIsCreateModalOpen(true);
                 setModalError('');
-                setConsentAccepted(true);
               }}
               disabled={!canManageAdmin}
               aria-disabled={!canManageAdmin}
@@ -1084,13 +983,26 @@ export const AdminPanelView = () => {
               : 'bg-red-50 border-red-300 text-red-950'
           }`}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             {feedbackMessage.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" aria-hidden="true" />
             ) : (
               <AlertTriangle className="w-5 h-5 text-red-700 shrink-0" aria-hidden="true" />
             )}
             <span>{feedbackMessage.text}</span>
+            {feedbackMessage.previewUrl && (
+              <a
+                href={feedbackMessage.previewUrl}
+                className="underline font-black text-[#002B49] hover:text-blue-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded px-1"
+              >
+                Abrir enlace de activación (dev)
+              </a>
+            )}
+            {feedbackMessage.previewToken && (
+              <code className="px-2 py-0.5 rounded-lg bg-white border border-emerald-300 text-[11px] font-mono text-[#002B49]">
+                Token dev: {feedbackMessage.previewToken}
+              </code>
+            )}
           </div>
           <button
             type="button"
@@ -1695,8 +1607,11 @@ export const AdminPanelView = () => {
                                     {student.ajustesAprobados.length}):
                                   </span>
                                   <ul className="space-y-1 text-xs text-blue-900 font-medium">
-                                    {student.ajustesAprobados.map((aj, idx) => (
-                                      <li key={idx} className="flex items-start gap-1.5">
+                                    {student.ajustesAprobados.map((aj) => (
+                                      <li
+                                        key={`${aj.tipo}-${aj.descripcion}`}
+                                        className="flex items-start gap-1.5"
+                                      >
                                         <span className="text-blue-700 font-bold">•</span>
                                         <span>
                                           <strong>{aj.tipo}:</strong> {aj.descripcion}
@@ -1715,12 +1630,7 @@ export const AdminPanelView = () => {
                                 semaforo: pred.trafficLight || pred.semaforo || pred.color,
                               });
                               const satBadgeMeta = getSatRiskBadgeMeta(trafficMeta.key);
-                              const trafficColor =
-                                trafficMeta.key === 'rojo'
-                                  ? 'red'
-                                  : trafficMeta.key === 'amarillo'
-                                  ? 'yellow'
-                                  : 'green';
+                              const trafficColor = TRAFFIC_LIGHT_COLOR_MAP[trafficMeta.key] || 'green';
 
                               return (
                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
@@ -1782,8 +1692,8 @@ export const AdminPanelView = () => {
 
                                   {Array.isArray(pred.factors) && pred.factors.length > 0 && (
                                     <ul className="space-y-1 text-xs text-slate-600 pt-1 border-t border-slate-200/50">
-                                      {pred.factors.map((f, i) => (
-                                        <li key={i} className="flex items-start gap-1.5">
+                                      {pred.factors.map((f) => (
+                                        <li key={f} className="flex items-start gap-1.5">
                                           <span className="text-slate-400 font-bold">•</span>
                                           <span>{f}</span>
                                         </li>
@@ -1828,7 +1738,7 @@ export const AdminPanelView = () => {
                                       {(
                                         selectedStudentForDetail.enrolledCourses ||
                                         student.enrolledCourses
-                                      ).map((c, i) => {
+                                      ).map((c) => {
                                         const rate = extractCourseAttendanceRate({
                                           ...c,
                                           attendanceRate:
@@ -1850,7 +1760,7 @@ export const AdminPanelView = () => {
 
                                         return (
                                           <tr
-                                            key={c.sigla || i}
+                                            key={`${c.sigla || c.nombre || c.curso}-${c.seccion || '001D'}`}
                                             {...getVoiceProps(
                                               `${c.nombre || c.curso || c.sigla}, asistencia ${rate} por ciento, ${statusText}`
                                             )}
@@ -2230,329 +2140,21 @@ export const AdminPanelView = () => {
       )}
 
       {/* MODAL 2: Registrar Nuevo Estudiante / Usuario */}
-      {isCreateModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-modal-title"
-          className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-6 sm:pt-10 overflow-y-auto bg-slate-900/60 backdrop-blur-xs"
-        >
-          <div
-            ref={createModalRef}
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-xl space-y-5 my-0 sm:my-4 animate-fade-in focus:outline-none"
-          >
-            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-              <div>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#002B49] bg-slate-100 px-2.5 py-0.5 rounded-full inline-block mb-1">
-                  Registro Institucional Oficial • Duoc UC - Sede Alameda
-                </span>
-                <h3 id="create-modal-title" className="text-xl font-bold text-slate-900">
-                  Registrar Estudiante / Usuario en Nexo360
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  Ambiente institucional seguro regulado por la Ley N° 21.719
-                </p>
-              </div>
-              <button
-                ref={createCloseBtnRef}
-                type="button"
-                onClick={() => {
-                  setIsCreateModalOpen(false);
-                  setIsCareerDropdownOpen(false);
-                }}
-                {...getVoiceProps('Cerrar modal de registro')}
-                className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-                aria-label="Cerrar modal de registro"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                handleCreateUser(e).catch((err) => {
-                  console.error('[AdminPanelView] Error creando usuario:', err);
-                });
-              }}
-              className="space-y-4 text-xs sm:text-sm"
-            >
-              {/* 1. Nombre Completo y Correo Institucional */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label htmlFor="create-name" className="text-xs font-semibold text-slate-700">
-                    Nombre Completo <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    id="create-name"
-                    type="text"
-                    required
-                    value={newUserForm.fullName}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, fullName: e.target.value })}
-                    placeholder="Ej. Matías Soto Gómez"
-                    {...getVoiceProps('Nombre completo del usuario')}
-                    className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="create-email" className="text-xs font-semibold text-slate-700">
-                    Correo Duoc UC <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    id="create-email"
-                    type="email"
-                    required
-                    value={newUserForm.email}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                    placeholder="ejemplo@duocuc.cl"
-                    {...getVoiceProps('Correo institucional Duoc UC')}
-                    className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                  />
-                </div>
-              </div>
-
-              {/* 2. Contraseña Inicial Dinámica y RUT */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label
-                    htmlFor="create-password"
-                    className="text-xs font-semibold text-slate-700 flex items-center justify-between"
-                  >
-                    <span>Contraseña Inicial</span>
-                    <span className="text-[10px] text-amber-700 font-medium lowercase">
-                      (formato Duoc{currentYear}!)
-                    </span>
-                  </label>
-                  <input
-                    id="create-password"
-                    type="text"
-                    required
-                    value={newUserForm.password}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                    placeholder={`Duoc${currentYear}!`}
-                    {...getVoiceProps(`Contraseña inicial, formato Duoc${currentYear}!`)}
-                    className="w-full min-h-[44px] px-3.5 py-2.5 bg-amber-50/40 hover:bg-amber-50/60 focus:bg-white border border-amber-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="create-rut" className="text-xs font-semibold text-slate-700">
-                    RUT <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    id="create-rut"
-                    type="text"
-                    required
-                    value={newUserForm.rut}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, rut: e.target.value })}
-                    placeholder="20.123.456-7"
-                    {...getVoiceProps('RUT del estudiante o funcionario')}
-                    className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                  />
-                </div>
-              </div>
-
-              {/* 3. Rol Institucional (Estrictamente limitado a 4 opciones) */}
-              <div className="space-y-1">
-                <label htmlFor="create-role" className="text-xs font-semibold text-slate-700">
-                  Rol Institucional <span className="text-red-600">*</span>
-                </label>
-                <select
-                  id="create-role"
-                  required
-                  value={newUserForm.role}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
-                  {...getVoiceProps('Seleccionar rol institucional')}
-                  className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                >
-                  <option value="" disabled>
-                    Selecciona un rol...
-                  </option>
-                  <optgroup label={`Alumnado Duoc UC - ${DEFAULT_CAMPUS}`}>
-                    <option value="estudiante">Estudiante</option>
-                    <option value="estudiante_paedis">Estudiante PAEDIS</option>
-                  </optgroup>
-                  <optgroup label="Apartado Administrativo & PAEDIS">
-                    <option value="coordinador_paedis">Coordinador PAEDIS</option>
-                    {isAdmin ? (
-                      <option value="admin">Administrador</option>
-                    ) : (
-                      <option value="" disabled>
-                        Administrador (Restringido: Solo Administrador puede asignar este rol)
-                      </option>
-                    )}
-                  </optgroup>
-                </select>
-                {!isAdmin && (
-                  <span className="text-[11px] text-slate-500 font-medium block">
-                    *Por política de seguridad institucional, solo un Administrador puede crear
-                    usuarios con rol Administrador.
-                  </span>
-                )}
-              </div>
-
-              {/* 4. Carrera: COMBOBOX CON FILTRO DE BÚSQUEDA ORDENADO ALFABÉTICAMENTE */}
-              <div className="space-y-1 relative" ref={careerDropdownRef}>
-                <label htmlFor="create-career-input" className="text-xs font-semibold text-slate-700">
-                  Carrera Duoc UC <span className="text-red-600">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="create-career-input"
-                    type="text"
-                    required
-                    value={careerQuery}
-                    onChange={(e) => {
-                      setCareerQuery(e.target.value);
-                      setNewUserForm({ ...newUserForm, career: e.target.value });
-                      setIsCareerDropdownOpen(true);
-                    }}
-                    data-voice-managed={careerInputVoiceProps['data-voice-managed']}
-                    onMouseEnter={careerInputVoiceProps.onMouseEnter}
-                    onFocus={(e) => {
-                      careerInputVoiceProps.onFocus(e);
-                      setIsCareerDropdownOpen(true);
-                    }}
-                    placeholder="Selecciona una carrera..."
-                    className="w-full min-h-[44px] px-3.5 py-2.5 pr-10 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                    autoComplete="off"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsCareerDropdownOpen(!isCareerDropdownOpen)}
-                    {...getVoiceProps('Desplegar lista de carreras')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
-                    aria-label="Desplegar lista de carreras"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {isCareerDropdownOpen && (
-                  <div className="absolute z-20 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl divide-y divide-slate-100 animate-fade-in">
-                    {filteredCareersForCombobox.length === 0 ? (
-                      <div className="p-3 text-xs text-slate-500 font-medium">
-                        No se encontraron carreras con ese nombre. Puedes escribir una nueva.
-                      </div>
-                    ) : (
-                      filteredCareersForCombobox.map((c) => (
-                        <button
-                          key={c._id || c.id || c.name}
-                          type="button"
-                          onClick={() => {
-                            setCareerQuery(c.name);
-                            setNewUserForm({ ...newUserForm, career: c.name });
-                            setIsCareerDropdownOpen(false);
-                          }}
-                          {...getVoiceProps(`Seleccionar carrera ${c.name}`)}
-                          className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold hover:bg-slate-50 transition-colors flex items-center justify-between ${
-                            newUserForm.career === c.name
-                              ? 'bg-amber-50 text-[#002B49]'
-                              : 'text-slate-800'
-                          }`}
-                        >
-                          <span>{c.name}</span>
-                          {newUserForm.career === c.name && (
-                            <Check className="w-4 h-4 text-amber-600" aria-hidden="true" />
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* 5. Sede Institucional */}
-              <div className="space-y-1">
-                <label htmlFor="create-campus-select" className="text-xs font-semibold text-slate-700">
-                  Sede Duoc UC - {DEFAULT_CAMPUS} <span className="text-red-600">*</span>
-                </label>
-                <select
-                  id="create-campus-select"
-                  required
-                  value={newUserForm.campus}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, campus: e.target.value })}
-                  {...getVoiceProps(`Seleccionar sede institucional ${DEFAULT_CAMPUS}`)}
-                  className="w-full min-h-[44px] px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
-                >
-                  <option value="" disabled>
-                    Selecciona una sede...
-                  </option>
-                  {sortedSedes.map((s) => (
-                    <option key={s._id || s.id || s.name} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 6. Cumplimiento Ley N° 21.719 */}
-              <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#002B49]">
-                  <Shield className="w-4 h-4 text-[#002B49] shrink-0" aria-hidden="true" />
-                  <span>Aviso de Privacidad y Cumplimiento Ley N° 21.719</span>
-                </div>
-                <p className="text-[11px] text-slate-600 font-normal leading-relaxed">
-                  En cumplimiento de la <strong>Ley N° 21.719 sobre Protección de Datos Personales</strong>,
-                  los datos recopilados en Nexo360 tienen como finalidad exclusiva la gestión
-                  académica, la asignación de ajustes de accesibilidad PAEDIS y el seguimiento de
-                  retención estudiantil. Los datos no se cederán a terceros no autorizados.
-                </p>
-                <label className="flex items-start gap-2.5 pt-1 text-xs font-medium text-slate-800 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={consentAccepted}
-                    onChange={(e) => setConsentAccepted(e.target.checked)}
-                    {...getVoiceProps(
-                      `Consentimiento Ley 21.719: ${consentAccepted ? 'aceptado' : 'no aceptado'}`
-                    )}
-                    className="mt-0.5 w-4 h-4 text-[#002B49] rounded border-slate-300 focus:ring-[#002B49] shrink-0"
-                  />
-                  <span>
-                    Al registrar el usuario, se formaliza la aceptación expresa e informada del
-                    tratamiento institucional de sus datos según la Ley N° 21.719.
-                  </span>
-                </label>
-              </div>
-
-              {modalError && (
-                <div
-                  role="alert"
-                  aria-live="assertive"
-                  {...getVoiceProps(modalError)}
-                  className="p-3.5 bg-red-50 border border-red-300 text-red-900 text-xs font-bold rounded-2xl flex items-center gap-2.5 animate-fade-in"
-                >
-                  <AlertTriangle className="w-4 h-4 text-red-700 shrink-0" aria-hidden="true" />
-                  <span>{modalError}</span>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreateModalOpen(false);
-                    setIsCareerDropdownOpen(false);
-                  }}
-                  {...getVoiceProps('Cancelar registro de usuario')}
-                  className="min-h-[42px] px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  {...getVoiceProps('Registrar usuario en Nexo360')}
-                  className="min-h-[42px] px-6 py-2 bg-[#002B49] hover:bg-[#001D33] text-white text-xs font-semibold rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors"
-                >
-                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin text-[#FFB81C]" />}
-                  <span>Registrar Usuario</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <RegisterUserModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setModalError('');
+        }}
+        closeBtnRef={createCloseBtnRef}
+        sortedCareers={sortedCareers}
+        sortedSedes={sortedSedes}
+        isAdmin={isAdmin}
+        defaultCampus={DEFAULT_CAMPUS}
+        isSubmitting={isSubmitting}
+        serverError={modalError}
+        onSubmitUser={handleCreateUser}
+      />
     </div>
   );
 };

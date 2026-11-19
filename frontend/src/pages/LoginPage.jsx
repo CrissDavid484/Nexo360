@@ -1,23 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LoginForm } from '../components/auth/LoginForm';
 import { MfaPrompt } from '../components/auth/MfaPrompt';
+import { ForgotPasswordFlow } from '../components/auth/ForgotPasswordFlow';
 import { AccessibilityBar } from '../components/common/AccessibilityBar';
 import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import logo03 from '../assets/logo03.png';
 
-export const LoginPage = () => {
-  const [mfaSession, setMfaSession] = useState(null);
-  const { setAuthData, isAuthenticated } = useAuth();
-  const { getVoiceProps } = useAccessibility();
+function resolveAuthMode(initialMode, queryMode, hasToken) {
+  if (initialMode === 'reset' || queryMode === 'reset' || hasToken) {
+    return 'reset';
+  }
+  if (initialMode === 'forgot' || queryMode === 'forgot') {
+    return 'forgot';
+  }
+  return 'login';
+}
+
+export const LoginPage = ({ initialMode = 'login' }) => {
+  const location = useLocation();
   const navigate = useNavigate();
+
+  const urlRecoveryParams = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      mode: (params.get('mode') || '').trim().toLowerCase(),
+      token: (params.get('token') || '').trim(),
+      email: (params.get('email') || '').trim().toLowerCase(),
+    };
+  }, [location.search]);
+
+  const [mfaSession, setMfaSession] = useState(null);
+  const [authMode, setAuthMode] = useState(() =>
+    resolveAuthMode(initialMode, urlRecoveryParams.mode, Boolean(urlRecoveryParams.token))
+  );
+  const [recoveryEmail, setRecoveryEmail] = useState(urlRecoveryParams.email);
+  const [recoveryToken, setRecoveryToken] = useState(urlRecoveryParams.token);
+
+  const { setAuthData, isAuthenticated } = useAuth();
+  const { getVoiceProps, clearReadingMode } = useAccessibility();
 
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    const resolved = resolveAuthMode(
+      initialMode,
+      urlRecoveryParams.mode,
+      Boolean(urlRecoveryParams.token)
+    );
+    setAuthMode(resolved);
+    if (urlRecoveryParams.email) {
+      setRecoveryEmail(urlRecoveryParams.email);
+    }
+    if (urlRecoveryParams.token) {
+      setRecoveryToken(urlRecoveryParams.token);
+    }
+  }, [initialMode, urlRecoveryParams.mode, urlRecoveryParams.email, urlRecoveryParams.token]);
 
   const handleMfaRequired = ({ sessionId, mfaCode, email }) => {
     setMfaSession({ sessionId, initialMfaCode: mfaCode, email });
@@ -31,6 +74,53 @@ export const LoginPage = () => {
   const handleCancelMfa = () => {
     setMfaSession(null);
   };
+
+  const handleOpenForgotPassword = (prefillEmail = '') => {
+    setRecoveryEmail(String(prefillEmail || '').trim().toLowerCase());
+    setRecoveryToken('');
+    setAuthMode('forgot');
+  };
+
+  const handleBackToLogin = () => {
+    setAuthMode('login');
+    setRecoveryToken('');
+    if (location.pathname !== '/login' || location.search) {
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const renderAuthFlow = () => {
+    if (mfaSession) {
+      return (
+        <MfaPrompt
+          sessionInfo={mfaSession}
+          onApproved={handleApproved}
+          onCancel={handleCancelMfa}
+        />
+      );
+    }
+    if (authMode === 'forgot' || authMode === 'reset') {
+      return (
+        <ForgotPasswordFlow
+          initialMode={authMode === 'reset' ? 'reset' : 'request'}
+          initialEmail={recoveryEmail}
+          initialToken={recoveryToken}
+          onBackToLogin={handleBackToLogin}
+        />
+      );
+    }
+    return (
+      <LoginForm
+        onMfaRequired={handleMfaRequired}
+        onDirectSuccess={handleApproved}
+        onForgotPassword={handleOpenForgotPassword}
+      />
+    );
+  };
+
+  const subtitleText = clearReadingMode
+    ? 'Centro de Ayuda Duoc UC'
+    : 'Centro de Ayuda y Servicios • Duoc UC - Sede Alameda';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#EEF2F6] text-slate-900">
@@ -53,25 +143,14 @@ export const LoginPage = () => {
               }}
             />
             <p className="text-xs sm:text-sm text-slate-600 font-semibold mt-2.5">
-              Centro de Ayuda y Servicios • Duoc UC - Sede Alameda
+              {subtitleText}
             </p>
           </div>
         </header>
 
         {/* Contenedor del flujo de autenticación */}
         <div className="w-full max-w-[460px]">
-          {mfaSession ? (
-            <MfaPrompt
-              sessionInfo={mfaSession}
-              onApproved={handleApproved}
-              onCancel={handleCancelMfa}
-            />
-          ) : (
-            <LoginForm
-              onMfaRequired={handleMfaRequired}
-              onDirectSuccess={handleApproved}
-            />
-          )}
+          {renderAuthFlow()}
         </div>
 
         <footer className="mt-8 pt-4 border-t border-slate-300/70 w-full max-w-[460px] text-center">

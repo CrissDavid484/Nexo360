@@ -201,9 +201,12 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
       const readFrontendFile = (relPath) =>
         fs.readFileSync(path.resolve(__dirname, '../../frontend/src', relPath), 'utf8');
 
-      // 1. AccessibilityBar.jsx: FAB oculto en esquina inferior derecha con ícono universal Accessibility
+      // 1. AccessibilityBar.jsx: FAB oculto en esquina inferior derecha con ícono universal en círculo AccessibilityCircleIcon
       const a11yBar = readFrontendFile('components/common/AccessibilityBar.jsx');
-      assert.ok(a11yBar.includes('Accessibility,') || a11yBar.includes('Accessibility\n'));
+      assert.ok(
+        a11yBar.includes('AccessibilityCircleIcon'),
+        'AccessibilityBar debe renderizar AccessibilityCircleIcon en lugar de Lucide genérico'
+      );
       assert.ok(!a11yBar.includes('SlidersHorizontal'));
       assert.ok(a11yBar.includes('Ajustes de accesibilidad'));
       assert.ok(a11yBar.includes('fixed bottom-5 right-0 z-50'));
@@ -251,6 +254,23 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
       const mfaPrompt = readFrontendFile('components/auth/MfaPrompt.jsx');
       assert.ok(mfaPrompt.includes('BASE_MAX_POLL_COUNT * 2'));
       assert.ok(mfaPrompt.includes('Escuchar código nuevamente'));
+
+      // 6. Navegación bidireccional por flechas e inclusión en App.jsx
+      const keyboardNav = readFrontendFile('components/common/KeyboardNavigationObserver.jsx');
+      assert.ok(keyboardNav.includes('ArrowDown') && keyboardNav.includes('ArrowUp'));
+      assert.ok(keyboardNav.includes('ArrowRight') && keyboardNav.includes('ArrowLeft'));
+      const appJsx = readFrontendFile('App.jsx');
+      assert.ok(appJsx.includes('KeyboardNavigationObserver'));
+
+      // 7. Perfiles de discapacidad institucional y adaptación
+      const a11yProfiles = readFrontendFile('utils/accessibilityProfiles.js');
+      assert.ok(a11yProfiles.includes('ceguera_total'));
+      assert.ok(a11yProfiles.includes('baja_vision'));
+      assert.ok(a11yProfiles.includes('daltonismo'));
+      assert.ok(a11yProfiles.includes('tea'));
+
+      const readingGuide = readFrontendFile('components/common/ReadingGuideOverlay.jsx');
+      assert.ok(readingGuide.includes('isBlindMode'));
     }
   );
 });

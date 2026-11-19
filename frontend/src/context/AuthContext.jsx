@@ -8,14 +8,15 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('nexo360_token') || null);
   const [isLoading, setIsLoading] = useState(true);
-  const { loadUserPreferences, announce } = useAccessibility();
+  const { loadUserPreferences, clearDisabilityProfile, announce } = useAccessibility();
 
   const logout = useCallback(() => {
+    localStorage.removeItem('nexo360_token');
     setToken(null);
     setUser(null);
-    localStorage.removeItem('nexo360_token');
+    clearDisabilityProfile();
     announce('Sesión cerrada correctamente');
-  }, [announce]);
+  }, [announce, clearDisabilityProfile]);
 
   useEffect(() => {
     let isActive = true;
@@ -32,9 +33,9 @@ export const AuthProvider = ({ children }) => {
 
         if (response?.success && response?.user) {
           setUser(response.user);
-          if (response.user.accessibilityPreferences) {
-            loadUserPreferences(response.user.accessibilityPreferences);
-          }
+          loadUserPreferences(response.user.accessibilityPreferences, {
+            disabilityProfile: response.user.disabilityProfile,
+          });
         } else {
           logout();
         }
@@ -62,8 +63,10 @@ export const AuthProvider = ({ children }) => {
       setToken(newToken);
       setUser(newUser);
 
-      if (newUser?.accessibilityPreferences) {
-        loadUserPreferences(newUser.accessibilityPreferences);
+      if (newUser) {
+        loadUserPreferences(newUser.accessibilityPreferences, {
+          disabilityProfile: newUser.disabilityProfile,
+        });
       }
     },
     [loadUserPreferences]

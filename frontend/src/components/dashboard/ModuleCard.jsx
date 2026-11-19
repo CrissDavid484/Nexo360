@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { simplifyText } from '../../utils/clearReadingUtils';
 
 const ICON_MAP = {
   GraduationCap,
@@ -32,12 +33,15 @@ const ICON_MAP = {
  * Diseño limpio, estructurado como lista editorial de temas para evitar sobrecarga sensorial.
  */
 export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
-  const { getVoiceProps } = useAccessibility();
+  const { getVoiceProps, clearReadingMode } = useAccessibility();
   const IconComponent = ICON_MAP[category.iconName] || BookOpen;
   const previewSubmodules = category.submodules.slice(0, 4);
   const remainingCount = Math.max(0, category.submodules.length - previewSubmodules.length);
+  const displayDescription = clearReadingMode
+    ? simplifyText(category.description, { maxSentences: 1, maxChars: 130 })
+    : category.description;
   const cardVoiceProps = getVoiceProps(
-    `${category.title}. ${category.description} Incluye ${category.submodules.length} trámites.`
+    `${category.title}. ${displayDescription} Incluye ${category.submodules.length} trámites.`
   );
 
   return (
@@ -83,7 +87,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
 
         {/* Descripción breve y humana */}
         <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-4 font-normal">
-          {category.description}
+          {displayDescription}
         </p>
 
         {/* Lista limpia de apartados directos */}

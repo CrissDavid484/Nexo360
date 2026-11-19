@@ -16,15 +16,24 @@ const mfaPollingLimiter = createRateLimiter({
   message: 'Límite de consultas de estado MFA alcanzado. Espere unos segundos.',
 });
 
+const passwordRecoveryLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Demasiados intentos de recuperación de contraseña. Intente nuevamente en 15 minutos.',
+});
+
 // Rutas públicas de autenticación institucional
 router.get('/users', authController.getInstitutionalUsers);
 router.get('/ley21719', authController.getLey21719Info);
 router.post('/sso-login', loginLimiter, authController.ssoLogin);
 router.post('/login', loginLimiter, authController.login);
+router.post('/forgot-password', passwordRecoveryLimiter, authController.forgotPassword);
+router.post('/reset-password', passwordRecoveryLimiter, authController.resetPassword);
 router.get('/mfa-status/:sessionId', mfaPollingLimiter, authController.getMfaStatus);
 
 // Rutas protegidas con JWT: Perfil, Accesibilidad y Simulador de Toma de Ramos en MongoDB
 router.get('/me', verifyToken, authController.getProfile);
+router.put('/change-password', verifyToken, authController.changePassword);
 router.put('/accessibility', verifyToken, authController.updateAccessibility);
 router.put('/profile', verifyToken, authController.updateProfile);
 router.put('/profile/photo', verifyToken, authController.updatePhoto);

@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { EMAIL_REGEX, DEFAULT_SEDE } = require('../utils/validationUtils');
+const {
+  EMAIL_REGEX,
+  DEFAULT_SEDE,
+  VALID_DISABILITY_PROFILES,
+  VALID_COLOR_BLIND_MODES,
+} = require('../utils/validationUtils');
 
 const ScheduleBlockSchema = new mongoose.Schema(
   {
@@ -119,6 +124,38 @@ const UserProfileSchema = new mongoose.Schema(
       type: String,
       required: false, // Opcional al crear pero autogenerado si no se provee
       select: true,
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+    passwordResetTokenHash: {
+      type: String,
+      default: '',
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    firstName: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: '',
+    },
+    paternalLastName: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: '',
+    },
+    maternalLastName: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: '',
     },
     fullName: {
       type: String,
@@ -278,6 +315,12 @@ const UserProfileSchema = new mongoose.Schema(
       maxlength: 80,
       default: 'Visual / Sensorial',
     },
+    disabilityProfile: {
+      type: String,
+      trim: true,
+      enum: VALID_DISABILITY_PROFILES,
+      default: 'ninguna',
+    },
     acreditacionPaedis: {
       type: String,
       trim: true,
@@ -331,6 +374,15 @@ const UserProfileSchema = new mongoose.Schema(
       screenReaderOptimized: {
         type: Boolean,
         default: true,
+      },
+      colorBlindMode: {
+        type: String,
+        enum: VALID_COLOR_BLIND_MODES,
+        default: 'none',
+      },
+      clearReadingMode: {
+        type: Boolean,
+        default: false,
       },
     },
     enrolledCourses: {
@@ -418,21 +470,21 @@ UserProfileSchema.methods.comparePassword = async function (candidatePassword) {
   return this.password === candidatePassword;
 };
 
-// Métodos de transformación para cumplir con la Ley N° 21.719 (Cero almacenamiento o exposición de contraseñas)
+// Métodos de transformación para cumplir con la Ley N° 21.719 (Cero almacenamiento o exposición de contraseñas y tokens)
+function sanitizeSerializedUser(_doc, ret) {
+  delete ret.password;
+  delete ret.passwordResetTokenHash;
+  delete ret.passwordResetExpires;
+  delete ret.__v;
+  return ret;
+}
+
 UserProfileSchema.set('toJSON', {
-  transform: (doc, ret) => {
-    delete ret.password;
-    delete ret.__v;
-    return ret;
-  },
+  transform: sanitizeSerializedUser,
 });
 
 UserProfileSchema.set('toObject', {
-  transform: (doc, ret) => {
-    delete ret.password;
-    delete ret.__v;
-    return ret;
-  },
+  transform: sanitizeSerializedUser,
 });
 
 // Índices de alto rendimiento para búsquedas y filtros en Admin Panel y Auth

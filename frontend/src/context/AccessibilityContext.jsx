@@ -9,8 +9,18 @@ import React, {
 } from 'react';
 import { api } from '../services/api';
 import { speak, stopSpeech, resolveReadableText } from '../utils/speechService';
+import {
+  getColorBlindModeMeta,
+  getDefaultPreferencesForDisability,
+  getDisabilityProfileMeta,
+  isBlindDisabilityProfile,
+  normalizeColorBlindMode,
+} from '../utils/accessibilityProfiles';
 
 const AccessibilityContext = createContext();
+
+const VALID_FONT_SIZES = new Set(['normal', 'large', 'xlarge']);
+const COLOR_BLIND_CLASSES = ['cb-protanopia', 'cb-deuteranopia', 'cb-tritanopia'];
 
 function syncDocumentAccessibilityClasses({
   fontSize,
@@ -19,27 +29,105 @@ function syncDocumentAccessibilityClasses({
   reducedMotion,
   readingGuide,
   voiceReader,
+  colorBlindMode,
+  clearReadingMode,
+  disabilityProfile,
 }) {
   const root = document.documentElement;
+  const isBlind = isBlindDisabilityProfile(disabilityProfile);
+  const safeColorBlind = normalizeColorBlindMode(colorBlindMode);
+
   root.classList.remove('font-size-normal', 'font-size-large', 'font-size-xlarge');
   root.classList.add(`font-size-${fontSize}`);
 
   root.classList.toggle('high-contrast', highContrast);
   root.classList.toggle('font-dyslexic', dyslexicFont);
   root.classList.toggle('reduced-motion', reducedMotion);
+  root.classList.toggle('clear-reading-mode', Boolean(clearReadingMode));
+  root.classList.toggle('blind-mode', isBlind);
+
+  root.classList.remove(...COLOR_BLIND_CLASSES);
+  if (safeColorBlind !== 'none') {
+    root.classList.add(`cb-${safeColorBlind}`);
+  }
 
   localStorage.setItem('nexo360_font_size', fontSize);
   localStorage.setItem('nexo360_high_contrast', String(highContrast));
   localStorage.setItem('nexo360_dyslexic_font', String(dyslexicFont));
   localStorage.setItem('nexo360_reduced_motion', String(reducedMotion));
-  localStorage.setItem('nexo360_reading_guide', String(readingGuide));
+  localStorage.setItem('nexo360_reading_guide', String(isBlind ? false : readingGuide));
   localStorage.setItem('nexo360_voice_reader', String(voiceReader));
+  localStorage.setItem('nexo360_color_blind_mode', safeColorBlind);
+  localStorage.setItem('nexo360_clear_reading_mode', String(Boolean(clearReadingMode)));
+  localStorage.setItem('nexo360_disability_profile', disabilityProfile || 'ninguna');
+}
+
+function pickBooleanPref(rawVal, fallbackOverride, currentVal) {
+  if (typeof rawVal === 'boolean') return rawVal;
+  if (typeof fallbackOverride === 'boolean') return fallbackOverride;
+  return currentVal;
+}
+
+function resolveMergedPreferences(prefs, options, current) {
+  const hasProfileOption =
+    typeof options?.disabilityProfile === 'string' && options.disabilityProfile.trim().length > 0;
+  if (!prefs && !hasProfileOption) return null;
+
+  const resolvedProfile = hasProfileOption
+    ? getDisabilityProfileMeta(options.disabilityProfile).id
+    : current.disabilityProfile;
+  const isBlind = isBlindDisabilityProfile(resolvedProfile);
+  const overrides =
+    resolvedProfile !== 'ninguna' ? getDisabilityProfileMeta(resolvedProfile).defaults : {};
+
+  let nextFontSize = current.fontSize;
+  if (VALID_FONT_SIZES.has(prefs?.fontSize)) {
+    nextFontSize = prefs.fontSize;
+  } else if (VALID_FONT_SIZES.has(overrides.fontSize)) {
+    nextFontSize = overrides.fontSize;
+  }
+
+  let nextColorBlindMode = current.colorBlindMode;
+  if (typeof prefs?.colorBlindMode === 'string') {
+    nextColorBlindMode = normalizeColorBlindMode(prefs.colorBlindMode);
+  } else if (typeof overrides.colorBlindMode === 'string') {
+    nextColorBlindMode = normalizeColorBlindMode(overrides.colorBlindMode);
+  }
+
+  const nextReadingGuide = isBlind
+    ? false
+    : pickBooleanPref(prefs?.readingGuide, overrides.readingGuide, current.readingGuide);
+
+  return {
+    fontSize: nextFontSize,
+    highContrast: pickBooleanPref(prefs?.highContrast, overrides.highContrast, current.highContrast),
+    dyslexicFont: pickBooleanPref(prefs?.dyslexicFont, overrides.dyslexicFont, current.dyslexicFont),
+    reducedMotion: pickBooleanPref(
+      prefs?.reducedMotion,
+      overrides.reducedMotion,
+      current.reducedMotion
+    ),
+    readingGuide: nextReadingGuide,
+    voiceReader: pickBooleanPref(prefs?.voiceReader, overrides.voiceReader, current.voiceReader),
+    colorBlindMode: nextColorBlindMode,
+    clearReadingMode: pickBooleanPref(
+      prefs?.clearReadingMode,
+      overrides.clearReadingMode,
+      current.clearReadingMode
+    ),
+    disabilityProfile: resolvedProfile,
+  };
+}
+
+function hasPreferencesChanged(next, current) {
+  return Object.keys(next).some((key) => next[key] !== current[key]);
 }
 
 export const AccessibilityProvider = ({ children }) => {
   // Inicialización desde localStorage
   const [fontSize, setFontSize] = useState(() => {
-    return localStorage.getItem('nexo360_font_size') || 'normal';
+    const saved = localStorage.getItem('nexo360_font_size');
+    return VALID_FONT_SIZES.has(saved) ? saved : 'normal';
   });
 
   const [highContrast, setHighContrast] = useState(() => {
@@ -64,6 +152,24 @@ export const AccessibilityProvider = ({ children }) => {
     return localStorage.getItem('nexo360_voice_reader') === 'true';
   });
 
+  // Adaptación cromática para daltonismo
+  const [colorBlindMode, setColorBlindModeState] = useState(() => {
+    return normalizeColorBlindMode(localStorage.getItem('nexo360_color_blind_mode') || 'none');
+  });
+
+  // Lectura clara y resumida (TEA / W3C COGA)
+  const [clearReadingMode, setClearReadingMode] = useState(() => {
+    return localStorage.getItem('nexo360_clear_reading_mode') === 'true';
+  });
+
+  // Perfil de discapacidad PAEDIS activo
+  const [disabilityProfile, setDisabilityProfile] = useState(() => {
+    const saved = localStorage.getItem('nexo360_disability_profile') || 'ninguna';
+    return getDisabilityProfileMeta(saved).id;
+  });
+
+  const isBlindMode = isBlindDisabilityProfile(disabilityProfile);
+
   // Estado para la cortina de transición suave entre temas
   const [isCurtainAnimating, setIsCurtainAnimating] = useState(false);
 
@@ -77,6 +183,19 @@ export const AccessibilityProvider = ({ children }) => {
   const skipBackendSyncRef = useRef(false);
   const voiceReaderRef = useRef(voiceReader);
   voiceReaderRef.current = voiceReader;
+
+  const currentSnapshotRef = useRef(null);
+  currentSnapshotRef.current = {
+    fontSize,
+    highContrast,
+    dyslexicFont,
+    reducedMotion,
+    readingGuide,
+    voiceReader,
+    colorBlindMode,
+    clearReadingMode,
+    disabilityProfile,
+  };
 
   // Función memoizada para anunciar cambios dinámicos a lectores de pantalla (NVDA, JAWS, VoiceOver)
   // y locutar automáticamente estados/alertas cuando Lectura por Voz está activa.
@@ -106,13 +225,17 @@ export const AccessibilityProvider = ({ children }) => {
 
   // Sincronizar clases con el elemento raíz <html> y persistir solo ante cambios del usuario autenticado
   useEffect(() => {
+    const effectiveReadingGuide = isBlindMode ? false : readingGuide;
     syncDocumentAccessibilityClasses({
       fontSize,
       highContrast,
       dyslexicFont,
       reducedMotion,
-      readingGuide,
+      readingGuide: effectiveReadingGuide,
       voiceReader,
+      colorBlindMode,
+      clearReadingMode,
+      disabilityProfile,
     });
 
     if (isInitialMountRef.current) {
@@ -133,15 +256,28 @@ export const AccessibilityProvider = ({ children }) => {
           highContrast,
           dyslexicFont,
           reducedMotion,
-          readingGuide,
+          readingGuide: effectiveReadingGuide,
           voiceReader,
+          colorBlindMode,
+          clearReadingMode,
           screenReaderOptimized: true,
         })
         .catch((err) => {
           console.warn('[AccessibilityContext] Error al sincronizar preferencias con backend:', err);
         });
     }
-  }, [fontSize, highContrast, dyslexicFont, reducedMotion, readingGuide, voiceReader]);
+  }, [
+    fontSize,
+    highContrast,
+    dyslexicFont,
+    reducedMotion,
+    readingGuide,
+    voiceReader,
+    colorBlindMode,
+    clearReadingMode,
+    disabilityProfile,
+    isBlindMode,
+  ]);
 
   // Controles de tamaño de fuente memoizados
   const increaseFontSize = useCallback(() => {
@@ -215,6 +351,12 @@ export const AccessibilityProvider = ({ children }) => {
   }, [reducedMotion, announce]);
 
   const toggleReadingGuide = useCallback(() => {
+    if (isBlindMode) {
+      setReadingGuide(false);
+      localStorage.setItem('nexo360_reading_guide', 'false');
+      announce('La guía visual está desactivada en el perfil para persona no vidente.');
+      return;
+    }
     const next = !readingGuide;
     setReadingGuide(next);
     localStorage.setItem('nexo360_reading_guide', String(next));
@@ -224,7 +366,64 @@ export const AccessibilityProvider = ({ children }) => {
         : 'Guía de lectura desactivada.',
       'polite'
     );
-  }, [readingGuide, announce]);
+  }, [readingGuide, isBlindMode, announce]);
+
+  const setColorBlindMode = useCallback(
+    (mode) => {
+      const normalized = normalizeColorBlindMode(mode);
+      setColorBlindModeState(normalized);
+      localStorage.setItem('nexo360_color_blind_mode', normalized);
+      const modeMeta = getColorBlindModeMeta(normalized);
+      announce(
+        normalized === 'none'
+          ? 'Filtro de daltonismo desactivado'
+          : `Modo de daltonismo ${modeMeta.label} activado`
+      );
+    },
+    [announce]
+  );
+
+  const toggleClearReadingMode = useCallback(() => {
+    const next = !clearReadingMode;
+    setClearReadingMode(next);
+    localStorage.setItem('nexo360_clear_reading_mode', String(next));
+    announce(next ? 'Lectura clara y resumida activada' : 'Lectura clara y resumida desactivada');
+  }, [clearReadingMode, announce]);
+
+  const applyDisabilityProfile = useCallback(
+    (profileId, subtype) => {
+      const meta = getDisabilityProfileMeta(profileId);
+      const defaults = getDefaultPreferencesForDisability(meta.id, subtype);
+      const blind = isBlindDisabilityProfile(meta.id);
+      const nextVoice = Boolean(defaults.voiceReader);
+
+      setDisabilityProfile(meta.id);
+      setFontSize(defaults.fontSize);
+      setHighContrast(Boolean(defaults.highContrast));
+      setDyslexicFont(Boolean(defaults.dyslexicFont));
+      setReducedMotion(Boolean(defaults.reducedMotion));
+      setReadingGuide(blind ? false : Boolean(defaults.readingGuide));
+      voiceReaderRef.current = nextVoice;
+      setVoiceReader(nextVoice);
+      setColorBlindModeState(normalizeColorBlindMode(defaults.colorBlindMode));
+      setClearReadingMode(Boolean(defaults.clearReadingMode));
+
+      if (!nextVoice) {
+        stopSpeech();
+      }
+
+      announce(
+        `Perfil de accesibilidad adaptado: ${meta.label}`,
+        blind ? 'assertive' : 'polite'
+      );
+    },
+    [announce]
+  );
+
+  const clearDisabilityProfile = useCallback(() => {
+    setDisabilityProfile('ninguna');
+    localStorage.removeItem('nexo360_disability_profile');
+  }, []);
 
   const toggleVoiceReader = useCallback(() => {
     const next = !voiceReaderRef.current;
@@ -283,40 +482,49 @@ export const AccessibilityProvider = ({ children }) => {
     setReadingGuide(false);
     voiceReaderRef.current = false;
     setVoiceReader(false);
+    setColorBlindModeState('none');
+    setClearReadingMode(false);
     stopSpeech();
     localStorage.removeItem('nexo360_reading_guide');
     localStorage.removeItem('nexo360_voice_reader');
+    localStorage.removeItem('nexo360_color_blind_mode');
+    localStorage.removeItem('nexo360_clear_reading_mode');
+    if (!localStorage.getItem('nexo360_token')) {
+      setDisabilityProfile('ninguna');
+      localStorage.removeItem('nexo360_disability_profile');
+    }
     announce('Preferencias de visualización restablecidas a los valores predeterminados');
   }, [announce]);
 
   // Cargar preferencias guardadas del usuario desde el backend sin disparar PUT redundante
-  const loadUserPreferences = useCallback((prefs) => {
-    if (!prefs) return;
-    skipBackendSyncRef.current = true;
-    if (prefs.fontSize) {
-      setFontSize(prefs.fontSize);
-      localStorage.setItem('nexo360_font_size', prefs.fontSize);
+  const loadUserPreferences = useCallback((prefs, options = {}) => {
+    const merged = resolveMergedPreferences(prefs, options, currentSnapshotRef.current);
+    if (!merged) return;
+
+    if (hasPreferencesChanged(merged, currentSnapshotRef.current)) {
+      skipBackendSyncRef.current = true;
     }
-    if (typeof prefs.highContrast === 'boolean') {
-      setHighContrast(prefs.highContrast);
-      localStorage.setItem('nexo360_high_contrast', String(prefs.highContrast));
-    }
-    if (typeof prefs.dyslexicFont === 'boolean') {
-      setDyslexicFont(prefs.dyslexicFont);
-      localStorage.setItem('nexo360_dyslexic_font', String(prefs.dyslexicFont));
-    }
-    if (typeof prefs.reducedMotion === 'boolean') {
-      setReducedMotion(prefs.reducedMotion);
-      localStorage.setItem('nexo360_reduced_motion', String(prefs.reducedMotion));
-    }
-    if (typeof prefs.readingGuide === 'boolean') {
-      setReadingGuide(prefs.readingGuide);
-      localStorage.setItem('nexo360_reading_guide', String(prefs.readingGuide));
-    }
-    if (typeof prefs.voiceReader === 'boolean') {
-      setVoiceReader(prefs.voiceReader);
-      localStorage.setItem('nexo360_voice_reader', String(prefs.voiceReader));
-    }
+
+    setFontSize(merged.fontSize);
+    setHighContrast(merged.highContrast);
+    setDyslexicFont(merged.dyslexicFont);
+    setReducedMotion(merged.reducedMotion);
+    setReadingGuide(merged.readingGuide);
+    voiceReaderRef.current = merged.voiceReader;
+    setVoiceReader(merged.voiceReader);
+    setColorBlindModeState(merged.colorBlindMode);
+    setClearReadingMode(merged.clearReadingMode);
+    setDisabilityProfile(merged.disabilityProfile);
+
+    localStorage.setItem('nexo360_font_size', merged.fontSize);
+    localStorage.setItem('nexo360_high_contrast', String(merged.highContrast));
+    localStorage.setItem('nexo360_dyslexic_font', String(merged.dyslexicFont));
+    localStorage.setItem('nexo360_reduced_motion', String(merged.reducedMotion));
+    localStorage.setItem('nexo360_reading_guide', String(merged.readingGuide));
+    localStorage.setItem('nexo360_voice_reader', String(merged.voiceReader));
+    localStorage.setItem('nexo360_color_blind_mode', merged.colorBlindMode);
+    localStorage.setItem('nexo360_clear_reading_mode', String(merged.clearReadingMode));
+    localStorage.setItem('nexo360_disability_profile', merged.disabilityProfile);
   }, []);
 
   const contextValue = useMemo(
@@ -327,6 +535,10 @@ export const AccessibilityProvider = ({ children }) => {
       reducedMotion,
       readingGuide,
       voiceReader,
+      colorBlindMode,
+      clearReadingMode,
+      disabilityProfile,
+      isBlindMode,
       isCurtainAnimating,
       announcement,
       announcementPriority,
@@ -338,6 +550,10 @@ export const AccessibilityProvider = ({ children }) => {
       toggleReducedMotion,
       toggleReadingGuide,
       toggleVoiceReader,
+      setColorBlindMode,
+      toggleClearReadingMode,
+      applyDisabilityProfile,
+      clearDisabilityProfile,
       speakText,
       stopSpeaking,
       getVoiceProps,
@@ -352,6 +568,10 @@ export const AccessibilityProvider = ({ children }) => {
       reducedMotion,
       readingGuide,
       voiceReader,
+      colorBlindMode,
+      clearReadingMode,
+      disabilityProfile,
+      isBlindMode,
       isCurtainAnimating,
       announcement,
       announcementPriority,
@@ -363,6 +583,10 @@ export const AccessibilityProvider = ({ children }) => {
       toggleReducedMotion,
       toggleReadingGuide,
       toggleVoiceReader,
+      setColorBlindMode,
+      toggleClearReadingMode,
+      applyDisabilityProfile,
+      clearDisabilityProfile,
       speakText,
       stopSpeaking,
       getVoiceProps,

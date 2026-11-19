@@ -94,8 +94,8 @@ exports.getInstitutionalUsers = async (req, res) => {
       officialLoginUrl: authService.getOfficialLoginUrl(),
       users,
     });
-  } catch (error) {
-    console.error('[AuthController] Error obteniendo usuarios de la BD:', error.message);
+  } catch {
+    console.error('[AuthController] Error obteniendo usuarios de la BD.');
     return res.status(500).json({
       success: false,
       message: 'No se pudo obtener la lista de usuarios de la base de datos.',
@@ -126,8 +126,8 @@ exports.ssoLogin = async (req, res) => {
       officialLoginUrl: ssoResult.officialLoginUrl,
       message: 'Sesión institucional iniciada exitosamente en Nexo360.',
     });
-  } catch (error) {
-    console.error('[AuthController] Error en ssoLogin:', error.message);
+  } catch {
+    console.error('[AuthController] Error en ssoLogin.');
     return res.status(500).json({
       success: false,
       message: 'Error al validar el usuario en la base de datos de Nexo360.',
@@ -181,7 +181,7 @@ exports.login = async (req, res) => {
         message: error.message,
       });
     }
-    console.error('[AuthController] Error en login:', error.message);
+    console.error('[AuthController] Error en login.');
     return res.status(500).json({
       success: false,
       message: 'Error al verificar las credenciales en la base de datos de Nexo360.',
@@ -220,8 +220,8 @@ exports.recordSimulatorUsage = async (req, res) => {
       success: true,
       message: 'Uso del simulador registrado en la base de datos.',
     });
-  } catch (error) {
-    console.error('[AuthController] Error registrando uso del simulador:', error.message);
+  } catch {
+    console.error('[AuthController] Error registrando uso del simulador.');
     return res.status(500).json({
       success: false,
       message: 'No se pudo registrar el uso del simulador.',
@@ -240,7 +240,7 @@ exports.getProfile = async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error('[AuthController] Error obteniendo perfil:', error.message);
+    console.error('[AuthController] Error obteniendo perfil.');
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.statusCode === 401 ? error.message : 'No se pudo obtener el perfil de usuario.',
@@ -275,8 +275,8 @@ exports.updateAccessibility = async (req, res) => {
         : 'Preferencias de accesibilidad aplicadas en sesión.',
       accessibilityPreferences,
     });
-  } catch (error) {
-    console.error('[AuthController] Error actualizando preferencias de accesibilidad:', error.message);
+  } catch {
+    console.error('[AuthController] Error actualizando preferencias de accesibilidad.');
     return res.status(500).json({
       success: false,
       message: 'No se pudieron actualizar las preferencias de accesibilidad.',
@@ -336,8 +336,8 @@ exports.updateProfile = async (req, res) => {
         : 'Datos de contacto actualizados en sesión.',
       user: responseUser,
     });
-  } catch (error) {
-    console.error('[AuthController] Error actualizando perfil:', error.message);
+  } catch {
+    console.error('[AuthController] Error actualizando perfil.');
     return res.status(500).json({
       success: false,
       message: 'No se pudieron actualizar los datos de perfil.',
@@ -377,8 +377,8 @@ exports.updatePhoto = async (req, res) => {
       photo: formattedUser.photo,
       user: formattedUser,
     });
-  } catch (error) {
-    console.error('[AuthController] Error actualizando fotografía de perfil:', error.message);
+  } catch {
+    console.error('[AuthController] Error actualizando fotografía de perfil.');
     return res.status(500).json({
       success: false,
       message: 'No se pudo actualizar la fotografía de perfil.',
@@ -398,7 +398,7 @@ exports.getTomaRamos = async (req, res) => {
       enrolledCourses: user.enrolledCourses || [],
     });
   } catch (error) {
-    console.error('[AuthController] Error obteniendo toma de ramos:', error.message);
+    console.error('[AuthController] Error obteniendo toma de ramos.');
     return res.status(error.statusCode || 500).json({
       success: false,
       message: 'Error al consultar las asignaturas inscritas.',
@@ -474,11 +474,133 @@ exports.saveTomaRamos = async (req, res) => {
         : 'Carga académica grabada en sesión.',
       enrolledCourses: user ? user.enrolledCourses : sanitizedCourses,
     });
-  } catch (error) {
-    console.error('[AuthController] Error guardando toma de ramos:', error.message);
+  } catch {
+    console.error('[AuthController] Error guardando toma de ramos.');
     return res.status(500).json({
       success: false,
       message: 'Error al guardar la carga académica en la base de datos.',
+    });
+  }
+};
+
+/**
+ * POST /api/auth/forgot-password
+ */
+exports.forgotPassword = async (req, res) => {
+  try {
+    const cleanEmail = parseInstitutionalEmailOrReply(
+      req.body?.email,
+      res,
+      'Por favor ingrese su correo institucional.'
+    );
+    if (!cleanEmail) return;
+
+    const result = await authService.requestPasswordReset(cleanEmail);
+    const isProd = process.env.NODE_ENV === 'production';
+
+    return res.status(200).json({
+      success: true,
+      message:
+        'Si el correo institucional está registrado en Nexo360, recibirás instrucciones para restablecer tu contraseña.',
+      ...(isProd ? {} : { deliveryMode: result.deliveryMode }),
+      ...(result.devPreview ? { devPreview: result.devPreview } : {}),
+    });
+  } catch {
+    console.error('[AuthController] Error interno en forgotPassword.');
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudo procesar la solicitud de recuperación de contraseña.',
+    });
+  }
+};
+
+/**
+ * POST /api/auth/reset-password
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body || {};
+
+    if (typeof email !== 'string' || typeof token !== 'string' || typeof newPassword !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar correo institucional, código de recuperación y nueva contraseña.',
+      });
+    }
+
+    const cleanEmail = parseInstitutionalEmailOrReply(
+      email,
+      res,
+      'Por favor ingrese su correo institucional.'
+    );
+    if (!cleanEmail) return;
+
+    if (!token.trim() || token.length > 256 || !newPassword || newPassword.length > 256) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código de recuperación o contraseña con formato inválido.',
+      });
+    }
+
+    await authService.resetPasswordWithToken(cleanEmail, token, newPassword);
+    return res.status(200).json({
+      success: true,
+      message: 'Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.',
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    console.error('[AuthController] Error interno en resetPassword.');
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudo restablecer la contraseña.',
+    });
+  }
+};
+
+/**
+ * PUT /api/auth/change-password
+ */
+exports.changePassword = async (req, res) => {
+  try {
+    const targetEmail = requireAuthenticatedEmail(req, res);
+    if (!targetEmail) return;
+
+    const { currentPassword, newPassword } = req.body || {};
+    if (
+      typeof currentPassword !== 'string' ||
+      typeof newPassword !== 'string' ||
+      !currentPassword ||
+      !newPassword ||
+      currentPassword.length > 256 ||
+      newPassword.length > 256
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe ingresar su contraseña actual y una nueva contraseña válida.',
+      });
+    }
+
+    await authService.changeUserPassword(targetEmail, currentPassword, newPassword);
+    return res.status(200).json({
+      success: true,
+      message: 'Contraseña actualizada exitosamente.',
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    console.error('[AuthController] Error interno en changePassword.');
+    return res.status(500).json({
+      success: false,
+      message: 'No se pudo actualizar la contraseña.',
     });
   }
 };

@@ -7,6 +7,7 @@ import { LiveAnnouncer } from './components/common/LiveAnnouncer';
 import { ReadingGuideOverlay } from './components/common/ReadingGuideOverlay';
 import { ThemeCurtainOverlay } from './components/common/ThemeCurtainOverlay';
 import { VoiceReaderObserver } from './components/common/VoiceReaderObserver';
+import { KeyboardNavigationObserver } from './components/common/KeyboardNavigationObserver';
 import { LoginPage } from './pages/LoginPage';
 
 // Code-Splitting para optimización extrema de carga y rendimiento de red
@@ -77,6 +78,9 @@ export const App = () => {
       {/* 2.3 Observador global de lectura en voz alta (Web Speech API) */}
       <VoiceReaderObserver />
 
+      {/* 2.4 Observador global de navegación por teclado (Flechas + Tab) */}
+      <KeyboardNavigationObserver />
+
       {/* 3. Contenido Principal Rutas */}
       <Suspense
         fallback={
@@ -91,6 +95,7 @@ export const App = () => {
         <Routes>
           <Route path="/" element={<RootRoute />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<LoginPage initialMode="reset" />} />
           <Route
             path="/dashboard"
             element={

@@ -18,14 +18,14 @@ const MicrosoftLogo = () => (
   </svg>
 );
 
-export const LoginForm = ({ onDirectSuccess }) => {
+export const LoginForm = ({ onDirectSuccess, onForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSsoLoading, setIsSsoLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const { announce, getVoiceProps } = useAccessibility();
+  const { announce, getVoiceProps, clearReadingMode } = useAccessibility();
 
   const handleQuickSelect = (user) => {
     setEmail(user.email);
@@ -60,7 +60,9 @@ export const LoginForm = ({ onDirectSuccess }) => {
       }
     } catch (err) {
       console.error('Error en SSO Microsoft:', err);
-      setErrorMessage(err.message || 'Error al conectar con la base de datos institucional.');
+      const msg = err.message || 'Error al conectar con la base de datos institucional.';
+      setErrorMessage(msg);
+      announce(msg, 'assertive');
       setIsSsoLoading(false);
     }
   };
@@ -115,7 +117,9 @@ export const LoginForm = ({ onDirectSuccess }) => {
             Iniciar Sesión
           </h1>
           <p className="text-xs font-medium text-slate-600 mt-1">
-            Accede con tu cuenta institucional Duoc UC • Sede Alameda
+            {clearReadingMode
+              ? 'Ingresa con tu cuenta institucional Duoc UC.'
+              : 'Accede con tu cuenta institucional Duoc UC • Sede Alameda'}
           </p>
         </div>
 
@@ -227,6 +231,16 @@ export const LoginForm = ({ onDirectSuccess }) => {
                 ) : (
                   <Eye className="w-4 h-4" aria-hidden="true" />
                 )}
+              </button>
+            </div>
+            <div className="flex justify-end pt-0.5">
+              <button
+                type="button"
+                onClick={() => onForgotPassword?.(email.trim().toLowerCase())}
+                {...getVoiceProps('¿Olvidaste tu contraseña? Recuperar acceso')}
+                className="min-h-[38px] px-2 py-1 text-xs font-semibold text-[#002B49] hover:text-[#001D33] hover:underline rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB81C] cursor-pointer"
+              >
+                ¿Olvidaste tu contraseña?
               </button>
             </div>
           </div>

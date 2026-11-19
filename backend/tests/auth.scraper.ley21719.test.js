@@ -186,4 +186,86 @@ test('AUDITORÍA AUTH-NATIVO: Microsoft OAuth, Cohesión MongoDB, Control Acceso
     assert.equal(ssoResult.user.email, 'c.guzman@duocuc.cl');
     assert.equal(ssoResult.isRegisteredInDb, true);
   });
+
+  await t.test('7. [Flujo de Recuperación y Cambio de Contraseña] Token seguro, Anti-enumeración y Ley 21.719', async () => {
+    const emailService = require('../services/emailService');
+
+    // 1. Forgot password para usuario existente (retorna 200 y genera outbox)
+    const forgotRes = await request('/api/auth/forgot-password', {
+      method: 'POST',
+      body: { email: 'c.guzman@duocuc.cl' },
+    });
+    assert.equal(forgotRes.status, 200);
+    assert.equal(forgotRes.body?.success, true);
+
+    // Anti-enumeración: usuario inexistente también retorna 200 con mensaje idéntico
+    const forgotGhostRes = await request('/api/auth/forgot-password', {
+      method: 'POST',
+      body: { email: 'fantasma.noexiste@duocuc.cl' },
+    });
+    assert.equal(forgotGhostRes.status, 200);
+    assert.equal(forgotGhostRes.body?.success, true);
+    assert.equal(forgotGhostRes.body?.message, forgotRes.body?.message);
+
+    // Obtener token del outbox (o preview)
+    const outbox = emailService.getOutbox();
+    const resetMail = outbox.slice().reverse().find((m) => m.resetToken);
+    assert.ok(resetMail, 'Debe haber un correo con resetToken en el outbox');
+    const token = resetMail.resetToken;
+
+    // 2. Reset password con token válido
+    const newPwd = 'NuevaPasswordSegura2026!';
+    const resetRes = await request('/api/auth/reset-password', {
+      method: 'POST',
+      body: {
+        email: 'c.guzman@duocuc.cl',
+        token,
+        newPassword: newPwd,
+      },
+    });
+    assert.equal(resetRes.status, 200);
+    assert.equal(resetRes.body?.success, true);
+
+    // 3. Token reutilizado debe ser rechazado
+    const reuseRes = await request('/api/auth/reset-password', {
+      method: 'POST',
+      body: {
+        email: 'c.guzman@duocuc.cl',
+        token,
+        newPassword: 'OtraPasswordMas2026!',
+      },
+    });
+    assert.equal(reuseRes.status, 400);
+
+    // 4. Iniciar sesión con la nueva contraseña
+    const loginNewRes = await request('/api/auth/login', {
+      method: 'POST',
+      body: {
+        email: 'c.guzman@duocuc.cl',
+        password: newPwd,
+      },
+    });
+    assert.equal(loginNewRes.status, 200);
+    const userToken = loginNewRes.body?.token;
+
+    // 5. Cambio de contraseña autenticado (PUT /api/auth/change-password)
+    const changeRes = await request('/api/auth/change-password', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${userToken}` },
+      body: {
+        currentPassword: newPwd,
+        newPassword: 'Duoc2026!',
+      },
+    });
+    assert.equal(changeRes.status, 200);
+    assert.equal(changeRes.body?.success, true);
+
+    // 6. Verificar que passwordResetTokenHash nunca se expone en toJSON
+    const userMeRes = await request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${userToken}` },
+    });
+    assert.equal(userMeRes.status, 200);
+    assert.equal(userMeRes.body?.user?.passwordResetTokenHash, undefined);
+    assert.equal(userMeRes.body?.user?.password, undefined);
+  });
 });

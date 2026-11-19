@@ -10,6 +10,64 @@ export const DEFAULT_CAMPUS = 'Sede Alameda';
 
 export const SEDES_DUOC = [DEFAULT_CAMPUS];
 
+export const INSTITUTIONAL_DOMAINS = ['duocuc.cl', 'profesor.duoc.cl', 'duoc.cl'];
+export const STUDENT_DOMAINS = ['duocuc.cl'];
+export const STAFF_DOMAINS = ['profesor.duoc.cl', 'duoc.cl'];
+
+function normalizeDomainInput(domainOrEmail = '') {
+  const clean = String(domainOrEmail || '').trim().toLowerCase();
+  const atIndex = clean.lastIndexOf('@');
+  return atIndex >= 0 ? clean.slice(atIndex + 1) : clean;
+}
+
+/**
+ * Indica si el dominio (o correo) corresponde a estudiantes Duoc UC (@duocuc.cl).
+ */
+export function isStudentDomain(domain) {
+  return STUDENT_DOMAINS.includes(normalizeDomainInput(domain));
+}
+
+/**
+ * Indica si el dominio (o correo) corresponde a personal docente o administrativo (@profesor.duoc.cl, @duoc.cl).
+ */
+export function isStaffDomain(domain) {
+  return STAFF_DOMAINS.includes(normalizeDomainInput(domain));
+}
+
+/**
+ * Compone el nombre completo institucional uniendo partes no vacías con un espacio simple.
+ */
+export function composeFullName({
+  firstName = '',
+  paternalLastName = '',
+  maternalLastName = '',
+} = {}) {
+  return [firstName, paternalLastName, maternalLastName]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * Genera la vista previa de contraseña inicial institucional:
+ * RUT normalizado (dígitos + 'k' minúscula, sin puntos ni guion) + primera letra ASCII minúscula del apellido paterno.
+ * Retorna cadena vacía si alguno de los dos datos está incompleto.
+ */
+export function buildInitialPasswordPreview(rut, paternalLastName) {
+  const cleanRut = normalizeRutToken(rut);
+  const firstAsciiLetter = String(paternalLastName || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .match(/[a-z]/)?.[0];
+
+  if (!cleanRut || !firstAsciiLetter) {
+    return '';
+  }
+
+  return `${cleanRut}${firstAsciiLetter}`;
+}
+
 export const CARRERAS_DUOC_LIST = [
   'Actuación',
   'Administración de Empresas',

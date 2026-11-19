@@ -3,16 +3,23 @@ const bcrypt = require('bcryptjs');
 const UserProfile = require('../models/UserProfile');
 const ActivityLog = require('../models/ActivityLog');
 const authService = require('../services/authService');
+const emailService = require('../services/emailService');
 const courseService = require('../services/courseService');
 const satAlertService = require('../services/satAlertService');
 const { calculatePredictiveRisk } = require('../services/predictiveRiskService');
 const { careerCatalog, sedeCatalog } = require('../services/catalogService');
 const {
   EMAIL_REGEX,
+  STUDENT_DOMAINS,
+  STAFF_DOMAINS,
+  VALID_DISABILITY_PROFILES,
   DEFAULT_SEDE,
   sanitizeString,
   normalizeRutSearch,
   sanitizeAccessibilityPreferences,
+  generateInitialPassword,
+  getBarrierForDisability,
+  getDefaultAccessibilityForDisability,
 } = require('../utils/validationUtils');
 
 const ROLE_LABELS = Object.freeze({
@@ -224,8 +231,8 @@ exports.getMetrics = async (req, res) => {
         recentActivity,
       },
     });
-  } catch (error) {
-    console.error('[AdminController] Error al obtener métricas:', error.message);
+  } catch {
+    console.error('[AdminController] Error al obtener métricas.');
     return res.status(500).json({
       success: false,
       message: 'Error al compilar las métricas del panel de administración.',
@@ -295,8 +302,8 @@ exports.getStudents = async (req, res) => {
       count: enriched.length,
       students: enriched,
     });
-  } catch (error) {
-    console.error('[AdminController] Error al listar estudiantes:', error.message);
+  } catch {
+    console.error('[AdminController] Error al listar estudiantes.');
     return res.status(500).json({
       success: false,
       message: 'Error al obtener el directorio de estudiantes.',
@@ -304,117 +311,313 @@ exports.getStudents = async (req, res) => {
   }
 };
 
+function resolveIdentityFields(body) {
+  const firstName = sanitizeString(body.firstName, 60) || '';
+  const paternalLastName = sanitizeString(body.paternalLastName, 60) || '';
+  const maternalLastName = sanitizeString(body.maternalLastName, 60) || '';
+
+  if (firstName || paternalLastName || maternalLastName) {
+    const composed = [firstName, paternalLastName, maternalLastName].filter(Boolean).join(' ');
+    return {
+      firstName,
+      paternalLastName,
+      maternalLastName,
+      fullName: composed || sanitizeString(body.fullName || body.nombre, 120) || '',
+    };
+  }
+
+  const legacyFullName = sanitizeString(body.fullName || body.nombre, 120) || '';
+  const parts = legacyFullName.split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || '',
+    paternalLastName: parts.length >= 2 ? parts[1] : '',
+    maternalLastName: parts.length >= 3 ? parts.slice(2).join(' ') : '',
+    fullName: legacyFullName,
+  };
+}
+
+function validateDomainForRole(email, role) {
+  const domain = email.split('@')[1] || '';
+  const isStaffRole = role === 'admin' || role === 'coordinador_paedis';
+
+  if (isStaffRole && !STAFF_DOMAINS.includes(domain)) {
+    return 'Los roles de Administrador y Coordinador PAEDIS requieren un correo institucional de colaborador (@profesor.duoc.cl o @duoc.cl).';
+  }
+  if (!isStaffRole && !STUDENT_DOMAINS.includes(domain)) {
+    return 'Los roles de Estudiante y Estudiante PAEDIS requieren un correo institucional estudiantil (@duocuc.cl).';
+  }
+  return null;
+}
+
+function resolveDisabilityAndAccessibility(body, isPaedis, isStaffRole) {
+  const rawProfile = sanitizeString(body.disabilityProfile, 40)?.toLowerCase() || '';
+  if (rawProfile && !VALID_DISABILITY_PROFILES.includes(rawProfile)) {
+    return { error: 'El perfil de discapacidad PAEDIS especificado no es válido.' };
+  }
+
+  const disabilityProfile = isStaffRole ? 'ninguna' : rawProfile || 'ninguna';
+  const explicitPrefs =
+    body.accessibilityPreferences &&
+    typeof body.accessibilityPreferences === 'object' &&
+    !Array.isArray(body.accessibilityPreferences)
+      ? body.accessibilityPreferences
+      : {};
+  const colorBlindSubtype =
+    sanitizeString(body.colorBlindMode || explicitPrefs.colorBlindMode, 30)?.toLowerCase() ||
+    'deuteranopia';
+
+  const basePrefs =
+    isPaedis && disabilityProfile !== 'ninguna'
+      ? getDefaultAccessibilityForDisability(disabilityProfile, colorBlindSubtype)
+      : {};
+
+  const accessibilityPreferences = sanitizeAccessibilityPreferences({
+    ...basePrefs,
+    ...explicitPrefs,
+  });
+
+  const explicitBarrier = sanitizeString(body.barreraPaedis, 80);
+  let barreraPaedis = '';
+  if (explicitBarrier) {
+    barreraPaedis = explicitBarrier;
+  } else if (isPaedis && disabilityProfile !== 'ninguna') {
+    barreraPaedis = getBarrierForDisability(disabilityProfile) || 'Visual / Sensorial';
+  } else if (isPaedis) {
+    barreraPaedis = 'Visual / Sensorial';
+  }
+
+  return { disabilityProfile, barreraPaedis, accessibilityPreferences };
+}
+
+async function checkUserEmailExists(email) {
+  if (mongoose.connection.readyState === 1) {
+    const existing = await UserProfile.findOne({ email });
+    return Boolean(existing);
+  }
+  const allUsers = await authService.getAllUsers();
+  return allUsers.some((u) => (u.email || '').toLowerCase() === email.toLowerCase());
+}
+
+function resolveCareerForRole(body, isStaffRole) {
+  const rawCareer = sanitizeString(body.career || body.carrera, 120);
+  if (rawCareer) return rawCareer;
+  return isStaffRole ? '' : 'Ingeniería en Informática';
+}
+
+function validateCreateStudentRequest(body, reqUser) {
+  const requestedRole = sanitizeString(body.role || 'estudiante', 40)?.toLowerCase() || 'estudiante';
+  if (!ALLOWED_ROLES.includes(requestedRole)) {
+    return {
+      errorStatus: 400,
+      errorMessage:
+        'Rol no válido. Los roles institucionales permitidos son: Estudiante, Estudiante PAEDIS, Coordinador PAEDIS y Administrador.',
+    };
+  }
+
+  const isTargetAdmin = requestedRole === 'admin' || requestedRole === 'administrador';
+  const actorRole = (reqUser?.role || '').toLowerCase();
+  const isActorAdmin = actorRole === 'admin' || actorRole === 'administrador';
+  if (isTargetAdmin && !isActorAdmin) {
+    return {
+      errorStatus: 403,
+      errorMessage:
+        'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.',
+    };
+  }
+
+  const rawEmail =
+    body.email ||
+    (body.emailLocal && body.emailDomain ? `${body.emailLocal}@${body.emailDomain}` : '');
+  const email = sanitizeString(rawEmail, 120)?.toLowerCase() || '';
+  if (!email || !EMAIL_REGEX.test(email)) {
+    return {
+      errorStatus: 400,
+      errorMessage:
+        'Debe ingresar un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).',
+    };
+  }
+
+  const role = requestedRole === 'administrador' ? 'admin' : requestedRole;
+  const isStaffRole = role === 'admin' || role === 'coordinador_paedis';
+  const domainError = validateDomainForRole(email, role);
+  if (domainError) {
+    return { errorStatus: 400, errorMessage: domainError };
+  }
+
+  if (body.consentimientoLey21719?.aceptado === false) {
+    return {
+      errorStatus: 400,
+      errorMessage:
+        'El tratamiento de datos bajo la Ley N° 21.719 es obligatorio para registrar cuentas institucionales.',
+    };
+  }
+
+  const identity = resolveIdentityFields(body);
+  if (!identity.fullName) {
+    return { errorStatus: 400, errorMessage: 'El nombre completo es obligatorio.' };
+  }
+
+  const isPaedis = !isStaffRole && (role === 'estudiante_paedis' || Boolean(body.isPaedis));
+  const profileSetup = resolveDisabilityAndAccessibility(body, isPaedis, isStaffRole);
+  if (profileSetup.error) {
+    return { errorStatus: 400, errorMessage: profileSetup.error };
+  }
+
+  return { email, role, isStaffRole, isPaedis, identity, profileSetup };
+}
+
+function buildNewUserDocument({
+  body,
+  email,
+  role,
+  isStaffRole,
+  isPaedis,
+  identity,
+  profileSetup,
+  cleanRut,
+  hashedPassword,
+  mustChangePassword,
+}) {
+  const selectedCareer = resolveCareerForRole(body, isStaffRole);
+  const selectedCampus = sanitizeString(body.campus || body.sede, 80) || DEFAULT_SEDE;
+  const roleLabel =
+    sanitizeString(body.roleLabel, 120) || ROLE_LABELS[role] || 'Estudiante Duoc UC';
+
+  return {
+    email,
+    password: hashedPassword,
+    mustChangePassword,
+    firstName: identity.firstName,
+    paternalLastName: identity.paternalLastName,
+    maternalLastName: identity.maternalLastName,
+    fullName: identity.fullName,
+    nombre: identity.fullName,
+    photo: typeof body.photo === 'string' ? body.photo.trim() : '',
+    rut: cleanRut,
+    role,
+    roleLabel,
+    isPaedis,
+    disabilityProfile: profileSetup.disabilityProfile,
+    barreraPaedis: profileSetup.barreraPaedis,
+    academicStatus: 'activo',
+    statusReason: 'Registrado por Administrador en Nexo360',
+    attendanceRate: 88.9,
+    career: selectedCareer,
+    carrera: selectedCareer,
+    campus: selectedCampus,
+    sede: selectedCampus,
+    address: sanitizeString(body.address, 200) || 'Por actualizar',
+    personalEmail: sanitizeString(body.personalEmail, 120)?.toLowerCase() || email,
+    phone: sanitizeString(body.phone, 30) || '+56 9 0000 0000',
+    emergencyContact: sanitizeString(body.emergencyContact, 120) || 'Contacto Familiar',
+    emergencyPhone: sanitizeString(body.emergencyPhone, 30) || '+56 9 0000 0000',
+    tutorParAsignado: isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado',
+    diagnosticoDeclarado: sanitizeString(body.diagnosticoDeclarado, 160) || '',
+    ajustesAprobados: Array.isArray(body.ajustesAprobados) ? body.ajustesAprobados : [],
+    accessibilityPreferences: profileSetup.accessibilityPreferences,
+    enrolledCourses: Array.isArray(body.enrolledCourses) ? body.enrolledCourses : [],
+    consentimientoLey21719: {
+      aceptado: true,
+      fechaAceptacion: body.consentimientoLey21719?.fechaAceptacion || new Date(),
+      finalidadTratamiento:
+        sanitizeString(body.consentimientoLey21719?.finalidadTratamiento, 300) ||
+        'Gestión académica, registro curricular, acompañamiento PAEDIS y prevención de deserción estudiantil según Ley N° 21.719 de Chile',
+    },
+  };
+}
+
+async function dispatchWelcomeAndLogs({
+  reqUser,
+  createdUser,
+  email,
+  fullName,
+  role,
+  roleLabel,
+  initialPassword,
+}) {
+  let emailResult = { delivered: false, deliveryMode: 'fallback', devPreview: null };
+  try {
+    const resetToken = await authService.createPasswordResetToken(email);
+    emailResult = await emailService.sendWelcomeEmail({
+      to: email,
+      fullName,
+      initialPassword,
+      resetToken,
+      roleLabel,
+    });
+  } catch {
+    console.warn('[AdminController] No se pudo enviar el correo de bienvenida.');
+  }
+
+  await authService.logActivity({
+    userId: reqUser?._id || reqUser?.id,
+    userEmail: reqUser?.email || '',
+    userName: reqUser?.fullName || 'Administrador',
+    userRole: reqUser?.role || 'admin',
+    action: 'student_registered_by_admin',
+    details: `Usuario ${fullName} (${email}) registrado con rol ${roleLabel}. Cumplimiento Ley 21.719 verificado.`,
+  });
+
+  if (emailResult.delivered) {
+    await authService.logActivity({
+      userId: createdUser._id || createdUser.id,
+      userEmail: email,
+      userName: fullName,
+      userRole: role,
+      action: 'welcome_email_sent',
+      details: `Correo de bienvenida enviado (${emailResult.deliveryMode}).`,
+      metadata: { deliveryMode: emailResult.deliveryMode },
+    });
+  }
+
+  return emailResult;
+}
+
 /**
  * POST /api/admin/students
  */
 exports.createStudent = async (req, res) => {
   try {
     const body = req.body || {};
-    const email = sanitizeString(body.email, 120)?.toLowerCase() || '';
-    const fullName = sanitizeString(body.fullName || body.nombre, 120) || '';
-
-    // Contraseña inicial dinámica por año institucional: 'Duoc' + año + '!' (Ej: Duoc2026!)
-    const currentYear = new Date().getFullYear();
-    const dynamicInitialPassword = `Duoc${currentYear}!`;
-    const password = sanitizeString(body.password, 256) || dynamicInitialPassword;
-
-    const requestedRole = sanitizeString(body.role || 'estudiante', 40)?.toLowerCase() || 'estudiante';
-    if (!ALLOWED_ROLES.includes(requestedRole)) {
-      return res.status(400).json({
+    const validated = validateCreateStudentRequest(body, req.user);
+    if (validated.errorStatus) {
+      return res.status(validated.errorStatus).json({
         success: false,
-        message:
-          'Rol no válido. Los roles institucionales permitidos son: Estudiante, Estudiante PAEDIS, Coordinador PAEDIS y Administrador.',
+        message: validated.errorMessage,
       });
     }
 
-    const isTargetAdmin = requestedRole === 'admin' || requestedRole === 'administrador';
-    const actorRole = (req.user?.role || '').toLowerCase();
-    const isActorAdmin = actorRole === 'admin' || actorRole === 'administrador';
-
-    if (isTargetAdmin && !isActorAdmin) {
-      return res.status(403).json({
-        success: false,
-        message:
-          'Acceso restringido: Solo un Administrador puede crear o asignar usuarios con el rol Administrador.',
-      });
-    }
-
-    if (!email || !EMAIL_REGEX.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Debe ingresar un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).',
-      });
-    }
-
-    if (!fullName) {
-      return res.status(400).json({
-        success: false,
-        message: 'El nombre completo es obligatorio.',
-      });
-    }
-
-    let existing = null;
-    if (mongoose.connection.readyState === 1) {
-      existing = await UserProfile.findOne({ email });
-    } else {
-      const allUsers = await authService.getAllUsers();
-      existing = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    }
-
-    if (existing) {
+    const { email, role, isStaffRole, isPaedis, identity, profileSetup } = validated;
+    if (await checkUserEmailExists(email)) {
       return res.status(409).json({
         success: false,
         message: `El correo ${email} ya se encuentra registrado en la base de datos de Nexo360.`,
       });
     }
 
-    const role = requestedRole === 'administrador' ? 'admin' : requestedRole;
-    const isPaedis = role === 'estudiante_paedis' ? true : Boolean(body.isPaedis);
+    const cleanRut = sanitizeString(body.rut, 20) || 'Sin RUT';
+    const explicitPassword = sanitizeString(body.password, 256);
+    const password =
+      explicitPassword ||
+      generateInitialPassword(cleanRut, identity.paternalLastName, identity.fullName);
+    const mustChangePassword =
+      body.mustChangePassword !== undefined ? Boolean(body.mustChangePassword) : !explicitPassword;
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const selectedCareer =
-      sanitizeString(body.career || body.carrera, 120) || 'Ingeniería en Informática';
-    const selectedCampus = sanitizeString(body.campus || body.sede, 80) || DEFAULT_SEDE;
-
-    const consentimientoLey21719 = {
-      aceptado: body.consentimientoLey21719?.aceptado !== false,
-      fechaAceptacion: body.consentimientoLey21719?.fechaAceptacion || new Date(),
-      finalidadTratamiento:
-        sanitizeString(body.consentimientoLey21719?.finalidadTratamiento, 300) ||
-        'Gestión académica, registro curricular, acompañamiento PAEDIS y prevención de deserción estudiantil según Ley N° 21.719 de Chile',
-    };
-
-    const newUserData = {
+    const newUserData = buildNewUserDocument({
+      body,
       email,
-      password: hashedPassword,
-      fullName,
-      nombre: fullName,
-      photo: typeof body.photo === 'string' ? body.photo.trim() : '',
-      rut: sanitizeString(body.rut, 20) || 'Sin RUT',
       role,
-      roleLabel: sanitizeString(body.roleLabel, 120) || ROLE_LABELS[role] || 'Estudiante Duoc UC',
+      isStaffRole,
       isPaedis,
-      academicStatus: 'activo',
-      statusReason: 'Registrado por Administrador en Nexo360',
-      attendanceRate: 88.9,
-      career: selectedCareer,
-      carrera: selectedCareer,
-      campus: selectedCampus,
-      sede: selectedCampus,
-      address: sanitizeString(body.address, 200) || 'Por actualizar',
-      personalEmail: sanitizeString(body.personalEmail, 120)?.toLowerCase() || email,
-      phone: sanitizeString(body.phone, 30) || '+56 9 0000 0000',
-      emergencyContact: sanitizeString(body.emergencyContact, 120) || 'Contacto Familiar',
-      emergencyPhone: sanitizeString(body.emergencyPhone, 30) || '+56 9 0000 0000',
-      tutorParAsignado: isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado',
-      diagnosticoDeclarado: sanitizeString(body.diagnosticoDeclarado, 160) || '',
-      ajustesAprobados: Array.isArray(body.ajustesAprobados) ? body.ajustesAprobados : [],
-      accessibilityPreferences: sanitizeAccessibilityPreferences(body.accessibilityPreferences),
-      enrolledCourses: Array.isArray(body.enrolledCourses) ? body.enrolledCourses : [],
-      consentimientoLey21719,
-    };
+      identity,
+      profileSetup,
+      cleanRut,
+      hashedPassword,
+      mustChangePassword,
+    });
 
     let createdUser;
     if (mongoose.connection.readyState === 1) {
@@ -424,22 +627,27 @@ exports.createStudent = async (req, res) => {
       authService.registerUser(createdUser);
     }
 
-    await authService.logActivity({
-      userId: req.user._id || req.user.id,
-      userEmail: req.user.email,
-      userName: req.user.fullName || 'Administrador',
-      userRole: req.user.role || 'admin',
-      action: 'student_registered_by_admin',
-      details: `Usuario ${fullName} (${email}) registrado con rol ${ROLE_LABELS[role] || role}. Cumplimiento Ley 21.719 verificado.`,
+    const emailResult = await dispatchWelcomeAndLogs({
+      reqUser: req.user,
+      createdUser,
+      email,
+      fullName: identity.fullName,
+      role,
+      roleLabel: newUserData.roleLabel,
+      initialPassword: password,
     });
 
     return res.status(201).json({
       success: true,
-      message: `Usuario ${fullName} registrado exitosamente en la base de datos de Nexo360.`,
+      message: `Usuario ${identity.fullName} registrado exitosamente en la base de datos de Nexo360.`,
       user: authService.formatUserResponse(createdUser),
+      emailSent: Boolean(emailResult.delivered),
+      ...(process.env.NODE_ENV !== 'production' && emailResult.devPreview
+        ? { emailPreview: emailResult.devPreview }
+        : {}),
     });
-  } catch (error) {
-    console.error('[AdminController] Error al crear usuario:', error.message);
+  } catch {
+    console.error('[AdminController] Error al crear usuario.');
     return res.status(500).json({
       success: false,
       message: 'Error al registrar usuario en la base de datos.',
@@ -474,7 +682,7 @@ exports.updateStudentStatus = async (req, res) => {
             statusUpdatedAt: new Date(),
           },
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
     }
 
@@ -492,8 +700,8 @@ exports.updateStudentStatus = async (req, res) => {
       message: `Estado académico actualizado a "${academicStatus.toUpperCase()}" correctamente.`,
       user: updatedUser ? authService.formatUserResponse(updatedUser) : null,
     });
-  } catch (error) {
-    console.error('[AdminController] Error al actualizar estado:', error.message);
+  } catch {
+    console.error('[AdminController] Error al actualizar estado.');
     return res.status(500).json({
       success: false,
       message: 'Error al actualizar el estado del estudiante.',
@@ -522,8 +730,8 @@ exports.deleteStudent = async (req, res) => {
       success: true,
       message: 'Usuario eliminado correctamente de la base de datos.',
     });
-  } catch (error) {
-    console.error('[AdminController] Error al eliminar usuario:', error.message);
+  } catch {
+    console.error('[AdminController] Error al eliminar usuario.');
     return res.status(500).json({
       success: false,
       message: 'Error al eliminar el usuario de la base de datos.',
@@ -551,7 +759,7 @@ exports.getCoursesSummary = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[AdminController] Error al obtener resumen de cursos:', error.message);
+    console.error('[AdminController] Error al obtener resumen de cursos.');
     return res.status(500).json({
       success: false,
       message: 'Error al consultar el resumen de asignaturas.',
@@ -603,7 +811,7 @@ exports.importCourses = async (req, res) => {
       result,
     });
   } catch (error) {
-    console.error('[AdminController] Error en importación masiva de cursos:', error.message);
+    console.error('[AdminController] Error en importación masiva de cursos.');
     return res.status(500).json({
       success: false,
       message: error.message || 'Error al procesar e importar las asignaturas en la base de datos.',
@@ -639,7 +847,7 @@ exports.seedCourses = async (req, res) => {
       result,
     });
   } catch (error) {
-    console.error('[AdminController] Error al sembrar cursos:', error.message);
+    console.error('[AdminController] Error al sembrar cursos.');
     return res.status(500).json({
       success: false,
       message: 'Error al sembrar el catálogo de cursos.',
@@ -670,7 +878,7 @@ exports.clearCourses = async (req, res) => {
       message: 'Base de datos de asignaturas vaciada correctamente.',
     });
   } catch (error) {
-    console.error('[AdminController] Error al vaciar cursos:', error.message);
+    console.error('[AdminController] Error al vaciar cursos.');
     return res.status(500).json({
       success: false,
       message: 'Error al limpiar la base de datos de asignaturas.',
@@ -731,8 +939,8 @@ exports.getSatAlerts = async (req, res) => {
       metrics,
       students: evaluatedStudents,
     });
-  } catch (error) {
-    console.error('[AdminController] Error al obtener alertas SAT:', error.message);
+  } catch {
+    console.error('[AdminController] Error al obtener alertas SAT.');
     return res.status(500).json({
       success: false,
       message: 'Error al consultar el Sistema de Alerta Temprana (SAT).',
@@ -808,8 +1016,8 @@ exports.simulateSatCourse = async (req, res) => {
         satEvaluation: satEval,
       },
     });
-  } catch (error) {
-    console.error('[AdminController] Error al simular alerta SAT:', error.message);
+  } catch {
+    console.error('[AdminController] Error al simular alerta SAT.');
     return res.status(500).json({
       success: false,
       message: 'Error al simular corte semanal de asistencia.',
@@ -888,8 +1096,8 @@ exports.updateSatIntervention = async (req, res) => {
         satEvaluation: satEval,
       },
     });
-  } catch (error) {
-    console.error('[AdminController] Error al registrar intervención SAT:', error.message);
+  } catch {
+    console.error('[AdminController] Error al registrar intervención SAT.');
     return res.status(500).json({
       success: false,
       message: 'Error al registrar la intervención en la Ficha 360.',
@@ -1031,8 +1239,8 @@ exports.updatePaedisCase = async (req, res) => {
         : 'Expediente PAEDIS y ajustes razonables actualizados exitosamente.',
       student: authService.formatUserResponse(updatedUser),
     });
-  } catch (error) {
-    console.error('[AdminController] Error al actualizar expediente PAEDIS:', error.message);
+  } catch {
+    console.error('[AdminController] Error al actualizar expediente PAEDIS.');
     return res.status(500).json({
       success: false,
       message: 'Error al guardar el expediente PAEDIS.',

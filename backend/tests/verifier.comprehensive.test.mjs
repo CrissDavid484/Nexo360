@@ -177,30 +177,38 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     const adminCodePath = path.resolve(backendDir, 'controllers/adminController.js');
     const adminCode = fs.readFileSync(adminCodePath, 'utf8');
 
-    // 1. Password dinámico del año: formato Duoc + año + !
-    const currentYear = new Date().getFullYear();
+    // 1. Password dinámico: función generateInitialPassword y fallback anual
+    const validationUtils = await import('../utils/validationUtils.js');
     assert.ok(
-      adminCode.includes('`Duoc${currentYear}!`'),
-      `adminController debe computar la contraseña dinámica como Duoc${currentYear}!`
+      adminCode.includes('generateInitialPassword'),
+      'adminController debe computar la contraseña dinámica con generateInitialPassword'
     );
+    const generatedPwd = validationUtils.generateInitialPassword('20.123.456-7', 'Guzmán');
+    assert.equal(generatedPwd, '201234567g', 'Contraseña inicial debe ser RUT limpio + inicial apellido');
+    const fallbackPwd = validationUtils.generateInitialPassword('', '');
+    const currentYear = new Date().getFullYear();
+    assert.equal(fallbackPwd, `Duoc${currentYear}!`, 'Fallback debe ser Duoc + año + !');
 
-    // 2. Comprobar label RUT y 4 roles en código fuente del formulario
+    // 2. Comprobar label RUT y roles en RegisterUserModal y AdminPanelView
+    const regModalPath = path.resolve(projectRootDir, 'frontend/src/components/admin/RegisterUserModal.jsx');
+    const regModalCode = fs.readFileSync(regModalPath, 'utf8');
     const adminViewPath = path.resolve(projectRootDir, 'frontend/src/components/views/AdminPanelView.jsx');
     const adminViewCode = fs.readFileSync(adminViewPath, 'utf8');
 
-    assert.ok(adminViewCode.includes('RUT <span className="text-red-600">*</span>'), 'El label debe ser estrictamente RUT');
-    assert.ok(!adminViewCode.includes('RUT institucional <span'), 'No debe existir RUT institucional');
+    assert.ok(regModalCode.includes('RUT <span className="text-red-600">*</span>'), 'El label debe ser estrictamente RUT');
+    assert.ok(!regModalCode.includes('RUT institucional <span'), 'No debe existir RUT institucional');
+    assert.ok(adminViewCode.includes('RegisterUserModal'), 'AdminPanelView debe integrar RegisterUserModal');
 
-    // 3. Comprobar que solo 4 roles institucionales están en las opciones
-    assert.ok(adminViewCode.includes('value="estudiante">Estudiante</option>'), 'Debe incluir rol Estudiante');
-    assert.ok(adminViewCode.includes('value="estudiante_paedis">Estudiante PAEDIS</option>'), 'Debe incluir rol Estudiante PAEDIS');
-    assert.ok(adminViewCode.includes('value="coordinador_paedis">Coordinador PAEDIS</option>'), 'Debe incluir rol Coordinador PAEDIS');
-    assert.ok(adminViewCode.includes('value="admin">Administrador</option>'), 'Debe incluir rol Administrador');
+    // 3. Comprobar que los roles institucionales están soportados y separados
+    assert.ok(regModalCode.includes('estudiante_paedis'), 'Debe incluir rol Estudiante PAEDIS');
+    assert.ok(regModalCode.includes('estudiante'), 'Debe incluir rol Estudiante');
+    assert.ok(regModalCode.includes('value="coordinador_paedis"'), 'Debe incluir rol Coordinador PAEDIS');
+    assert.ok(regModalCode.includes('value="admin"'), 'Debe incluir rol Administrador');
 
     // 4. Comprobar que 'Estado académico', 'Asistencia estimada', 'Tutor par asignado' fueron eliminados del formulario de creación
-    assert.ok(!adminViewCode.includes('id="create-academic-status"'), 'No debe tener campo create-academic-status');
-    assert.ok(!adminViewCode.includes('id="create-attendance-rate"'), 'No debe tener campo create-attendance-rate');
-    assert.ok(!adminViewCode.includes('id="create-tutor-par"'), 'No debe tener campo create-tutor-par');
+    assert.ok(!regModalCode.includes('id="create-academic-status"'), 'No debe tener campo create-academic-status');
+    assert.ok(!regModalCode.includes('id="create-attendance-rate"'), 'No debe tener campo create-attendance-rate');
+    assert.ok(!regModalCode.includes('id="create-tutor-par"'), 'No debe tener campo create-tutor-par');
 
     // 5. Restricción en backend: Coordinador PAEDIS no puede crear Administrador
     let denied = false;

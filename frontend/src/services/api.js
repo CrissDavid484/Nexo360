@@ -238,6 +238,39 @@ export const api = {
   },
 
   /**
+   * Solicitar recuperación de contraseña con correo institucional
+   */
+  async forgotPassword(email) {
+    return request('/auth/forgot-password', {
+      method: 'POST',
+      auth: false,
+      body: { email },
+    });
+  },
+
+  /**
+   * Restablecer contraseña usando el código/token de recuperación
+   */
+  async resetPassword({ email, token, newPassword }) {
+    return request('/auth/reset-password', {
+      method: 'POST',
+      auth: false,
+      body: { email, token, newPassword },
+    });
+  },
+
+  /**
+   * Cambiar la contraseña del usuario autenticado
+   */
+  async changePassword({ currentPassword, newPassword }) {
+    return request('/auth/change-password', {
+      method: 'PUT',
+      auth: true,
+      body: { currentPassword, newPassword },
+    });
+  },
+
+  /**
    * Obtener datos del estudiante actual autenticado desde MongoDB
    */
   async getMe() {
@@ -245,7 +278,7 @@ export const api = {
   },
 
   /**
-   * Guardar preferencias de accesibilidad en MongoDB
+   * Guardar preferencias de accesibilidad (incluyendo daltonismo y lectura clara) en MongoDB
    */
   async saveAccessibilityPreferences(preferences) {
     return request('/auth/accessibility', {
