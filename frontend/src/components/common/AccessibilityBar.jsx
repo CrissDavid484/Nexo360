@@ -17,22 +17,26 @@ import {
 } from 'lucide-react';
 
 /**
- * Ícono universal de accesibilidad en círculo (persona con brazos extendidos dentro de un círculo).
+ * Ícono universal de accesibilidad: círculo azul institucional con una persona blanca en medio.
  */
-export const AccessibilityCircleIcon = ({ className = 'w-4 h-4' }) => (
+export const AccessibilityCircleIcon = ({ className = 'w-7 h-7' }) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
-    stroke="currentColor"
-    strokeWidth="1.85"
-    strokeLinecap="round"
-    strokeLinejoin="round"
     aria-hidden="true"
     className={className}
   >
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="6.6" r="1.5" fill="currentColor" stroke="none" />
-    <path d="M6.5 10.2h11M12 10.2v4.3M12 14.5l-2.6 4.5M12 14.5l2.6 4.5" />
+    {/* Círculo azul con borde sutil para cualquier fondo */}
+    <circle cx="12" cy="12" r="11" fill="#002B49" stroke="#FFFFFF" strokeWidth="0.8" strokeOpacity="0.3" />
+    {/* Persona en color blanco en el centro */}
+    <circle cx="12" cy="6" r="1.8" fill="#FFFFFF" />
+    <path
+      d="M5.5 10.2h13M12 10.2v4.2M12 14.4l-2.8 4.6M12 14.4l2.8 4.6"
+      stroke="#FFFFFF"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -235,8 +239,8 @@ export const AccessibilityBar = () => {
           {/* Cabecera del panel con Sello Duoc UC */}
           <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#002B49]/10 text-[#002B49] flex items-center justify-center shrink-0">
-                <AccessibilityCircleIcon className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0">
+                <AccessibilityCircleIcon className="w-7 h-7" />
               </div>
               <div>
                 <h2 className="text-sm font-bold text-slate-900 leading-tight">
@@ -521,14 +525,10 @@ export const AccessibilityBar = () => {
         }`}
       >
         <div
-          className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0 ${
-            isOpen || hasActivePreferences
-              ? 'bg-white/15 text-[#FFB81C]'
-              : 'bg-slate-100 text-[#002B49] border border-slate-200'
-          }`}
+          className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
           aria-hidden="true"
         >
-          <AccessibilityCircleIcon className="w-4 h-4" />
+          <AccessibilityCircleIcon className="w-7 h-7" />
         </div>
         <span
           className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${

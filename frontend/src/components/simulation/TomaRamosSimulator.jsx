@@ -949,7 +949,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
         <div className="px-6 sm:px-8 py-5 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
             <span className="text-xs font-semibold text-[#002B49] block">
-              Vida Académica Duoc UC - Sede Alameda • Sistema SICOL (SAP NetWeaver)
+              Vida Académica Duoc UC - Sede Alameda
             </span>
             <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
               Inscripción y Modificación de Asignaturas (Toma de Ramos)
@@ -1066,7 +1066,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   Instrucciones para Tomar y Modificar Ramos
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Pasos reales del portal SAP WebDynpro SICOL
+                  Pasos oficiales del portal institucional
                 </p>
               </div>
               <span className="text-[10px] font-bold uppercase tracking-wider bg-[#002B49] text-[#FFB81C] px-2.5 py-1 rounded-full">
