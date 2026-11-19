@@ -197,7 +197,7 @@ export const DashboardPage = () => {
       {/* 3. Contenido Principal */}
       <main
         id="main-content"
-        className={`flex-1 mx-auto pt-16 sm:pt-20 lg:pt-8 pb-8 sm:pb-10 w-full px-4 sm:px-6 lg:px-8 ${
+        className={`flex-1 mx-auto pt-4 sm:pt-6 lg:pt-8 pb-8 sm:pb-10 w-full px-4 sm:px-6 lg:px-8 ${
           activeTab === 'toma-ramos' ? 'max-w-[1480px]' : 'max-w-7xl'
         }`}
       >
