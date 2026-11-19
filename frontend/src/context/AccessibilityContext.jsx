@@ -21,17 +21,20 @@ const AccessibilityContext = createContext();
 
 const VALID_FONT_SIZES = new Set(['normal', 'large', 'xlarge']);
 const COLOR_BLIND_CLASSES = ['cb-protanopia', 'cb-deuteranopia', 'cb-tritanopia'];
-const ALLOWED_COLOR_BLIND_MODES = new Set([
-  'none',
-  'protanopia',
-  'deuteranopia',
-  'tritanopia',
-  'achromatopsia',
-]);
 
 function sanitizeColorBlindStorageValue(val) {
-  const clean = typeof val === 'string' ? val.trim().toLowerCase() : '';
-  return ALLOWED_COLOR_BLIND_MODES.has(clean) ? clean : 'none';
+  switch (val) {
+    case 'protanopia':
+      return 'protanopia';
+    case 'deuteranopia':
+      return 'deuteranopia';
+    case 'tritanopia':
+      return 'tritanopia';
+    case 'achromatopsia':
+      return 'achromatopsia';
+    default:
+      return 'none';
+  }
 }
 
 function syncDocumentAccessibilityClasses({
@@ -69,7 +72,7 @@ function syncDocumentAccessibilityClasses({
   localStorage.setItem('nexo360_reduced_motion', String(reducedMotion));
   localStorage.setItem('nexo360_reading_guide', String(isBlind ? false : readingGuide));
   localStorage.setItem('nexo360_voice_reader', String(voiceReader));
-  localStorage.setItem('nexo360_color_blind_mode', safeColorBlind);
+  localStorage.setItem('nexo360_color_blind_mode', sanitizeColorBlindStorageValue(safeColorBlind));
   localStorage.setItem('nexo360_clear_reading_mode', String(Boolean(clearReadingMode)));
   localStorage.setItem('nexo360_disability_profile', disabilityProfile || 'ninguna');
 }
