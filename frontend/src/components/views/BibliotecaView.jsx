@@ -224,7 +224,7 @@ export const BibliotecaView = () => {
               Bibliotecas Duoc UC • {DEFAULT_CAMPUS}
             </span>
             <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-              Catálogo Oficial LibCal
+              Espacios Disponibles
             </span>
           </div>
 
@@ -243,14 +243,14 @@ export const BibliotecaView = () => {
           </p>
         </div>
 
-        {/* Botones directos a las 3 rutas oficiales de LibCal Duoc UC */}
+        {/* Botones directos a las rutas oficiales de Duoc UC */}
         <div className="shrink-0 flex flex-wrap items-center gap-2.5">
           <a
             href={LIBCAL_ALAMEDA_CONFIG.urls.alamedaSpaces}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Abrir portal oficial de reserva de espacios en Biblioteca Alameda (nueva pestaña)"
-            {...getVoiceProps('Ir a Portal Oficial de Reserva Alameda en LibCal')}
+            {...getVoiceProps('Ir a Portal Oficial de Reserva Alameda')}
             className="min-h-[42px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
           >
             <span>Portal Oficial Alameda</span>
@@ -261,8 +261,8 @@ export const BibliotecaView = () => {
             href={currentAccessibleUrl}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`Abrir versión accesible oficial de LibCal para ${currentCategory.name} (nueva pestaña)`}
-            {...getVoiceProps(`Abrir versión accesible oficial de LibCal para ${currentCategory.name}`)}
+            aria-label={`Abrir versión accesible oficial para ${currentCategory.name} (nueva pestaña)`}
+            {...getVoiceProps(`Abrir versión accesible oficial para ${currentCategory.name}`)}
             className="min-h-[42px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-2 border border-slate-300 transition-all active:scale-[0.98]"
           >
             <span>Modo Accesible Oficial</span>
@@ -273,8 +273,8 @@ export const BibliotecaView = () => {
             href={LIBCAL_ALAMEDA_CONFIG.urls.checkin}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Abrir pantalla oficial de ingreso y check-in en LibCal (nueva pestaña)"
-            {...getVoiceProps('Abrir pantalla oficial de Check-in en LibCal')}
+            aria-label="Abrir pantalla oficial de ingreso y check-in (nueva pestaña)"
+            {...getVoiceProps('Abrir pantalla oficial de Check-in')}
             className="min-h-[42px] px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98]"
           >
             <LogIn className="w-4 h-4 text-emerald-200 shrink-0" aria-hidden="true" />
@@ -470,7 +470,7 @@ export const BibliotecaView = () => {
                   Check-in obligatorio
                 </h4>
                 <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                  Al llegar al espacio, pulsa Check-in en LibCal e ingresa tu código. Tienes hasta 15 min de tolerancia.
+                  Al llegar al espacio, pulsa Check-in e ingresa tu código de ingreso. Tienes hasta 15 min de tolerancia.
                 </p>
               </div>
             </div>
@@ -810,7 +810,7 @@ export const BibliotecaView = () => {
                   <thead className="bg-slate-100 border-b border-slate-200 text-slate-800 font-bold">
                     <tr>
                       <th className="p-3">Recurso</th>
-                      <th className="p-3">Categoría LibCal</th>
+                      <th className="p-3">Tipo de Espacio</th>
                       <th className="p-3">Horario</th>
                       <th className="p-3">Fecha</th>
                       <th className="p-3 text-right">Acción</th>
@@ -942,14 +942,14 @@ export const BibliotecaView = () => {
               </div>
 
               <p className="text-xs sm:text-sm text-slate-700 max-w-2xl leading-relaxed">
-                Tu solicitud para <strong>{confirmedBooking.roomName}</strong> en Duoc UC - {DEFAULT_CAMPUS} está lista. Hemos generado tu código de ingreso alfanumérico para el check-in presencial:
+                Tu solicitud para <strong>{confirmedBooking.roomName}</strong> en Duoc UC - {DEFAULT_CAMPUS} está lista. Aquí tienes tu código para registrar tu ingreso al llegar:
               </p>
 
               {/* Tarjeta de Código Destacado */}
               <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 max-w-xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900 block">
-                    Código de Check-in LibCal
+                    Tu Código de Ingreso
                   </span>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-3xl font-black font-mono tracking-widest text-[#002B49]">
@@ -1140,11 +1140,11 @@ export const BibliotecaView = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => handleCopyCode(checkinInputCode || savedBookingCode)}
-                    {...getVoiceProps('Copiar código e ir a pantalla oficial de Check-in LibCal')}
+                    {...getVoiceProps('Copiar código e ir a pantalla oficial de Check-in')}
                     className="w-full min-h-[46px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                   >
                     <ExternalLink className="w-4 h-4 text-[#FFB81C]" />
-                    <span>Copiar e ir a Check-in Oficial LibCal</span>
+                    <span>Copiar e ir a Check-in Oficial</span>
                   </a>
                 </div>
               </form>
@@ -1160,7 +1160,7 @@ export const BibliotecaView = () => {
                 <h4>Regla de los 15 minutos de tolerancia</h4>
               </div>
               <p className="text-xs text-amber-900 leading-relaxed">
-                En LibCal de Bibliotecas Duoc UC, dispones de hasta <strong>15 minutos</strong> desde la hora de inicio de tu reserva para registrar tu ingreso. Si no realizas el check-in en ese período, el sistema cancela la reserva automáticamente y libera la sala para otros estudiantes.
+                En Bibliotecas Duoc UC, dispones de hasta <strong>15 minutos</strong> desde la hora de inicio de tu reserva para registrar tu ingreso presencial. Si no realizas el check-in en ese período, el sistema libera automáticamente la sala para que otros compañeros puedan utilizarla.
               </p>
             </div>
 
