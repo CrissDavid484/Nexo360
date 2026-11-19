@@ -1099,7 +1099,7 @@ export const AdminPanelView = () => {
                 Métricas Clave de Uso & Matrícula • Duoc UC - {DEFAULT_CAMPUS}
               </h2>
               <span className="text-xs font-semibold text-slate-500">
-                Actualización en vivo vía MongoDB & Scraping
+                Sincronización en tiempo real vía MongoDB Institucional
               </span>
             </div>
 

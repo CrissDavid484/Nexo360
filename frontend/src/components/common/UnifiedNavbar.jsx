@@ -329,10 +329,10 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 {...getVoiceProps(
                   user?.role === 'coordinador_paedis' ? 'Panel PAEDIS' : 'Panel Admin'
                 )}
-                className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 active:scale-[0.98] ${
+                className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer ${
                   activeTab === 'admin-panel'
-                    ? 'bg-[#002B49] text-white shadow-xs ring-2 ring-amber-400/80 font-black'
-                    : 'text-slate-700 hover:text-[#002B49] hover:bg-slate-100/90 border border-slate-200/80'
+                    ? 'bg-[#002B49] text-white shadow-xs ring-2 ring-amber-400/80'
+                    : 'text-slate-700 hover:text-[#002B49] hover:bg-white/90 border border-slate-200/80'
                 }`}
               >
                 <ShieldAlert
@@ -354,7 +354,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               type="button"
               onClick={() => onTabChange('perfil')}
               {...getVoiceProps(`Ver mi perfil institucional. ${displayName}, ${displayCampus}`)}
-              className="hidden sm:flex items-center gap-2.5 text-right pl-3 py-1 rounded-xl hover:bg-slate-50 transition-colors"
+              className="hidden sm:flex items-center gap-2.5 text-right pl-2.5 pr-3 py-1.5 rounded-2xl hover:bg-slate-50 border border-transparent hover:border-slate-200/80 transition-all duration-150 cursor-pointer"
               title="Ver mi perfil institucional"
             >
               {user?.photo ? (
@@ -385,7 +385,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               type="button"
               onClick={logout}
               {...getVoiceProps('Cerrar sesión')}
-              className="hidden sm:flex min-h-[40px] min-w-[40px] items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 hover:text-slate-950 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200/80 transition-all duration-150 active:scale-[0.98]"
+              className="hidden sm:flex min-h-[40px] min-w-[40px] items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 hover:text-slate-950 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200/80 transition-all duration-150 active:scale-[0.98] cursor-pointer"
               aria-label="Cerrar sesión"
             >
               <LogOut className="w-4 h-4 shrink-0 text-slate-500" aria-hidden="true" />

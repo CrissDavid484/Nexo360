@@ -230,15 +230,22 @@ export const AccessibilityBar = () => {
         <div
           role="dialog"
           aria-label="Ajustes de accesibilidad"
-          className="mr-3 sm:mr-5 mb-3 w-[320px] sm:w-[360px] max-h-[82vh] overflow-y-auto bg-white text-slate-900 rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] shadow-[0_18px_40px_rgba(0,43,73,0.18)] p-5 space-y-4 animate-scale-in origin-bottom-right"
+          className="mr-3 sm:mr-5 mb-3 w-[320px] sm:w-[370px] max-h-[82vh] overflow-y-auto bg-white text-slate-900 rounded-3xl border border-slate-200 border-t-4 border-t-[#002B49] shadow-[0_18px_40px_rgba(0,43,73,0.18)] p-5 space-y-4 animate-scale-in origin-bottom-right"
         >
-          {/* Cabecera del panel */}
+          {/* Cabecera del panel con Sello Duoc UC */}
           <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-3">
             <div className="flex items-center gap-2">
-              <AccessibilityCircleIcon className="w-4 h-4 text-[#002B49] shrink-0" />
-              <h2 className="text-sm font-bold text-slate-900">
-                Ajustes de accesibilidad
-              </h2>
+              <div className="w-7 h-7 rounded-lg bg-[#002B49]/10 text-[#002B49] flex items-center justify-center shrink-0">
+                <AccessibilityCircleIcon className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 leading-tight">
+                  Ajustes de accesibilidad
+                </h2>
+                <span className="text-[10px] text-slate-500 font-semibold block">
+                  Duoc UC • Sede Alameda
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -481,6 +488,16 @@ export const AccessibilityBar = () => {
               </div>
             </>
           )}
+
+          {/* Sello institucional Duoc UC UIE & Ally 100% */}
+          <div className="pt-3 border-t border-slate-200 text-center">
+            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+              Subdirección de Inclusión Educativa • Duoc UC
+            </span>
+            <p className="text-[10px] text-slate-500 mt-0.5 leading-normal">
+              Ley N° 20.422 • UNE 71362 • UNE 153101 • WCAG 2.2 AAA (Ally 100%)
+            </p>
+          </div>
         </div>
       )}
 

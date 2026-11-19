@@ -202,22 +202,26 @@ export const DashboardPage = () => {
       >
         {activeTab === 'centro-ayuda' && (
           <div className="space-y-8 animate-fade-in-up">
-            {/* BIENVENIDA + BUSCADOR INTEGRADO (Baja sobrecarga sensorial, diseño limpio institucional) */}
+            {/* BIENVENIDA + BUSCADOR INTEGRADO (Baja sobrecarga sensorial, diseño limpio institucional Duoc UC) */}
             <section
               aria-labelledby="main-summary-heading"
-              className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-300 border-t-4 border-t-[#002B49] shadow-xs"
+              className="bg-white rounded-3xl p-6 sm:p-9 border border-slate-200/90 border-t-4 border-t-[#002B49] shadow-sm relative overflow-hidden transition-all"
             >
               <div className="max-w-3xl">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 mb-2">
-                  <span className="font-semibold text-slate-700">{userCareer}</span>
-                  <span aria-hidden="true">•</span>
-                  <span className="font-semibold text-slate-700">{userCampus}</span>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600 mb-3">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-[#002B49] border border-slate-200/80 font-bold">
+                    <GraduationCap className="w-3.5 h-3.5 text-amber-500" aria-hidden="true" />
+                    <span>{userCareer}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200/80">
+                    <span>{userCampus}</span>
+                  </span>
                 </div>
 
                 <h1
                   id="main-summary-heading"
                   {...getVoiceProps(`Hola, ${userName}. ${userCareer}, ${userCampus}`)}
-                  className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900"
+                  className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight"
                 >
                   Hola, {userName}
                 </h1>
@@ -226,7 +230,7 @@ export const DashboardPage = () => {
                   {...getVoiceProps(
                     '¿En qué te podemos ayudar hoy? Encuentra guías paso a paso, requisitos y enlaces directos a tus trámites estudiantiles en Duoc UC - Sede Alameda.'
                   )}
-                  className="mt-2 text-slate-600 text-sm sm:text-base leading-relaxed"
+                  className="mt-2.5 text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl font-normal"
                 >
                   ¿En qué te podemos ayudar hoy? Encuentra guías paso a paso, requisitos y enlaces directos a tus trámites estudiantiles en Duoc UC - Sede Alameda.
                 </p>
@@ -510,7 +514,7 @@ export const DashboardPage = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {INTENT_SHORTCUTS.map((shortcut) => {
                   const IconComp = INTENT_ICON_MAP[shortcut.iconName] || Compass;
                   return (
@@ -520,29 +524,29 @@ export const DashboardPage = () => {
                       onClick={() => handleSelectIntentShortcut(shortcut)}
                       aria-haspopup="dialog"
                       {...getVoiceProps(`${shortcut.question}. ${shortcut.subtitle}`)}
-                      className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50/50 border border-slate-200/80 hover:border-slate-300 shadow-xs hover:shadow-md text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 group active:scale-[0.99]"
+                      className="p-5 sm:p-6 rounded-3xl bg-white hover:bg-slate-50/70 border border-slate-200/90 hover:border-slate-300 shadow-xs hover:shadow-md text-left flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 group active:scale-[0.99] cursor-pointer"
                     >
                       <div>
-                        <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center justify-between gap-2 mb-3.5">
                           <div
-                            className="w-9 h-9 rounded-xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
+                            className="w-10 h-10 rounded-2xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center transition-colors duration-200 shrink-0"
                             aria-hidden="true"
                           >
-                            <IconComp className="w-4 h-4" aria-hidden="true" />
+                            <IconComp className="w-5 h-5" aria-hidden="true" />
                           </div>
-                          <span className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200/60">
+                          <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200/80">
                             {shortcut.badge}
                           </span>
                         </div>
                         <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#002B49] transition-colors leading-snug">
                           {shortcut.question}
                         </h3>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        <p className="text-xs text-slate-600 mt-1.5 leading-relaxed font-normal">
                           {shortcut.subtitle}
                         </p>
                       </div>
 
-                      <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-[#002B49]">
+                      <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-[#002B49]">
                         <span>Ver pasos</span>
                         <ArrowRight
                           className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#002B49] transition-transform duration-200 group-hover:translate-x-0.5"
@@ -852,26 +856,44 @@ export const DashboardPage = () => {
         />
       )}
 
-      {/* Pie de Página Limpio */}
-      <footer className="bg-white text-slate-500 py-6 px-4 border-t border-slate-200/80 mt-12 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <p className="font-semibold text-slate-800">
-              Nexo360 • Centro de Ayuda y Servicios Duoc UC - Sede Alameda
-            </p>
-            <p className="text-slate-500 mt-0.5">
-              Información oficial sincronizada con centroayuda.duoc.cl • Plataforma Oficial Duoc UC - Sede Alameda
+      {/* Pie de Página Institucional Duoc UC (UIE & Accesibilidad Digital) */}
+      <footer className="bg-white text-slate-500 py-8 px-4 sm:px-6 lg:px-8 border-t border-slate-200/90 mt-16 text-xs">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900 text-sm">
+                Nexo360 • Centro de Ayuda y Servicios Duoc UC - Sede Alameda
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                Ally 100% Óptimo
+              </span>
+            </div>
+            <p className="text-slate-600 leading-relaxed font-normal">
+              Subdirección de Inclusión Educativa (UIE) • Vicerrectoría Académica Duoc UC.
+              Diseñado bajo la Guía de Introducción a la Accesibilidad Digital, Ley N° 20.422, Ley N° 21.719,
+              Norma UNE 71362:2020 y Norma UNE 153101:2018 (Lectura Fácil) para garantizar el acceso universal (WCAG 2.2 AA/AAA).
             </p>
           </div>
-          <div className="text-center sm:text-right">
-            <p>
+          <div className="text-left md:text-right shrink-0 space-y-1">
+            <p className="font-medium text-slate-700">
               Contacto Sede Alameda:{' '}
               <a
                 href="mailto:ayuda.alameda@duoc.cl"
                 {...getVoiceProps('Enviar correo a ayuda.alameda@duoc.cl')}
-                className="font-semibold text-[#002B49] hover:underline rounded px-1"
+                className="font-bold text-[#002B49] hover:underline rounded px-1"
               >
                 ayuda.alameda@duoc.cl
+              </a>
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Información oficial sincronizada con{' '}
+              <a
+                href="https://centroayuda.duoc.cl"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline text-[#002B49] font-semibold"
+              >
+                centroayuda.duoc.cl
               </a>
             </p>
           </div>

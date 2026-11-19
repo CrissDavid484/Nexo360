@@ -14,6 +14,60 @@
   border-radius: 8px;
 }
 
+/* 1.1 Superficies del Navegador: Selección, Cursor y Scrollbars Institucionales (Impeccable & Taste) */
+::selection {
+  background-color: #002B49;
+  color: #FFB81C;
+}
+
+html.high-contrast ::selection {
+  background-color: #FFB81C;
+  color: #002B49;
+}
+
+input, textarea {
+  caret-color: #002B49;
+}
+
+html.high-contrast input,
+html.high-contrast textarea {
+  caret-color: #FFB81C;
+}
+
+/* Barra de desplazamiento ergonómica institucional (Duoc UC) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #CBD5E1;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #94A3B8;
+}
+
+html.high-contrast * {
+  scrollbar-color: #475569 transparent;
+}
+
+html.high-contrast *::-webkit-scrollbar-thumb {
+  background-color: #475569;
+}
+
 /* 2. Reglas de Presentación Visual Ergonómica (Baja sobrecarga sensorial) */
 body {
   background-color: #EEF2F6;

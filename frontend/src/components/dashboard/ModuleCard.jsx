@@ -53,19 +53,19 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
           cardVoiceProps.onFocus(event);
         }
       }}
-      className="group w-full flex flex-col justify-between rounded-2xl bg-white p-6 text-left border border-slate-200/80 hover:border-slate-300 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+      className="group w-full flex flex-col justify-between rounded-3xl bg-white p-6 sm:p-7 text-left border border-slate-200/90 hover:border-slate-300 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
     >
       <div className="w-full">
         {/* Cabecera limpia: Ícono suave y contador simple */}
         <div className="flex items-center justify-between gap-3 mb-4">
           <div
-            className="w-10 h-10 rounded-xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center shrink-0 transition-colors duration-200"
+            className="w-11 h-11 rounded-2xl bg-slate-100 text-[#002B49] group-hover:bg-[#002B49] group-hover:text-[#FFB81C] flex items-center justify-center shrink-0 transition-colors duration-200"
             aria-hidden="true"
           >
             <IconComponent className="w-5 h-5" aria-hidden="true" />
           </div>
 
-          <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200/60">
+          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/80">
             {category.submodules.length} trámites
           </span>
         </div>
@@ -79,7 +79,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
             type="button"
             onClick={() => onSelect(category)}
             {...getVoiceProps(`Abrir categoría ${category.title}`)}
-            className="text-left hover:text-[#002B49] transition-colors rounded-md"
+            className="text-left hover:text-[#002B49] transition-colors rounded-md cursor-pointer"
           >
             {category.title}
           </button>
@@ -102,7 +102,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
                   }
                   aria-label={`Ver ${sub.title} en ${category.title}`}
                   {...getVoiceProps(`${sub.title}, en ${category.title}`)}
-                  className="w-full min-h-[38px] py-2 px-2 -mx-2 rounded-lg text-left text-xs sm:text-sm font-medium text-slate-700 hover:text-[#002B49] hover:bg-slate-50 flex items-center justify-between gap-2 transition-colors group/row"
+                  className="w-full min-h-[40px] py-2 px-2.5 -mx-1 rounded-xl text-left text-xs sm:text-sm font-semibold text-slate-700 hover:text-[#002B49] hover:bg-slate-50 flex items-center justify-between gap-2 transition-colors group/row cursor-pointer"
                 >
                   <span className="truncate">{sub.title}</span>
                   <ChevronRight
@@ -117,7 +117,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
       </div>
 
       {/* Pie de tarjeta con botón pulido */}
-      <div className="w-full pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div className="w-full pt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => onSelect(category)}
@@ -128,7 +128,7 @@ export const ModuleCard = ({ category, onSelect, onSelectSubmodule }) => {
               ? `Ver todos los ${category.submodules.length} trámites de ${category.title}`
               : `Explorar categoría ${category.title}`
           )}
-          className="min-h-[40px] flex-1 bg-slate-50 hover:bg-[#002B49] text-slate-700 hover:text-white px-4 py-2 rounded-xl font-medium text-xs sm:text-sm flex items-center justify-between gap-2 border border-slate-200/80 hover:border-[#002B49] transition-all duration-200 group/btn active:scale-[0.98]"
+          className="min-h-[42px] flex-1 bg-slate-50 hover:bg-[#002B49] text-slate-700 hover:text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-between gap-2 border border-slate-200/80 hover:border-[#002B49] transition-all duration-200 group/btn active:scale-[0.98] cursor-pointer"
         >
           <span>
             {remainingCount > 0
