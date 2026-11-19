@@ -125,403 +125,410 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
   return (
     <header className="bg-white/95 backdrop-blur-md text-slate-900 sticky top-0 z-40 border-b border-slate-200/90 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)] transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="min-h-[70px] sm:h-20 py-2 flex items-center justify-between gap-4">
-          {/* 1. Marca Institucional Oficial (Logo 03 - Prominente y legible) */}
-          <button
-            type="button"
-            onClick={() => {
-              onTabChange('centro-ayuda');
-              setIsMobileMenuOpen(false);
-            }}
-            {...getVoiceProps(`Ir al inicio de Nexo360 Duoc UC ${DEFAULT_CAMPUS}`)}
-            className="h-14 flex items-center group text-left rounded-2xl px-1.5 transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 cursor-pointer"
-            aria-label={`Ir al inicio de Nexo360 Centro de Ayuda ${DEFAULT_CAMPUS}`}
-          >
-            <img
-              src={logo03}
-              alt={`Nexo360 Duoc UC - ${DEFAULT_CAMPUS}`}
-              className="w-auto object-contain transition-all duration-200 group-hover:opacity-95 select-none"
-              style={{
-                height: 'clamp(36px, 2.6vw + 16px, 48px)',
-                aspectRatio: '1024 / 307',
+        <div className="min-h-[70px] sm:h-20 py-2 flex items-center justify-between lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-4">
+          {/* 1. Marca Institucional Oficial (Logo 03 - Prominente y legible a la izquierda) */}
+          <div className="flex items-center justify-self-start shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                onTabChange('centro-ayuda');
+                setIsMobileMenuOpen(false);
               }}
-            />
-          </button>
-
-          {/* 2. Bloque Coherente: Navegación + Perfil de Usuario + Salir + Menú Móvil */}
-          <div className="flex items-center gap-2 sm:gap-2.5 lg:gap-3">
-            {/* Navegación en Escritorio (>= lg) */}
-            <nav
-              aria-label="Secciones principales del portal"
-              className="hidden lg:flex items-center gap-1 bg-slate-100/70 p-1 rounded-full border border-slate-200/70 shadow-2xs backdrop-blur-xs"
+              {...getVoiceProps(`Ir al inicio de Nexo360 Duoc UC ${DEFAULT_CAMPUS}`)}
+              className="h-14 flex items-center group text-left rounded-2xl px-1.5 transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 cursor-pointer"
+              aria-label={`Ir al inicio de Nexo360 Centro de Ayuda ${DEFAULT_CAMPUS}`}
             >
-              {/* Opción 1: Centro de Ayuda */}
-              <button
-                type="button"
-                onClick={() => onTabChange('centro-ayuda')}
-                aria-current={activeTab === 'centro-ayuda' ? 'page' : undefined}
-                {...getVoiceProps('Centro de Ayuda')}
-                className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
-                  activeTab === 'centro-ayuda'
-                    ? 'bg-[#002B49] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-                }`}
-              >
-                <HelpCircle
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    activeTab === 'centro-ayuda' ? 'text-[#FFB81C]' : 'text-slate-500'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span>Centro de Ayuda</span>
-              </button>
+              <img
+                src={logo03}
+                alt={`Nexo360 Duoc UC - ${DEFAULT_CAMPUS}`}
+                className="w-auto object-contain transition-all duration-200 group-hover:opacity-95 select-none"
+                style={{
+                  height: 'clamp(36px, 2.6vw + 16px, 48px)',
+                  aspectRatio: '1024 / 307',
+                }}
+              />
+            </button>
+          </div>
 
-              {/* Opción 2: Menú Desplegable "Simulaciones" */}
-              <div className="relative" ref={simMenuRef}>
+          {/* 2. Bloque Central: Navegación + Perfil de Usuario + Salir (Centrado en el encabezado) */}
+          <div className="hidden lg:flex items-center justify-center justify-self-center">
+            <div className="flex items-center gap-2 lg:gap-2.5">
+              {/* Navegación en Escritorio (>= lg) */}
+              <nav
+                aria-label="Secciones principales del portal"
+                className="flex items-center gap-1 bg-slate-100/70 p-1 rounded-full border border-slate-200/70 shadow-2xs backdrop-blur-xs"
+              >
+                {/* Opción 1: Centro de Ayuda */}
                 <button
                   type="button"
-                  onClick={() => setIsSimMenuOpen(!isSimMenuOpen)}
-                  aria-haspopup="menu"
-                  aria-expanded={isSimMenuOpen}
-                  {...getVoiceProps(
-                    isSimActive && activeSimItem
-                      ? `Simulaciones, seleccionado actualmente ${activeSimItem.label}`
-                      : 'Simulaciones'
-                  )}
+                  onClick={() => onTabChange('centro-ayuda')}
+                  aria-current={activeTab === 'centro-ayuda' ? 'page' : undefined}
+                  {...getVoiceProps('Centro de Ayuda')}
                   className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
-                    isSimActive
+                    activeTab === 'centro-ayuda'
                       ? 'bg-[#002B49] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                   }`}
                 >
-                  <Layers
+                  <HelpCircle
                     className={`w-4 h-4 shrink-0 transition-colors ${
-                      isSimActive ? 'text-[#FFB81C]' : 'text-slate-500'
+                      activeTab === 'centro-ayuda' ? 'text-[#FFB81C]' : 'text-slate-500'
                     }`}
                     aria-hidden="true"
                   />
-                  <span className="truncate max-w-[150px]">
-                    {isSimActive && activeSimItem ? activeSimItem.label : 'Simulaciones'}
-                  </span>
+                  <span>Centro de Ayuda</span>
+                </button>
+
+                {/* Opción 2: Menú Desplegable "Simulaciones" */}
+                <div className="relative" ref={simMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsSimMenuOpen(!isSimMenuOpen)}
+                    aria-haspopup="menu"
+                    aria-expanded={isSimMenuOpen}
+                    {...getVoiceProps(
+                      isSimActive && activeSimItem
+                        ? `Simulaciones, seleccionado actualmente ${activeSimItem.label}`
+                        : 'Simulaciones'
+                    )}
+                    className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                      isSimActive
+                        ? 'bg-[#002B49] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                    }`}
+                  >
+                    <Layers
+                      className={`w-4 h-4 shrink-0 transition-colors ${
+                        isSimActive ? 'text-[#FFB81C]' : 'text-slate-500'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate max-w-[150px]">
+                      {isSimActive && activeSimItem ? activeSimItem.label : 'Simulaciones'}
+                    </span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                        isSimMenuOpen ? 'rotate-180' : ''
+                      } ${isSimActive ? 'text-[#FFB81C]' : 'text-slate-400'}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  {/* Menú Flotante Desplegable en Escritorio */}
+                  {isSimMenuOpen && (
+                    <div
+                      role="menu"
+                      aria-label="Submenú de simulaciones prácticas"
+                      className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-fade-in space-y-1"
+                    >
+                      <div className="px-3 py-1.5 border-b border-slate-100">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                          Módulos Prácticos
+                        </span>
+                        <p className="text-xs text-slate-600 font-medium">
+                          Simuladores oficiales y guías interactivas
+                        </p>
+                      </div>
+
+                      {simulationItems.map((item) => {
+                        const Icon = item.icon;
+                        const isCurrent = activeTab === item.id;
+
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => handleSelectSimItem(item.id)}
+                            {...getVoiceProps(`${item.label}. ${item.subtitle}`)}
+                            className={`w-full min-h-[44px] flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
+                              isCurrent
+                                ? 'bg-[#002B49] text-white shadow-2xs'
+                                : 'hover:bg-slate-50 text-slate-800'
+                            }`}
+                          >
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                                isCurrent
+                                  ? 'bg-white/10 text-[#FFB81C]'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" aria-hidden="true" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className={`text-xs font-bold block truncate ${
+                                    isCurrent ? 'text-white' : 'text-slate-900'
+                                  }`}
+                                >
+                                  {item.label}
+                                </span>
+                                {isCurrent && (
+                                  <Check className="w-3.5 h-3.5 text-[#FFB81C] shrink-0" />
+                                )}
+                              </div>
+                              <p
+                                className={`text-[11px] leading-tight mt-0.5 truncate ${
+                                  isCurrent ? 'text-slate-200' : 'text-slate-500'
+                                }`}
+                              >
+                                {item.subtitle}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Opción 3: Soporte TI */}
+                <button
+                  type="button"
+                  onClick={() => onTabChange('tickets')}
+                  aria-current={activeTab === 'tickets' ? 'page' : undefined}
+                  {...getVoiceProps('Soporte TI')}
+                  className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                    activeTab === 'tickets'
+                      ? 'bg-[#002B49] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                  }`}
+                >
+                  <Laptop
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      activeTab === 'tickets' ? 'text-[#FFB81C]' : 'text-slate-500'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span>Soporte TI</span>
+                </button>
+              </nav>
+
+              {/* Separador vertical sutil entre navegación y sesión */}
+              <div className="h-6 w-px bg-slate-200/90 mx-0.5" aria-hidden="true" />
+
+              {/* Menú de Usuario Desplegable (Escritorio / Tablet) */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  aria-haspopup="menu"
+                  aria-expanded={isUserMenuOpen}
+                  {...getVoiceProps(`Menú de cuenta de ${displayName}. Rol ${roleLabel}`)}
+                  className={`min-h-[40px] flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
+                    isUserMenuOpen || activeTab === 'perfil' || activeTab === 'admin-panel'
+                      ? 'bg-slate-100/90 border-slate-300 shadow-2xs'
+                      : 'bg-white hover:bg-slate-50 border-slate-200 shadow-2xs hover:border-slate-300'
+                  }`}
+                  aria-label="Abrir menú de usuario y cuenta"
+                >
+                  {/* Avatar */}
+                  {user?.photo ? (
+                    <img
+                      src={user.photo}
+                      alt=""
+                      className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className="w-7 h-7 rounded-full bg-[#002B49] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs"
+                      aria-hidden="true"
+                    >
+                      {displayName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+
+                  {/* Info de texto */}
+                  <div className="text-left hidden md:block">
+                    <span className="text-xs font-bold text-slate-800 block leading-tight max-w-[130px] truncate">
+                      {displayName}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium block leading-tight truncate">
+                      {isAdminOrCoordinator ? roleLabel : displayCampus}
+                    </span>
+                  </div>
+
+                  {/* Indicador de estado activo si está en admin-panel o perfil */}
+                  {(activeTab === 'admin-panel' || activeTab === 'perfil') && (
+                    <span
+                      className="w-2 h-2 rounded-full bg-amber-500 shrink-0"
+                      title={activeTab === 'admin-panel' ? 'Panel Activo' : 'Perfil Activo'}
+                      aria-hidden="true"
+                    />
+                  )}
+
+                  {/* Flecha desplegable */}
                   <ChevronDown
-                    className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
-                      isSimMenuOpen ? 'rotate-180' : ''
-                    } ${isSimActive ? 'text-[#FFB81C]' : 'text-slate-400'}`}
+                    className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                      isUserMenuOpen ? 'rotate-180 text-slate-700' : ''
+                    }`}
                     aria-hidden="true"
                   />
                 </button>
 
-                {/* Menú Flotante Desplegable en Escritorio */}
-                {isSimMenuOpen && (
+                {/* Menú Desplegable Flotante */}
+                {isUserMenuOpen && (
                   <div
                     role="menu"
-                    aria-label="Submenú de simulaciones prácticas"
-                    className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-fade-in space-y-1"
+                    aria-label="Menú de cuenta y accesos"
+                    className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-fade-in space-y-1.5"
                   >
-                    <div className="px-3 py-1.5 border-b border-slate-100">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                        Módulos Prácticos
-                      </span>
-                      <p className="text-xs text-slate-600 font-medium">
-                        Simuladores oficiales y guías interactivas
-                      </p>
+                    {/* Tarjeta de Resumen de Usuario */}
+                    <div className="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        {user?.photo ? (
+                          <img
+                            src={user.photo}
+                            alt=""
+                            className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-[#002B49] text-white flex items-center justify-center font-bold text-sm shrink-0">
+                            {displayName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs font-bold text-slate-900 block truncate">
+                            {displayName}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block truncate">
+                            {user?.email || 'usuario@duocuc.cl'}
+                          </span>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#002B49]/10 text-[#002B49] border border-[#002B49]/20">
+                              {roleLabel}
+                            </span>
+                            <span className="text-[10px] text-slate-400">· {DEFAULT_CAMPUS}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    {simulationItems.map((item) => {
-                      const Icon = item.icon;
-                      const isCurrent = activeTab === item.id;
-
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => handleSelectSimItem(item.id)}
-                          {...getVoiceProps(`${item.label}. ${item.subtitle}`)}
-                          className={`w-full min-h-[44px] flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
-                            isCurrent
-                              ? 'bg-[#002B49] text-white shadow-2xs'
-                              : 'hover:bg-slate-50 text-slate-800'
-                          }`}
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                              isCurrent
-                                ? 'bg-white/10 text-[#FFB81C]'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
+                    {/* Acceso a Panel de Administración / PAEDIS (Si aplica al rol) */}
+                    {isAdminOrCoordinator && (
+                      <div className="pt-0.5">
+                        {activeTab === 'admin-panel' ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              onTabChange('centro-ayuda');
+                              setIsUserMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-amber-50 hover:bg-amber-100/80 text-amber-950 border border-amber-200/80 transition-colors cursor-pointer"
                           >
-                            <Icon className="w-4 h-4" aria-hidden="true" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-1">
-                              <span
-                                className={`text-xs font-bold block truncate ${
-                                  isCurrent ? 'text-white' : 'text-slate-900'
-                                }`}
-                              >
-                                {item.label}
-                              </span>
-                              {isCurrent && (
-                                <Check className="w-3.5 h-3.5 text-[#FFB81C] shrink-0" />
-                              )}
+                            <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                              <HelpCircle className="w-4 h-4" />
                             </div>
-                            <p
-                              className={`text-[11px] leading-tight mt-0.5 truncate ${
-                                isCurrent ? 'text-slate-200' : 'text-slate-500'
-                              }`}
-                            >
-                              {item.subtitle}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-bold block truncate">
+                                Volver al Portal Estudiantil
+                              </span>
+                              <span className="text-[10px] text-amber-800/80 block truncate">
+                                Ir al Centro de Ayuda
+                              </span>
+                            </div>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              onTabChange('admin-panel');
+                              setIsUserMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-[#002B49] hover:bg-[#003B66] text-white transition-colors shadow-xs cursor-pointer"
+                          >
+                            <div className="w-7 h-7 rounded-lg bg-white/15 text-[#FFB81C] flex items-center justify-center shrink-0">
+                              <ShieldAlert className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-bold block truncate text-white">
+                                {adminPanelLabel}
+                              </span>
+                              <span className="text-[10px] text-slate-200 block truncate">
+                                Métricas SAT y gestión institucional
+                              </span>
+                            </div>
+                            <ArrowRight className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Opción: Mi Perfil Institucional */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        onTabChange('perfil');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                        activeTab === 'perfil'
+                          ? 'bg-slate-100 text-slate-900 font-bold'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-bold block">Mi Perfil Institucional</span>
+                        <span className="text-[10px] text-slate-500 block">
+                          Datos y accesibilidad PAEDIS
+                        </span>
+                      </div>
+                      {activeTab === 'perfil' && (
+                        <Check className="w-3.5 h-3.5 text-[#002B49] shrink-0" />
+                      )}
+                    </button>
+
+                    <div className="h-px bg-slate-100 my-1" />
+
+                    {/* Opción: Cerrar Sesión */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-rose-50 text-rose-700 hover:text-rose-900 transition-colors cursor-pointer"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-rose-100/70 flex items-center justify-center text-rose-600 shrink-0">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-bold block">Cerrar sesión</span>
+                        <span className="text-[10px] text-rose-500 block">
+                          Finalizar sesión segura en Nexo360
+                        </span>
+                      </div>
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Opción 3: Soporte TI */}
+              {/* Botón Salir Rápido (Escritorio) */}
               <button
                 type="button"
-                onClick={() => onTabChange('tickets')}
-                aria-current={activeTab === 'tickets' ? 'page' : undefined}
-                {...getVoiceProps('Soporte TI')}
-                className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
-                  activeTab === 'tickets'
-                    ? 'bg-[#002B49] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-                }`}
+                onClick={logout}
+                {...getVoiceProps('Cerrar sesión')}
+                className="min-h-[38px] flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100/70 hover:bg-slate-200/80 border border-slate-200/70 transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
+                aria-label="Cerrar sesión"
               >
-                <Laptop
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    activeTab === 'tickets' ? 'text-[#FFB81C]' : 'text-slate-500'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span>Soporte TI</span>
+                <LogOut className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                <span>Salir</span>
               </button>
-            </nav>
-
-            {/* Separador vertical sutil entre navegación y sesión */}
-            <div className="hidden lg:block h-6 w-px bg-slate-200/90 mx-0.5" aria-hidden="true" />
-
-            {/* Menú de Usuario Desplegable (Escritorio / Tablet) */}
-            <div className="relative hidden sm:block" ref={userMenuRef}>
-              <button
-                type="button"
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                aria-haspopup="menu"
-                aria-expanded={isUserMenuOpen}
-                {...getVoiceProps(`Menú de cuenta de ${displayName}. Rol ${roleLabel}`)}
-                className={`min-h-[40px] flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
-                  isUserMenuOpen || activeTab === 'perfil' || activeTab === 'admin-panel'
-                    ? 'bg-slate-100/90 border-slate-300 shadow-2xs'
-                    : 'bg-white hover:bg-slate-50 border-slate-200 shadow-2xs hover:border-slate-300'
-                }`}
-                aria-label="Abrir menú de usuario y cuenta"
-              >
-                {/* Avatar */}
-                {user?.photo ? (
-                  <img
-                    src={user.photo}
-                    alt=""
-                    className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
-                  />
-                ) : (
-                  <div
-                    className="w-7 h-7 rounded-full bg-[#002B49] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs"
-                    aria-hidden="true"
-                  >
-                    {displayName.charAt(0).toUpperCase()}
-                  </div>
-                )}
-
-                {/* Info de texto */}
-                <div className="text-left hidden md:block">
-                  <span className="text-xs font-bold text-slate-800 block leading-tight max-w-[130px] truncate">
-                    {displayName}
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-medium block leading-tight truncate">
-                    {isAdminOrCoordinator ? roleLabel : displayCampus}
-                  </span>
-                </div>
-
-                {/* Indicador de estado activo si está en admin-panel o perfil */}
-                {(activeTab === 'admin-panel' || activeTab === 'perfil') && (
-                  <span
-                    className="w-2 h-2 rounded-full bg-amber-500 shrink-0"
-                    title={activeTab === 'admin-panel' ? 'Panel Activo' : 'Perfil Activo'}
-                    aria-hidden="true"
-                  />
-                )}
-
-                {/* Flecha desplegable */}
-                <ChevronDown
-                  className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
-                    isUserMenuOpen ? 'rotate-180 text-slate-700' : ''
-                  }`}
-                  aria-hidden="true"
-                />
-              </button>
-
-              {/* Menú Desplegable Flotante */}
-              {isUserMenuOpen && (
-                <div
-                  role="menu"
-                  aria-label="Menú de cuenta y accesos"
-                  className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-fade-in space-y-1.5"
-                >
-                  {/* Tarjeta de Resumen de Usuario */}
-                  <div className="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-2.5">
-                      {user?.photo ? (
-                        <img
-                          src={user.photo}
-                          alt=""
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-[#002B49] text-white flex items-center justify-center font-bold text-sm shrink-0">
-                          {displayName.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <span className="text-xs font-bold text-slate-900 block truncate">
-                          {displayName}
-                        </span>
-                        <span className="text-[11px] text-slate-500 block truncate">
-                          {user?.email || 'usuario@duocuc.cl'}
-                        </span>
-                        <div className="mt-1 flex items-center gap-1.5">
-                          <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#002B49]/10 text-[#002B49] border border-[#002B49]/20">
-                            {roleLabel}
-                          </span>
-                          <span className="text-[10px] text-slate-400">· {DEFAULT_CAMPUS}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Acceso a Panel de Administración / PAEDIS (Si aplica al rol) */}
-                  {isAdminOrCoordinator && (
-                    <div className="pt-0.5">
-                      {activeTab === 'admin-panel' ? (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            onTabChange('centro-ayuda');
-                            setIsUserMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-amber-50 hover:bg-amber-100/80 text-amber-950 border border-amber-200/80 transition-colors cursor-pointer"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                            <HelpCircle className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-bold block truncate">
-                              Volver al Portal Estudiantil
-                            </span>
-                            <span className="text-[10px] text-amber-800/80 block truncate">
-                              Ir al Centro de Ayuda
-                            </span>
-                          </div>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            onTabChange('admin-panel');
-                            setIsUserMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-[#002B49] hover:bg-[#003B66] text-white transition-colors shadow-xs cursor-pointer"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-white/15 text-[#FFB81C] flex items-center justify-center shrink-0">
-                            <ShieldAlert className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-bold block truncate text-white">
-                              {adminPanelLabel}
-                            </span>
-                            <span className="text-[10px] text-slate-200 block truncate">
-                              Métricas SAT y gestión institucional
-                            </span>
-                          </div>
-                          <ArrowRight className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Opción: Mi Perfil Institucional */}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onTabChange('perfil');
-                      setIsUserMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
-                      activeTab === 'perfil'
-                        ? 'bg-slate-100 text-slate-900 font-bold'
-                        : 'hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                      <User className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold block">Mi Perfil Institucional</span>
-                      <span className="text-[10px] text-slate-500 block">
-                        Datos y accesibilidad PAEDIS
-                      </span>
-                    </div>
-                    {activeTab === 'perfil' && (
-                      <Check className="w-3.5 h-3.5 text-[#002B49] shrink-0" />
-                    )}
-                  </button>
-
-                  <div className="h-px bg-slate-100 my-1" />
-
-                  {/* Opción: Cerrar Sesión */}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      logout();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-rose-50 text-rose-700 hover:text-rose-900 transition-colors cursor-pointer"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-rose-100/70 flex items-center justify-center text-rose-600 shrink-0">
-                      <LogOut className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold block">Cerrar sesión</span>
-                      <span className="text-[10px] text-rose-500 block">
-                        Finalizar sesión segura en Nexo360
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              )}
             </div>
+          </div>
 
-            {/* Botón Salir Rápido (Escritorio) */}
-            <button
-              type="button"
-              onClick={logout}
-              {...getVoiceProps('Cerrar sesión')}
-              className="hidden sm:flex min-h-[38px] items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100/70 hover:bg-slate-200/80 border border-slate-200/70 transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
-              aria-label="Cerrar sesión"
-            >
-              <LogOut className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-              <span>Salir</span>
-            </button>
-
-            {/* BOTÓN MÓVIL (Menú hamburguesa accesible) */}
+          {/* 3. Lado Derecho: En desktop espacio de balance simétrico; en móvil botón menú accesible */}
+          <div className="flex items-center justify-end justify-self-end">
+            {/* BOTÓN MÓVIL (Menú hamburguesa accesible < lg) */}
             <button
               id="mobile-menu-button"
               type="button"
