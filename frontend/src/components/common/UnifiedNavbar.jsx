@@ -125,8 +125,8 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
   return (
     <header className="bg-white/95 backdrop-blur-md text-slate-900 sticky top-0 z-40 border-b border-slate-200/90 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)] transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="h-16 flex items-center justify-between gap-3 sm:gap-6">
-          {/* 1. Marca Institucional Oficial (Logo 03) */}
+        <div className="min-h-[70px] sm:h-20 py-2 flex items-center justify-between gap-4">
+          {/* 1. Marca Institucional Oficial (Logo 03 - Prominente y legible) */}
           <button
             type="button"
             onClick={() => {
@@ -134,7 +134,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               setIsMobileMenuOpen(false);
             }}
             {...getVoiceProps(`Ir al inicio de Nexo360 Duoc UC ${DEFAULT_CAMPUS}`)}
-            className="h-11 flex items-center group text-left rounded-xl px-1.5 transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#002B49] focus-visible:ring-offset-2"
+            className="h-14 flex items-center group text-left rounded-2xl px-1.5 transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 cursor-pointer"
             aria-label={`Ir al inicio de Nexo360 Centro de Ayuda ${DEFAULT_CAMPUS}`}
           >
             <img
@@ -142,167 +142,170 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               alt={`Nexo360 Duoc UC - ${DEFAULT_CAMPUS}`}
               className="w-auto object-contain transition-all duration-200 group-hover:opacity-95 select-none"
               style={{
-                height: 'clamp(28px, 2.2vw + 14px, 40px)',
+                height: 'clamp(36px, 2.6vw + 16px, 48px)',
                 aspectRatio: '1024 / 307',
               }}
             />
           </button>
 
-          {/* 2. Navegación Central en Escritorio (>= lg) - Uniforme e idéntica para todos los usuarios */}
-          <nav
-            aria-label="Secciones principales del portal"
-            className="hidden lg:flex items-center gap-1 bg-slate-100/70 p-1 rounded-full border border-slate-200/70 shadow-2xs backdrop-blur-xs"
-          >
-            {/* Opción 1: Centro de Ayuda */}
-            <button
-              type="button"
-              onClick={() => onTabChange('centro-ayuda')}
-              aria-current={activeTab === 'centro-ayuda' ? 'page' : undefined}
-              {...getVoiceProps('Centro de Ayuda')}
-              className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
-                activeTab === 'centro-ayuda'
-                  ? 'bg-[#002B49] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-              }`}
+          {/* 2. Bloque Coherente: Navegación + Perfil de Usuario + Salir + Menú Móvil */}
+          <div className="flex items-center gap-2 sm:gap-2.5 lg:gap-3">
+            {/* Navegación en Escritorio (>= lg) */}
+            <nav
+              aria-label="Secciones principales del portal"
+              className="hidden lg:flex items-center gap-1 bg-slate-100/70 p-1 rounded-full border border-slate-200/70 shadow-2xs backdrop-blur-xs"
             >
-              <HelpCircle
-                className={`w-4 h-4 shrink-0 transition-colors ${
-                  activeTab === 'centro-ayuda' ? 'text-[#FFB81C]' : 'text-slate-500'
-                }`}
-                aria-hidden="true"
-              />
-              <span>Centro de Ayuda</span>
-            </button>
-
-            {/* Opción 2: Menú Desplegable "Simulaciones" */}
-            <div className="relative" ref={simMenuRef}>
+              {/* Opción 1: Centro de Ayuda */}
               <button
                 type="button"
-                onClick={() => setIsSimMenuOpen(!isSimMenuOpen)}
-                aria-haspopup="menu"
-                aria-expanded={isSimMenuOpen}
-                {...getVoiceProps(
-                  isSimActive && activeSimItem
-                    ? `Simulaciones, seleccionado actualmente ${activeSimItem.label}`
-                    : 'Simulaciones'
-                )}
+                onClick={() => onTabChange('centro-ayuda')}
+                aria-current={activeTab === 'centro-ayuda' ? 'page' : undefined}
+                {...getVoiceProps('Centro de Ayuda')}
                 className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
-                  isSimActive
+                  activeTab === 'centro-ayuda'
                     ? 'bg-[#002B49] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
               >
-                <Layers
+                <HelpCircle
                   className={`w-4 h-4 shrink-0 transition-colors ${
-                    isSimActive ? 'text-[#FFB81C]' : 'text-slate-500'
+                    activeTab === 'centro-ayuda' ? 'text-[#FFB81C]' : 'text-slate-500'
                   }`}
                   aria-hidden="true"
                 />
-                <span className="truncate max-w-[150px]">
-                  {isSimActive && activeSimItem ? activeSimItem.label : 'Simulaciones'}
-                </span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
-                    isSimMenuOpen ? 'rotate-180' : ''
-                  } ${isSimActive ? 'text-[#FFB81C]' : 'text-slate-400'}`}
-                  aria-hidden="true"
-                />
+                <span>Centro de Ayuda</span>
               </button>
 
-              {/* Menú Flotante Desplegable en Escritorio */}
-              {isSimMenuOpen && (
-                <div
-                  role="menu"
-                  aria-label="Submenú de simulaciones prácticas"
-                  className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-fade-in space-y-1"
+              {/* Opción 2: Menú Desplegable "Simulaciones" */}
+              <div className="relative" ref={simMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsSimMenuOpen(!isSimMenuOpen)}
+                  aria-haspopup="menu"
+                  aria-expanded={isSimMenuOpen}
+                  {...getVoiceProps(
+                    isSimActive && activeSimItem
+                      ? `Simulaciones, seleccionado actualmente ${activeSimItem.label}`
+                      : 'Simulaciones'
+                  )}
+                  className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                    isSimActive
+                      ? 'bg-[#002B49] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                  }`}
                 >
-                  <div className="px-3 py-1.5 border-b border-slate-100">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                      Módulos Prácticos
-                    </span>
-                    <p className="text-xs text-slate-600 font-medium">
-                      Simuladores oficiales y guías interactivas
-                    </p>
-                  </div>
+                  <Layers
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      isSimActive ? 'text-[#FFB81C]' : 'text-slate-500'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate max-w-[150px]">
+                    {isSimActive && activeSimItem ? activeSimItem.label : 'Simulaciones'}
+                  </span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                      isSimMenuOpen ? 'rotate-180' : ''
+                    } ${isSimActive ? 'text-[#FFB81C]' : 'text-slate-400'}`}
+                    aria-hidden="true"
+                  />
+                </button>
 
-                  {simulationItems.map((item) => {
-                    const Icon = item.icon;
-                    const isCurrent = activeTab === item.id;
+                {/* Menú Flotante Desplegable en Escritorio */}
+                {isSimMenuOpen && (
+                  <div
+                    role="menu"
+                    aria-label="Submenú de simulaciones prácticas"
+                    className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-fade-in space-y-1"
+                  >
+                    <div className="px-3 py-1.5 border-b border-slate-100">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                        Módulos Prácticos
+                      </span>
+                      <p className="text-xs text-slate-600 font-medium">
+                        Simuladores oficiales y guías interactivas
+                      </p>
+                    </div>
 
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handleSelectSimItem(item.id)}
-                        {...getVoiceProps(`${item.label}. ${item.subtitle}`)}
-                        className={`w-full min-h-[44px] flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
-                          isCurrent
-                            ? 'bg-[#002B49] text-white shadow-2xs'
-                            : 'hover:bg-slate-50 text-slate-800'
-                        }`}
-                      >
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                    {simulationItems.map((item) => {
+                      const Icon = item.icon;
+                      const isCurrent = activeTab === item.id;
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => handleSelectSimItem(item.id)}
+                          {...getVoiceProps(`${item.label}. ${item.subtitle}`)}
+                          className={`w-full min-h-[44px] flex items-start gap-3 p-2.5 rounded-xl text-left transition-colors cursor-pointer ${
                             isCurrent
-                              ? 'bg-white/10 text-[#FFB81C]'
-                              : 'bg-slate-100 text-slate-700'
+                              ? 'bg-[#002B49] text-white shadow-2xs'
+                              : 'hover:bg-slate-50 text-slate-800'
                           }`}
                         >
-                          <Icon className="w-4 h-4" aria-hidden="true" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span
-                              className={`text-xs font-bold block truncate ${
-                                isCurrent ? 'text-white' : 'text-slate-900'
-                              }`}
-                            >
-                              {item.label}
-                            </span>
-                            {isCurrent && (
-                              <Check className="w-3.5 h-3.5 text-[#FFB81C] shrink-0" />
-                            )}
-                          </div>
-                          <p
-                            className={`text-[11px] leading-tight mt-0.5 truncate ${
-                              isCurrent ? 'text-slate-200' : 'text-slate-500'
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                              isCurrent
+                                ? 'bg-white/10 text-[#FFB81C]'
+                                : 'bg-slate-100 text-slate-700'
                             }`}
                           >
-                            {item.subtitle}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                            <Icon className="w-4 h-4" aria-hidden="true" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span
+                                className={`text-xs font-bold block truncate ${
+                                  isCurrent ? 'text-white' : 'text-slate-900'
+                                }`}
+                              >
+                                {item.label}
+                              </span>
+                              {isCurrent && (
+                                <Check className="w-3.5 h-3.5 text-[#FFB81C] shrink-0" />
+                              )}
+                            </div>
+                            <p
+                              className={`text-[11px] leading-tight mt-0.5 truncate ${
+                                isCurrent ? 'text-slate-200' : 'text-slate-500'
+                              }`}
+                            >
+                              {item.subtitle}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-            {/* Opción 3: Soporte TI */}
-            <button
-              type="button"
-              onClick={() => onTabChange('tickets')}
-              aria-current={activeTab === 'tickets' ? 'page' : undefined}
-              {...getVoiceProps('Soporte TI')}
-              className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
-                activeTab === 'tickets'
-                  ? 'bg-[#002B49] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-              }`}
-            >
-              <Laptop
-                className={`w-4 h-4 shrink-0 transition-colors ${
-                  activeTab === 'tickets' ? 'text-[#FFB81C]' : 'text-slate-500'
+              {/* Opción 3: Soporte TI */}
+              <button
+                type="button"
+                onClick={() => onTabChange('tickets')}
+                aria-current={activeTab === 'tickets' ? 'page' : undefined}
+                {...getVoiceProps('Soporte TI')}
+                className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                  activeTab === 'tickets'
+                    ? 'bg-[#002B49] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                 }`}
-                aria-hidden="true"
-              />
-              <span>Soporte TI</span>
-            </button>
-          </nav>
+              >
+                <Laptop
+                  className={`w-4 h-4 shrink-0 transition-colors ${
+                    activeTab === 'tickets' ? 'text-[#FFB81C]' : 'text-slate-500'
+                  }`}
+                  aria-hidden="true"
+                />
+                <span>Soporte TI</span>
+              </button>
+            </nav>
 
-          {/* 3. Acciones Derecha: Menú de Usuario Unificado, Salir y Menú Móvil */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Separador vertical sutil entre navegación y sesión */}
+            <div className="hidden lg:block h-6 w-px bg-slate-200/90 mx-0.5" aria-hidden="true" />
+
             {/* Menú de Usuario Desplegable (Escritorio / Tablet) */}
             <div className="relative hidden sm:block" ref={userMenuRef}>
               <button
