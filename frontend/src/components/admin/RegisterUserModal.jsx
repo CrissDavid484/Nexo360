@@ -403,6 +403,7 @@ function PaedisStudentSection({
             <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl space-y-1.5 text-xs">
               <label
                 htmlFor="create-auto-voice-reader"
+                aria-label="Activar lector de pantalla o voz asistida por defecto para el estudiante"
                 className="flex items-start gap-2.5 cursor-pointer"
               >
                 <input

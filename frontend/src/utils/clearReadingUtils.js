@@ -70,11 +70,30 @@ function stripTagsAndNormalizeSpaces(input) {
     .trim();
 }
 
+function removeSpacesBeforePunctuation(str) {
+  let result = '';
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === ' ' || ch === '\t') {
+      let j = i;
+      while (j < str.length && (str[j] === ' ' || str[j] === '\t')) {
+        j++;
+      }
+      if (j < str.length && ',.;:!?'.includes(str[j])) {
+        i = j - 1;
+        continue;
+      }
+    }
+    result += ch;
+  }
+  return result;
+}
+
 function removeParentheticalClutter(input) {
-  return input
+  const withoutParens = input
     .replace(/\([^()]{1,140}\)/g, ' ')
-    .replace(/\[[^[\]]{1,140}\]/g, ' ')
-    .replace(/[ \t]+([,.;:!?])/g, '$1')
+    .replace(/\[[^[\]]{1,140}\]/g, ' ');
+  return removeSpacesBeforePunctuation(withoutParens)
     .replace(/\s+/g, ' ')
     .trim();
 }

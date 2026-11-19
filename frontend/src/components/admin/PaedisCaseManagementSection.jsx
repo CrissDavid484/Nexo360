@@ -1124,6 +1124,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 <div className="pt-2 border-t border-slate-200">
                   <label
                     htmlFor="paedis-voice-reader-default"
+                    aria-label="Activar lector de pantalla o voz asistida por defecto en el perfil"
                     className="flex items-start gap-2.5 cursor-pointer"
                   >
                     <input
