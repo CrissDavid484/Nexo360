@@ -221,7 +221,7 @@ export const BibliotecaView = () => {
         <div className="space-y-1.5 max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-[#002B49] bg-slate-100 px-3 py-1 rounded-full border border-slate-200/80">
-              Bibliotecas Duoc UC • {DEFAULT_CAMPUS} (lid={LIBCAL_ALAMEDA_CONFIG.lid})
+              Bibliotecas Duoc UC • {DEFAULT_CAMPUS}
             </span>
             <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
               Catálogo Oficial LibCal
@@ -237,9 +237,9 @@ export const BibliotecaView = () => {
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-            Prepara y practica tu reserva para <strong>Duoc UC - {DEFAULT_CAMPUS}</strong>. Consulta los espacios reales de{' '}
-            <strong className="text-slate-900">Salas de estudio (gid={BIBLIOTECA_ALAMEDA_CATEGORIES[0].gid})</strong> y{' '}
-            <strong className="text-slate-900">Lentes VR (gid={BIBLIOTECA_ALAMEDA_CATEGORIES[1].gid})</strong>, o accede con un clic a los enlaces oficiales de LibCal sin intermediarios.
+            Prepara y practica tu reserva para <strong>Duoc UC - {DEFAULT_CAMPUS}</strong>. Consulta los espacios disponibles de{' '}
+            <strong className="text-slate-900">Salas de estudio</strong> y{' '}
+            <strong className="text-slate-900">Lentes VR</strong>, o accede directamente a las plataformas oficiales de reserva y check-in.
           </p>
         </div>
 
@@ -378,7 +378,7 @@ export const BibliotecaView = () => {
             {/* Paso 1 */}
             <div
               {...getVoiceProps(
-                'Paso 1: Elige Salas de estudio (gid 31398) o Lentes VR (gid 52104) según lo que requieras para tu jornada en Sede Alameda.'
+                'Paso 1: Elige Salas de estudio o Lentes VR según lo que requieras para tu jornada en Sede Alameda.'
               )}
               className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col justify-between hover:bg-slate-50 transition-colors"
             >
@@ -395,7 +395,7 @@ export const BibliotecaView = () => {
                   Salas de estudio o Lentes VR
                 </h4>
                 <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                  Selecciona la categoría: Salas 1 a 4 (gid=31398) o visores de Realidad Virtual (gid=52104).
+                  Selecciona la categoría: Salas de estudio 1 a 4 o visores de Realidad Virtual.
                 </p>
               </div>
             </div>
@@ -549,7 +549,7 @@ export const BibliotecaView = () => {
                 Duoc<span className="text-[#FFB81C]">UC</span>
               </span>
               <span className="text-xs text-slate-300 font-medium">
-                Bibliotecas • {DEFAULT_CAMPUS} (lid={LIBCAL_ALAMEDA_CONFIG.lid})
+                Bibliotecas • {DEFAULT_CAMPUS}
               </span>
             </div>
 
@@ -603,13 +603,13 @@ export const BibliotecaView = () => {
                             {category.name}
                           </span>
                           <span
-                            className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               isSelected
-                                ? 'bg-amber-400 text-slate-950'
+                                ? 'bg-white/20 text-white'
                                 : 'bg-slate-100 text-slate-600'
                             }`}
                           >
-                            gid={category.gid}
+                            {category.type === 'vr-headset' ? 'Visores VR' : 'Salas Grupales'}
                           </span>
                         </div>
                         <p className={`text-[11px] mt-0.5 leading-snug line-clamp-1 ${isSelected ? 'text-slate-200' : 'text-slate-500'}`}>
@@ -644,17 +644,10 @@ export const BibliotecaView = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs">
-                  <a
-                    href={currentAccessibleUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    {...getVoiceProps(`Abrir versión accesible oficial de LibCal para ${currentCategory.name}`)}
-                    className="text-[#002B49] font-bold hover:underline flex items-center gap-1"
-                  >
-                    <span>Abrir en LibCal Accesible (gid={currentCategory.gid})</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/80">
+                    Capacidad máxima: {currentCategory.maxCapacity} {currentCategory.maxCapacity > 1 ? 'estudiantes' : 'estudiante'}
+                  </span>
                 </div>
               </div>
 
@@ -826,7 +819,7 @@ export const BibliotecaView = () => {
                   <tbody>
                     <tr className="border-b border-slate-100">
                       <td className="p-3 font-bold text-slate-900">{selectedSlot.roomName}</td>
-                      <td className="p-3 text-slate-600">{currentCategory.name} (gid={currentCategory.gid})</td>
+                      <td className="p-3 text-slate-600">{currentCategory.name}</td>
                       <td className="p-3 text-slate-800 font-medium">{selectedSlot.time}</td>
                       <td className="p-3 text-slate-800 font-medium">{selectedSlot.date}</td>
                       <td className="p-3 text-right">
@@ -1006,8 +999,8 @@ export const BibliotecaView = () => {
                     Detalles del Espacio
                   </h4>
                   <div className="text-xs space-y-1 text-slate-700">
-                    <p><strong>Sede:</strong> Duoc UC - {DEFAULT_CAMPUS} (lid={LIBCAL_ALAMEDA_CONFIG.lid})</p>
-                    <p><strong>Categoría:</strong> {confirmedBooking.categoryName} (gid={confirmedBooking.gid})</p>
+                    <p><strong>Sede:</strong> Duoc UC - {DEFAULT_CAMPUS}</p>
+                    <p><strong>Categoría:</strong> {confirmedBooking.categoryName}</p>
                     <p><strong>Espacio:</strong> {confirmedBooking.roomName}</p>
                     <p><strong>Fecha:</strong> {confirmedBooking.date}</p>
                     <p><strong>Bloque:</strong> {confirmedBooking.time}</p>
@@ -1200,7 +1193,7 @@ export const BibliotecaView = () => {
       <footer className="bg-slate-50 border border-slate-200/90 rounded-2xl px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Bibliotecas Duoc UC • Sede Alameda (lid={LIBCAL_ALAMEDA_CONFIG.lid}) • Ley N° 21.719</span>
+          <span>Bibliotecas Duoc UC • Sede Alameda • Ley N° 21.719</span>
         </div>
         <div className="flex items-center gap-4 font-semibold">
           <a

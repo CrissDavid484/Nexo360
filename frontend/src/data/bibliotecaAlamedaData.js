@@ -173,7 +173,7 @@ export function generateRealisticLibcalCode() {
  */
 export const BIBLIOTECA_VOICE_GUIDE_TEXT =
   'Instrucciones para reserva en Biblioteca Duoc UC Sede Alameda. ' +
-  'Paso 1: Elige Salas de estudio (código 31398) o Lentes VR (código 52104). ' +
+  'Paso 1: Elige Salas de estudio o Lentes VR según lo que requieras. ' +
   'Paso 2: En la grilla selecciona tu sala o visor y el bloque horario disponible. ' +
   'Paso 3: Confirma con tu correo institucional. Recibirás tu código alfanumérico como 2VF. ' +
   'Paso 4: Al llegar a Biblioteca Alameda, ingresa a la pantalla de Check-in antes de 15 minutos para activar tu espacio.';
