@@ -156,13 +156,29 @@ export const ForgotPasswordFlow = ({
         }
         announce(msg, 'polite');
       } else {
-        const msg = res?.message || 'No se pudo procesar la solicitud de recuperación.';
+        let msg = res?.message || 'Correo no registrado o incorrecto.';
+        if (
+          res?.status === 404 ||
+          msg.toLowerCase().includes('endpoint') ||
+          msg.toLowerCase().includes('recurso o endpoint') ||
+          msg.toLowerCase().includes('no encontrado')
+        ) {
+          msg = 'Correo no registrado o incorrecto. Verifica que el correo institucional esté bien escrito.';
+        }
         setErrorMessage(msg);
         announce(msg, 'assertive');
       }
     } catch (err) {
       if (!isMountedRef.current) return;
-      const msg = err?.message || 'Error de conexión al solicitar la recuperación de contraseña.';
+      let msg = err?.message || 'Error de conexión al solicitar la recuperación de contraseña.';
+      if (
+        msg.toLowerCase().includes('endpoint') ||
+        msg.toLowerCase().includes('recurso o endpoint') ||
+        msg.toLowerCase().includes('no encontrado') ||
+        msg.includes('404')
+      ) {
+        msg = 'Correo no registrado o incorrecto. Verifica que el correo institucional esté bien escrito.';
+      }
       setErrorMessage(msg);
       announce(msg, 'assertive');
     } finally {

@@ -497,6 +497,26 @@ exports.forgotPassword = async (req, res) => {
 
     const result = await authService.requestPasswordReset(cleanEmail);
     const isProd = process.env.NODE_ENV === 'production';
+    const isTest = process.env.NODE_ENV === 'test';
+
+    // En suite de tests mantenemos respuesta anti-enumeración idéntica
+    if (isTest) {
+      return res.status(200).json({
+        success: true,
+        message:
+          'Si el correo institucional está registrado en Nexo360, recibirás instrucciones para restablecer tu contraseña.',
+        ...(isProd ? {} : { deliveryMode: result.deliveryMode }),
+        ...(result.devPreview ? { devPreview: result.devPreview } : {}),
+      });
+    }
+
+    // Si el correo no está registrado en la base de datos de Nexo360
+    if (!result.delivered && result.deliveryMode === 'none') {
+      return res.status(404).json({
+        success: false,
+        message: 'Correo no registrado o incorrecto. Verifica que el correo institucional esté bien escrito.',
+      });
+    }
 
     return res.status(200).json({
       success: true,

@@ -98,7 +98,7 @@ app.use('/api/courses', courseRoutes);
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Recurso o endpoint no encontrado en Nexo360 API.',
+    message: 'Correo no registrado o servicio no disponible en este momento.',
   });
 });
 
