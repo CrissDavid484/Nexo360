@@ -28,6 +28,7 @@ import {
   FileText,
   Layers,
   Package,
+  GraduationCap,
 } from 'lucide-react';
 
 // Vistas complementarias con Code-Splitting (React.lazy)

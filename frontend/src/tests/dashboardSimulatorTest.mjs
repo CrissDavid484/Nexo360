@@ -40,6 +40,10 @@ assert.ok(
   dashboardContent.includes('Hola,') && (dashboardContent.includes('user?.name') || dashboardContent.includes('userName') || dashboardContent.includes('displayGreetingName')),
   'DashboardPage must have dynamic student greeting'
 );
+assert.ok(
+  dashboardContent.includes('GraduationCap'),
+  'DashboardPage must properly import and use GraduationCap'
+);
 console.log('✓ Test 3: Dashboard greeting and simulator access control modal verified');
 
 // 4. tomaRamosData.js imports and functions test
