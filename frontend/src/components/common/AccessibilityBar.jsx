@@ -489,13 +489,13 @@ export const AccessibilityBar = () => {
             </>
           )}
 
-          {/* Sello institucional Duoc UC UIE & Ally 100% */}
+          {/* Identidad institucional Duoc UC - Sede Alameda */}
           <div className="pt-3 border-t border-slate-200 text-center">
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-              Subdirección de Inclusión Educativa • Duoc UC
+              Nexo360 • Duoc UC - Sede Alameda
             </span>
             <p className="text-[10px] text-slate-500 mt-0.5 leading-normal">
-              Ley N° 20.422 • UNE 71362 • UNE 153101 • WCAG 2.2 AAA (Ally 100%)
+              Ajustes de accesibilidad universal e inclusión
             </p>
           </div>
         </div>

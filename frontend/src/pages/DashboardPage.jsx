@@ -197,7 +197,7 @@ export const DashboardPage = () => {
       {/* 3. Contenido Principal */}
       <main
         id="main-content"
-        className={`flex-1 mx-auto pt-16 sm:pt-20 pb-8 sm:pb-10 w-full px-4 sm:px-6 lg:px-8 ${
+        className={`flex-1 mx-auto pt-16 sm:pt-20 lg:pt-8 pb-8 sm:pb-10 w-full px-4 sm:px-6 lg:px-8 ${
           activeTab === 'toma-ramos' ? 'max-w-[1480px]' : 'max-w-7xl'
         }`}
       >
@@ -857,7 +857,7 @@ export const DashboardPage = () => {
         />
       )}
 
-      {/* Pie de Página Institucional Duoc UC (UIE & Accesibilidad Digital) */}
+      {/* Pie de Página Institucional Duoc UC - Sede Alameda */}
       <footer className="bg-white text-slate-500 py-8 px-4 sm:px-6 lg:px-8 border-t border-slate-200/90 mt-16 text-xs">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-1.5 max-w-2xl">
@@ -865,14 +865,10 @@ export const DashboardPage = () => {
               <span className="font-bold text-slate-900 text-sm">
                 Nexo360 • Centro de Ayuda y Servicios Duoc UC - Sede Alameda
               </span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                Ally 100% Óptimo
-              </span>
             </div>
             <p className="text-slate-600 leading-relaxed font-normal">
-              Subdirección de Inclusión Educativa (UIE) • Vicerrectoría Académica Duoc UC.
-              Diseñado bajo la Guía de Introducción a la Accesibilidad Digital, Ley N° 20.422, Ley N° 21.719,
-              Norma UNE 71362:2020 y Norma UNE 153101:2018 (Lectura Fácil) para garantizar el acceso universal (WCAG 2.2 AA/AAA).
+              Plataforma de inducción y orientación accesible para la comunidad estudiantil de Sede Alameda.
+              Gestión institucional conforme a la normativa de protección de datos (Ley N° 21.719).
             </p>
           </div>
           <div className="text-left md:text-right shrink-0 space-y-1">
