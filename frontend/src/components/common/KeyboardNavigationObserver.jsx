@@ -124,14 +124,13 @@ export const KeyboardNavigationObserver = () => {
 
       const isForward = event.key === 'ArrowDown' || event.key === 'ArrowRight';
       const currentIndex = focusables.indexOf(activeEl);
-
-      let targetIndex;
+      // Si el foco no está en un control interactivo (p. ej. leyendo texto o párrafos con NVDA), no interceptar
       if (currentIndex === -1) {
-        targetIndex = isForward ? 0 : focusables.length - 1;
-      } else {
-        const step = isForward ? 1 : -1;
-        targetIndex = (currentIndex + step + focusables.length) % focusables.length;
+        return;
       }
+
+      const step = isForward ? 1 : -1;
+      const targetIndex = (currentIndex + step + focusables.length) % focusables.length;
 
       const nextTarget = focusables[targetIndex];
       if (nextTarget) {

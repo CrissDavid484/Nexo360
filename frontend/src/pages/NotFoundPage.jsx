@@ -19,6 +19,10 @@ export const NotFoundPage = () => {
   const { getVoiceProps } = useAccessibility();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    document.title = 'Página no encontrada (Error 404) | Nexo360 - Duoc UC Alameda';
+  }, []);
+
   const handleReturnToPortal = () => {
     if (isAuthenticated) {
       navigate('/dashboard', { replace: true });
@@ -33,8 +37,9 @@ export const NotFoundPage = () => {
 
       <main
         id="main-content"
-        className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 animate-fade-in-up"
+        className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 animate-fade-in-up focus:outline-none"
         tabIndex="-1"
+        aria-label="Página no encontrada"
       >
         <div className="max-w-lg w-full bg-white rounded-3xl border border-slate-200 shadow-xl p-8 sm:p-10 text-center relative overflow-hidden">
           {/* Acento decorativo superior Duoc UC */}

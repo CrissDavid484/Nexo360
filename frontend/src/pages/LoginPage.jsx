@@ -62,6 +62,17 @@ export const LoginPage = ({ initialMode = 'login' }) => {
     }
   }, [initialMode, urlRecoveryParams.mode, urlRecoveryParams.email, urlRecoveryParams.token]);
 
+  // Sincronización de título de página para NVDA y lectores de pantalla (WCAG 2.4.2)
+  useEffect(() => {
+    const titles = {
+      login: 'Iniciar Sesión Institucional | Nexo360 - Duoc UC Alameda',
+      forgot: 'Recuperar Contraseña | Nexo360 - Duoc UC Alameda',
+      reset: 'Restablecer Contraseña | Nexo360 - Duoc UC Alameda',
+      mfa: 'Verificación de Seguridad MFA | Nexo360 - Duoc UC Alameda',
+    };
+    document.title = titles[mfaSession ? 'mfa' : authMode] || 'Iniciar Sesión | Nexo360';
+  }, [authMode, mfaSession]);
+
   const handleMfaRequired = ({ sessionId, mfaCode, email }) => {
     setMfaSession({ sessionId, initialMfaCode: mfaCode, email });
   };
@@ -128,7 +139,9 @@ export const LoginPage = ({ initialMode = 'login' }) => {
 
       <main
         id="main-content"
-        className="flex-1 flex flex-col items-center justify-center py-8 sm:py-12 px-4 w-full max-w-full animate-fade-in-up"
+        tabIndex="-1"
+        aria-label="Acceso y autenticación institucional Nexo360"
+        className="flex-1 flex flex-col items-center justify-center py-8 sm:py-12 px-4 w-full max-w-full animate-fade-in-up focus:outline-none"
       >
         {/* Marca institucional oficial (Logo 03: Nexo360 Duoc UC | Ícono N 360 - Responsive tipo SVG) */}
         <header className="mb-7 text-center">

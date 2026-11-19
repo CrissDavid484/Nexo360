@@ -133,6 +133,21 @@ export const DashboardPage = () => {
     }
   }, [activeTab]);
 
+  // Sincronización de título de página y avisos accesibles para lectores de pantalla como NVDA (WCAG 2.4.2)
+  useEffect(() => {
+    const TAB_TITLES = {
+      'centro-ayuda': 'Centro de Ayuda y Preguntas Frecuentes | Nexo360 - Duoc UC Alameda',
+      'toma-ramos': 'Simulador de Toma de Ramos | Nexo360 - Duoc UC Alameda',
+      'biblioteca': 'Biblioteca Alameda | Nexo360 - Duoc UC Alameda',
+      'vivo-duoc': 'Experiencia Vivo Duoc | Nexo360 - Duoc UC Alameda',
+      'tickets': 'Soporte TI y Servicios Digitales | Nexo360 - Duoc UC Alameda',
+      'perfil': 'Mi Perfil Institucional PAEDIS | Nexo360 - Duoc UC Alameda',
+      'admin-panel': 'Panel de Administración SAT | Nexo360 - Duoc UC Alameda',
+    };
+    const title = TAB_TITLES[activeTab] || 'Nexo360 | Duoc UC - Sede Alameda';
+    document.title = title;
+  }, [activeTab]);
+
   const handleOpenCategory = (category) => {
     setSelectedCategory(category);
     setSelectedSubmodule(null);
@@ -197,7 +212,9 @@ export const DashboardPage = () => {
       {/* 3. Contenido Principal */}
       <main
         id="main-content"
-        className={`flex-1 mx-auto pt-4 sm:pt-6 lg:pt-8 pb-8 sm:pb-10 w-full px-4 sm:px-6 lg:px-8 ${
+        tabIndex="-1"
+        aria-label="Contenido principal de Nexo360"
+        className={`flex-1 mx-auto pt-4 sm:pt-6 lg:pt-8 pb-8 sm:pb-10 w-full px-4 sm:px-6 lg:px-8 focus:outline-none ${
           activeTab === 'toma-ramos' ? 'max-w-[1480px]' : 'max-w-7xl'
         }`}
       >

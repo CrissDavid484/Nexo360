@@ -45,6 +45,7 @@ const KEYBOARD_GUIDE_ITEMS = [
   { id: 'arrows', keys: 'Flechas (↑ ↓ ← →)', label: 'Navegar entre botones, menús y tarjetas' },
   { id: 'voice', keys: 'Alt + V', label: 'Activar o desactivar Lectura por Voz' },
   { id: 'escape', keys: 'Escape', label: 'Silenciar voz o cerrar ventanas' },
+  { id: 'nvda', keys: 'NVDA + T / H / D', label: 'Leer título (NVDA+T), encabezados (H) o regiones (D)' },
 ];
 
 const A11yToggleOption = ({
@@ -292,7 +293,7 @@ export const AccessibilityBar = () => {
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Las herramientas puramente visuales se ocultan para priorizar lector de pantalla, voz y teclado.
+                  Totalmente compatible con NVDA, JAWS y lectores de pantalla. Las herramientas puramente visuales se ocultan para priorizar navegación por regiones, teclado y voz.
                 </p>
                 <ul className="space-y-1 text-[11px] text-slate-700 pt-1 border-t border-slate-200/80">
                   {KEYBOARD_GUIDE_ITEMS.map((item) => (
