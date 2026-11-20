@@ -532,4 +532,161 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(coordGetStudentsRes.status, 200);
     assert.ok(coordGetStudentsRes.body?.students?.length > 0);
   });
+
+  test('11. Bitácora ActivityLog (/api/admin/activity-logs): 403 Coordinador/Estudiante, 200 Admin, filtros action/q y sanitización Ley 21.719', async () => {
+    const authService = require('../services/authService');
+
+    // 1. Bloqueo RBAC estricto: Coordinador PAEDIS y Estudiante reciben 403
+    const coordRes = await request('/api/admin/activity-logs', { headers: coordinatorHeaders });
+    assert.equal(coordRes.status, 403);
+
+    const studentRes = await request('/api/admin/activity-logs', { headers: studentHeaders });
+    assert.equal(studentRes.status, 403);
+
+    // 2. Inyectar un registro con claves sensibles anidadas para verificar sanitización recursiva
+    const uniqueMarker = `AUDIT_MARKER_${Date.now()}_[regex.*+?^$()]`;
+    await authService.logActivity({
+      userId: 'seed_admin_c_guzman',
+      userEmail: 'c.guzman@duocuc.cl',
+      userName: 'Cristian Guzmán',
+      userRole: 'admin',
+      action: 'student_updated_by_admin',
+      details: `Verificación gobernanza ${uniqueMarker}`,
+      metadata: {
+        safeField: 'valor_seguro',
+        passwordHash: 'no_debe_aparecer',
+        resetToken: 'tok_123',
+        jwtSecret: 'sec_456',
+        diagnosticoDeclarado: 'TEA',
+        notasConfidencialesPaedis: 'Confidencial',
+        ajustesAprobados: [{ tipo: 'Tiempo extra' }],
+        nested: {
+          keepMe: 42,
+          userPassword: 'secret',
+          ajusteRazonable: 'oculto',
+        },
+      },
+    });
+
+    // 3. Admin obtiene 200 con contrato completo
+    const adminRes = await request('/api/admin/activity-logs?page=1&limit=25', {
+      headers: adminHeaders,
+    });
+    assert.equal(adminRes.status, 200);
+    assert.equal(adminRes.body?.success, true);
+    assert.ok(Array.isArray(adminRes.body?.logs));
+    assert.equal(typeof adminRes.body?.total, 'number');
+    assert.equal(adminRes.body?.page, 1);
+    assert.equal(adminRes.body?.limit, 25);
+    assert.ok(Array.isArray(adminRes.body?.actions));
+    assert.ok(adminRes.body.actions.includes('student_updated_by_admin'));
+
+    // 4. Filtro por texto q (case-insensitive y con caracteres especiales regex escapados) y por action
+    const filteredRes = await request(
+      `/api/admin/activity-logs?action=student_updated_by_admin&q=${encodeURIComponent(uniqueMarker.toLowerCase())}`,
+      { headers: adminHeaders }
+    );
+    assert.equal(filteredRes.status, 200);
+    assert.equal(filteredRes.body?.total, 1);
+    const logItem = filteredRes.body?.logs?.[0];
+    assert.ok(logItem);
+    assert.ok(logItem.id);
+    assert.equal(logItem.action, 'student_updated_by_admin');
+    assert.equal(logItem.userEmail, 'c.guzman@duocuc.cl');
+    assert.equal(logItem.metadata?.safeField, 'valor_seguro');
+    assert.equal(logItem.metadata?.nested?.keepMe, 42);
+
+    // 5. Ninguna clave sensible (/pass|token|jwt|secret|diagnostico|notas|ajuste/i) se filtra en metadata
+    const sensitiveKeyRegex = /pass|token|jwt|secret|diagnostico|notas|ajuste/i;
+    function assertNoSensitiveKeys(obj) {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        assert.equal(
+          sensitiveKeyRegex.test(k),
+          false,
+          `Clave sensible filtrada en metadata: ${k}`
+        );
+        if (v && typeof v === 'object') assertNoSensitiveKeys(v);
+      }
+    }
+    for (const entry of adminRes.body.logs) {
+      assertNoSensitiveKeys(entry.metadata);
+    }
+  });
+
+  test('12. Dry-Run de Importación (/api/admin/courses/import?dryRun=true): Contrato de previsualización, alerta D/V mixto y cero escritura', async () => {
+    // 1. Obtener conteo actual de secciones antes del dry-run
+    const beforeSummary = await request('/api/admin/courses/summary', { headers: adminHeaders });
+    assert.equal(beforeSummary.status, 200);
+    const countBefore = beforeSummary.body?.summary?.totalSecciones;
+    assert.equal(typeof countBefore, 'number');
+
+    // 2. Ejecutar dryRun=true con secciones Diurnas (D), Vespertinas (V), ambiguas y filas inválidas (incluso con replace:true)
+    const dryRunRes = await request('/api/admin/courses/import?dryRun=true', {
+      method: 'POST',
+      headers: adminHeaders,
+      body: {
+        replace: true,
+        rows: [
+          {
+            sigla: 'DRY101',
+            nombre: 'ARQUITECTURA DE SOFTWARE',
+            seccion: 'DRY101-001D',
+            jornada: 'Diurno',
+          },
+          {
+            sigla: 'DRY102',
+            nombre: 'SEGURIDAD INFORMÁTICA',
+            seccion: 'V1',
+            jornada: 'Vespertino',
+          },
+          {
+            sigla: 'DRY103',
+            nombre: 'TALLER DE INTEGRACIÓN',
+            seccion: 'DRY103-003A',
+            jornada: 'Diurno',
+          },
+          {
+            sigla: '',
+            nombre: 'FILA SIN SIGLA INVALIDA',
+            seccion: '001D',
+          },
+        ],
+      },
+    });
+
+    assert.equal(dryRunRes.status, 200);
+    assert.equal(dryRunRes.body?.success, true);
+    assert.equal(dryRunRes.body?.dryRun, true);
+
+    const preview = dryRunRes.body?.preview;
+    assert.ok(preview);
+    assert.equal(preview.totalDetected, 4);
+    assert.equal(preview.validCount, 3);
+    assert.equal(preview.invalidCount, 1);
+    assert.deepEqual(preview.sections, { D: 1, V: 1, ambiguous: 1 });
+    assert.equal(preview.mixedSections, true);
+    assert.equal(preview.errors.length, 1);
+    assert.equal(preview.errors[0].row, 4);
+    assert.equal(typeof preview.errors[0].message, 'string');
+    assert.equal(preview.ambiguousRows.length, 1);
+    assert.deepEqual(preview.ambiguousRows[0], {
+      row: 3,
+      sigla: 'DRY103',
+      seccion: 'DRY103-003A',
+    });
+    assert.ok(Array.isArray(preview.warnings) && preview.warnings.length > 0);
+    assert.equal(preview.sample.length, 3);
+    assert.deepEqual(Object.keys(preview.sample[0]).sort(), [
+      'jornada',
+      'nombre',
+      'seccion',
+      'sigla',
+    ]);
+
+    // 3. Verificar que dryRun=true NO modificó el catálogo (cero escrituras)
+    const afterSummary = await request('/api/admin/courses/summary', { headers: adminHeaders });
+    assert.equal(afterSummary.status, 200);
+    assert.equal(afterSummary.body?.summary?.totalSecciones, countBefore);
+  });
 });

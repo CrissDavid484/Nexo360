@@ -47,6 +47,9 @@ router.get('/sat-alerts', requireAdminOrCoordinator, adminController.getSatAlert
 router.patch('/sat-alerts/:userId/simulate', requireAdminOrCoordinator, adminController.simulateSatCourse);
 router.patch('/sat-alerts/:userId/intervention', requireAdminOrCoordinator, adminController.updateSatIntervention);
 
+// Bitácora de Auditoría Institucional (ActivityLog) - Exclusivo para Administrador (Ley N° 21.719)
+router.get('/activity-logs', requireAdmin, adminController.getActivityLogs);
+
 // Centro de Operaciones de Inclusión PAEDIS - Gestión de Ajustes Razonables y Ficha Docente Confidencial
 // Exclusivo para Coordinadores PAEDIS (Ley N° 21.719)
 router.patch('/paedis/:id/case', requirePaedisCoordinator, adminController.updatePaedisCase);

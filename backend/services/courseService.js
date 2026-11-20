@@ -104,11 +104,23 @@ async function fetchMatchingOfferings({ carrera, periodo = '2026 - 002', jornada
 }
 
 /**
+ * Resultado homogéneo de extractImportPayload (filas a procesar + filas rechazadas por el parser).
+ */
+function buildPayload(rowsToProcess, sourceFormat, replace, periodo, rejected = []) {
+  return { rowsToProcess, rejected, sourceFormat, replace, periodo };
+}
+
+function fromParsed(parsed, sourceFormat, replace, periodo) {
+  return buildPayload(parsed.offerings, sourceFormat, replace, periodo, parsed.rejected);
+}
+
+/**
  * Extrae filas de entrada para importación masiva desde JSON, Markdown o Excel.
+ * No escribe nada: solo parsea (compartido por la importación real y el dry-run).
  */
 async function extractImportPayload(input, periodo) {
   if (Array.isArray(input)) {
-    return { rowsToProcess: input, sourceFormat: 'JSON', replace: undefined, periodo };
+    return buildPayload(input, 'JSON', undefined, periodo);
   }
 
   if (typeof input === 'string') {
@@ -116,19 +128,12 @@ async function extractImportPayload(input, periodo) {
     if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
       try {
         const parsed = JSON.parse(trimmed);
-        return {
-          rowsToProcess: Array.isArray(parsed) ? parsed : parsed.rows || [],
-          sourceFormat: 'JSON',
-          replace: undefined,
-          periodo,
-        };
+        return buildPayload(Array.isArray(parsed) ? parsed : parsed.rows || [], 'JSON', undefined, periodo);
       } catch {
-        const mdRes = excelParserService.parseMarkdownTable(trimmed, { periodo });
-        return { rowsToProcess: mdRes.offerings, sourceFormat: 'MARKDOWN', replace: undefined, periodo };
+        // No es JSON válido: se interpreta como tabla Markdown
       }
     }
-    const mdRes = excelParserService.parseMarkdownTable(trimmed, { periodo });
-    return { rowsToProcess: mdRes.offerings, sourceFormat: 'MARKDOWN', replace: undefined, periodo };
+    return fromParsed(excelParserService.parseMarkdownTable(trimmed, { periodo }), 'MARKDOWN', undefined, periodo);
   }
 
   if (Buffer.isBuffer(input)) {
@@ -138,7 +143,7 @@ async function extractImportPayload(input, periodo) {
       replace: false,
       periodo,
     });
-    return { rowsToProcess: uploadRes.offerings, sourceFormat: 'XLSX', replace: undefined, periodo };
+    return fromParsed(uploadRes, 'XLSX', undefined, periodo);
   }
 
   if (input && typeof input === 'object') {
@@ -148,12 +153,7 @@ async function extractImportPayload(input, periodo) {
     if (input.markdown || input.md || input.textContent) {
       const mdText = input.markdown || input.md || input.textContent;
       const mdRes = excelParserService.parseMarkdownTable(mdText, { periodo: effectivePeriodo });
-      return {
-        rowsToProcess: mdRes.offerings,
-        sourceFormat: 'MARKDOWN',
-        replace: effectiveReplace,
-        periodo: effectivePeriodo,
-      };
+      return fromParsed(mdRes, 'MARKDOWN', effectiveReplace, effectivePeriodo);
     }
 
     if (input.base64 || input.fileBase64) {
@@ -165,27 +165,118 @@ async function extractImportPayload(input, periodo) {
         replace: false,
         periodo: effectivePeriodo,
       });
-      return {
-        rowsToProcess: uploadRes.offerings,
-        sourceFormat: filename.endsWith('.md') ? 'MARKDOWN' : 'XLSX',
-        replace: effectiveReplace,
-        periodo: effectivePeriodo,
-      };
+      const sourceFormat = filename.endsWith('.md') ? 'MARKDOWN' : 'XLSX';
+      return fromParsed(uploadRes, sourceFormat, effectiveReplace, effectivePeriodo);
     }
 
     if (Array.isArray(input.rows)) {
-      return {
-        rowsToProcess: input.rows,
-        sourceFormat: 'JSON',
-        replace: effectiveReplace,
-        periodo: effectivePeriodo,
-      };
+      return buildPayload(input.rows, 'JSON', effectiveReplace, effectivePeriodo);
     }
   }
 
-  return { rowsToProcess: [], sourceFormat: 'JSON', replace: undefined, periodo };
+  return buildPayload([], 'JSON', undefined, periodo);
 }
 
+const PREVIEW_CAP = 50;
+const PREVIEW_SAMPLE_SIZE = 10;
+
+/**
+ * Clasifica una sección Duoc en Diurna (D), Vespertina (V) o ambigua.
+ * Usa el último tramo tras '-' (p. ej. "ING101-001D" => "001D") para no confundirse con la sigla.
+ */
+function classifySection(rawLabel) {
+  const label = String(rawLabel || '').trim().toUpperCase().split('-').pop();
+  const isD = label.startsWith('D') || label.endsWith('D');
+  const isV = label.startsWith('V') || label.endsWith('V');
+  if (isD === isV) return 'ambiguous';
+  return isD ? 'D' : 'V';
+}
+
+function countSectionKinds(rows) {
+  const counts = { D: 0, V: 0, ambiguous: 0 };
+  for (const row of rows) counts[classifySection(row.seccion)] += 1;
+  return counts;
+}
+
+/** Valor crudo de la sección (antes de que normalizeRow le asigne un valor por defecto). */
+function rawSectionLabel(raw) {
+  const entry = Object.entries(raw && typeof raw === 'object' ? raw : {}).find(
+    ([key]) => excelParserService.normalizeHeaderKey(key) === 'seccion'
+  );
+  return entry ? entry[1] : '';
+}
+
+function buildPreviewWarnings({ invalidCount, sections, mixedSections, duplicates, validCount, errorsTruncated }) {
+  const warnings = [];
+  if (validCount === 0) warnings.push('No se detectaron filas válidas para importar.');
+  if (invalidCount > 0) warnings.push(`${invalidCount} fila(s) inválida(s) serán omitidas.`);
+  if (errorsTruncated) warnings.push(`Solo se muestran los primeros ${PREVIEW_CAP} errores.`);
+  if (mixedSections) warnings.push('El archivo mezcla secciones diurnas (D) y vespertinas (V).');
+  if (sections.ambiguous > 0) {
+    warnings.push(`${sections.ambiguous} sección(es) no se pueden clasificar como diurna (D) o vespertina (V).`);
+  }
+  if (duplicates > 0) warnings.push(`${duplicates} sección(es) duplicada(s) (misma carrera, sigla y sección).`);
+  return warnings;
+}
+
+/**
+ * Construye el informe de validación (dry-run) a partir de las filas ya extraídas. No persiste nada.
+ */
+function buildImportPreview({ rowsToProcess, rejected = [], periodo }) {
+  const errors = [...rejected];
+  const sections = { D: 0, V: 0, ambiguous: 0 };
+  const ambiguousRows = [];
+  const sample = [];
+  const seen = new Set();
+  let validCount = 0;
+  let duplicates = 0;
+
+  rowsToProcess.forEach((raw, idx) => {
+    const row = idx + 1;
+    const norm = excelParserService.normalizeRow(raw, periodo);
+    if (!excelParserService.isValidOffering(norm)) {
+      errors.push({ row, message: excelParserService.INVALID_ROW_MESSAGE });
+      return;
+    }
+    validCount += 1;
+
+    const kind = classifySection(rawSectionLabel(raw) || norm.seccion);
+    sections[kind] += 1;
+    if (kind === 'ambiguous' && ambiguousRows.length < PREVIEW_CAP) {
+      ambiguousRows.push({ row, sigla: norm.sigla, seccion: norm.seccion });
+    }
+
+    const key = `${norm.carrera}||${norm.sigla}||${norm.seccion}`;
+    if (seen.has(key)) duplicates += 1;
+    seen.add(key);
+
+    if (sample.length < PREVIEW_SAMPLE_SIZE) {
+      sample.push({ sigla: norm.sigla, nombre: norm.nombre, seccion: norm.seccion, jornada: norm.jornada });
+    }
+  });
+
+  errors.sort((a, b) => a.row - b.row);
+  const mixedSections = sections.D > 0 && sections.V > 0;
+
+  return {
+    totalDetected: rowsToProcess.length + rejected.length,
+    validCount,
+    invalidCount: errors.length,
+    errors: errors.slice(0, PREVIEW_CAP),
+    sections,
+    mixedSections,
+    ambiguousRows,
+    warnings: buildPreviewWarnings({
+      invalidCount: errors.length,
+      sections,
+      mixedSections,
+      duplicates,
+      validCount,
+      errorsTruncated: errors.length > PREVIEW_CAP,
+    }),
+    sample,
+  };
+}
 /**
  * Inserta ofertas en lotes de 1000 documentos para optimizar memoria BSON en MongoDB.
  */
@@ -221,6 +312,7 @@ const courseService = {
       return {
         success: true,
         count: inMemoryCourses.length,
+        sections: countSectionKinds(inMemoryCourses),
         source: alamedaSeedData ? 'ALAMEDA_2026_OFFICIAL_CATALOG' : 'SEED_ROWS_RAW',
       };
     } catch (err) {
@@ -321,7 +413,7 @@ const courseService = {
 
     const normalized = rowsToProcess
       .map((r) => excelParserService.normalizeRow(r, effectivePeriodo))
-      .filter((r) => r.sigla && r.nombre);
+      .filter(excelParserService.isValidOffering);
 
     if (normalized.length === 0) {
       throw new Error('Ninguna fila contiene sigla y nombre de asignatura válidos.');
@@ -353,9 +445,18 @@ const courseService = {
       seccionesImportadas: normalized.length,
       asignaturasUnicas: uniqueSiglas.size,
       carrerasDetectadas: Array.from(uniqueCarreras),
+      sections: countSectionKinds(normalized),
       periodo: safePeriodo,
       reemplazado: effectiveReplace,
     };
+  },
+
+  /**
+   * Dry-run de importación: parsea y valida igual que bulkImport pero NO escribe en memoria ni en MongoDB.
+   */
+  async previewImport(input, { periodo = '2026 - 002' } = {}) {
+    const extracted = await extractImportPayload(input, periodo);
+    return buildImportPreview({ ...extracted, periodo: extracted.periodo || periodo });
   },
 
   /**
@@ -389,9 +490,10 @@ const courseService = {
    * Limpia las asignaturas registradas en memoria y en MongoDB.
    */
   async clearAll() {
+    const removedCount = inMemoryCourses.length;
     inMemoryCourses = [];
     await excelParserService.wipeAllData();
-    return { success: true };
+    return { success: true, removedCount };
   },
 
   parseDuocSchedule,

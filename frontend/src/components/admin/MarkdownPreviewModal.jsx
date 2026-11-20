@@ -37,23 +37,20 @@ export const MarkdownPreviewModal = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="md-modal-title"
-      className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
-    >
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
       <div
         ref={modalRef}
-        tabIndex={-1}
-        className="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden focus:outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="md-modal-title"
+        className="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden"
       >
-        <header className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-100 text-[#002B49] flex items-center justify-center">
+        <header className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 text-[#002B49] flex items-center justify-center shrink-0">
               <FileText className="w-5 h-5" aria-hidden="true" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 id="md-modal-title" className="text-base sm:text-lg font-black text-slate-950">
                 Representación Limpia en Formato Markdown (.md)
               </h3>
@@ -63,7 +60,7 @@ export const MarkdownPreviewModal = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={onCopy}

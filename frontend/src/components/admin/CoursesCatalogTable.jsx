@@ -19,7 +19,7 @@ export const CoursesCatalogTable = ({
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs" {...props}>
-      <table className="w-full text-left text-xs min-w-[620px]" role="table">
+      <table className="w-full text-left text-xs min-w-[620px]">
         <caption className="sr-only">
           Catálogo actual de asignaturas de Duoc UC - Sede Alameda almacenadas en la base de datos de Nexo360
         </caption>
@@ -78,7 +78,7 @@ export const CoursesCatalogTable = ({
                         type="button"
                         onClick={() => onSelectCourse(course)}
                         {...getVoiceProps(voiceText)}
-                        className="text-left text-slate-950 hover:text-[#002B49] hover:underline cursor-pointer"
+                        className="min-h-[44px] inline-flex items-center text-left text-slate-950 hover:text-[#002B49] hover:underline rounded-lg px-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 cursor-pointer"
                       >
                         {course.nombre}
                       </button>

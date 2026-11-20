@@ -139,6 +139,15 @@ export const api = {
   },
 
   /**
+   * Bitácora de auditoría (solo administradores). Omite filtros vacíos.
+   */
+  async getAdminActivityLogs(params = {}) {
+    const clean = Object.entries(params).filter(([, v]) => v !== '' && v != null);
+    const qs = new URLSearchParams(clean).toString();
+    return request(`/admin/activity-logs${qs ? `?${qs}` : ''}`);
+  },
+
+  /**
    * Directorio de estudiantes con analítica predictiva de deserción
    */
   async getAdminStudents(params = {}) {
@@ -373,8 +382,8 @@ export const api = {
    * Importación masiva de asignaturas desde Excel/CSV o Markdown procesado en el Panel Admin
    * Soporta sobreescritura limpia del catálogo con replace: true por defecto
    */
-  async importAdminCourses(rows, replace = true, rawMarkdown = null) {
-    return request('/admin/courses/import', {
+  async importAdminCourses(rows, replace = true, rawMarkdown = null, { dryRun = false } = {}) {
+    return request(`/admin/courses/import${dryRun ? '?dryRun=true' : ''}`, {
       method: 'POST',
       body: { rows, replace, rawMarkdown },
     });

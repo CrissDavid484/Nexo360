@@ -22,6 +22,7 @@ import {
   BookOpen,
   Plus,
   Shield,
+  ScrollText,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -41,6 +42,7 @@ import {
   getSatRiskBadgeMeta,
   extractCourseAttendanceRate,
 } from '../../utils/satUtils';
+import { AuditLogSection } from '../admin/AuditLogSection';
 import { CoursesAdminSection } from '../admin/CoursesAdminSection';
 import { EarlyWarningSatSection } from '../admin/EarlyWarningSatSection';
 import { PaedisCaseManagementSection } from '../admin/PaedisCaseManagementSection';
@@ -465,8 +467,19 @@ export const AdminPanelView = () => {
         icon: FileSpreadsheet,
         iconColor: 'text-emerald-400',
       },
+      ...(isAdmin
+        ? [
+            {
+              id: 'auditoria',
+              label: 'Auditoría',
+              announceMsg: 'Pestaña de Auditoría de actividad seleccionada.',
+              icon: ScrollText,
+              iconColor: 'text-sky-400',
+            },
+          ]
+        : []),
     ];
-  }, [isCoordinator]);
+  }, [isCoordinator, isAdmin]);
 
   const effectiveDirectoryMode = isCoordinator
     ? 'estudiantes'
@@ -1026,12 +1039,13 @@ export const AdminPanelView = () => {
             <button
               key={tab.id}
               type="button"
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => {
                 setAdminSubTab(tab.id);
                 announce(tab.announceMsg, 'polite');
               }}
               {...getVoiceProps(tab.label)}
-              className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
                 isActive
                   ? 'bg-[#002B49] text-white shadow-xs'
                   : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -1104,6 +1118,8 @@ export const AdminPanelView = () => {
       )}
 
       {adminSubTab === 'alerta-temprana' && <EarlyWarningSatSection announce={announce} />}
+
+      {adminSubTab === 'auditoria' && isAdmin && <AuditLogSection />}
 
       {(adminSubTab === 'oferta-academica' || adminSubTab === 'oferta-ramos') && (
         <div className="space-y-6">

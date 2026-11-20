@@ -41,7 +41,31 @@ const ALLOWED_ROLES = Object.freeze([
 /**
  * Crea handlers CRUD uniformes (DRY) para catálogos dinámicos (Carreras / Sedes).
  */
-function createCatalogHandlers({ manager, listKey, itemKey, entityPlural, entitySingular }) {
+/**
+ * Registra una acción administrativa atribuida al usuario autenticado (actor).
+ * Nunca incluir contraseñas, tokens ni datos clínicos en details/metadata (Ley N° 21.719).
+ */
+function logAdminAction(actor, { action, details, metadata, fallbackName = 'Administrador' }) {
+  return authService.logActivity({
+    userId: actor?._id || actor?.id || 'admin',
+    userEmail: actor?.email || 'admin@duocuc.cl',
+    userName: actor?.fullName || actor?.nombre || fallbackName,
+    userRole: actor?.role || 'admin',
+    action,
+    details,
+    metadata,
+  });
+}
+
+function createCatalogHandlers({
+  manager,
+  listKey,
+  itemKey,
+  entityPlural,
+  entitySingular,
+  createAction,
+  removeAction,
+}) {
   return {
     list: async (req, res) => {
       try {
@@ -63,6 +87,11 @@ function createCatalogHandlers({ manager, listKey, itemKey, entityPlural, entity
     create: async (req, res) => {
       try {
         const created = await manager.create(req.body || {});
+        await logAdminAction(req.user, {
+          action: createAction,
+          details: `${entitySingular} "${created.name}" creada.`,
+          metadata: { entity: itemKey, name: created.name },
+        });
         return res.status(201).json({
           success: true,
           message: `${entitySingular} "${created.name}" agregada exitosamente.`,
@@ -86,6 +115,11 @@ function createCatalogHandlers({ manager, listKey, itemKey, entityPlural, entity
     remove: async (req, res) => {
       try {
         await manager.remove(req.params.id);
+        await logAdminAction(req.user, {
+          action: removeAction,
+          details: `${entitySingular} eliminada.`,
+          metadata: { entity: itemKey, targetId: String(req.params.id).slice(0, 100) },
+        });
         return res.status(200).json({
           success: true,
           message: `${entitySingular} eliminada exitosamente.`,
@@ -113,6 +147,8 @@ const careerHandlers = createCatalogHandlers({
   itemKey: 'career',
   entityPlural: 'carreras',
   entitySingular: 'Carrera',
+  createAction: 'career_created',
+  removeAction: 'career_deleted',
 });
 
 const sedeHandlers = createCatalogHandlers({
@@ -121,6 +157,8 @@ const sedeHandlers = createCatalogHandlers({
   itemKey: 'sede',
   entityPlural: 'sedes',
   entitySingular: 'Sede',
+  createAction: 'sede_created',
+  removeAction: 'sede_deleted',
 });
 
 /**
@@ -579,13 +617,10 @@ async function dispatchWelcomeAndLogs({
     console.warn('[AdminController] No se pudo enviar el correo de bienvenida.');
   }
 
-  await authService.logActivity({
-    userId: reqUser?._id || reqUser?.id,
-    userEmail: reqUser?.email || '',
-    userName: reqUser?.fullName || 'Administrador',
-    userRole: reqUser?.role || 'admin',
+  await logAdminAction(reqUser, {
     action: 'student_registered_by_admin',
     details: `Usuario ${fullName} (${email}) registrado con rol ${roleLabel}. Cumplimiento Ley 21.719 verificado.`,
+    metadata: { targetEmail: email, targetRole: role },
   });
 
   if (emailResult.delivered) {
@@ -754,15 +789,11 @@ exports.updateStudentStatus = async (req, res) => {
       updatedUser = targetUser;
     }
 
-    await authService.logActivity({
-      userId: req.user._id || req.user.id,
-      userEmail: req.user.email,
-      userName:
-        req.user.fullName ||
-        (actorRole === 'coordinador_paedis' ? 'Coordinador PAEDIS' : 'Administrador'),
-      userRole: req.user.role || actorRole,
+    await logAdminAction(req.user, {
       action: 'status_changed_by_admin',
+      fallbackName: actorRole === 'coordinador_paedis' ? 'Coordinador PAEDIS' : 'Administrador',
       details: `Estado del usuario ${targetUser.fullName || targetUser.email} actualizado a "${academicStatus}". Motivo: ${cleanReason}`,
+      metadata: { targetEmail: targetUser.email, academicStatus },
     });
 
     return res.status(200).json({
@@ -792,9 +823,16 @@ exports.deleteStudent = async (req, res) => {
       });
     }
 
+    const targetUser = await findUserByIdOrEmail(id);
     if (mongoose.connection.readyState === 1) {
       await UserProfile.findByIdAndDelete(id);
     }
+
+    await logAdminAction(req.user, {
+      action: 'student_deleted_by_admin',
+      details: `Usuario ${targetUser?.email || String(id).slice(0, 100)} eliminado.`,
+      metadata: { targetId: String(id).slice(0, 100), targetEmail: targetUser?.email },
+    });
 
     return res.status(200).json({
       success: true,
@@ -854,22 +892,26 @@ exports.importCourses = async (req, res) => {
       });
     }
 
-    const result = await courseService.bulkImport(req.body, {
-      replace: Boolean(replace),
-      periodo: periodo || '2026 - 002',
-    });
+    const importOptions = { replace: Boolean(replace), periodo: periodo || '2026 - 002' };
 
-    await authService.logActivity({
-      userId: req.user?._id || req.user?.id || 'admin',
-      userEmail: req.user?.email || 'admin@duocuc.cl',
-      userName: req.user?.fullName || req.user?.nombre || 'Administrador',
-      userRole: req.user?.role || 'admin',
+    // Dry-run: valida y previsualiza sin escribir nada en memoria, MongoDB ni ActivityLog
+    if (['true', '1'].includes(String(req.query?.dryRun).toLowerCase())) {
+      const preview = await courseService.previewImport(req.body, importOptions);
+      return res.status(200).json({ success: true, dryRun: true, preview });
+    }
+
+    const result = await courseService.bulkImport(req.body, importOptions);
+
+    await logAdminAction(req.user, {
       action: 'IMPORT',
       details: `Importación masiva (${result.sourceFormat || 'XLSX/MD/JSON'}): ${result.seccionesImportadas} secciones para ${result.carrerasDetectadas.length} carreras. Sobreescritura previa: ${Boolean(replace)}.`,
       metadata: {
         replace: Boolean(replace),
         sourceFormat: result.sourceFormat,
         seccionesImportadas: result.seccionesImportadas,
+        seccionesDiurnas: result.sections.D,
+        seccionesVespertinas: result.sections.V,
+        seccionesAmbiguas: result.sections.ambiguous,
         carreras: result.carrerasDetectadas,
         totalFilas: result.totalFilas,
       },
@@ -897,15 +939,14 @@ exports.seedCourses = async (req, res) => {
   try {
     const result = await courseService.seedInitialCourses({ force: true });
 
-    await authService.logActivity({
-      userId: req.user?._id || req.user?.id || 'admin',
-      userEmail: req.user?.email || 'admin@duocuc.cl',
-      userName: req.user?.fullName || req.user?.nombre || 'Administrador',
-      userRole: req.user?.role || 'admin',
+    await logAdminAction(req.user, {
       action: 'SEED',
       details: `Restablecimiento de Catálogo Oficial Alameda 2026-002: ${result.count} secciones cargadas exitosamente.`,
       metadata: {
         count: result.count,
+        seccionesDiurnas: result.sections.D,
+        seccionesVespertinas: result.sections.V,
+        seccionesAmbiguas: result.sections.ambiguous,
         source: result.source,
         periodo: '2026 - 002',
       },
@@ -931,16 +972,12 @@ exports.seedCourses = async (req, res) => {
  */
 exports.clearCourses = async (req, res) => {
   try {
-    await courseService.clearAll();
+    const { removedCount } = await courseService.clearAll();
 
-    await authService.logActivity({
-      userId: req.user?._id || req.user?.id || 'admin',
-      userEmail: req.user?.email || 'admin@duocuc.cl',
-      userName: req.user?.fullName || req.user?.nombre || 'Administrador',
-      userRole: req.user?.role || 'admin',
+    await logAdminAction(req.user, {
       action: 'CLEAR',
-      details: 'Vaciado completo del catálogo de asignaturas y secciones.',
-      metadata: { timestamp: new Date().toISOString() },
+      details: `Vaciado completo del catálogo de asignaturas y secciones (${removedCount} secciones).`,
+      metadata: { removedCount },
     });
 
     return res.status(200).json({
@@ -1084,6 +1121,14 @@ exports.simulateSatCourse = async (req, res) => {
       userRole: user.role,
       action: 'sat_weekly_cut_simulated',
       details: `Simulación SAP aplicada a ramo ${rawCourseCode}: acción '${rawAction || 'personalizada'}'. Nuevo estado SAT: ${satEval.riskLevel}`,
+      metadata: {
+        actorEmail: req.user?.email || '',
+        actorRole: req.user?.role || 'admin',
+        targetEmail: user.email,
+        courseCode: rawCourseCode,
+        simulatedAction: rawAction || 'personalizada',
+        riskLevel: satEval.riskLevel,
+      },
     });
 
     const formatted = authService.formatUserResponse(user);
@@ -1183,6 +1228,14 @@ exports.updateSatIntervention = async (req, res) => {
       userRole: user.role,
       action: 'sat_intervention_updated',
       details: `Ficha 360 de intervención SAT actualizada. Responsable: ${cleanAssignedTo}, Estado: ${cleanStatus}`,
+      metadata: {
+        actorEmail: req.user?.email || '',
+        actorRole: req.user?.role || 'admin',
+        targetEmail: user.email,
+        assignedTo: cleanAssignedTo,
+        status: cleanStatus,
+        riskLevel: user.satIntervention.riskLevel,
+      },
     });
 
     const satEval = satAlertService.evaluateStudentSat(user);
@@ -1377,6 +1430,27 @@ exports.updatePaedisCase = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error al guardar el expediente PAEDIS.',
+    });
+  }
+};
+
+/**
+ * GET /api/admin/activity-logs
+ * Consulta paginada y filtrada de auditoría ActivityLog (exclusivo para Administrador, Ley N° 21.719).
+ */
+exports.getActivityLogs = async (req, res) => {
+  try {
+    const { action, q, page, limit } = req.query || {};
+    const result = await authService.queryActivityLogs({ action, q, page, limit });
+    return res.status(200).json({
+      success: true,
+      ...result,
+    });
+  } catch {
+    console.error('[AdminController] Error al consultar registros de auditoría.');
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar la bitácora de auditoría.',
     });
   }
 };

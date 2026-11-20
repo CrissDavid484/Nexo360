@@ -15,6 +15,13 @@ const {
 
 const normalizeRow = normalizeRowToOffering;
 
+const INVALID_ROW_MESSAGE = 'Fila sin sigla o nombre de asignatura.';
+
+/** Una oferta es importable solo si trae sigla y nombre. */
+function isValidOffering(offering) {
+  return Boolean(offering && offering.sigla && offering.nombre);
+}
+
 /**
  * Agrupa y consolida filas por sección combinando sus bloques de horario.
  */
@@ -112,14 +119,23 @@ function parseXlsxBuffer(buffer, options = {}) {
     return obj;
   });
 
-  const normalized = rawRows
-    .map((r) => normalizeRow(r, options.periodo || '2026 - 002'))
-    .filter((r) => r.sigla && r.nombre);
+  const normalized = [];
+  const rejected = [];
+  rawRows.forEach((raw, idx) => {
+    if (Object.values(raw).every((v) => String(v).trim() === '')) return;
+    const norm = normalizeRow(raw, options.periodo || '2026 - 002');
+    if (isValidOffering(norm)) {
+      normalized.push(norm);
+    } else {
+      rejected.push({ row: idx + 2, message: INVALID_ROW_MESSAGE });
+    }
+  });
 
   return {
     sheetName,
     totalRows: rawRows.length,
     offerings: normalized,
+    rejected,
     consolidated: consolidateSections(normalized),
   };
 }
@@ -203,7 +219,7 @@ function zipSegmentedColumns(columns, mapRowFn, defaultPeriodo) {
   for (let i = 0; i < minLen; i++) {
     const raw = mapRowFn(columns.map((col) => col[i]), defaultPeriodo);
     const norm = normalizeRow(raw, defaultPeriodo);
-    if (norm.sigla && norm.nombre) {
+    if (isValidOffering(norm)) {
       offerings.push(norm);
     }
   }
@@ -288,9 +304,10 @@ function parseSegmentedMarkdown(lines, defaultPeriodo) {
  */
 function parseStandardMarkdown(lines, defaultPeriodo) {
   const offerings = [];
+  const rejected = [];
   let headers = null;
 
-  for (const line of lines) {
+  for (const [lineIdx, line] of lines.entries()) {
     const parts = parseMdRow(line);
     if (!parts) continue;
 
@@ -305,14 +322,17 @@ function parseStandardMarkdown(lines, defaultPeriodo) {
     });
 
     const norm = normalizeRow(row, defaultPeriodo);
-    if (norm.sigla && norm.nombre) {
+    if (isValidOffering(norm)) {
       offerings.push(norm);
+    } else {
+      rejected.push({ row: lineIdx + 1, message: INVALID_ROW_MESSAGE });
     }
   }
 
   return {
     totalRows: offerings.length,
     offerings,
+    rejected,
     consolidated: consolidateSections(offerings),
   };
 }
@@ -395,9 +415,7 @@ async function processCatalogUpload({
   } else if (isJson) {
     const jsonStr = textContent || (buffer ? buffer.toString('utf8') : '[]');
     const jsonList = JSON.parse(jsonStr);
-    const normalized = jsonList
-      .map((r) => normalizeRow(r, periodo))
-      .filter((r) => r.sigla && r.nombre);
+    const normalized = jsonList.map((r) => normalizeRow(r, periodo)).filter(isValidOffering);
     parsedResult = {
       totalRows: normalized.length,
       offerings: normalized,
@@ -426,4 +444,6 @@ module.exports = {
   wipePeriodData,
   wipeAllData,
   processCatalogUpload,
+  isValidOffering,
+  INVALID_ROW_MESSAGE,
 };

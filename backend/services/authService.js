@@ -10,9 +10,51 @@ const SEED_USERS = require('../data/seedUsers.json');
 const {
   DEFAULT_SEDE,
   createDeterministicRut,
+  escapeRegex,
   sanitizeAccessibilityPreferences,
   validatePasswordStrength,
 } = require('../utils/validationUtils');
+
+const SENSITIVE_LOG_KEY_REGEX = /pass|token|jwt|secret|diagnostico|notas|ajuste/i;
+const IN_MEMORY_LOG_CAP = 200;
+
+/**
+ * Elimina recursivamente de metadata cualquier clave que coincida con credenciales o datos clínicos (Ley N° 21.719).
+ */
+function sanitizeLogMetadata(value, depth = 0) {
+  if (depth > 5 || value === null || value === undefined) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeLogMetadata(item, depth + 1));
+  }
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object') {
+    const clean = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (!SENSITIVE_LOG_KEY_REGEX.test(k)) {
+        clean[k] = sanitizeLogMetadata(v, depth + 1);
+      }
+    }
+    return clean;
+  }
+  return value;
+}
+
+function formatActivityLog(doc = {}) {
+  const rawMeta =
+    doc.metadata && typeof doc.metadata === 'object' && !Array.isArray(doc.metadata)
+      ? sanitizeLogMetadata(doc.metadata)
+      : {};
+  return {
+    id: String(doc._id || doc.id || crypto.randomUUID()),
+    action: String(doc.action || ''),
+    userEmail: String(doc.userEmail || ''),
+    userName: String(doc.userName || doc.userEmail || 'Usuario'),
+    userRole: String(doc.userRole || 'estudiante'),
+    details: String(doc.details || ''),
+    metadata: rawMeta,
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+  };
+}
 
 function createAuthError(statusCode, message) {
   const err = new Error(message);
@@ -661,19 +703,24 @@ class AuthService {
    * Registrar auditoría en la colección ActivityLog de MongoDB.
    */
   async logActivity({ userId, userEmail, userName, userRole, action, details, metadata = {} }) {
+    const safeMetadata =
+      metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+        ? sanitizeLogMetadata(metadata)
+        : {};
     const logEntry = {
+      id: crypto.randomUUID(),
       userId: userId ? String(userId) : undefined,
       userEmail: (userEmail || '').toLowerCase(),
       userName: userName || userEmail || 'Usuario',
       userRole: userRole || 'estudiante',
       action: action || 'login',
       details: details || '',
-      metadata,
+      metadata: safeMetadata,
       createdAt: new Date(),
     };
 
     inMemoryLogs.unshift(logEntry);
-    if (inMemoryLogs.length > 50) inMemoryLogs.pop();
+    if (inMemoryLogs.length > IN_MEMORY_LOG_CAP) inMemoryLogs.pop();
 
     if (mongoose.connection.readyState === 1) {
       try {
@@ -686,6 +733,68 @@ class AuthService {
 
   getRecentLogs(limit = 10) {
     return inMemoryLogs.slice(0, limit);
+  }
+
+  /**
+   * Consulta paginada y filtrada de ActivityLog con sanitización de metadata y fallback en memoria.
+   */
+  async queryActivityLogs({ action, q, page = 1, limit = 25 } = {}) {
+    const parsedPage = Number.parseInt(String(page ?? 1), 10);
+    const safePage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const parsedLimit = Number.parseInt(String(limit ?? 25), 10);
+    const safeLimit =
+      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 25;
+    const safeAction = typeof action === 'string' ? action.trim().slice(0, 80) : '';
+    const rawQ = typeof q === 'string' ? q.trim().slice(0, 100) : '';
+    const escapedQ = rawQ ? escapeRegex(rawQ, 100) : '';
+    const skip = (safePage - 1) * safeLimit;
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const query = {};
+        if (safeAction) query.action = { $eq: safeAction };
+        if (escapedQ) {
+          const rx = { $regex: escapedQ, $options: 'i' };
+          query.$or = [{ action: rx }, { userEmail: rx }, { userName: rx }, { details: rx }];
+        }
+        const [docs, total, distinctActions] = await Promise.all([
+          ActivityLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(safeLimit).lean(),
+          ActivityLog.countDocuments(query),
+          ActivityLog.distinct('action'),
+        ]);
+        return {
+          logs: docs.map(formatActivityLog),
+          total,
+          page: safePage,
+          limit: safeLimit,
+          actions: distinctActions.filter(Boolean).sort(),
+        };
+      } catch {
+        console.warn('[AuthService] Fallback a memoria consultando ActivityLog.');
+      }
+    }
+
+    const allLogs = this.getRecentLogs(inMemoryLogs.length || IN_MEMORY_LOG_CAP);
+    const actions = Array.from(
+      new Set(allLogs.map((entry) => entry.action).filter(Boolean))
+    ).sort();
+    const searchRx = escapedQ ? new RegExp(escapedQ, 'i') : null;
+    const filtered = allLogs.filter((entry) => {
+      if (safeAction && entry.action !== safeAction) return false;
+      if (searchRx) {
+        const hay = [entry.action, entry.userEmail, entry.userName, entry.details];
+        if (!hay.some((field) => searchRx.test(String(field || '')))) return false;
+      }
+      return true;
+    });
+
+    return {
+      logs: filtered.slice(skip, skip + safeLimit).map(formatActivityLog),
+      total: filtered.length,
+      page: safePage,
+      limit: safeLimit,
+      actions,
+    };
   }
 
   /**

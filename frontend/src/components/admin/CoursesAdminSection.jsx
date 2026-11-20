@@ -17,6 +17,7 @@ import {
   X,
   Eye,
   ShieldAlert,
+  Trash2,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +36,10 @@ import {
 } from '../../utils/studentUtils';
 import { MarkdownPreviewModal } from './MarkdownPreviewModal';
 import { CoursesCatalogTable } from './CoursesCatalogTable';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
+import { ImportDryRunPreview } from './ImportDryRunPreview';
+import { CatalogEntitiesPanel } from './CatalogEntitiesPanel';
+import { normalizeImportPreview } from '../../services/courseImportPreview';
 
 /**
  * Genera una representación limpia y unificada en formato Markdown (.md)
@@ -315,6 +320,11 @@ export const CoursesAdminSection = () => {
   const [isCopiedMd, setIsCopiedMd] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [replaceCatalog, setReplaceCatalog] = useState(true);
+  const [dryRunPreview, setDryRunPreview] = useState(null);
+  const [ackSections, setAckSections] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const fileInputRef = useRef(null);
   const fileReadAbortRef = useRef(null);
@@ -418,6 +428,11 @@ export const CoursesAdminSection = () => {
     [notifyFeedback]
   );
 
+  const resetDryRun = useCallback(() => {
+    setDryRunPreview(null);
+    setAckSections(false);
+  }, []);
+
   // Procesador unificado de archivos (.xlsx, .xls, .csv, .md) vía readFileAsText con AbortController
   const processSelectedFile = async (file) => {
     if (!file) return;
@@ -426,6 +441,7 @@ export const CoursesAdminSection = () => {
     const controller = new AbortController();
     fileReadAbortRef.current = controller;
 
+    resetDryRun();
     setUploadedFileName(file.name);
     const fileNameLower = file.name.toLowerCase();
     const isMarkdown = fileNameLower.endsWith('.md') || fileNameLower.endsWith('.markdown');
@@ -500,8 +516,57 @@ export const CoursesAdminSection = () => {
     }
   };
 
-  const handleImportToDatabase = async () => {
+  // Paso 1: validación previa (dry-run). No guarda nada en la base de datos.
+  const handleValidateImport = async () => {
     if (!parsedRows || parsedRows.length === 0) return;
+    if (!ensureCourseManagePermission('modificar el catálogo')) return;
+
+    setIsValidating(true);
+    resetDryRun();
+    try {
+      const res = await api.importAdminCourses(parsedRows, replaceCatalog, cleanMarkdownContent, {
+        dryRun: true,
+      });
+      if (!isMountedRef.current) return;
+
+      const preview = res?.success && res.dryRun === true ? normalizeImportPreview(res.preview) : null;
+      if (!preview) {
+        notifyFeedback(
+          'error',
+          res?.message || 'No se pudo revisar el archivo antes de guardar. No se guardó nada.',
+          'assertive'
+        );
+        return;
+      }
+
+      setDryRunPreview(preview);
+      const needsReview = preview.mixedSections || preview.sections.ambiguous > 0;
+      announce(
+        `Revisión lista: ${preview.validCount} filas válidas y ${preview.invalidCount} con errores. ` +
+          `Diurna D: ${preview.sections.D}. Vespertina V: ${preview.sections.V}. ` +
+          `Ambiguas: ${preview.sections.ambiguous}.${needsReview ? ' Atención: revisa las secciones antes de guardar.' : ''}`,
+        needsReview ? 'assertive' : 'polite'
+      );
+    } catch (err) {
+      console.error('[CoursesAdminSection] Error validando importación:', err);
+      notifyFeedback(
+        'error',
+        'No se pudo conectar con el servidor para revisar el archivo. No se guardó nada.',
+        'assertive'
+      );
+    } finally {
+      if (isMountedRef.current) setIsValidating(false);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    resetDryRun();
+    announce('Revisión descartada. No se guardó nada.', 'polite');
+  };
+
+  // Paso 2: importación real, solo tras confirmar la revisión.
+  const handleImportToDatabase = async () => {
+    if (!parsedRows || parsedRows.length === 0 || !dryRunPreview) return;
     if (!ensureCourseManagePermission('modificar el catálogo')) return;
 
     setIsSubmitting(true);
@@ -517,6 +582,7 @@ export const CoursesAdminSection = () => {
         setParsedRows([]);
         setPreviewStats(null);
         setUploadedFileName('');
+        resetDryRun();
         if (fileInputRef.current) fileInputRef.current.value = '';
         await loadCoursesData();
       } else {
@@ -663,27 +729,88 @@ export const CoursesAdminSection = () => {
     }
   };
 
-  const handleSeedOfficialData = async () => {
-    if (!ensureCourseManagePermission('restaurar el catálogo semilla')) return;
+  const runCatalogAction = async ({ permissionText, call, successText, errorText, logLabel }) => {
+    if (!ensureCourseManagePermission(permissionText)) return;
 
     setIsSubmitting(true);
     try {
-      await api.seedAdminCourses();
-      notifyFeedback(
-        'success',
-        'Catálogo oficial semilla Duoc UC - Sede Alameda 2026-002 restaurado correctamente en la Base de Datos.',
-        'polite'
-      );
+      const res = await call();
+      if (res?.success === false) {
+        notifyFeedback('error', res.message || errorText, 'assertive');
+        return;
+      }
+      notifyFeedback('success', successText, 'polite');
       await loadCoursesData();
     } catch (err) {
-      console.error('[CoursesAdminSection] Error al restaurar semilla:', err);
-      notifyFeedback('error', 'Error al restaurar el catálogo semilla.', 'assertive');
+      console.error(`[CoursesAdminSection] ${logLabel}:`, err);
+      notifyFeedback('error', errorText, 'assertive');
     } finally {
       if (isMountedRef.current) {
         setIsSubmitting(false);
       }
     }
   };
+
+  const handleSeedOfficialData = () =>
+    runCatalogAction({
+      permissionText: 'restaurar el catálogo semilla',
+      call: () => api.seedAdminCourses(),
+      successText:
+        'Catálogo oficial semilla Duoc UC - Sede Alameda 2026-002 restaurado correctamente en la Base de Datos.',
+      errorText: 'Error al restaurar el catálogo semilla.',
+      logLabel: 'Error al restaurar semilla',
+    });
+
+  const handleClearCatalog = () =>
+    runCatalogAction({
+      permissionText: 'vaciar el catálogo',
+      call: () => api.clearAdminCourses(),
+      successText: 'El catálogo de asignaturas quedó vacío.',
+      errorText: 'Error al vaciar el catálogo.',
+      logLabel: 'Error al vaciar catálogo',
+    });
+
+  // Todas las acciones destructivas pasan por el diálogo de confirmación accesible.
+  const requestConfirm = useCallback((config) => setPendingConfirm(config), []);
+
+  const handleConfirmPending = async () => {
+    if (!pendingConfirm) return;
+    setIsConfirming(true);
+    try {
+      await pendingConfirm.run();
+    } catch (err) {
+      console.error('[CoursesAdminSection] Error ejecutando acción confirmada:', err);
+    } finally {
+      if (isMountedRef.current) {
+        setIsConfirming(false);
+        setPendingConfirm(null);
+      }
+    }
+  };
+
+  const handleCancelPending = () => {
+    if (isConfirming) return;
+    setPendingConfirm(null);
+    announce('Acción cancelada. No se hicieron cambios.', 'polite');
+  };
+
+  const requestSeedConfirm = () =>
+    requestConfirm({
+      title: '¿Restaurar el catálogo oficial?',
+      message:
+        'Se reemplazarán las asignaturas actuales por el catálogo oficial 2026-002 de Duoc UC - Sede Alameda. Los cambios que hayas cargado se perderán.',
+      confirmLabel: 'Sí, restaurar catálogo',
+      run: handleSeedOfficialData,
+    });
+
+  const requestClearConfirm = () =>
+    requestConfirm({
+      title: '¿Vaciar todo el catálogo?',
+      message:
+        'Se eliminarán todas las asignaturas guardadas. Los estudiantes no verán ramos en el simulador hasta que cargues o restaures un catálogo.',
+      confirmLabel: 'Sí, vaciar catálogo',
+      run: handleClearCatalog,
+    });
 
   const dynamicCareersForFilter = useMemo(() => {
     const map = new Map();
@@ -864,11 +991,7 @@ export const CoursesAdminSection = () => {
 
             <button
               type="button"
-              onClick={() => {
-                handleSeedOfficialData().catch((err) => {
-                  console.error('[CoursesAdminSection] Error restaurando catálogo oficial:', err);
-                });
-              }}
+              onClick={requestSeedConfirm}
               disabled={isSubmitting || !canManageCourses}
               aria-disabled={isSubmitting || !canManageCourses}
               {...getVoiceProps('Restaurar catálogo oficial Duoc UC - Sede Alameda 2026')}
@@ -886,6 +1009,19 @@ export const CoursesAdminSection = () => {
               <Sparkles className="w-4 h-4 text-amber-500" aria-hidden="true" />
               <span>Restaurar Catálogo Oficial 2026</span>
             </button>
+
+            {canManageCourses && (
+              <button
+                type="button"
+                onClick={requestClearConfirm}
+                disabled={isSubmitting}
+                {...getVoiceProps('Vaciar todo el catálogo de asignaturas')}
+                className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 border border-red-400 bg-red-50 hover:bg-red-100 text-red-900 cursor-pointer disabled:opacity-60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
+              >
+                <Trash2 className="w-4 h-4" aria-hidden="true" />
+                <span>Vaciar Catálogo</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -1039,8 +1175,8 @@ export const CoursesAdminSection = () => {
                   id="replace-catalog-switch"
                   checked={replaceCatalog}
                   onChange={(e) => canManageCourses && setReplaceCatalog(e.target.checked)}
-                  disabled={!canManageCourses}
-                  aria-disabled={!canManageCourses}
+                  disabled={!canManageCourses || Boolean(dryRunPreview)}
+                  aria-disabled={!canManageCourses || Boolean(dryRunPreview)}
                   aria-label="Sobreescribir catálogo anterior (eliminar datos del año previo)"
                   {...getVoiceProps(
                     `Sobreescribir catálogo anterior: ${replaceCatalog ? 'activado' : 'desactivado'}`
@@ -1061,36 +1197,53 @@ export const CoursesAdminSection = () => {
               <button
                 type="button"
                 onClick={() => {
-                  handleImportToDatabase().catch((err) => {
-                    console.error('[CoursesAdminSection] Error importando cursos:', err);
+                  handleValidateImport().catch((err) => {
+                    console.error('[CoursesAdminSection] Error revisando archivo:', err);
                   });
                 }}
-                disabled={isSubmitting || !canManageCourses}
-                aria-disabled={isSubmitting || !canManageCourses}
-                {...getVoiceProps('Guardar asignaturas procesadas en la base de datos')}
+                disabled={isValidating || isSubmitting || !canManageCourses || Boolean(dryRunPreview)}
+                aria-disabled={isValidating || isSubmitting || !canManageCourses || Boolean(dryRunPreview)}
+                {...getVoiceProps('Revisar el archivo antes de guardarlo en la base de datos')}
                 title={
                   canManageCourses
-                    ? 'Guardar los datos procesados en la Base de Datos oficial de Nexo360'
-                    : 'Acción restringida a Administradores y Coordinación PAEDIS'
+                    ? 'Revisa el archivo sin guardar nada todavía'
+                    : 'Acción restringida a Administradores'
                 }
-                className={`min-h-[44px] px-6 py-2.5 rounded-xl font-black text-xs sm:text-sm inline-flex items-center gap-2 shadow-md transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 ${
-                  canManageCourses
+                className={`min-h-[44px] px-6 py-2.5 rounded-xl font-black text-xs sm:text-sm inline-flex items-center justify-center gap-2 shadow-md transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2 ${
+                  canManageCourses && !dryRunPreview
                     ? 'bg-[#002B49] hover:bg-blue-950 text-white cursor-pointer'
-                    : 'bg-slate-300 text-slate-600 cursor-not-allowed opacity-60'
+                    : 'bg-slate-300 text-slate-700 cursor-not-allowed opacity-70'
                 }`}
               >
-                {isSubmitting ? (
+                {isValidating ? (
                   <RefreshCw className="w-4 h-4 animate-spin text-amber-400" aria-hidden="true" />
                 ) : (
                   <Check className="w-4 h-4 text-amber-400" aria-hidden="true" />
                 )}
-                <span>Guardar en Base de Datos</span>
+                <span>{isValidating ? 'Revisando archivo…' : 'Revisar antes de guardar'}</span>
               </button>
             </div>
 
+            {dryRunPreview && (
+              <ImportDryRunPreview
+                preview={dryRunPreview}
+                fileName={uploadedFileName}
+                replaceCatalog={replaceCatalog}
+                acknowledged={ackSections}
+                onAcknowledgeChange={setAckSections}
+                onConfirm={() => {
+                  handleImportToDatabase().catch((err) => {
+                    console.error('[CoursesAdminSection] Error importando cursos:', err);
+                  });
+                }}
+                onCancel={handleCancelPreview}
+                isSubmitting={isSubmitting}
+              />
+            )}
+
             {/* Muestra de las primeras 5 filas parseadas */}
             <div className="overflow-x-auto rounded-xl border border-amber-300 bg-white shadow-2xs">
-              <table className="w-full text-left text-xs min-w-[640px]" role="table">
+              <table className="w-full text-left text-xs min-w-[640px]">
                 <caption className="sr-only">
                   Muestra preliminar de las primeras asignaturas analizadas
                 </caption>
@@ -1246,6 +1399,27 @@ export const CoursesAdminSection = () => {
         }}
         onDownload={handleDownloadCleanMarkdown}
         copied={isCopiedMd}
+      />
+      {/* 6. Carreras y Sedes: sección secundaria, colapsada por defecto */}
+      <CatalogEntitiesPanel
+        canManage={canManageCourses}
+        requestConfirm={requestConfirm}
+        notify={notifyFeedback}
+      />
+
+      {/* 7. Confirmación accesible para acciones destructivas */}
+      <ConfirmActionDialog
+        isOpen={Boolean(pendingConfirm)}
+        title={pendingConfirm?.title}
+        message={pendingConfirm?.message}
+        confirmLabel={pendingConfirm?.confirmLabel}
+        busy={isConfirming}
+        onConfirm={() => {
+          handleConfirmPending().catch((err) => {
+            console.error('[CoursesAdminSection] Error confirmando acción:', err);
+          });
+        }}
+        onCancel={handleCancelPending}
       />
     </article>
   );
