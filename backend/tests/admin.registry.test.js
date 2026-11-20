@@ -238,12 +238,28 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.ok(satRes.body?.metrics);
     assert.ok(Array.isArray(satRes.body?.students));
 
+    // Verificación de ordenación por severidad reglamentaria (Rojo -> Amarillo -> Verde)
+    const riskPriorityMap = {
+      LEVEL_2_CRITICAL: 1,
+      LEVEL_1_PREVENTIVE: 2,
+      PAEDIS_JUSTIFIED: 3,
+      NONE: 4,
+    };
+    for (let i = 0; i < satRes.body.students.length - 1; i++) {
+      const curr = riskPriorityMap[satRes.body.students[i].satEvaluation?.riskLevel] || 5;
+      const next = riskPriorityMap[satRes.body.students[i + 1].satEvaluation?.riskLevel] || 5;
+      assert.ok(
+        curr <= next,
+        `Estudiante ${satRes.body.students[i].fullName} (${curr}) debe tener mayor o igual prioridad que ${satRes.body.students[i + 1].fullName} (${next})`
+      );
+    }
+
     // Matías Contreras debe estar en LEVEL_2_CRITICAL
     const matias = satRes.body.students.find((s) => s.email === 'm.contreras@duocuc.cl');
     assert.ok(matias, 'Matías Contreras debe estar en el listado SAT');
     assert.equal(matias.satEvaluation?.riskLevel, 'LEVEL_2_CRITICAL');
 
-    // 2. PATCH /api/admin/sat-alerts/:userId/simulate
+    // 2. PATCH /api/admin/sat-alerts/:userId/simulate (Modo Simulación SAP)
     const simRes = await request(`/api/admin/sat-alerts/${matias.id || matias._id}/simulate`, {
       method: 'PATCH',
       headers: coordinatorHeaders,
@@ -255,19 +271,37 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(simRes.status, 200);
     assert.equal(simRes.body?.success, true);
 
-    // 3. PATCH /api/admin/sat-alerts/:userId/intervention
+    // 3. PATCH /api/admin/sat-alerts/:userId/intervention (Ciclo cerrado: AGREEMENT y Tutor PAEDIS Asignado 'Sí')
     const intervRes = await request(`/api/admin/sat-alerts/${matias.id || matias._id}/intervention`, {
       method: 'PATCH',
       headers: coordinatorHeaders,
       body: {
-        assignedTo: 'Coordinación PAEDIS',
-        status: 'IN_PROGRESS',
-        notes: 'Estudiante contactado telefónicamente y derivado a tutor par.',
+        assignedTo: 'Coordinación PAEDIS Duoc UC',
+        status: 'AGREEMENT',
+        tutorPaedisAsignado: 'Sí',
+        notes: 'Estudiante contactado telefónicamente y derivado a tutor PAEDIS para apoyo curricular.',
       },
     });
     assert.equal(intervRes.status, 200);
     assert.equal(intervRes.body?.success, true);
-    assert.equal(intervRes.body?.student?.satIntervention?.status, 'IN_PROGRESS');
+    assert.equal(intervRes.body?.student?.satIntervention?.status, 'AGREEMENT');
+    assert.equal(intervRes.body?.student?.satIntervention?.tutorPaedisAsignado, 'Sí');
+    assert.equal(intervRes.body?.student?.tutorPaedisAsignado, 'Sí');
+
+    // 4. Transición de ciclo cerrado a RESOLVED y Tutor PAEDIS Asignado 'No'
+    const resolveRes = await request(`/api/admin/sat-alerts/${matias.id || matias._id}/intervention`, {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: {
+        status: 'RESOLVED',
+        tutorPaedisAsignado: 'No',
+        notes: 'Caso regularizado con asistencia sobre el 75%.',
+      },
+    });
+    assert.equal(resolveRes.status, 200);
+    assert.equal(resolveRes.body?.student?.satIntervention?.status, 'RESOLVED');
+    assert.equal(resolveRes.body?.student?.satIntervention?.tutorPaedisAsignado, 'No');
+    assert.equal(resolveRes.body?.student?.tutorPaedisAsignado, 'No');
   });
 
   test('8. Centro de Operaciones PAEDIS: Gestión de Ajustes Razonables, Ficha Docente Confidencial (Ley 21.719) y permisos RBAC', async () => {

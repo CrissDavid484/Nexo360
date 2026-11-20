@@ -93,8 +93,13 @@ const SatInterventionSchema = new mongoose.Schema(
     slaDeadline: { type: Date, default: null },
     status: {
       type: String,
-      enum: ['PENDING', 'IN_PROGRESS', 'RESOLVED'],
+      enum: ['PENDING', 'IN_PROGRESS', 'AGREEMENT', 'RESOLVED'],
       default: 'PENDING',
+    },
+    tutorPaedisAsignado: {
+      type: String,
+      enum: ['Sí', 'No'],
+      default: 'No',
     },
     notes: { type: String, trim: true, maxlength: 500, default: '' },
     lastUpdated: { type: Date, default: Date.now },
@@ -298,6 +303,11 @@ const UserProfileSchema = new mongoose.Schema(
       trim: true,
       maxlength: 120,
       default: 'Inclusión y Bienestar Duoc UC',
+    },
+    tutorPaedisAsignado: {
+      type: String,
+      enum: ['Sí', 'No'],
+      default: 'No',
     },
     diagnosticoDeclarado: {
       type: String,

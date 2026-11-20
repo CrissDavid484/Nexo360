@@ -763,14 +763,27 @@ class AuthService {
       accessibilityPreferences,
       enrolledCourses: Array.isArray(raw.enrolledCourses) ? raw.enrolledCourses : [],
       courseAttendance: Array.isArray(raw.courseAttendance) ? raw.courseAttendance : [],
-      satIntervention: raw.satIntervention || {
-        riskLevel: 'NONE',
-        assignedTo: 'Coordinación PAEDIS',
-        slaDeadline: null,
-        status: 'PENDING',
-        notes: '',
-        lastUpdated: new Date(),
-      },
+      satIntervention: raw.satIntervention
+        ? {
+            riskLevel: raw.satIntervention.riskLevel || 'NONE',
+            assignedTo: raw.satIntervention.assignedTo || 'Coordinación PAEDIS',
+            slaDeadline: raw.satIntervention.slaDeadline || null,
+            status: raw.satIntervention.status || 'PENDING',
+            tutorPaedisAsignado:
+              raw.satIntervention.tutorPaedisAsignado ||
+              (raw.tutorPaedisAsignado === 'Sí' || isPaedis ? 'Sí' : 'No'),
+            notes: raw.satIntervention.notes || '',
+            lastUpdated: raw.satIntervention.lastUpdated || new Date(),
+          }
+        : {
+            riskLevel: 'NONE',
+            assignedTo: 'Coordinación PAEDIS',
+            slaDeadline: null,
+            status: 'PENDING',
+            tutorPaedisAsignado: isPaedis ? 'Sí' : 'No',
+            notes: '',
+            lastUpdated: new Date(),
+          },
       photo: raw.photo || '',
       address,
       direccion: address,
@@ -780,6 +793,12 @@ class AuthService {
       telefonoPersonal: phone,
       emergencyContact: raw.emergencyContact || 'Contacto Familiar',
       emergencyPhone: raw.emergencyPhone || '+56 9 1234 5678',
+      tutorPaedisAsignado:
+        raw.tutorPaedisAsignado ||
+        raw.satIntervention?.tutorPaedisAsignado ||
+        (isPaedis || (raw.tutorParAsignado && raw.tutorParAsignado !== 'Sin tutor asignado')
+          ? 'Sí'
+          : 'No'),
       tutorParAsignado:
         raw.tutorParAsignado || (isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado'),
       diagnosticoDeclarado: raw.diagnosticoDeclarado || '',

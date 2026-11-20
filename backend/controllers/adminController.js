@@ -996,6 +996,16 @@ exports.getSatAlerts = async (req, res) => {
       const pA = riskPriority[a.satEvaluation.riskLevel] || 5;
       const pB = riskPriority[b.satEvaluation.riskLevel] || 5;
       if (pA !== pB) return pA - pB;
+
+      const getMinAttendance = (student) => {
+        const list = Array.isArray(student.courseAttendance) ? student.courseAttendance : [];
+        if (list.length === 0) return 100;
+        return Math.min(...list.map((c) => Number(c.attendancePercentage ?? 100)));
+      };
+      const minA = getMinAttendance(a);
+      const minB = getMinAttendance(b);
+      if (minA !== minB) return minA - minB;
+
       const nameA = (a.fullName || a.nombre || a.email || '').trim();
       const nameB = (b.fullName || b.nombre || b.email || '').trim();
       return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
@@ -1116,9 +1126,21 @@ exports.updateSatIntervention = async (req, res) => {
       });
     }
 
-    const allowedStatuses = ['PENDING', 'IN_PROGRESS', 'RESOLVED'];
+    const allowedStatuses = ['PENDING', 'IN_PROGRESS', 'AGREEMENT', 'RESOLVED'];
+    const statusMap = {
+      PENDING: 'PENDING',
+      PENDIENTE: 'PENDING',
+      IN_PROGRESS: 'IN_PROGRESS',
+      EN_GESTION: 'IN_PROGRESS',
+      CONTACTADO: 'IN_PROGRESS',
+      AGREEMENT: 'AGREEMENT',
+      ACUERDO: 'AGREEMENT',
+      DERIVACION: 'AGREEMENT',
+      RESOLVED: 'RESOLVED',
+      RESUELTA: 'RESOLVED',
+    };
     const rawStatus = String(req.body.status || 'IN_PROGRESS').trim().toUpperCase();
-    const cleanStatus = allowedStatuses.includes(rawStatus) ? rawStatus : 'IN_PROGRESS';
+    const cleanStatus = statusMap[rawStatus] || (allowedStatuses.includes(rawStatus) ? rawStatus : 'IN_PROGRESS');
 
     const cleanAssignedTo = sanitizeString(req.body.assignedTo, 120) || 'Coordinación PAEDIS';
     const cleanNotes = sanitizeString(req.body.notes, 500) || '';
@@ -1131,6 +1153,13 @@ exports.updateSatIntervention = async (req, res) => {
     const cleanRiskLevel = String(req.body.riskLevel || '').trim().toUpperCase();
     const validRiskLevels = ['NONE', 'LEVEL_1_PREVENTIVE', 'LEVEL_2_CRITICAL', 'PAEDIS_JUSTIFIED'];
 
+    const rawTutorPaedis = req.body.tutorPaedisAsignado;
+    const cleanTutorPaedis =
+      rawTutorPaedis === 'Sí' || rawTutorPaedis === true || rawTutorPaedis === 'Si'
+        ? 'Sí'
+        : 'No';
+
+    user.tutorPaedisAsignado = cleanTutorPaedis;
     user.satIntervention = {
       riskLevel: validRiskLevels.includes(cleanRiskLevel)
         ? cleanRiskLevel
@@ -1138,6 +1167,7 @@ exports.updateSatIntervention = async (req, res) => {
       assignedTo: cleanAssignedTo,
       slaDeadline: cleanSla,
       status: cleanStatus,
+      tutorPaedisAsignado: cleanTutorPaedis,
       notes: cleanNotes,
       lastUpdated: new Date(),
     };
@@ -1232,6 +1262,11 @@ function buildPaedisCaseUpdates(body) {
     if (body[key] !== undefined) {
       updates[key] = sanitizeString(body[key], maxLen) || '';
     }
+  }
+
+  if (body.tutorPaedisAsignado !== undefined) {
+    const isYes = body.tutorPaedisAsignado === 'Sí' || body.tutorPaedisAsignado === true || body.tutorPaedisAsignado === 'Si';
+    updates.tutorPaedisAsignado = isYes ? 'Sí' : 'No';
   }
 
   if (Array.isArray(body.ajustesAprobados)) {

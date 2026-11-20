@@ -14,6 +14,10 @@ import {
   Search,
   FileText,
   ChevronRight,
+  Clock,
+  RotateCcw,
+  PhoneCall,
+  FileSignature,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -48,6 +52,155 @@ function resolveStudentSatBadgeClass(riskLevel) {
 }
 
 /**
+ * Estados del Flujo de Ciclo Cerrado SAT
+ */
+const SAT_LIFECYCLE_STATES = [
+  {
+    id: 'PENDING',
+    label: 'Pendiente',
+    stepNumber: 1,
+    description: 'Alerta generada, contacto pendiente',
+    badgeClass: 'bg-rose-100 text-rose-950 border border-rose-300',
+    activeClass: 'bg-rose-50 text-rose-950 border-rose-400 ring-2 ring-rose-400',
+  },
+  {
+    id: 'IN_PROGRESS',
+    label: 'En gestión / Contactado',
+    stepNumber: 2,
+    description: 'Estudiante contactado y en seguimiento activo',
+    badgeClass: 'bg-amber-100 text-amber-950 border border-amber-300',
+    activeClass: 'bg-amber-50 text-amber-950 border-amber-400 ring-2 ring-amber-400',
+  },
+  {
+    id: 'AGREEMENT',
+    label: 'Acuerdo o Derivación',
+    stepNumber: 3,
+    description: 'Compromiso académico o derivación asistencial firmada',
+    badgeClass: 'bg-blue-100 text-blue-950 border border-blue-300',
+    activeClass: 'bg-blue-50 text-blue-950 border-blue-400 ring-2 ring-blue-400',
+  },
+  {
+    id: 'RESOLVED',
+    label: 'Resuelta',
+    stepNumber: 4,
+    description: 'Caso resuelto o justificación curricular aprobada',
+    badgeClass: 'bg-emerald-100 text-emerald-950 border border-emerald-300',
+    activeClass: 'bg-emerald-50 text-emerald-950 border-emerald-400 ring-2 ring-emerald-400',
+  },
+];
+
+function getSatLifecycleMeta(status) {
+  const norm = String(status || '').toUpperCase();
+  return SAT_LIFECYCLE_STATES.find((s) => s.id === norm) || SAT_LIFECYCLE_STATES[0];
+}
+
+function getLifecycleStepIndex(status) {
+  const norm = String(status || '').toUpperCase();
+  const idx = SAT_LIFECYCLE_STATES.findIndex((s) => s.id === norm);
+  return idx >= 0 ? idx : 0;
+}
+
+/**
+ * Calcula con precisión el factor disparador/causa de la alerta
+ * para no depender únicamente del color (WCAG 1.4.1).
+ */
+function getSatTriggerFactor(student) {
+  const sat = student.satEvaluation || {};
+  const courses = sat.coursesDetails || student.courseAttendance || [];
+
+  if (sat.riskLevel === 'LEVEL_2_CRITICAL') {
+    const criticalCourse =
+      courses.find((c) => {
+        const pct = Number(c.attendancePercentage ?? 100);
+        const abs = Number(c.consecutiveAbsences || 0);
+        return !c.paedisJustified && (pct < 75 || abs >= 3 || c.missedKeySession);
+      }) || courses[0];
+
+    const pct = criticalCourse
+      ? Math.round(Number(criticalCourse.attendancePercentage ?? 0) * 10) / 10
+      : 0;
+    const abs = criticalCourse ? Number(criticalCourse.consecutiveAbsences || 0) : 0;
+
+    let triggerReason = `${criticalCourse?.courseCode || 'Asignatura'} (${criticalCourse?.courseName || 'Ramo'}): ${pct}% de asistencia (bajo el 75% exigido).`;
+    if (abs >= 3) {
+      triggerReason += ` Acumula ${abs} inasistencias consecutivas.`;
+    }
+    if (criticalCourse?.missedKeySession) {
+      triggerReason += ' Falta a evaluación o certamen clave institucional.';
+    }
+
+    return {
+      severity: 'CRITICAL',
+      title: 'Factor Disparador: Alerta Crítica (Causal Inminente de RI)',
+      courseCode: criticalCourse?.courseCode || '',
+      courseName: criticalCourse?.courseName || '',
+      attendancePct: pct,
+      description: triggerReason,
+      boxClass: 'bg-rose-50 border-rose-300 text-rose-950',
+      badgeClass: 'bg-rose-700 text-white',
+      icon: AlertOctagon,
+      iconClass: 'text-rose-700',
+    };
+  }
+
+  if (sat.riskLevel === 'LEVEL_1_PREVENTIVE') {
+    const prevCourse =
+      courses.find((c) => {
+        const pct = Number(c.attendancePercentage ?? 100);
+        const abs = Number(c.consecutiveAbsences || 0);
+        return !c.paedisJustified && ((pct >= 75 && pct <= 79) || abs === 2);
+      }) || courses[0];
+
+    const pct = prevCourse
+      ? Math.round(Number(prevCourse.attendancePercentage ?? 0) * 10) / 10
+      : 0;
+
+    return {
+      severity: 'PREVENTIVE',
+      title: 'Factor Disparador: Alerta Preventiva (Margen Crítico Restante)',
+      courseCode: prevCourse?.courseCode || '',
+      courseName: prevCourse?.courseName || '',
+      attendancePct: pct,
+      description: `${prevCourse?.courseCode || 'Asignatura'} (${prevCourse?.courseName || 'Ramo'}): ${pct}% de asistencia (zona de riesgo preventivo 75% a 79%). Requiere acompañamiento temprano.`,
+      boxClass: 'bg-amber-50 border-amber-300 text-amber-950',
+      badgeClass: 'bg-amber-500 text-slate-950',
+      icon: AlertTriangle,
+      iconClass: 'text-amber-700',
+    };
+  }
+
+  if (sat.riskLevel === 'PAEDIS_JUSTIFIED') {
+    return {
+      severity: 'JUSTIFIED',
+      title: 'Factor Disparador: Acompañamiento PAEDIS Justificado',
+      courseCode: '',
+      courseName: '',
+      attendancePct: 0,
+      description:
+        'Inasistencias amparadas en expediente confidencial de ajustes razonables vigentes (Ley N° 21.719).',
+      boxClass: 'bg-purple-50 border-purple-300 text-purple-950',
+      badgeClass: 'bg-purple-700 text-white',
+      icon: HeartHandshake,
+      iconClass: 'text-purple-700',
+    };
+  }
+
+  return {
+    severity: 'REGULAR',
+    title: 'Sin Factores de Riesgo Activos',
+    courseCode: '',
+    courseName: '',
+    attendancePct: 100,
+    description:
+      'Todas las asignaturas monitoreadas presentan asistencia regular superior al 80% reglamentario.',
+    boxClass: 'bg-emerald-50 border-emerald-300 text-emerald-950',
+    badgeClass: 'bg-emerald-700 text-white',
+    icon: CheckCircle2,
+    iconClass: 'text-emerald-700',
+  };
+}
+
+/**
  * Fila modular accesible para renderizar cada asignatura monitoreada en el SAT
  */
 function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
@@ -74,15 +227,35 @@ function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
           <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
             {course.courseName}
           </span>
+
+          {/* Etiquetas textuales no dependientes de color */}
+          {status === 'ri' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-700 text-white">
+              <AlertOctagon className="w-3 h-3" aria-hidden="true" />
+              Causal de RI (&lt;75%)
+            </span>
+          )}
+          {status === 'preventive' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 font-black">
+              <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+              Preventivo (75-79%)
+            </span>
+          )}
+          {status === 'normal' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-700 text-white">
+              <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+              Regular (≥80%)
+            </span>
+          )}
           {isJustified && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-purple-200/80 text-purple-900 border border-purple-300">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-purple-200 text-purple-950 border border-purple-300">
               <HeartHandshake className="w-3 h-3" aria-hidden="true" />
               Justificado PAEDIS
             </span>
           )}
           {course.missedKeySession && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-200 text-rose-950 border border-rose-300">
-              Falta a Hito/Certamen
+              Falta a Certamen
             </span>
           )}
         </div>
@@ -125,12 +298,12 @@ function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
       <button
         type="button"
         onClick={() => onSelectCourseForSimulation(course)}
-        {...getVoiceProps(`Simular riesgo de inasistencia para ${course.courseCode}`)}
-        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs rounded-xl border border-slate-200 shadow-2xs transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
-        title={`Cargar ${course.courseCode} en el simulador de riesgo y corte de inasistencia`}
+        {...getVoiceProps(`Cargar ${course.courseCode} en el simulador de proyección SAP`)}
+        className="shrink-0 min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-xs rounded-xl border border-amber-300 shadow-2xs transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
+        title={`Cargar ${course.courseCode} en el Entorno de Simulación SAP (no oficial)`}
       >
-        <Play className="w-3.5 h-3.5 text-blue-600" aria-hidden="true" />
-        <span>Simular riesgo</span>
+        <Play className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
+        <span>Proyectar en Simulador</span>
       </button>
     </div>
   );
@@ -141,25 +314,19 @@ const SIMULATION_ACTIONS = [
     id: 'act-add-absence',
     label: '+1 Falta Consecutiva',
     action: 'add_absence',
-    btnClass: 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200',
+    btnClass: 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300',
   },
   {
     id: 'act-drop-ri',
     label: 'Simular Baja <75% (RI)',
     action: 'drop_below_75',
-    btnClass: 'bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-200',
+    btnClass: 'bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-300',
   },
   {
     id: 'act-justify',
     label: 'Excepción PAEDIS',
     action: 'paedis_justify',
-    btnClass: 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-200',
-  },
-  {
-    id: 'act-reset',
-    label: 'Restablecer',
-    action: 'reset',
-    btnClass: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300',
+    btnClass: 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-300',
   },
 ];
 
@@ -185,6 +352,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
   const [selectedStudentForIntervention, setSelectedStudentForIntervention] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [statusFeedback, setStatusFeedback] = useState(null);
+  const [activeSimulationInfo, setActiveSimulationInfo] = useState(null);
 
   const [interventionForm, setInterventionForm] = useState({
     assignedTo: 'Coordinación PAEDIS Duoc UC',
@@ -265,10 +433,22 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
     });
   }, [loadSatAlerts]);
 
+  /**
+   * Ordenación estricta por severidad (Rojo -> Amarillo -> Púrpura -> Verde)
+   * y luego por menor porcentaje de asistencia.
+   */
   const filteredStudents = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     const hasDigitQuery = /\d/.test(searchQuery);
-    return (satData.students || []).filter((s) => {
+
+    const riskRank = {
+      LEVEL_2_CRITICAL: 1,
+      LEVEL_1_PREVENTIVE: 2,
+      PAEDIS_JUSTIFIED: 3,
+      NONE: 4,
+    };
+
+    const list = (satData.students || []).filter((s) => {
       const sat = s.satEvaluation || {};
       const matchesLevel = filterLevel === 'ALL' || sat.riskLevel === filterLevel;
 
@@ -281,6 +461,25 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
         (hasDigitQuery && matchesRutQuery(s.rut, searchQuery));
 
       return matchesLevel && matchesSearch;
+    });
+
+    return list.sort((a, b) => {
+      const rA = riskRank[a.satEvaluation?.riskLevel] || 5;
+      const rB = riskRank[b.satEvaluation?.riskLevel] || 5;
+      if (rA !== rB) return rA - rB;
+
+      const getMinAttendance = (student) => {
+        const courses = Array.isArray(student.courseAttendance) ? student.courseAttendance : [];
+        if (courses.length === 0) return 100;
+        return Math.min(...courses.map((c) => Number(c.attendancePercentage ?? 100)));
+      };
+      const minA = getMinAttendance(a);
+      const minB = getMinAttendance(b);
+      if (minA !== minB) return minA - minB;
+
+      const nameA = (a.fullName || a.nombre || a.email || '').trim();
+      const nameB = (b.fullName || b.nombre || b.email || '').trim();
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
     });
   }, [satData.students, filterLevel, searchQuery]);
 
@@ -310,11 +509,25 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
       if (!isMountedRef.current) return;
 
       if (res?.success) {
-        setStatusFeedback({
-          type: 'success',
-          text: `Corte semanal SAP ejecutado con éxito (${actionType}) para ${simulationTarget.courseCode}.`,
-        });
-        announce(`Corte semanal SAP actualizado para ${simulationTarget.courseCode}`, 'polite');
+        if (actionType === 'reset') {
+          setActiveSimulationInfo(null);
+          setStatusFeedback({
+            type: 'success',
+            text: `Asistencia de ${simulationTarget.courseCode} restablecida a valores base de origen.`,
+          });
+          announce(`Asistencia de ${simulationTarget.courseCode} restablecida exitosamente.`, 'polite');
+        } else {
+          setActiveSimulationInfo({
+            courseCode: simulationTarget.courseCode,
+            action: actionType,
+            studentName: currentSimStudent?.fullName || currentSimStudent?.nombre || 'Estudiante',
+          });
+          setStatusFeedback({
+            type: 'success',
+            text: `Proyección SAP ejecutada (${actionType}) para ${simulationTarget.courseCode}.`,
+          });
+          announce(`Proyección SAP ejecutada para ${simulationTarget.courseCode}`, 'polite');
+        }
         await loadSatAlerts();
       } else {
         setStatusFeedback({
@@ -342,13 +555,15 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
     const existing = student.satIntervention || {};
     const hasTutor =
       existing.tutorPaedisAsignado ||
-      (student.tutorParAsignado && student.tutorParAsignado !== 'Sin tutor asignado' ? 'Sí' : 'No');
+      student.tutorPaedisAsignado ||
+      (student.isPaedis ? 'Sí' : 'No');
+
     setInterventionForm({
       assignedTo: existing.assignedTo || 'Coordinación PAEDIS Duoc UC',
       status: existing.status || 'IN_PROGRESS',
       notes: existing.notes || '',
       slaDays: '2',
-      tutorPaedisAsignado: hasTutor,
+      tutorPaedisAsignado: hasTutor === 'Sí' || hasTutor === true ? 'Sí' : 'No',
     });
   };
 
@@ -376,7 +591,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
       if (res?.success) {
         setStatusFeedback({
           type: 'success',
-          text: `Ficha 360 registrada para ${selectedStudentForIntervention.fullName || 'el estudiante'}.`,
+          text: `Ficha 360 registrada para ${selectedStudentForIntervention.fullName || 'el estudiante'}. Estado: ${getSatLifecycleMeta(interventionForm.status).label}.`,
         });
         announce('Intervención guardada exitosamente.', 'polite');
         setSelectedStudentForIntervention(null);
@@ -452,16 +667,13 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-400 text-[#002B49]">
               <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Sistema de Alerta Temprana (SAT) • Duoc UC - Sede Alameda & PAEDIS</span>
+              <span>Sistema de Alerta Temprana (SAT) • Duoc UC - Sede Alameda</span>
             </div>
             <h2 id="sat-header-title" className="text-xl sm:text-2xl font-black tracking-tight">
-              Monitoreo Determinista de Asistencia por Asignatura & Ficha 360
+              Monitoreo Determinista de Asistencia &amp; Ficha de Intervención de Ciclo Cerrado
             </h2>
             <p className="text-xs sm:text-sm text-slate-200 max-w-3xl leading-relaxed">
-              Cumplimiento normativo institucional en <strong>Duoc UC - Sede Alameda</strong>{' '}
-              (mínimo <strong>75% de asistencia por ramo</strong> para evitar Reprobación por
-              Inasistencia - RI) con cruce directo a la ficha de ajustes razonables y acompañamiento
-              de PAEDIS.
+              Cumplimiento normativo en <strong>Duoc UC - Sede Alameda</strong> (mínimo <strong>75% de asistencia por asignatura</strong> para evitar Reprobación por Inasistencia - RI) con trazabilidad de ciclo cerrado e integración a ajustes PAEDIS.
             </p>
           </div>
 
@@ -474,7 +686,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
             }}
             disabled={loading}
             {...getVoiceProps('Actualizar datos del Sistema de Alerta Temprana')}
-            className="self-start md:self-auto inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white font-bold text-xs rounded-xl border border-white/20 transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
+            className="self-start md:self-auto min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white font-bold text-xs rounded-xl border border-white/20 transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
             <span>Actualizar Datos</span>
@@ -506,7 +718,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
             type="button"
             onClick={() => setStatusFeedback(null)}
             {...getVoiceProps('Cerrar notificación')}
-            className="text-slate-500 hover:text-slate-900 p-1 rounded-lg focus-visible:ring-4 focus-visible:ring-amber-400"
+            className="text-slate-500 hover:text-slate-900 p-2 rounded-lg focus-visible:ring-4 focus-visible:ring-amber-400 min-h-[44px] min-w-[44px] inline-flex items-center justify-center cursor-pointer"
             aria-label="Cerrar notificación"
           >
             <X className="w-4 h-4" />
@@ -550,30 +762,76 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
         </div>
       </section>
 
-      {/* 3. SIMULADOR INTERACTIVO DE CORTE SEMANAL SAP */}
+      {/* 3. ENTORNO DE SIMULACIÓN Y PROYECCIÓN SAP (AISLADO / NO OFICIAL) */}
       <section
         aria-labelledby="sat-simulator-title"
-        className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4"
+        className="bg-amber-50/70 p-6 sm:p-8 rounded-3xl border-2 border-amber-300 shadow-xs space-y-4 relative overflow-hidden"
       >
-        <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider text-blue-900 bg-blue-100">
-              <Play className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
-              <span>Simulador de Escenarios en Vivo • Duoc UC - Sede Alameda</span>
+        <div className="border-b border-amber-200/90 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider text-amber-950 bg-amber-200 border border-amber-300">
+              <Sparkles className="w-3.5 h-3.5 text-amber-800" aria-hidden="true" />
+              <span>Modo Simulación / Proyección (No Oficial)</span>
             </div>
-            <h3 id="sat-simulator-title" className="text-lg font-black text-slate-900 mt-1">
-              Simular Ingesta de Reporte Semanal SAP / Libro de Clases
+            <h3 id="sat-simulator-title" className="text-lg sm:text-xl font-black text-slate-900 mt-1">
+              Simulador de Escenarios de Asistencia y Corte Semanal SAP
             </h3>
-            <p className="text-xs text-slate-500">
-              Permite demostrar a la comisión evaluadora cómo el motor SAT recalcula el riesgo al
-              instante y activa los protocolos de SLA.
+            <p className="text-xs sm:text-sm text-slate-700 max-w-3xl leading-relaxed">
+              Entorno aislado para proyectar escenarios de inasistencias y verificar los protocolos automáticos del motor SAT. <strong>No modifica los registros curriculares oficiales</strong> del libro de clases.
             </p>
+          </div>
+
+          {/* Acciones de control y restablecimiento */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                handleRunSimulation('reset').catch((err) => {
+                  console.error('[EarlyWarningSAT] Error restableciendo simulación:', err);
+                });
+              }}
+              disabled={isSimulating}
+              {...getVoiceProps('Restablecer asistencia a valores base de origen')}
+              className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 shadow-2xs inline-flex items-center gap-1.5 cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+              <span>Restablecer Asistencia</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                loadSatAlerts().catch((err) => {
+                  console.error('[EarlyWarningSAT] Error recargando alertas:', err);
+                });
+              }}
+              disabled={loading}
+              {...getVoiceProps('Salir de la simulación y recargar datos oficiales')}
+              className="min-h-[44px] px-3.5 py-2 bg-[#002B49] hover:bg-[#003b66] text-white text-xs font-bold rounded-xl shadow-2xs inline-flex items-center gap-1.5 cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+              <span>Salir de Simulación</span>
+            </button>
           </div>
         </div>
 
+        {activeSimulationInfo && (
+          <div className="p-3 bg-amber-100/90 border border-amber-300 rounded-xl flex items-center justify-between text-xs text-amber-950 font-bold">
+            <div className="flex items-center gap-2">
+              <Play className="w-4 h-4 text-amber-800" aria-hidden="true" />
+              <span>
+                Simulación activa en curso: <strong>{activeSimulationInfo.courseCode}</strong> para{' '}
+                <strong>{activeSimulationInfo.studentName}</strong> (acción: {activeSimulationInfo.action}).
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-amber-800">
+              *Proyección temporal en memoria
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div className="space-y-1">
-            <label htmlFor="sat-sim-student-select" className="text-xs font-bold text-slate-700">
+            <label htmlFor="sat-sim-student-select" className="text-xs font-bold text-slate-800">
               1. Seleccionar Estudiante:
             </label>
             <select
@@ -588,7 +846,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                 setSimulationTarget({ userId: uid, courseCode: firstCourse });
               }}
               {...getVoiceProps('Seleccionar estudiante para simular corte semanal SAP')}
-              className="w-full min-h-[44px] px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-[#002B49] transition-all"
+              className="w-full min-h-[44px] px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 transition-all"
             >
               {(satData.students || []).map((stu) => (
                 <option key={stu.id || stu._id} value={stu.id || stu._id}>
@@ -599,7 +857,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="sat-sim-course-select" className="text-xs font-bold text-slate-700">
+            <label htmlFor="sat-sim-course-select" className="text-xs font-bold text-slate-800">
               2. Asignatura a Evaluar:
             </label>
             <select
@@ -610,7 +868,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
               }
               disabled={!currentSimStudent || !currentSimStudent.courseAttendance?.length}
               {...getVoiceProps('Seleccionar asignatura a evaluar en simulador SAP')}
-              className="w-full min-h-[44px] px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-[#002B49] transition-all"
+              className="w-full min-h-[44px] px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 transition-all"
             >
               {currentSimStudent?.courseAttendance?.map((c) => (
                 <option key={c.courseCode} value={c.courseCode}>
@@ -632,7 +890,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                 }}
                 disabled={isSimulating}
                 {...getVoiceProps(`Simular acción SAP: ${btn.label}`)}
-                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400 ${btn.btnClass}`}
+                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-black border transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400 ${btn.btnClass}`}
               >
                 {btn.label}
               </button>
@@ -652,12 +910,15 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
               Desglose de Asistencia por Asignatura ({filteredStudents.length} estudiantes)
             </h3>
             <p className="text-xs sm:text-sm text-slate-500">
-              Evaluación automatizada en tiempo real en Duoc UC - Sede Alameda. Abre la Ficha 360
-              para asignar responsable y registrar bitácora de seguimiento.
+              Ordenado por severidad reglamentaria (Rojo → Amarillo → Verde) con factor disparador explícito y ciclo cerrado.
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full flex-nowrap sm:flex-wrap pb-1" role="group" aria-label="Filtrar por nivel SAT">
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto w-full flex-nowrap sm:flex-wrap pb-1"
+            role="group"
+            aria-label="Filtrar por nivel SAT"
+          >
             {FILTER_LEVEL_TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -717,6 +978,15 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
               const studentName = student.fullName || student.nombre;
               const studentCampus = student.campus || DEFAULT_CAMPUS;
               const badgeClass = resolveStudentSatBadgeClass(sat.riskLevel);
+              const trigger = getSatTriggerFactor(student);
+              const lifecycleMeta = getSatLifecycleMeta(intervention.status);
+              const currentStepIdx = getLifecycleStepIndex(intervention.status);
+              const TriggerIcon = trigger.icon;
+
+              const hasTutorPaedis =
+                student.tutorPaedisAsignado === 'Sí' ||
+                intervention.tutorPaedisAsignado === 'Sí' ||
+                student.isPaedis;
 
               return (
                 <article
@@ -724,9 +994,9 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                   {...getVoiceProps(
                     `Alerta SAT de ${studentName}, ${student.career}, ${studentCampus}. Estado: ${
                       sat.riskLabel || 'Sin Riesgo'
-                    }`
+                    }. Factor disparador: ${trigger.title}. ${trigger.description}`
                   )}
-                  className={`p-5 rounded-3xl border transition-all bg-white shadow-2xs ${
+                  className={`p-5 sm:p-6 rounded-3xl border transition-all bg-white shadow-2xs space-y-4 ${
                     isCritical
                       ? 'border-rose-300'
                       : isPreventive
@@ -734,8 +1004,9 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                       : 'border-slate-200'
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 mb-3">
-                    <div className="space-y-0.5">
+                  {/* Encabezado del estudiante */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-black text-slate-900 text-base">{studentName}</span>
                         <span className="text-xs text-slate-500 font-mono">({student.rut})</span>
@@ -749,6 +1020,15 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                         >
                           {sat.riskLabel || 'Sin Riesgo'}
                         </span>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${
+                            hasTutorPaedis
+                              ? 'bg-blue-50 text-blue-900 border-blue-200'
+                              : 'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          Tutor PAEDIS: <strong>{hasTutorPaedis ? 'Sí' : 'No'}</strong>
+                        </span>
                       </div>
                       <p className="text-xs text-slate-500">
                         {student.career} • {studentCampus} • {student.email}
@@ -759,7 +1039,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                       type="button"
                       onClick={() => handleOpenInterventionModal(student)}
                       {...getVoiceProps(`Abrir Ficha 360 de intervención para ${studentName}`)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#002B49] hover:bg-[#003b66] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400 self-start sm:self-auto"
+                      className="min-h-[44px] inline-flex items-center gap-1.5 px-4 py-2 bg-[#002B49] hover:bg-[#003b66] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400 self-start sm:self-auto shrink-0"
                     >
                       <FileText className="w-3.5 h-3.5 text-amber-300" aria-hidden="true" />
                       <span>Ficha 360 de Intervención</span>
@@ -767,31 +1047,87 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                     </button>
                   </div>
 
-                  {/* Estado de intervención activa si existe */}
-                  {intervention.status && intervention.status !== 'PENDING' && (
-                    <div className="mb-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="w-4 h-4 text-emerald-700" aria-hidden="true" />
-                        <span className="text-slate-700">
-                          Asignado a: <strong>{intervention.assignedTo}</strong>
-                        </span>
-                        <span className="text-slate-400">•</span>
-                        <span className="font-bold text-slate-800">
-                          Estado: {intervention.status === 'RESOLVED' ? 'Resuelto' : 'En Seguimiento'}
+                  {/* BLOQUE ACCESIBLE DE FACTOR DISPARADOR (No solo color) */}
+                  <div
+                    className={`p-3.5 rounded-2xl border text-xs flex items-start gap-3 ${trigger.boxClass}`}
+                    role="note"
+                    aria-label={trigger.title}
+                  >
+                    <TriggerIcon className={`w-5 h-5 shrink-0 mt-0.5 ${trigger.iconClass}`} aria-hidden="true" />
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-black uppercase tracking-wider text-[11px] block">
+                          {trigger.title}
                         </span>
                       </div>
-                      {intervention.notes && (
-                        <p className="text-[11px] text-slate-600 italic truncate max-w-md">
-                          &ldquo;{intervention.notes}&rdquo;
-                        </p>
-                      )}
+                      <p className="font-medium leading-relaxed">
+                        {trigger.description}
+                      </p>
                     </div>
-                  )}
+                  </div>
+
+                  {/* FLUJO DE SEGUIMIENTO DE CICLO CERRADO SAT */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-slate-600" aria-hidden="true" />
+                        <span className="font-black text-slate-800">
+                          Flujo de Ciclo Cerrado SAT:
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-md text-[11px] font-black uppercase ${lifecycleMeta.badgeClass}`}>
+                          {lifecycleMeta.label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-700" aria-hidden="true" />
+                        <span>
+                          Responsable: <strong>{intervention.assignedTo || 'Coordinación PAEDIS Duoc UC'}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Stepper visual y accesible */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1" role="list" aria-label="Progreso de la intervención">
+                      {SAT_LIFECYCLE_STATES.map((state, idx) => {
+                        const isCurrent = (intervention.status || 'PENDING') === state.id;
+                        const isPast = currentStepIdx >= idx;
+                        return (
+                          <div
+                            key={state.id}
+                            role="listitem"
+                            {...getVoiceProps(
+                              `Etapa ${idx + 1} de 4: ${state.label}. ${
+                                isCurrent ? 'Etapa actual' : isPast ? 'Completada' : 'Pendiente'
+                              }`
+                            )}
+                            className={`p-2 rounded-xl border text-center transition-all ${
+                              isCurrent
+                                ? `${state.activeClass} font-black`
+                                : isPast
+                                ? 'bg-white border-slate-300 text-slate-800 font-bold'
+                                : 'bg-slate-100/60 border-slate-200 text-slate-400 font-medium'
+                            }`}
+                          >
+                            <span className="text-[10px] block opacity-75">Etapa {idx + 1}</span>
+                            <span className="text-xs truncate block">{state.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {intervention.notes && (
+                      <div className="pt-1.5 border-t border-slate-200/80 text-xs text-slate-600">
+                        <span className="font-bold text-slate-700">Bitácora de Acuerdos: </span>
+                        <span className="italic">&ldquo;{intervention.notes}&rdquo;</span>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Asignaturas Monitoreadas */}
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Asignaturas del Periodo:
+                      Asignaturas del Periodo Monitoreadas ({courses.length}):
                     </span>
                     {courses.length === 0 ? (
                       <p className="text-xs text-slate-400 italic">Sin cursos registrados.</p>
@@ -807,7 +1143,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                                 userId: student.id || student._id,
                                 courseCode: c.courseCode,
                               });
-                              announce(`Asignatura ${c.courseCode} cargada en el simulador de riesgo SAT`, 'polite');
+                              announce(`Asignatura ${c.courseCode} cargada en el Entorno de Simulación SAP`, 'polite');
                               const simEl = document.getElementById('sat-simulator-title');
                               if (simEl) {
                                 simEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -852,7 +1188,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                 type="button"
                 onClick={() => setSelectedStudentForIntervention(null)}
                 {...getVoiceProps('Cerrar Ficha 360')}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus-visible:ring-4 focus-visible:ring-amber-400"
+                className="min-h-[44px] min-w-[44px] p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus-visible:ring-4 focus-visible:ring-amber-400 cursor-pointer inline-flex items-center justify-center"
                 aria-label="Cerrar Ficha 360"
               >
                 <X className="w-5 h-5" />
@@ -879,11 +1215,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                 <div>
                   <span className="text-slate-500 block">Tutor PAEDIS Asignado:</span>
                   <strong className="text-slate-900">
-                    {selectedStudentForIntervention.tutorPaedisAsignado ||
-                      (selectedStudentForIntervention.tutorParAsignado &&
-                      selectedStudentForIntervention.tutorParAsignado !== 'Sin tutor asignado'
-                        ? 'Sí'
-                        : 'No')}
+                    {interventionForm.tutorPaedisAsignado || 'No'}
                   </strong>
                 </div>
               </div>
@@ -950,7 +1282,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                         tutorPaedisAsignado: e.target.value,
                       })
                     }
-                    {...getVoiceProps('Indicar si tiene tutor PAEDIS asignado')}
+                    {...getVoiceProps('Indicar si tiene tutor PAEDIS asignado: Sí o No')}
                     className="w-full min-h-[44px] px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-[#002B49] transition-all"
                   >
                     <option value="No">No</option>
@@ -960,7 +1292,7 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
 
                 <div className="space-y-1">
                   <label htmlFor="sat-status-select" className="text-xs font-bold text-slate-700">
-                    Estado de la Intervención:
+                    Estado de Ciclo Cerrado:
                   </label>
                   <select
                     id="sat-status-select"
@@ -971,9 +1303,10 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                     {...getVoiceProps('Seleccionar estado de la intervención SAT')}
                     className="w-full min-h-[44px] px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:border-[#002B49] transition-all"
                   >
-                    <option value="PENDING">Pendiente de Contacto</option>
-                    <option value="IN_PROGRESS">En Seguimiento Activo</option>
-                    <option value="RESOLVED">Caso Resuelto / Justificado</option>
+                    <option value="PENDING">1. Pendiente (Alerta inicial generada)</option>
+                    <option value="IN_PROGRESS">2. En gestión / Contactado</option>
+                    <option value="AGREEMENT">3. Acuerdo o Derivación</option>
+                    <option value="RESOLVED">4. Resuelta (Caso regularizado / justificado)</option>
                   </select>
                 </div>
               </div>
@@ -1035,9 +1368,10 @@ export function EarlyWarningSatSection({ announce: announceProp } = {}) {
                 <button
                   type="submit"
                   {...getVoiceProps('Guardar Ficha 360 de intervención')}
-                  className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#003b66] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400"
+                  className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#003b66] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400 inline-flex items-center gap-2"
                 >
-                  Guardar Ficha 360
+                  <FileSignature className="w-4 h-4 text-amber-300" aria-hidden="true" />
+                  <span>Guardar Ficha 360</span>
                 </button>
               </div>
             </form>
