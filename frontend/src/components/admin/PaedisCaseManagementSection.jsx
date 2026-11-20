@@ -347,7 +347,7 @@ function PaedisStudentList({
         <span className="text-slate-500 font-semibold">{students.length} registrados</span>
       </div>
 
-      <div className="space-y-1.5 max-h-[580px] overflow-y-auto pr-1" role="list">
+      <div className="space-y-1.5 max-h-[580px] overflow-y-auto pr-1">
         {students.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-600 bg-white rounded-2xl border border-slate-300">
             No se encontraron estudiantes para este filtro.
@@ -366,7 +366,6 @@ function PaedisStudentList({
                 key={key}
                 type="button"
                 onClick={() => onSelectStudent(s)}
-                role="listitem"
                 aria-pressed={isSelected}
                 {...getVoiceProps(
                   `Estudiante ${s.fullName || s.nombre}, barrera ${barrier}, ${adjustmentsCount} ajustes, periodo ${semester}`
