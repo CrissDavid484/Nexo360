@@ -292,10 +292,26 @@ exports.getStudents = async (req, res) => {
       return cmp !== 0 ? cmp : (a.rut || '').localeCompare(b.rut || '');
     });
 
-    const enriched = users.map((u) => ({
-      ...u,
-      prediction: calculatePredictiveRisk(u),
-    }));
+    const actorRole = (req.user?.role || '').toLowerCase();
+    const isCoordinator = actorRole === 'coordinador_paedis';
+
+    const enriched = users.map((u) => {
+      const pred = calculatePredictiveRisk(u);
+      const studentData = { ...u, prediction: pred };
+
+      // Ley N° 21.719: Si el solicitante no es Coordinador PAEDIS (ej. Admin TI),
+      // se omiten campos clínicos y confidenciales detallados del expediente
+      if (!isCoordinator) {
+        delete studentData.diagnosticoDeclarado;
+        delete studentData.notasConfidencialesPaedis;
+        delete studentData.acreditacionPaedis;
+        studentData.isPaedis = Boolean(u.isPaedis || u.role === 'estudiante_paedis');
+        studentData.hasAdjustments =
+          Array.isArray(u.ajustesAprobados) && u.ajustesAprobados.length > 0;
+      }
+
+      return studentData;
+    });
 
     return res.status(200).json({
       success: true,
@@ -439,6 +455,20 @@ function validateCreateStudentRequest(body, reqUser) {
 
   const role = requestedRole === 'administrador' ? 'admin' : requestedRole;
   const isStaffRole = role === 'admin' || role === 'coordinador_paedis';
+
+  // Regla RBAC: Coordinador PAEDIS solo puede registrar estudiantes (@duocuc.cl / rol estudiante)
+  if (actorRole === 'coordinador_paedis') {
+    const isStudentTarget = role === 'estudiante' || role === 'estudiante_paedis';
+    const domain = email.split('@')[1] || '';
+    if (!isStudentTarget || !STUDENT_DOMAINS.includes(domain)) {
+      return {
+        errorStatus: 403,
+        errorMessage:
+          'Acceso restringido: El rol Coordinador PAEDIS solo tiene autorización para registrar cuentas de estudiantes (@duocuc.cl).',
+      };
+    }
+  }
+
   const domainError = validateDomainForRole(email, role);
   if (domainError) {
     return { errorStatus: 400, errorMessage: domainError };
@@ -670,11 +700,44 @@ exports.updateStudentStatus = async (req, res) => {
       });
     }
 
-    const cleanReason = sanitizeString(statusReason, 200) || `Estado actualizado a ${academicStatus}`;
+    const targetUser = await findUserByIdOrEmail(id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Estudiante no encontrado para actualización de estado.',
+      });
+    }
+
+    const actorRole = (req.user?.role || '').toLowerCase();
+
+    // Regla RBAC: Coordinador PAEDIS solo puede modificar estado de estudiantes, nunca de personal o administradores
+    if (actorRole === 'coordinador_paedis') {
+      const targetRole = (targetUser.role || '').toLowerCase();
+      const isTargetStaffOrAdmin = [
+        'admin',
+        'administrador',
+        'coordinador_paedis',
+        'profesor',
+        'docente',
+        'director',
+      ].includes(targetRole);
+      if (isTargetStaffOrAdmin) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Acceso restringido: El Coordinador PAEDIS solo puede modificar el estado académico de estudiantes, no de personal o administradores.',
+        });
+      }
+    }
+
+    const cleanReason =
+      sanitizeString(statusReason, 200) || `Estado actualizado a ${academicStatus}`;
     let updatedUser = null;
+    const targetDocId = targetUser._id || targetUser.id || id;
+
     if (mongoose.connection.readyState === 1) {
       updatedUser = await UserProfile.findByIdAndUpdate(
-        id,
+        targetDocId,
         {
           $set: {
             academicStatus,
@@ -684,15 +747,22 @@ exports.updateStudentStatus = async (req, res) => {
         },
         { returnDocument: 'after' }
       );
+    } else {
+      targetUser.academicStatus = academicStatus;
+      targetUser.statusReason = cleanReason;
+      targetUser.statusUpdatedAt = new Date();
+      updatedUser = targetUser;
     }
 
     await authService.logActivity({
       userId: req.user._id || req.user.id,
       userEmail: req.user.email,
-      userName: req.user.fullName || 'Administrador',
-      userRole: req.user.role || 'admin',
+      userName:
+        req.user.fullName ||
+        (actorRole === 'coordinador_paedis' ? 'Coordinador PAEDIS' : 'Administrador'),
+      userRole: req.user.role || actorRole,
       action: 'status_changed_by_admin',
-      details: `El administrador cambió el estado del usuario a "${academicStatus}". Motivo: ${statusReason || 'Sin motivo especificado'}`,
+      details: `Estado del usuario ${targetUser.fullName || targetUser.email} actualizado a "${academicStatus}". Motivo: ${cleanReason}`,
     });
 
     return res.status(200).json({

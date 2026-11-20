@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const { verifyToken, requireAdminOrCoordinator } = require('../middleware/authMiddleware');
+const {
+  verifyToken,
+  requireAdmin,
+  requireAdminOrCoordinator,
+  requirePaedisCoordinator,
+} = require('../middleware/authMiddleware');
 
 // Todas las rutas de administración están protegidas estrictamente con JWT
 router.use(verifyToken);
@@ -11,28 +16,30 @@ router.use(verifyToken);
 router.get('/metrics', requireAdminOrCoordinator, adminController.getMetrics);
 
 // Gestión y directorio de estudiantes con cálculo predictivo
-// Autorizado para Administradores y Coordinadores PAEDIS
+// Consulta, alta y actualización de estado compartida; eliminación exclusiva para Administrador
 router.get('/students', requireAdminOrCoordinator, adminController.getStudents);
 router.post('/students', requireAdminOrCoordinator, adminController.createStudent);
 router.put('/students/:id/status', requireAdminOrCoordinator, adminController.updateStudentStatus);
-router.delete('/students/:id', requireAdminOrCoordinator, adminController.deleteStudent);
+router.delete('/students/:id', requireAdmin, adminController.deleteStudent);
 
 // Gestión y carga de asignaturas/oferta académica para Toma de Ramos (Excel/MD/DB)
-// Autorizado para Administradores y Coordinadores PAEDIS
+// Consulta compartida; importación, inicialización (seed) y vaciado exclusivo de Administrador
 router.get('/courses/summary', requireAdminOrCoordinator, adminController.getCoursesSummary);
-router.post('/courses/import', requireAdminOrCoordinator, adminController.importCourses);
-router.post('/courses/seed', requireAdminOrCoordinator, adminController.seedCourses);
-router.delete('/courses', requireAdminOrCoordinator, adminController.clearCourses);
+router.post('/courses/import', requireAdmin, adminController.importCourses);
+router.post('/courses/seed', requireAdmin, adminController.seedCourses);
+router.delete('/courses', requireAdmin, adminController.clearCourses);
 
 // Gestión dinámica de Carreras Duoc UC (CRUD)
+// Consulta compartida; creación y eliminación exclusivas de Administrador
 router.get('/careers', requireAdminOrCoordinator, adminController.getCareers);
-router.post('/careers', requireAdminOrCoordinator, adminController.createCareer);
-router.delete('/careers/:id', requireAdminOrCoordinator, adminController.deleteCareer);
+router.post('/careers', requireAdmin, adminController.createCareer);
+router.delete('/careers/:id', requireAdmin, adminController.deleteCareer);
 
 // Gestión dinámica de Sedes Duoc UC (CRUD)
+// Consulta compartida; creación y eliminación exclusivas de Administrador
 router.get('/sedes', requireAdminOrCoordinator, adminController.getSedes);
-router.post('/sedes', requireAdminOrCoordinator, adminController.createSede);
-router.delete('/sedes/:id', requireAdminOrCoordinator, adminController.deleteSede);
+router.post('/sedes', requireAdmin, adminController.createSede);
+router.delete('/sedes/:id', requireAdmin, adminController.deleteSede);
 
 // Sistema de Alerta Temprana (SAT) - Asistencia por Asignatura y Ficha 360 PAEDIS
 // Autorizado para Administradores y Coordinadores PAEDIS
@@ -41,6 +48,7 @@ router.patch('/sat-alerts/:userId/simulate', requireAdminOrCoordinator, adminCon
 router.patch('/sat-alerts/:userId/intervention', requireAdminOrCoordinator, adminController.updateSatIntervention);
 
 // Centro de Operaciones de Inclusión PAEDIS - Gestión de Ajustes Razonables y Ficha Docente Confidencial
-router.patch('/paedis/:id/case', requireAdminOrCoordinator, adminController.updatePaedisCase);
+// Exclusivo para Coordinadores PAEDIS (Ley N° 21.719)
+router.patch('/paedis/:id/case', requirePaedisCoordinator, adminController.updatePaedisCase);
 
 module.exports = router;

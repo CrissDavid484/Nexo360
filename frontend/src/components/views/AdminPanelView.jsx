@@ -223,6 +223,7 @@ function CatalogCrudCard({
   totalCount,
   newInput,
   searchValue,
+  canEdit = true,
   onNewInputChange,
   onSearchChange,
   onAddSubmit,
@@ -246,28 +247,34 @@ function CatalogCrudCard({
         </span>
       </div>
 
-      <form onSubmit={onAddSubmit} className="space-y-2.5">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            required
-            value={newInput}
-            onChange={(e) => onNewInputChange(e.target.value)}
-            placeholder={cfg.addPlaceholder}
-            aria-label={cfg.addPlaceholder}
-            {...getVoiceProps(cfg.addPlaceholder)}
-            className="flex-1 min-h-[40px] px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-          />
-          <button
-            type="submit"
-            {...getVoiceProps(`Agregar ${kind === 'careers' ? 'carrera' : 'sede'}`)}
-            className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs font-black inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-          >
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            <span>Agregar</span>
-          </button>
+      {canEdit ? (
+        <form onSubmit={onAddSubmit} className="space-y-2.5">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              required
+              value={newInput}
+              onChange={(e) => onNewInputChange(e.target.value)}
+              placeholder={cfg.addPlaceholder}
+              aria-label={cfg.addPlaceholder}
+              {...getVoiceProps(cfg.addPlaceholder)}
+              className="flex-1 min-h-[40px] px-3.5 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+            />
+            <button
+              type="submit"
+              {...getVoiceProps(`Agregar ${kind === 'careers' ? 'carrera' : 'sede'}`)}
+              className="min-h-[40px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs font-black inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+            >
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              <span>Agregar</span>
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 font-medium">
+          Modo solo lectura: la creación y eliminación de carreras y sedes es exclusiva de Administradores.
         </div>
-      </form>
+      )}
 
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
@@ -299,16 +306,18 @@ function CatalogCrudCard({
                   {item.school || item.city || cfg.subtitleFallback}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => onDeleteItem(item)}
-                title={`${cfg.deleteLabelPrefix} ${item.name}`}
-                aria-label={`${cfg.deleteLabelPrefix} ${item.name}`}
-                {...getVoiceProps(`${cfg.deleteLabelPrefix} ${item.name}`)}
-                className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-              >
-                <Trash2 className="w-4 h-4" aria-hidden="true" />
-              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => onDeleteItem(item)}
+                  title={`${cfg.deleteLabelPrefix} ${item.name}`}
+                  aria-label={`${cfg.deleteLabelPrefix} ${item.name}`}
+                  {...getVoiceProps(`${cfg.deleteLabelPrefix} ${item.name}`)}
+                  className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                >
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+              )}
             </div>
           ))
         )}
@@ -398,6 +407,72 @@ export const AdminPanelView = () => {
   const [directoryMode, setDirectoryMode] = useState('estudiantes');
   const [adminRoleFilter, setAdminRoleFilter] = useState('all');
   const [selectedAdminForDetail, setSelectedAdminForDetail] = useState(null);
+
+  const visibleTabs = useMemo(() => {
+    if (isCoordinator) {
+      return [
+        {
+          id: 'estudiantes',
+          label: 'Estudiantes',
+          announceMsg: 'Pestaña de Estudiantes seleccionada.',
+          icon: Users,
+          iconColor: 'text-amber-400',
+          showCount: true,
+        },
+        {
+          id: 'alerta-temprana',
+          label: 'Alerta Temprana (SAT)',
+          announceMsg: 'Pestaña de Sistema de Alerta Temprana (SAT) seleccionada.',
+          icon: AlertOctagon,
+          iconColor: 'text-rose-400',
+        },
+        {
+          id: 'gestion-paedis',
+          label: 'Gestión PAEDIS & Ajustes',
+          announceMsg: 'Pestaña de Gestión PAEDIS y Ajustes Razonables seleccionada.',
+          icon: HeartHandshake,
+          iconColor: 'text-amber-400',
+        },
+      ];
+    }
+    return [
+      {
+        id: 'estudiantes',
+        label: 'Estudiantes',
+        announceMsg: 'Pestaña de Estudiantes seleccionada.',
+        icon: Users,
+        iconColor: 'text-amber-400',
+        showCount: true,
+      },
+      {
+        id: 'alerta-temprana',
+        label: 'Alerta Temprana (SAT)',
+        announceMsg: 'Pestaña de Sistema de Alerta Temprana (SAT) seleccionada.',
+        icon: AlertOctagon,
+        iconColor: 'text-rose-400',
+      },
+      {
+        id: 'personal-administrativos',
+        label: 'Personal / Administrativos',
+        announceMsg: 'Pestaña de Personal y Administrativos seleccionada.',
+        icon: Shield,
+        iconColor: 'text-purple-400',
+      },
+      {
+        id: 'oferta-academica',
+        label: 'Oferta Académica (Ramos, Carreras y Sedes)',
+        announceMsg: 'Pestaña de Oferta Académica (Ramos, Carreras y Sedes) seleccionada.',
+        icon: FileSpreadsheet,
+        iconColor: 'text-emerald-400',
+      },
+    ];
+  }, [isCoordinator]);
+
+  const effectiveDirectoryMode = isCoordinator
+    ? 'estudiantes'
+    : adminSubTab === 'personal-administrativos'
+    ? 'administrativos'
+    : directoryMode;
 
   // Estado CRUD unificado de Carreras y Sedes
   const [catalogState, setCatalogState] = useState({
@@ -941,9 +1016,12 @@ export const AdminPanelView = () => {
         aria-label="Secciones del Panel de Administración"
         className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto w-full flex-nowrap sm:flex-wrap"
       >
-        {ADMIN_SUB_TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const TabIcon = tab.icon;
-          const isActive = adminSubTab === tab.id;
+          const isActive =
+            adminSubTab === tab.id ||
+            (tab.id === 'oferta-academica' &&
+              (adminSubTab === 'oferta-ramos' || adminSubTab === 'carreras-sedes'));
           return (
             <button
               key={tab.id}
@@ -1017,7 +1095,7 @@ export const AdminPanelView = () => {
       )}
 
       {/* RENDERIZADO SEGÚN SUB-PESTAÑA */}
-      {adminSubTab === 'gestion-paedis' && (
+      {adminSubTab === 'gestion-paedis' && isCoordinator && (
         <PaedisCaseManagementSection
           students={students}
           onStudentUpdated={handlePaedisStudentUpdated}
@@ -1027,7 +1105,68 @@ export const AdminPanelView = () => {
 
       {adminSubTab === 'alerta-temprana' && <EarlyWarningSatSection announce={announce} />}
 
-      {adminSubTab === 'oferta-ramos' && <CoursesAdminSection />}
+      {(adminSubTab === 'oferta-academica' || adminSubTab === 'oferta-ramos') && (
+        <div className="space-y-6">
+          <CoursesAdminSection />
+
+          <section aria-labelledby="careers-sedes-title" className="space-y-6">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider text-[#002B49] bg-blue-100">
+                <Building2 className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
+                <span>Gestión Dinámica • Duoc UC - Sede Alameda</span>
+              </div>
+              <h2 id="careers-sedes-title" className="text-xl sm:text-2xl font-black text-slate-900">
+                Administración de Carreras y Sedes
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                Agrega y elimina carreras y sedes dinámicamente para Duoc UC - Sede
+                Alameda. Los cambios se sincronizan en tiempo real con el formulario de registro y la
+                oferta académica.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[
+                {
+                  kind: 'careers',
+                  label: 'carrera',
+                  items: filteredCareersCrud,
+                  totalCount: sortedCareers.length,
+                },
+                {
+                  kind: 'sedes',
+                  label: 'sede',
+                  items: filteredSedesCrud,
+                  totalCount: sortedSedes.length,
+                },
+              ].map(({ kind, label, items, totalCount }) => (
+                <CatalogCrudCard
+                  key={kind}
+                  kind={kind}
+                  canEdit={isAdmin}
+                  items={items}
+                  totalCount={totalCount}
+                  newInput={catalogState[kind].newInput}
+                  searchValue={catalogState[kind].search}
+                  onNewInputChange={(val) => updateCatalogField(kind, { newInput: val })}
+                  onSearchChange={(val) => updateCatalogField(kind, { search: val })}
+                  onAddSubmit={(e) => {
+                    handleCatalogAdd(kind, e).catch((err) => {
+                      console.error(`[AdminPanelView] Error agregando ${label}:`, err);
+                    });
+                  }}
+                  onDeleteItem={(item) => {
+                    handleCatalogDelete(kind, item).catch((err) => {
+                      console.error(`[AdminPanelView] Error eliminando ${label}:`, err);
+                    });
+                  }}
+                  getVoiceProps={getVoiceProps}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
 
       {adminSubTab === 'carreras-sedes' && (
         <section aria-labelledby="careers-sedes-title" className="space-y-6">
@@ -1064,6 +1203,7 @@ export const AdminPanelView = () => {
               <CatalogCrudCard
                 key={kind}
                 kind={kind}
+                canEdit={isAdmin}
                 items={items}
                 totalCount={totalCount}
                 newInput={catalogState[kind].newInput}
@@ -1087,7 +1227,9 @@ export const AdminPanelView = () => {
         </section>
       )}
 
-      {adminSubTab === 'estudiantes' && (
+      {(adminSubTab === 'estudiantes' || adminSubTab === 'personal-administrativos') && (
+        <>
+          {adminSubTab === 'estudiantes' && (
         <>
           {/* 2. TARJETAS KPI EJECUTIVAS */}
           <section aria-labelledby="kpis-heading" className="space-y-3.5">
@@ -1300,6 +1442,8 @@ export const AdminPanelView = () => {
               </div>
             </div>
           </section>
+        </>
+      )}
 
           {/* 4. DIRECTORIO INSTITUCIONAL: ESTUDIANTES O ADMINISTRATIVOS */}
           <section
@@ -1309,66 +1453,73 @@ export const AdminPanelView = () => {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div
-                    className="inline-flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200"
-                    role="tablist"
-                    aria-label="Seleccionar directorio institucional"
-                  >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={directoryMode === 'estudiantes'}
-                      onClick={() => {
-                        setDirectoryMode('estudiantes');
-                        announce('Mostrando directorio de estudiantes.', 'polite');
-                      }}
-                      {...getVoiceProps(`Directorio de Estudiantes, ${studentUsers.length} registros`)}
-                      className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                        directoryMode === 'estudiantes'
-                          ? 'bg-[#002B49] text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
+                  {!isCoordinator && (
+                    <div
+                      className="inline-flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200"
+                      role="tablist"
+                      aria-label="Seleccionar directorio institucional"
                     >
-                      Estudiantes ({studentUsers.length})
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={directoryMode === 'administrativos'}
-                      onClick={() => {
-                        setDirectoryMode('administrativos');
-                        announce('Mostrando directorio de administrativos.', 'polite');
-                      }}
-                      {...getVoiceProps(
-                        `Directorio de Administrativos, ${administrativeUsers.length} registros`
-                      )}
-                      className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                        directoryMode === 'administrativos'
-                          ? 'bg-[#002B49] text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Administrativos ({administrativeUsers.length})
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={effectiveDirectoryMode === 'estudiantes'}
+                        onClick={() => {
+                          setDirectoryMode('estudiantes');
+                          if (adminSubTab === 'personal-administrativos') {
+                            setAdminSubTab('estudiantes');
+                          }
+                          announce('Mostrando directorio de estudiantes.', 'polite');
+                        }}
+                        {...getVoiceProps(
+                          `Directorio de Estudiantes, ${studentUsers.length} registros`
+                        )}
+                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                          effectiveDirectoryMode === 'estudiantes'
+                            ? 'bg-[#002B49] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Estudiantes ({studentUsers.length})
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={effectiveDirectoryMode === 'administrativos'}
+                        onClick={() => {
+                          setDirectoryMode('administrativos');
+                          announce('Mostrando directorio de administrativos.', 'polite');
+                        }}
+                        {...getVoiceProps(
+                          `Directorio de Administrativos, ${administrativeUsers.length} registros`
+                        )}
+                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                          effectiveDirectoryMode === 'administrativos'
+                            ? 'bg-[#002B49] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Administrativos ({administrativeUsers.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <h2
                   id="students-directory-title"
                   className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight"
                 >
-                  {directoryMode === 'estudiantes'
+                  {effectiveDirectoryMode === 'estudiantes'
                     ? `Directorio de Estudiantes Registrados (${filteredStudents.length})`
                     : `Directorio de Administrativos Registrados (${filteredAdministradores.length})`}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                  {directoryMode === 'estudiantes'
+                  {effectiveDirectoryMode === 'estudiantes'
                     ? `Haz clic en cualquier estudiante de Duoc UC - ${DEFAULT_CAMPUS} para abrir su ficha completa con asistencia detallada por asignatura y semáforo predictivo.`
                     : `Haz clic en cualquier miembro del personal de Duoc UC - ${DEFAULT_CAMPUS} para ver su rol institucional, funciones asignadas y datos de contacto.`}
                 </p>
               </div>
 
-              {directoryMode === 'estudiantes' ? (
+              {effectiveDirectoryMode === 'estudiantes' ? (
                 <div
                   className="flex flex-wrap items-center gap-1.5"
                   role="group"
@@ -1426,17 +1577,17 @@ export const AdminPanelView = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={
-                  directoryMode === 'estudiantes'
+                  effectiveDirectoryMode === 'estudiantes'
                     ? 'Buscar estudiante por nombre, RUT o sede...'
                     : 'Buscar administrativo por nombre, RUT, correo o sede...'
                 }
                 aria-label={
-                  directoryMode === 'estudiantes'
+                  effectiveDirectoryMode === 'estudiantes'
                     ? 'Buscar estudiante por nombre, RUT o sede'
                     : 'Buscar administrativo por nombre, RUT, correo o sede'
                 }
                 {...getVoiceProps(
-                  directoryMode === 'estudiantes'
+                  effectiveDirectoryMode === 'estudiantes'
                     ? 'Buscar estudiante por nombre, RUT o sede'
                     : 'Buscar administrativo por nombre, RUT, correo o sede'
                 )}
@@ -1444,7 +1595,7 @@ export const AdminPanelView = () => {
               />
             </div>
 
-            {directoryMode === 'estudiantes' ? (
+            {effectiveDirectoryMode === 'estudiantes' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5" role="list">
                 {filteredStudents.length === 0 ? (
                   <div className="col-span-full p-8 text-center text-slate-500 font-bold bg-slate-50 rounded-2xl border border-slate-200">
@@ -1804,20 +1955,21 @@ export const AdminPanelView = () => {
                                 >
                                   Cambiar Estado Académico
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleDeleteStudent(student).catch((err) => {
-                                      console.error('[AdminPanelView] Error eliminando estudiante:', err);
-                                    });
-                                  }}
-                                  disabled={!canManageAdmin}
-                                  {...getVoiceProps(`Eliminar estudiante ${student.fullName}`)}
-                                  className="min-h-[44px] px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-xl border border-rose-200 cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
-                                >
-                                  <Trash2 className="w-4 h-4 text-rose-700" aria-hidden="true" />
-                                  <span>Eliminar Estudiante</span>
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleDeleteStudent(student).catch((err) => {
+                                        console.error('[AdminPanelView] Error eliminando estudiante:', err);
+                                      });
+                                    }}
+                                    {...getVoiceProps(`Eliminar estudiante ${student.fullName}`)}
+                                    className="min-h-[44px] px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-xl border border-rose-200 cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                                  >
+                                    <Trash2 className="w-4 h-4 text-rose-700" aria-hidden="true" />
+                                    <span>Eliminar Estudiante</span>
+                                  </button>
+                                )}
                               </div>
 
                               <button
@@ -2126,6 +2278,7 @@ export const AdminPanelView = () => {
         sortedCareers={sortedCareers}
         sortedSedes={sortedSedes}
         isAdmin={isAdmin}
+        isCoordinator={isCoordinator}
         defaultCampus={DEFAULT_CAMPUS}
         isSubmitting={isSubmitting}
         serverError={modalError}

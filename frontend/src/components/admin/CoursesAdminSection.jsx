@@ -296,8 +296,7 @@ export const CoursesAdminSection = () => {
   const { announce, getVoiceProps } = useAccessibility();
 
   const userRole = user?.role?.toLowerCase() || '';
-  const canManageCourses =
-    userRole === 'admin' || userRole === 'administrador' || userRole === 'coordinador_paedis';
+  const canManageCourses = userRole === 'admin' || userRole === 'administrador';
 
   const [coursesSummary, setCoursesSummary] = useState(null);
   const [coursesList, setCoursesList] = useState([]);
@@ -346,7 +345,7 @@ export const CoursesAdminSection = () => {
       if (canManageCourses) return true;
       notifyFeedback(
         'error',
-        `Acceso denegado: Se requiere rol de Administrador o Coordinador PAEDIS para ${actionDescription}.`,
+        `Acceso denegado: Se requieren privilegios de Administrador para ${actionDescription}.`,
         'assertive'
       );
       return false;

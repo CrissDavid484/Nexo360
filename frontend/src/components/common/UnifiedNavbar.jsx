@@ -119,21 +119,22 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
   const displayName = getStudentDisplayName(user);
   const displayCampus = `Duoc UC · ${DEFAULT_CAMPUS}`;
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'administrador';
-  const isCoordinator = user?.role === 'coordinador_paedis';
+  const userRole = (user?.role || '').toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'administrador';
+  const isCoordinator = userRole === 'coordinador_paedis';
   const isAdminOrCoordinator = isAdmin || isCoordinator;
 
   const roleLabel = isCoordinator
     ? 'Coordinador PAEDIS'
     : isAdmin
     ? 'Administrador'
-    : user?.role === 'docente'
+    : userRole === 'docente'
     ? 'Docente'
     : 'Estudiante';
 
   const adminPanelLabel = isCoordinator
-    ? 'Panel Coordinación PAEDIS'
-    : 'Panel de Administración';
+    ? 'Panel PAEDIS'
+    : 'Panel Admin';
 
   const getSectionLabel = (tab) => {
     switch (tab) {
@@ -150,7 +151,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
       case 'perfil':
         return 'Mi Perfil';
       case 'admin-panel':
-        return isCoordinator ? 'Coord. PAEDIS' : 'Admin';
+        return isCoordinator ? 'Panel PAEDIS' : 'Panel Admin';
       default:
         return 'Nexo360';
     }

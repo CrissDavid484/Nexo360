@@ -142,7 +142,10 @@ export const DashboardPage = () => {
       'vivo-duoc': 'Experiencia Vivo Duoc | Nexo360 - Duoc UC Alameda',
       'tickets': 'Soporte TI y Servicios Digitales | Nexo360 - Duoc UC Alameda',
       'perfil': 'Mi Perfil Institucional PAEDIS | Nexo360 - Duoc UC Alameda',
-      'admin-panel': 'Panel de Administración SAT | Nexo360 - Duoc UC Alameda',
+      'admin-panel':
+        (user?.role || '').toLowerCase() === 'coordinador_paedis'
+          ? 'Panel PAEDIS | Nexo360 - Duoc UC Alameda'
+          : 'Panel Admin | Nexo360 - Duoc UC Alameda',
     };
     const title = TAB_TITLES[activeTab] || 'Nexo360 | Duoc UC - Sede Alameda';
     document.title = title;

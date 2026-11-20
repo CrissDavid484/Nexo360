@@ -56,7 +56,7 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
       body: { rows: [{ sigla: 'TEST101', nombre: 'CURSO TEST', seccion: 'TEST101-001D' }] },
     });
     assert.equal(impRes.status, 403);
-    assert.match(impRes.body?.message, /Coordinador PAEDIS/i);
+    assert.match(impRes.body?.message, /Administrador/i);
 
     // Tutor intenta restablecer semilla
     const seedRes = await request('/api/admin/courses/seed', {
@@ -73,14 +73,20 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
     assert.equal(delRes.status, 403);
   });
 
-  test('2. Permisos RBAC: Coordinador PAEDIS puede gestionar catálogos (import, seed, delete)', async () => {
-    const seedRes = await request('/api/admin/courses/seed', {
+  test('2. Permisos RBAC: Coordinador PAEDIS es bloqueado en seed de cursos (403), solo Administrador puede', async () => {
+    const coordSeedRes = await request('/api/admin/courses/seed', {
       method: 'POST',
       headers: { Authorization: `Bearer ${coordinadorToken}` },
     });
-    assert.equal(seedRes.status, 200);
-    assert.equal(seedRes.body?.success, true);
-    assert.ok(seedRes.body?.result?.count >= 7000);
+    assert.equal(coordSeedRes.status, 403);
+
+    const adminSeedRes = await request('/api/admin/courses/seed', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(adminSeedRes.status, 200);
+    assert.equal(adminSeedRes.body?.success, true);
+    assert.ok(adminSeedRes.body?.result?.count >= 7000);
   });
 
   test('3. Consulta de Asignaturas: Estudiantes y Tutores pueden consultar cursos para el simulador', async () => {

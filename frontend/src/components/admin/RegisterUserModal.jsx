@@ -89,7 +89,7 @@ function validateStudentOrStaffFields({ form, careerQuery, isAdmin }) {
   return '';
 }
 
-function validateRegistrationForm({ form, careerQuery, isAdmin }) {
+function validateRegistrationForm({ form, careerQuery, isAdmin, isCoordinator = false }) {
   if (!form.firstName.trim()) {
     return 'Por favor, ingresa el nombre del usuario.';
   }
@@ -103,6 +103,10 @@ function validateRegistrationForm({ form, careerQuery, isAdmin }) {
   }
   if (!/^[a-zA-Z0-9._%+-]{1,64}$/.test(emailLocal)) {
     return 'La parte local del correo solo puede contener letras, números y los símbolos . _ % + -.';
+  }
+
+  if (isCoordinator && form.emailDomain !== 'duocuc.cl') {
+    return 'El rol Coordinador PAEDIS solo tiene autorización para registrar cuentas de estudiantes (@duocuc.cl).';
   }
 
   const rut = form.rut.trim();
@@ -475,6 +479,7 @@ export const RegisterUserModal = ({
   sortedCareers = [],
   sortedSedes = [],
   isAdmin = false,
+  isCoordinator = false,
   defaultCampus = 'Sede Alameda',
   isSubmitting = false,
   serverError = '',
@@ -524,6 +529,11 @@ export const RegisterUserModal = ({
     return sortedCareers.filter((item) => (item.name || '').toLowerCase().includes(q));
   }, [sortedCareers, careerQuery]);
 
+  const availableDomains = useMemo(
+    () => (isCoordinator ? ['duocuc.cl'] : INSTITUTIONAL_DOMAINS),
+    [isCoordinator]
+  );
+
   const isStudent = isStudentDomain(form.emailDomain);
   const passwordPreview = useMemo(
     () => buildInitialPasswordPreview(form.rut, form.paternalLastName),
@@ -531,8 +541,12 @@ export const RegisterUserModal = ({
   );
 
   const handleEmailLocalInputChange = (rawValue) => {
-    const { emailLocal, emailDomain } = parseEmailLocalChange(rawValue, form.emailDomain);
-    const switchingToStaff = emailDomain !== form.emailDomain && !isStudentDomain(emailDomain);
+    let { emailLocal, emailDomain } = parseEmailLocalChange(rawValue, form.emailDomain);
+    if (isCoordinator) {
+      emailDomain = 'duocuc.cl';
+    }
+    const switchingToStaff =
+      !isCoordinator && emailDomain !== form.emailDomain && !isStudentDomain(emailDomain);
     if (switchingToStaff) {
       setIsCareerDropdownOpen(false);
     }
@@ -544,12 +558,13 @@ export const RegisterUserModal = ({
   };
 
   const handleDomainSelectChange = (nextDomain) => {
-    if (!isStudentDomain(nextDomain)) {
+    const effectiveDomain = isCoordinator ? 'duocuc.cl' : nextDomain;
+    if (!isStudentDomain(effectiveDomain)) {
       setIsCareerDropdownOpen(false);
     }
     setForm((prev) => ({
       ...prev,
-      emailDomain: nextDomain,
+      emailDomain: effectiveDomain,
     }));
   };
 
@@ -570,7 +585,12 @@ export const RegisterUserModal = ({
     e.preventDefault();
     setLocalError('');
 
-    const validationError = validateRegistrationForm({ form, careerQuery, isAdmin });
+    const validationError = validateRegistrationForm({
+      form,
+      careerQuery,
+      isAdmin,
+      isCoordinator,
+    });
     if (validationError) {
       setLocalError(validationError);
       announce(validationError, 'assertive');
@@ -606,7 +626,9 @@ export const RegisterUserModal = ({
               Registro Institucional Oficial • Duoc UC - {defaultCampus}
             </span>
             <h3 id="create-modal-title" className="text-xl font-bold text-slate-900">
-              Registrar Estudiante / Usuario en Nexo360
+              {isCoordinator
+                ? 'Registrar Estudiante en Nexo360'
+                : 'Registrar Estudiante / Usuario en Nexo360'}
             </h3>
             <p className="text-xs text-slate-500 font-medium">
               Ambiente institucional seguro regulado por la Ley N° 21.719
@@ -715,11 +737,12 @@ export const RegisterUserModal = ({
                   id="create-email-domain"
                   value={form.emailDomain}
                   onChange={(e) => handleDomainSelectChange(e.target.value)}
+                  disabled={isCoordinator}
                   aria-label="Dominio institucional Duoc UC"
                   {...getVoiceProps(`Dominio institucional seleccionado arroba ${form.emailDomain}`)}
-                  className="min-h-[44px] px-3 py-2.5 bg-slate-100 hover:bg-slate-200/70 border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-bold text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] shrink-0"
+                  className="min-h-[44px] px-3 py-2.5 bg-slate-100 hover:bg-slate-200/70 border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-bold text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] shrink-0 disabled:opacity-80 disabled:cursor-not-allowed"
                 >
-                  {INSTITUTIONAL_DOMAINS.map((domain) => (
+                  {availableDomains.map((domain) => (
                     <option key={domain} value={domain}>
                       @{domain}
                     </option>

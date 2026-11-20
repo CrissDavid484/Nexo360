@@ -86,8 +86,9 @@ const verifyToken = async (req, res, next) => {
  * Middleware para restringir acceso exclusivo a Administradores.
  */
 const requireAdmin = (req, res, next) => {
+  const role = (req.user?.role || '').toLowerCase();
   const allowed = ['admin', 'administrador'];
-  if (!req.user || !allowed.includes(req.user.role)) {
+  if (!allowed.includes(role)) {
     return res.status(403).json({
       success: false,
       message:
@@ -101,12 +102,28 @@ const requireAdmin = (req, res, next) => {
  * Middleware para restringir acceso a Administradores y Coordinadores PAEDIS.
  */
 const requireAdminOrCoordinator = (req, res, next) => {
+  const role = (req.user?.role || '').toLowerCase();
   const allowed = ['admin', 'administrador', 'coordinador_paedis'];
-  if (!req.user || !allowed.includes(req.user.role)) {
+  if (!allowed.includes(role)) {
     return res.status(403).json({
       success: false,
       message:
         'Acceso restringido: Se requieren privilegios de Administrador o Coordinador PAEDIS para acceder a este módulo.',
+    });
+  }
+  return next();
+};
+
+/**
+ * Middleware para restringir acceso exclusivo a Coordinadores PAEDIS (Expedientes confidenciales Ley N° 21.719).
+ */
+const requirePaedisCoordinator = (req, res, next) => {
+  const role = (req.user?.role || '').toLowerCase();
+  if (role !== 'coordinador_paedis') {
+    return res.status(403).json({
+      success: false,
+      message:
+        'Acceso restringido: Se requieren privilegios exclusivos de Coordinador PAEDIS para gestionar expedientes confidenciales.',
     });
   }
   return next();
@@ -133,6 +150,7 @@ module.exports = {
   verifyToken,
   requireAdmin,
   requireAdminOrCoordinator,
+  requirePaedisCoordinator,
   optionalToken,
   getJwtSecret,
 };

@@ -118,16 +118,31 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.ok(Array.isArray(listRes.body?.careers));
     assert.ok(listRes.body.careers.length > 20);
 
-    // Crear carrera
+    // Coordinador no puede crear carrera (requireAdmin)
     const newCareerName = `Ingeniería Espacial y Satelital Duoc UC ${Date.now()}`;
-    const createRes = await request('/api/admin/careers', {
+    const deniedCreate = await request('/api/admin/careers', {
       method: 'POST',
       headers: coordinatorHeaders,
+      body: { name: newCareerName, school: 'Escuela de Informática y Telecomunicaciones' },
+    });
+    assert.equal(deniedCreate.status, 403);
+
+    // Crear carrera (Admin)
+    const createRes = await request('/api/admin/careers', {
+      method: 'POST',
+      headers: adminHeaders,
       body: { name: newCareerName, school: 'Escuela de Informática y Telecomunicaciones' },
     });
     assert.equal(createRes.status, 201);
     assert.equal(createRes.body?.success, true);
     assert.equal(createRes.body?.career?.name, newCareerName);
+
+    // Coordinador no puede eliminar carrera (requireAdmin)
+    const deniedDelete = await request(`/api/admin/careers/${encodeURIComponent(newCareerName)}`, {
+      method: 'DELETE',
+      headers: coordinatorHeaders,
+    });
+    assert.equal(deniedDelete.status, 403);
 
     // Eliminar carrera
     const deleteRes = await request(`/api/admin/careers/${encodeURIComponent(newCareerName)}`, {
@@ -149,16 +164,31 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
       'Debe incluir Sede Alameda como sede oficial'
     );
 
-    // Crear sede
+    // Coordinador no puede crear sede (requireAdmin)
     const newSedeName = `Sede Antártica Chilena ${Date.now()}`;
-    const createRes = await request('/api/admin/sedes', {
+    const deniedCreate = await request('/api/admin/sedes', {
       method: 'POST',
       headers: coordinatorHeaders,
+      body: { name: newSedeName, city: 'Punta Arenas' },
+    });
+    assert.equal(deniedCreate.status, 403);
+
+    // Crear sede (Admin)
+    const createRes = await request('/api/admin/sedes', {
+      method: 'POST',
+      headers: adminHeaders,
       body: { name: newSedeName, city: 'Punta Arenas' },
     });
     assert.equal(createRes.status, 201);
     assert.equal(createRes.body?.success, true);
     assert.equal(createRes.body?.sede?.name, newSedeName);
+
+    // Coordinador no puede eliminar sede (requireAdmin)
+    const deniedDelete = await request(`/api/admin/sedes/${encodeURIComponent(newSedeName)}`, {
+      method: 'DELETE',
+      headers: coordinatorHeaders,
+    });
+    assert.equal(deniedDelete.status, 403);
 
     // Eliminar sede
     const deleteRes = await request(`/api/admin/sedes/${encodeURIComponent(newSedeName)}`, {
@@ -373,5 +403,74 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(staffRes.status, 201);
     assert.equal(staffRes.body?.user?.role, 'coordinador_paedis');
     assert.equal(staffRes.body?.user?.career || '', '');
+  });
+
+  test('10. Separación estricta de permisos RBAC: Coordinador PAEDIS vs Administrador TI', async () => {
+    // 1. Coordinador PAEDIS recibe 403 al intentar eliminar un usuario
+    const coordDeleteRes = await request('/api/admin/students/target_student_to_delete', {
+      method: 'DELETE',
+      headers: coordinatorHeaders,
+    });
+    assert.equal(coordDeleteRes.status, 403);
+    assert.match(coordDeleteRes.body?.message, /Administrador/i);
+
+    // 2. Coordinador PAEDIS recibe 403 al intentar importar ramos
+    const coordImportRes = await request('/api/admin/courses/import', {
+      method: 'POST',
+      headers: coordinatorHeaders,
+      body: { rows: [] },
+    });
+    assert.equal(coordImportRes.status, 403);
+    assert.match(coordImportRes.body?.message, /Administrador/i);
+
+    // 3. Coordinador PAEDIS recibe 403 al intentar crear un usuario staff/admin
+    const coordCreateStaffRes = await request('/api/admin/students', {
+      method: 'POST',
+      headers: coordinatorHeaders,
+      body: {
+        email: `staff.coord.denegado.${Date.now()}@profesor.duoc.cl`,
+        fullName: 'Profesor Intento Denegado',
+        role: 'coordinador_paedis',
+        rut: '17.888.999-0',
+        campus: 'Sede Alameda',
+      },
+    });
+    assert.equal(coordCreateStaffRes.status, 403);
+    assert.match(
+      coordCreateStaffRes.body?.message,
+      /Coordinador PAEDIS solo tiene autorización para registrar cuentas de estudiantes/i
+    );
+
+    // 4. Administrador TI recibe 403 al intentar editar un expediente confidencial PAEDIS
+    const adminEditPaedisRes = await request('/api/admin/paedis/d.rojas@duocuc.cl/case', {
+      method: 'PATCH',
+      headers: adminHeaders,
+      body: {
+        notasConfidencialesPaedis: 'Intento de edición por Administrador TI',
+      },
+    });
+    assert.equal(adminEditPaedisRes.status, 403);
+    assert.match(adminEditPaedisRes.body?.message, /Coordinador PAEDIS/i);
+
+    // 5. Ley N° 21.719: Admin recibe lista de estudiantes con datos clínicos omitidos/enmascarados
+    const adminGetStudentsRes = await request('/api/admin/students', {
+      headers: adminHeaders,
+    });
+    assert.equal(adminGetStudentsRes.status, 200);
+    const adminStudents = adminGetStudentsRes.body?.students || [];
+    assert.ok(adminStudents.length > 0);
+    adminStudents.forEach((student) => {
+      assert.equal(student.diagnosticoDeclarado, undefined);
+      assert.equal(student.notasConfidencialesPaedis, undefined);
+      assert.equal(student.acreditacionPaedis, undefined);
+      assert.equal(typeof student.isPaedis, 'boolean');
+    });
+
+    // 6. Ley N° 21.719: Coordinador PAEDIS sí puede consultar datos clínicos completos
+    const coordGetStudentsRes = await request('/api/admin/students', {
+      headers: coordinatorHeaders,
+    });
+    assert.equal(coordGetStudentsRes.status, 200);
+    assert.ok(coordGetStudentsRes.body?.students?.length > 0);
   });
 });
