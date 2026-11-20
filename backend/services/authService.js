@@ -809,6 +809,8 @@ class AuthService {
       fichaDocenteNotificada: Boolean(raw.fichaDocenteNotificada),
       fechaNotificacionDocente: raw.fechaNotificacionDocente || null,
       acusesDocentes: Array.isArray(raw.acusesDocentes) ? raw.acusesDocentes : [],
+      vigenciaSemestrePaedis: raw.vigenciaSemestrePaedis || '2026-1',
+      fechaRenovacionSemestral: raw.fechaRenovacionSemestral || null,
       isRegisteredInDb: raw.isRegisteredInDb !== false,
       lastLogin: raw.lastLogin || new Date(),
       consentimientoLey21719: raw.consentimientoLey21719 || {

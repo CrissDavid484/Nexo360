@@ -24,18 +24,28 @@ RUN npm run build
 # =====================================================================
 FROM nginx:alpine
 
+# Configurar permisos para que el usuario no privilegiado 'nginx' pueda operar
+RUN touch /var/run/nginx.pid && \
+  chown -R nginx:nginx /var/run/nginx.pid /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
+
 # Copiar configuración personalizada de Nginx para SPA y reverse proxy
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copiar artefactos compilados desde la etapa constructora
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --chown=nginx:nginx --from=builder /app/dist /usr/share/nginx/html
 
-# Exponer el puerto estándar HTTP
-EXPOSE 80
+# Ajustar permisos de lectura para el usuario no privilegiado
+RUN chmod -R 755 /usr/share/nginx/html
+
+# Cambiar a usuario no privilegiado para cumplimiento estricto de seguridad (SonarQube docker:S6471 / CWE-250)
+USER nginx
+
+# Exponer el puerto del contenedor (8080 no privilegiado)
+EXPOSE 8080
 
 # Verificación de salud nativa del servidor web Nginx
 HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/ || exit 1
 
 # Iniciar servidor Nginx en primer plano
 CMD ["nginx", "-g", "daemon off;"]

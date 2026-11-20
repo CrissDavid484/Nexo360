@@ -96,10 +96,10 @@ export const DISABILITY_PROFILES = [
   },
   {
     id: 'tea',
-    label: 'TEA / Trastorno del Espectro Autista',
-    barrera: 'Neurodivergencia / TEA',
+    label: 'Neurodivergencia / Procesamiento adaptativo',
+    barrera: 'Neurodivergencia',
     summary:
-      'Reduce la sobrecarga sensorial con lectura clara resumida por pasos, calma visual y guía de lectura.',
+      'Reduce la sobrecarga sensorial con lectura clara y resumida por pasos, calma visual y guía de lectura.',
     autoAdaptationHint:
       'Activa Lectura clara y resumida, Sin animaciones y Guía de lectura.',
     defaults: {

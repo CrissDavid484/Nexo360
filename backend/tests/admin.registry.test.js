@@ -315,24 +315,31 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     });
     assert.equal(deniedRes.status, 403);
 
-    // 2. Coordinador PAEDIS actualiza expediente, ajustes, notas confidenciales y emite Ficha Docente
+    // 2. Coordinador PAEDIS actualiza expediente (Capa 1 Confidencial + Capa 2 Ajustes), vigencia semestral y preferencias iniciales
     const updateRes = await request(`/api/admin/paedis/${encodeURIComponent(targetEmail)}/case`, {
       method: 'PATCH',
       headers: coordinatorHeaders,
       body: {
         barreraPaedis: 'Auditiva / LSCh',
         acreditacionPaedis: 'Credencial RND SENADIS / COMPIN',
-        tutorParAsignado: 'Intérprete LSCh Institucional',
+        tutorPaedisAsignado: 'Sí',
         diagnosticoDeclarado: 'Hipoacusia bilateral moderada',
         notasConfidencialesPaedis: 'Entrevista inicial completada. Solicita apoyo LSCh en evaluaciones.',
+        vigenciaSemestrePaedis: '2026-1',
+        accessibilityPreferences: {
+          clearReadingMode: true,
+          voiceReader: true,
+        },
         ajustesAprobados: [
           {
             tipo: 'Intérprete de Señas (LSCh)',
             descripcion: 'Acompañamiento de intérprete en clases y certámenes.',
+            semestreVigencia: '2026-1',
           },
           {
             tipo: 'Tiempo extendido +50%',
             descripcion: '50% de tiempo adicional en evaluaciones teóricas.',
+            semestreVigencia: '2026-1',
           },
         ],
         fichaDocenteNotificada: true,
@@ -348,14 +355,32 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     });
     assert.equal(updateRes.status, 200);
     assert.equal(updateRes.body?.success, true);
-    assert.equal(updateRes.body?.student?.tutorParAsignado, 'Intérprete LSCh Institucional');
+    assert.equal(updateRes.body?.student?.tutorPaedisAsignado, 'Sí');
     assert.equal(updateRes.body?.student?.fichaDocenteNotificada, true);
     assert.equal(updateRes.body?.student?.ajustesAprobados?.length, 2);
+    assert.equal(updateRes.body?.student?.vigenciaSemestrePaedis, '2026-1');
+    assert.equal(updateRes.body?.student?.accessibilityPreferences?.clearReadingMode, true);
+    assert.equal(updateRes.body?.student?.accessibilityPreferences?.voiceReader, true);
     assert.equal(
       updateRes.body?.student?.notasConfidencialesPaedis,
       'Entrevista inicial completada. Solicita apoyo LSCh en evaluaciones.'
     );
     assert.equal(updateRes.body?.student?.acusesDocentes?.[0]?.confirmado, true);
+
+    // 2.1 Renovación Semestral con 1 clic (2026-1 -> 2026-2)
+    const renewRes = await request(`/api/admin/paedis/${encodeURIComponent(targetEmail)}/case`, {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: {
+        renewForSemester: '2026-2',
+      },
+    });
+    assert.equal(renewRes.status, 200);
+    assert.equal(renewRes.body?.success, true);
+    assert.equal(renewRes.body?.student?.vigenciaSemestrePaedis, '2026-2');
+    assert.ok(renewRes.body?.student?.fechaRenovacionSemestral, 'Debe registrar fecha de renovación');
+    assert.equal(renewRes.body?.student?.ajustesAprobados?.[0]?.semestreVigencia, '2026-2');
+    assert.equal(renewRes.body?.student?.acusesDocentes?.length, 0, 'Debe reiniciar acuses para el nuevo semestre');
 
     // 3. Verificar integración en Frontend AdminPanelView y PaedisCaseManagementSection
     const paedisCompPath = path.resolve(

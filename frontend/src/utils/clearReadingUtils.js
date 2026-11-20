@@ -1,5 +1,5 @@
 /**
- * Utilidades de Lectura Clara y Resumida (W3C COGA / TEA) para Nexo360.
+ * Utilidades de Lectura Clara y Resumida (W3C COGA) para Nexo360.
  * Simplifica párrafos extensos y extrae pasos clave seguros desde HTML de guías.
  */
 
@@ -212,7 +212,7 @@ export function extractArticleKeyPoints(html, maxPoints = 6) {
 
 /**
  * Convierte el HTML de un artículo en una lista HTML segura y escaneable por viñetas
- * para usuarios con TEA o sobrecarga cognitiva.
+ * para usuarios que requieren lectura clara o presentan sobrecarga cognitiva.
  */
 export function simplifyArticleHtml(html) {
   const keyPoints = extractArticleKeyPoints(html, 6);

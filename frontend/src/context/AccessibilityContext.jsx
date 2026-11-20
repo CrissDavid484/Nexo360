@@ -174,7 +174,7 @@ export const AccessibilityProvider = ({ children }) => {
     return normalizeColorBlindMode(localStorage.getItem('nexo360_color_blind_mode') || 'none');
   });
 
-  // Lectura clara y resumida (TEA / W3C COGA)
+  // Lectura clara y resumida (W3C COGA)
   const [clearReadingMode, setClearReadingMode] = useState(() => {
     return localStorage.getItem('nexo360_clear_reading_mode') === 'true';
   });

@@ -1,21 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  HeartHandshake,
-  Search,
-  ShieldCheck,
-  UserCheck,
+  FileText,
+  Lock,
   Plus,
   Trash2,
-  FileText,
   CheckCircle2,
   AlertTriangle,
-  Printer,
+  RotateCcw,
+  Search,
+  BookOpen,
+  HeartHandshake,
   Download,
   X,
-  Lock,
+  ShieldCheck,
   Save,
-  Laptop,
-  Send,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -27,7 +25,7 @@ const BARRIER_OPTIONS = [
   'Visual / Sensorial',
   'Auditiva / LSCh',
   'Física / Motora',
-  'Neurodivergencia / TEA',
+  'Neurodivergencia',
   'Psicosocial / Cognitiva',
 ];
 
@@ -36,15 +34,6 @@ const ACCREDITATION_OPTIONS = [
   'Certificado Médico Especialista',
   'Informe Psicopedagógico / Escolar',
   'En Proceso de Acreditación',
-];
-
-const SUPPORT_STAFF_OPTIONS = [
-  'Coordinación PAEDIS Duoc UC',
-  'Equipo Tutor PAEDIS Sede Alameda',
-  'Intérprete LSCh Institucional',
-  'Apoyo UAP / Psicopedagogía',
-  'Servicio TransVoz / Transcripción',
-  'Sin tutor asignado',
 ];
 
 const CASE_FILTERS = [
@@ -76,6 +65,10 @@ const ADJUSTMENT_PRESETS = [
     descripcion: 'Entrega anticipada de guías y PDF accesibles compatibles con NVDA / JAWS.',
   },
   {
+    tipo: 'Lectura clara y resumida',
+    descripcion: 'Enunciados directos por viñetas, sin dobles sentidos y con apoyos visuales concisos.',
+  },
+  {
     tipo: 'Puesto preferente / Accesibilidad motora',
     descripcion: 'Ubicación preferencial en primera fila, mobiliario ergonómico y acceso universal.',
   },
@@ -95,11 +88,14 @@ function isPaedisStudentRecord(student) {
 }
 
 function inferBarrierCategory(student) {
-  if (student?.barreraPaedis) return student.barreraPaedis;
+  if (student?.barreraPaedis) {
+    if (/tea|neuro/i.test(student.barreraPaedis)) return 'Neurodivergencia';
+    return student.barreraPaedis;
+  }
   const diag = String(student?.diagnosticoDeclarado || '').toLowerCase();
   if (/audit|sord|hipoac|lsch/.test(diag)) return 'Auditiva / LSCh';
   if (/motor|físic|fisic|silla|movil/.test(diag)) return 'Física / Motora';
-  if (/tea|espectro|neuro|tdah|asperger/.test(diag)) return 'Neurodivergencia / TEA';
+  if (/tea|espectro|neuro|tdah|asperger/.test(diag)) return 'Neurodivergencia';
   if (/psicosoc|cognit|ansiedad|aprend/.test(diag)) return 'Psicosocial / Cognitiva';
   return 'Visual / Sensorial';
 }
@@ -138,25 +134,31 @@ function mergeCourseAcknowledgments(student) {
   for (const course of extractSourceCourses(student)) {
     const sigla = String(course.sigla || course.courseCode || '').trim().toUpperCase();
     const nombre = String(course.nombre || course.courseName || '').trim();
-    if (!sigla || !nombre || seen.has(sigla)) continue;
+    if (!sigla || seen.has(sigla)) continue;
     seen.add(sigla);
 
-    const existing = existingMap.get(sigla);
+    const match = existingMap.get(sigla);
     merged.push({
       sigla,
-      nombre,
-      profesor: existing?.profesor || course.profesor || 'Docente Titular',
-      confirmado: Boolean(existing?.confirmado),
-      fechaAcuse: existing?.fechaAcuse || null,
+      nombre: nombre || match?.nombre || sigla,
+      profesor: course.profesor || match?.profesor || 'Docente Titular',
+      confirmado: Boolean(match?.confirmado),
+      fechaAcuse: match?.fechaAcuse || null,
     });
+  }
+
+  for (const [sigla, ack] of existingMap) {
+    if (!seen.has(sigla)) {
+      merged.push(ack);
+      seen.add(sigla);
+    }
   }
 
   return merged;
 }
 
 function updateSimulatorRiskCounters(student, counters) {
-  const rate = Number(student.attendanceRate ?? 88.9);
-  const isRisk = rate < 75;
+  const isRisk = Number(student.attendanceRate ?? 100) < 75;
   if (student.hasUsedSimulator) {
     counters.simAdopted++;
     if (isRisk) counters.simAtRisk++;
@@ -171,10 +173,9 @@ function computePaedisAnalytics(paedisStudents) {
     'Visual / Sensorial': 0,
     'Auditiva / LSCh': 0,
     'Física / Motora': 0,
-    'Neurodivergencia / TEA': 0,
+    'Neurodivergencia': 0,
     'Psicosocial / Cognitiva': 0,
   };
-  const tutorLoadMap = new Map();
   const riskCounters = { simAdopted: 0, simAtRisk: 0, noSimAtRisk: 0 };
   let withAdjustments = 0;
   let notifiedCount = 0;
@@ -186,9 +187,6 @@ function computePaedisAnalytics(paedisStudents) {
     if (s.fichaDocenteNotificada) notifiedCount++;
 
     updateSimulatorRiskCounters(s, riskCounters);
-
-    const tutor = s.tutorParAsignado || 'Sin tutor asignado';
-    tutorLoadMap.set(tutor, (tutorLoadMap.get(tutor) || 0) + 1);
   }
 
   return {
@@ -198,25 +196,36 @@ function computePaedisAnalytics(paedisStudents) {
     notifiedCount,
     coveragePct: total > 0 ? Math.round((withAdjustments / total) * 100) : 0,
     simAdopted: riskCounters.simAdopted,
-    simPct: total > 0 ? Math.round((riskCounters.simAdopted / total) * 100) : 0,
     simAtRisk: riskCounters.simAtRisk,
     noSimAtRisk: riskCounters.noSimAtRisk,
-    tutorDistribution: Array.from(tutorLoadMap.entries()).sort((a, b) => b[1] - a[1]),
   };
 }
 
-function buildDocenteConfidentialText(student, adjustments, acknowledgments) {
+/**
+ * Genera el texto oficial de la Ficha Docente Confidencial (Capa 2: Operativa)
+ * garantizando la omisión estricta de diagnósticos clínicos según la Ley N° 21.719.
+ */
+function buildDocenteConfidentialText(
+  student,
+  adjustments = [],
+  acknowledgments = [],
+  semester = '2026-1'
+) {
+  const effectiveSemester = student?.vigenciaSemestrePaedis || semester;
   const adjustmentLines =
     adjustments.length > 0
-      ? adjustments.map((a, i) => `  ${i + 1}. ${a.tipo}: ${a.descripcion}`)
-      : ['  - Sin ajustes registrados actualmente.'];
+      ? adjustments.map(
+          (adj, idx) =>
+            `${idx + 1}. [${adj.tipo}] (Vigencia: ${adj.semestreVigencia || effectiveSemester})\n   ${adj.descripcion}`
+        )
+      : ['  - Sin ajustes curriculares específicos registrados.'];
 
   const ackLines =
     acknowledgments.length > 0
       ? acknowledgments.map(
           (ack) =>
-            `  - ${ack.sigla} | ${ack.nombre} (${ack.profesor}): ${
-              ack.confirmado ? 'ACUSE CONFIRMADO' : 'PENDIENTE DE ACUSE'
+            `  - [${ack.sigla}] ${ack.nombre} | Docente: ${ack.profesor} | Estado: ${
+              ack.confirmado ? 'Acuse Confirmado ✓' : 'Pendiente de Notificación ⏳'
             }`
         )
       : ['  - Ficha general aplicable a la carga académica vigente del periodo.'];
@@ -224,16 +233,19 @@ function buildDocenteConfidentialText(student, adjustments, acknowledgments) {
   return [
     '====================================================================',
     'FICHA DOCENTE CONFIDENCIAL DE AJUSTES RAZONABLES - PAEDIS DUOC UC',
-    `Sede: ${student?.campus || DEFAULT_CAMPUS} | Cumplimiento Ley N° 21.719`,
+    `Sede: ${student?.campus || DEFAULT_CAMPUS} | Periodo Académico: ${effectiveSemester}`,
+    'Normativa: Cumplimiento Ley N° 21.719 (Protección de Datos Personales)',
     '====================================================================',
     `Estudiante: ${student?.fullName || student?.nombre || ''}`,
     `RUT: ${student?.rut || 'No informado'} | Correo: ${student?.email || ''}`,
     `Carrera: ${student?.career || student?.carrera || ''}`,
-    `Apoyo Humano/Técnico Asignado: ${student?.tutorParAsignado || 'Coordinación PAEDIS Duoc UC'}`,
+    `Tutor PAEDIS Asignado: ${student?.tutorPaedisAsignado || 'Sí'}`,
     '',
-    '[CONFIDENCIALIDAD LEY N° 21.719]',
-    'Se omiten diagnóstico clínico y notas de entrevista psicoeducativa.',
-    'Este documento detalla únicamente los ajustes pedagógicos aplicables en aula.',
+    '[CAPA 2: AJUSTES OPERATIVOS DE AULA Y EVALUACIÓN]',
+    '[AVISO DE PRIVACIDAD LEY N° 21.719]',
+    'Este documento NO contiene diagnósticos clínicos, notas de salud ni antecedentes',
+    'médicos protegidos por confidencialidad. Contiene exclusivamente las adecuaciones',
+    'pedagógicas y evaluativas acordadas para el periodo vigente.',
     '',
     'AJUSTES RAZONABLES APROBADOS:',
     ...adjustmentLines,
@@ -244,18 +256,18 @@ function buildDocenteConfidentialText(student, adjustments, acknowledgments) {
   ].join('\n');
 }
 
-function PaedisKpiSummary({ analytics, getVoiceProps }) {
+function PaedisAnalyticsHeader({ analytics, getVoiceProps }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
       <div
         {...getVoiceProps(
-          `Estudiantes PAEDIS activos: ${analytics.total}. Desglose por barrera de apoyo`
+          `Total estudiantes PAEDIS: ${analytics.total}. Cobertura de ajustes: ${analytics.coveragePct} por ciento.`
         )}
-        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] p-4 shadow-xs space-y-2.5"
+        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] p-4 shadow-xs space-y-2"
       >
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-            Cobertura PAEDIS • {DEFAULT_CAMPUS}
+            Estudiantes PAEDIS Activos
           </span>
           <HeartHandshake className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
         </div>
@@ -267,7 +279,7 @@ function PaedisKpiSummary({ analytics, getVoiceProps }) {
           <span>Visual: <strong>{analytics.barrierCounts['Visual / Sensorial'] || 0}</strong></span>
           <span>Auditiva: <strong>{analytics.barrierCounts['Auditiva / LSCh'] || 0}</strong></span>
           <span>Motora: <strong>{analytics.barrierCounts['Física / Motora'] || 0}</strong></span>
-          <span>TEA/Neuro: <strong>{analytics.barrierCounts['Neurodivergencia / TEA'] || 0}</strong></span>
+          <span>Neurodivergencia: <strong>{analytics.barrierCounts['Neurodivergencia'] || 0}</strong></span>
         </div>
       </div>
 
@@ -284,159 +296,122 @@ function PaedisKpiSummary({ analytics, getVoiceProps }) {
           <ShieldCheck className="w-4 h-4 text-emerald-700" aria-hidden="true" />
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-black text-emerald-700">{analytics.coveragePct}%</span>
+          <span className="text-3xl font-black text-emerald-950">{analytics.coveragePct}%</span>
           <span className="text-xs font-semibold text-slate-600">
-            ({analytics.withAdjustments}/{analytics.total} con ajustes)
+            ({analytics.withAdjustments}/{analytics.total}) con ajustes
           </span>
         </div>
         <p className="text-[11px] text-slate-600 pt-1 border-t border-slate-100">
-          <strong>{analytics.notifiedCount}</strong> con Ficha Docente emitida •{' '}
-          <strong>{Math.max(0, analytics.total - analytics.notifiedCount)}</strong> pendientes
+          {analytics.notifiedCount} ficha(s) docente(s) confidenciales emitidas este periodo.
         </p>
       </div>
 
       <div
         {...getVoiceProps(
-          `Cruce Simulador Toma de Ramos y Riesgo RI: ${analytics.simPct} por ciento adopta el simulador.`
+          `Adopción del simulador: ${analytics.simAdopted} de ${analytics.total} estudiantes lo han utilizado.`
         )}
-        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-[#FFB81C] p-4 shadow-xs space-y-2"
+        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-amber-500 p-4 shadow-xs space-y-2 sm:col-span-2 lg:col-span-1"
       >
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-            Simulador vs Riesgo RI (&lt;75%)
+            Simulador Toma de Ramos
           </span>
-          <Laptop className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+          <BookOpen className="w-4 h-4 text-amber-800" aria-hidden="true" />
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-black text-[#002B49]">{analytics.simPct}%</span>
-          <span className="text-xs font-semibold text-slate-600">
-            usa Simulador ({analytics.simAdopted})
-          </span>
+          <span className="text-3xl font-black text-amber-950">{analytics.simAdopted}</span>
+          <span className="text-xs font-semibold text-slate-600">de {analytics.total} usan el simulador</span>
         </div>
         <p className="text-[11px] text-slate-600 pt-1 border-t border-slate-100">
-          Riesgo &lt;75% con simulador: <strong>{analytics.simAtRisk}</strong> • sin simulador:{' '}
-          <strong className="text-rose-700">{analytics.noSimAtRisk}</strong>
+          {analytics.simAtRisk > 0
+            ? `${analytics.simAtRisk} estudiante(s) en alerta temprana utilizan la herramienta.`
+            : 'Fomenta la inscripción oportuna y sin choques de horario.'}
         </p>
-      </div>
-
-      <div
-        {...getVoiceProps('Distribución de carga de tutores pares e intérpretes PAEDIS')}
-        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-slate-700 p-4 shadow-xs space-y-2"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-            Carga Apoyo Humano / Técnico
-          </span>
-          <UserCheck className="w-4 h-4 text-slate-700" aria-hidden="true" />
-        </div>
-        <div className="space-y-1 max-h-[82px] overflow-y-auto pr-1 text-[11px]">
-          {analytics.tutorDistribution.map(([tutorName, count]) => (
-            <div key={tutorName} className="flex items-center justify-between gap-2 text-slate-700">
-              <span className="truncate font-medium">{tutorName}</span>
-              <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-bold text-[#002B49] shrink-0">
-                {count}
-              </span>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
 }
 
-function PaedisStudentListSidebar({
-  filteredStudents,
-  selectedStudent,
-  searchQuery,
-  onSearchChange,
-  caseFilter,
-  onCaseFilterChange,
+function PaedisStudentList({
+  students,
+  selectedKey,
   onSelectStudent,
+  resolveStudentKey,
+  inferBarrierCategory,
   getVoiceProps,
 }) {
   return (
-    <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-300 shadow-xs p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-black text-slate-900">
-          Nómina PAEDIS ({filteredStudents.length})
-        </h3>
-        <span className="text-[11px] font-bold text-[#002B49] bg-slate-100 px-2 py-0.5 rounded">
-          {DEFAULT_CAMPUS}
-        </span>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+        <span>Estudiantes PAEDIS</span>
+        <span className="text-slate-500 font-semibold">{students.length} registrados</span>
       </div>
 
-      <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Buscar estudiante, RUT o carrera..."
-          aria-label="Buscar estudiante PAEDIS"
-          {...getVoiceProps('Buscar estudiante PAEDIS por nombre, RUT o carrera')}
-          className="w-full min-h-[40px] pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-slate-50 focus:bg-white"
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar casos PAEDIS">
-        {CASE_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            aria-pressed={caseFilter === f.id}
-            onClick={() => onCaseFilterChange(f.id)}
-            {...getVoiceProps(`Filtrar casos PAEDIS: ${f.label}`)}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
-              caseFilter === f.id
-                ? 'bg-[#002B49] text-white border-[#002B49]'
-                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="max-h-[470px] overflow-y-auto space-y-1.5 pr-1">
-        {filteredStudents.length === 0 ? (
-          <p className="text-xs text-slate-500 text-center py-6">
-            No se encontraron estudiantes PAEDIS con ese filtro.
-          </p>
+      <div className="space-y-1.5 max-h-[580px] overflow-y-auto pr-1" role="list">
+        {students.length === 0 ? (
+          <div className="p-6 text-center text-xs text-slate-600 bg-white rounded-2xl border border-slate-300">
+            No se encontraron estudiantes para este filtro.
+          </div>
         ) : (
-          filteredStudents.map((s) => {
+          students.map((s) => {
             const key = resolveStudentKey(s);
-            const isSelected = Boolean(selectedStudent && resolveStudentKey(selectedStudent) === key);
-            const adjustmentsCount = s.ajustesAprobados?.length || 0;
-            const sheetStatus = s.fichaDocenteNotificada ? 'Emitida' : 'Pendiente';
+            const isSelected = key === selectedKey;
+            const barrier = inferBarrierCategory(s);
+            const adjustmentsCount = Array.isArray(s.ajustesAprobados) ? s.ajustesAprobados.length : 0;
+            const hasFicha = Boolean(s.fichaDocenteNotificada);
+            const semester = s.vigenciaSemestrePaedis || '2026-1';
 
             return (
               <button
                 key={key}
                 type="button"
+                onClick={() => onSelectStudent(s)}
+                role="listitem"
                 aria-pressed={isSelected}
-                onClick={() => onSelectStudent(key)}
                 {...getVoiceProps(
-                  `${s.fullName || s.nombre}, ${adjustmentsCount} ajustes aprobados, ficha ${sheetStatus}`
+                  `Estudiante ${s.fullName || s.nombre}, barrera ${barrier}, ${adjustmentsCount} ajustes, periodo ${semester}`
                 )}
-                className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer space-y-1 ${
+                className={`w-full min-h-[44px] text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-[#002B49] text-white border-[#002B49] shadow-sm'
-                    : 'bg-slate-50/70 hover:bg-slate-100 text-slate-900 border-slate-200'
+                    ? 'bg-[#002B49] text-white border-[#002B49] shadow-sm ring-2 ring-[#FFB81C]'
+                    : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200 shadow-2xs'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold truncate">{s.fullName || s.nombre}</span>
+                  <span className={`text-xs font-black truncate ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                    {s.fullName || s.nombre}
+                  </span>
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                      s.fichaDocenteNotificada
-                        ? 'bg-emerald-100 text-emerald-900'
-                        : 'bg-amber-100 text-amber-950'
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                      isSelected
+                        ? 'bg-white/20 text-[#FFB81C]'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200'
                     }`}
                   >
-                    {sheetStatus}
+                    {semester}
                   </span>
                 </div>
-                <div className={`text-[11px] truncate ${isSelected ? 'text-slate-200' : 'text-slate-600'}`}>
+
+                <div className="flex items-center justify-between gap-2 mt-1">
+                  <span
+                    className={`text-[10px] font-semibold truncate ${
+                      isSelected ? 'text-amber-300' : 'text-slate-600'
+                    }`}
+                  >
+                    {barrier}
+                  </span>
+                  {hasFicha && (
+                    <span
+                      className={`text-[10px] font-black uppercase px-1.5 py-0.2 rounded ${
+                        isSelected ? 'bg-emerald-400 text-slate-950' : 'bg-emerald-100 text-emerald-950'
+                      }`}
+                    >
+                      Ficha OK
+                    </span>
+                  )}
+                </div>
+
+                <div className={`text-[11px] truncate mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
                   {s.career || s.carrera} • {adjustmentsCount} ajuste(s)
                 </div>
               </button>
@@ -450,6 +425,7 @@ function PaedisStudentListSidebar({
 
 function PaedisAdjustmentsManager({
   adjustments,
+  currentSemester,
   newAdjustment,
   onNewAdjustmentChange,
   onAddPreset,
@@ -460,11 +436,11 @@ function PaedisAdjustmentsManager({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-          Ajustes Razonables Aprobados ({adjustments.length})
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+          Ajustes Razonables Aprobados ({adjustments.length}) • Periodo {currentSemester}
         </h4>
         <span className="text-[11px] text-slate-500">
-          Aprobación rápida con un clic o medida personalizada
+          Aprobación rápida por botón o medida pedagógica personalizada
         </span>
       </div>
 
@@ -475,9 +451,9 @@ function PaedisAdjustmentsManager({
             type="button"
             onClick={() => onAddPreset(preset)}
             {...getVoiceProps(`Agregar ajuste rápido: ${preset.tipo}`)}
-            className="min-h-[34px] px-2.5 py-1 bg-blue-50 hover:bg-[#002B49] text-[#002B49] hover:text-white border border-blue-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+            className="min-h-[44px] px-3 py-1.5 bg-blue-50 hover:bg-[#002B49] text-[#002B49] hover:text-white border border-blue-200 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Plus className="w-3 h-3" aria-hidden="true" />
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
             <span>{preset.tipo}</span>
           </button>
         ))}
@@ -485,25 +461,30 @@ function PaedisAdjustmentsManager({
 
       {adjustments.length === 0 ? (
         <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
-          Sin ajustes aprobados. Selecciona un ajuste rápido o registra una medida abajo.
+          Sin ajustes aprobados para este periodo. Selecciona un ajuste rápido o registra una medida abajo.
         </p>
       ) : (
         <ul className="space-y-2">
           {adjustments.map((adj) => (
             <li
               key={`${adj.tipo}-${adj.descripcion}`}
-              className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3"
+              className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3"
             >
-              <div className="space-y-0.5 text-xs">
-                <strong className="text-[#002B49] block">{adj.tipo}</strong>
-                <p className="text-slate-700">{adj.descripcion}</p>
+              <div className="space-y-1 text-xs min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="text-[#002B49]">{adj.tipo}</strong>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-200">
+                    Vigencia: {adj.semestreVigencia || currentSemester}
+                  </span>
+                </div>
+                <p className="text-slate-700 leading-relaxed">{adj.descripcion}</p>
               </div>
               <button
                 type="button"
                 onClick={() => onRemoveAdjustment(adj)}
                 aria-label={`Revocar ajuste ${adj.tipo}`}
                 {...getVoiceProps(`Revocar ajuste ${adj.tipo}`)}
-                className="min-h-[34px] px-2.5 py-1 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                className="min-h-[44px] px-3 py-1.5 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Revocar</span>
@@ -520,7 +501,7 @@ function PaedisAdjustmentsManager({
           onChange={(e) => onNewAdjustmentChange({ ...newAdjustment, tipo: e.target.value })}
           placeholder="Nombre del ajuste (ej. Pausas sensoriales)"
           aria-label="Nombre del ajuste personalizado"
-          className="sm:col-span-4 min-h-[40px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
+          className="sm:col-span-4 min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
         />
         <input
           type="text"
@@ -528,14 +509,14 @@ function PaedisAdjustmentsManager({
           onChange={(e) => onNewAdjustmentChange({ ...newAdjustment, descripcion: e.target.value })}
           placeholder="Descripción pedagógica para el docente en aula..."
           aria-label="Descripción del ajuste personalizado"
-          className="sm:col-span-6 min-h-[40px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
+          className="sm:col-span-6 min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
         />
         <button
           type="submit"
           {...getVoiceProps('Agregar ajuste razonable personalizado')}
-          className="sm:col-span-2 min-h-[40px] px-3 py-2 bg-slate-800 hover:bg-[#002B49] text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer"
+          className="sm:col-span-2 min-h-[44px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer"
         >
-          <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+          <Plus className="w-4 h-4" aria-hidden="true" />
           <span>Añadir</span>
         </button>
       </form>
@@ -552,7 +533,6 @@ function DocenteSheetModal({
   onToggleAck,
   onConfirmNotify,
   isSaving,
-  tutorParAsignado,
   announce,
   getVoiceProps,
 }) {
@@ -570,21 +550,20 @@ function DocenteSheetModal({
 
   if (!isOpen || !student) return null;
 
-  const safeTutor = String(tutorParAsignado || '')
-    .replace(/Tania\s+Montes\s*(\(Coordinaci[oó]n\s+PAEDIS\))?/gi, 'Coordinación PAEDIS Duoc UC')
-    .trim() || 'Coordinación PAEDIS Duoc UC';
+  const currentSemester = student.vigenciaSemestrePaedis || '2026-1';
 
   const handleDownloadTxt = () => {
     const content = buildDocenteConfidentialText(
-      { ...student, tutorParAsignado: safeTutor },
+      student,
       adjustments,
-      acknowledgments
+      acknowledgments,
+      currentSemester
     );
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `Ficha_Docente_PAEDIS_${(student.rut || 'estudiante').replace(/[^0-9kK]/g, '')}.txt`;
+    anchor.download = `Ficha_Docente_PAEDIS_${(student.rut || 'estudiante').replace(/[^0-9kK]/g, '')}_${currentSemester}.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
     announce('Ficha Docente Confidencial descargada en formato texto seguro.', 'polite');
@@ -606,14 +585,14 @@ function DocenteSheetModal({
             <div className="flex items-center gap-2 mb-1">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 <Lock className="w-3 h-3" aria-hidden="true" />
-                <span>Ficha Docente Confidencial • Ley N° 21.719</span>
+                <span>Capa 2: Ficha Docente Confidencial • Ley N° 21.719</span>
               </span>
             </div>
             <h3 id="docente-sheet-title" className="text-lg sm:text-xl font-black text-slate-900 truncate">
               Ficha de Ajustes Razonables para Docentes de Aula
             </h3>
             <p className="text-xs text-slate-600 mt-0.5 truncate">
-              Resumen pedagógico para docentes de {student.fullName || student.nombre} ({student.career})
+              Resumen pedagógico para docentes de {student.fullName || student.nombre} ({student.career}) • Periodo {currentSemester}
             </p>
           </div>
           <button
@@ -633,8 +612,8 @@ function DocenteSheetModal({
             <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <strong>Privacidad Clínica Resguardada (Ley N° 21.719):</strong> Esta ficha omite
-              automáticamente el diagnóstico clínico declarado y las notas privadas de entrevista,
-              exhibiendo solo las adecuaciones pedagógicas aplicables en clase y evaluaciones.
+              automáticamente el diagnóstico clínico declarado y las notas privadas de entrevista (Capa 1),
+              exhibiendo solo las adecuaciones pedagógicas aplicables en clase y certámenes (Capa 2).
             </div>
           </div>
 
@@ -650,8 +629,8 @@ function DocenteSheetModal({
               </strong>
             </div>
             <div>
-              <span className="text-slate-500 font-semibold block">Apoyo PAEDIS Asignado</span>
-              <strong className="text-slate-900">{safeTutor}</strong>
+              <span className="text-slate-500 font-semibold block">Periodo de Vigencia</span>
+              <strong className="text-[#002B49] font-black">Semestre {currentSemester}</strong>
             </div>
           </div>
 
@@ -661,19 +640,19 @@ function DocenteSheetModal({
             </h4>
             {adjustments.length === 0 ? (
               <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
-                No hay ajustes razonables aprobados todavía. Agrega medidas antes de emitir la ficha.
+                No hay ajustes razonables aprobados todavía para este periodo.
               </p>
             ) : (
               <ul className="space-y-2">
                 {adjustments.map((adj) => (
                   <li
                     key={`${adj.tipo}-${adj.descripcion}`}
-                    className="p-3 rounded-xl bg-white border border-slate-200 text-xs flex items-start gap-2.5"
+                    className="p-3.5 rounded-xl bg-white border border-slate-200 text-xs flex items-start gap-2.5"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
                     <div>
                       <strong className="text-slate-900 block">{adj.tipo}</strong>
-                      <span className="text-slate-700">{adj.descripcion}</span>
+                      <span className="text-slate-700 block mt-0.5">{adj.descripcion}</span>
                     </div>
                   </li>
                 ))}
@@ -716,13 +695,13 @@ function DocenteSheetModal({
                             {...getVoiceProps(
                               `Acuse docente de ${ack.nombre}, ${ack.confirmado ? 'confirmado' : 'pendiente'}`
                             )}
-                            className={`min-h-[34px] px-3 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                            className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                               ack.confirmado
-                                ? 'bg-emerald-600 text-white border-emerald-700'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                ? 'bg-emerald-50 text-emerald-950 border-emerald-300'
+                                : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
                             }`}
                           >
-                            {ack.confirmado ? '✓ Confirmado' : 'Marcar Acuse'}
+                            {ack.confirmado ? 'Acuse Confirmado ✓' : 'Marcar Acuse'}
                           </button>
                         </td>
                       </tr>
@@ -734,37 +713,26 @@ function DocenteSheetModal({
           </div>
         </div>
 
-        <footer className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleDownloadTxt}
-              {...getVoiceProps('Exportar Ficha Docente en archivo de texto')}
-              className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
-              <span>Exportar (.txt)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              {...getVoiceProps('Imprimir Ficha Docente Confidencial')}
-              className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <Printer className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
-              <span>Imprimir</span>
-            </button>
-          </div>
+        <footer className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={handleDownloadTxt}
+            {...getVoiceProps('Descargar Ficha Docente Confidencial en formato texto seguro')}
+            className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 cursor-pointer shadow-2xs"
+          >
+            <Download className="w-4 h-4" aria-hidden="true" />
+            <span>Descargar Ficha (.txt)</span>
+          </button>
 
           <button
             type="button"
             disabled={isSaving}
             onClick={onConfirmNotify}
-            {...getVoiceProps('Notificar y Emitir Ficha Docente Confidencial')}
-            className="min-h-[44px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            {...getVoiceProps('Emitir y notificar Ficha Docente a los profesores')}
+            className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
           >
-            <Send className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
-            <span>{isSaving ? 'Registrando...' : 'Notificar y Emitir Ficha'}</span>
+            <ShieldCheck className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+            <span>{isSaving ? 'Notificando...' : 'Notificar a Docentes de Aula'}</span>
           </button>
         </footer>
       </div>
@@ -773,20 +741,19 @@ function DocenteSheetModal({
 }
 
 /**
- * Centro de Operaciones de Inclusión y Continuidad Académica (PAEDIS • Duoc UC Sede Alameda).
+ * Componente Principal del Centro de Operaciones PAEDIS
+ * Estructurado en 2 Capas (Capa 1: Confidencial, Capa 2: Operativa) y Renovación Semestral
  */
-export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, announce }) => {
-  const { getVoiceProps } = useAccessibility();
+export const PaedisCaseManagementSection = ({
+  students = [],
+  onStudentUpdated,
+  announce: announceProp,
+}) => {
+  const { announce: contextAnnounce, getVoiceProps } = useAccessibility();
+  const announce = announceProp || contextAnnounce;
 
   const paedisStudents = useMemo(
-    () =>
-      students
-        .filter(isPaedisStudentRecord)
-        .sort((a, b) =>
-          (a.fullName || a.nombre || '').localeCompare(b.fullName || b.nombre || '', 'es', {
-            sensitivity: 'base',
-          })
-        ),
+    () => (Array.isArray(students) ? students.filter(isPaedisStudentRecord) : []),
     [students]
   );
 
@@ -798,11 +765,19 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
   const [isDocenteModalOpen, setIsDocenteModalOpen] = useState(false);
 
   const [formState, setFormState] = useState({
+    // Capa 1: Expediente Confidencial
     barreraPaedis: 'Visual / Sensorial',
     acreditacionPaedis: 'Credencial RND SENADIS / COMPIN',
-    tutorParAsignado: 'Coordinación PAEDIS Duoc UC',
+    tutorPaedisAsignado: 'Sí',
     diagnosticoDeclarado: '',
     notasConfidencialesPaedis: '',
+    voiceReaderByDefault: false,
+    clearReadingByDefault: false,
+    highContrastByDefault: false,
+    dyslexicFontByDefault: false,
+
+    // Capa 2: Ajustes Razonables Operativos
+    vigenciaSemestrePaedis: '2026-1',
     ajustesAprobados: [],
     acusesDocentes: [],
   });
@@ -828,16 +803,24 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
     const isVisual =
       inferBarrierCategory(selectedStudent) === 'Visual / Sensorial' ||
       /visual|ciego|no vidente|baja visi[oó]n/i.test(selectedStudent.diagnosticoDeclarado || '');
+
     setFormState({
       barreraPaedis: inferBarrierCategory(selectedStudent),
       acreditacionPaedis: selectedStudent.acreditacionPaedis || 'Credencial RND SENADIS / COMPIN',
-      tutorParAsignado: selectedStudent.tutorParAsignado || 'Coordinación PAEDIS Duoc UC',
+      tutorPaedisAsignado: selectedStudent.tutorPaedisAsignado || 'Sí',
       diagnosticoDeclarado: selectedStudent.diagnosticoDeclarado || '',
       notasConfidencialesPaedis: selectedStudent.notasConfidencialesPaedis || '',
       voiceReaderByDefault:
         typeof selectedStudent.accessibilityPreferences?.voiceReader === 'boolean'
           ? selectedStudent.accessibilityPreferences.voiceReader
           : isVisual,
+      clearReadingByDefault:
+        Boolean(selectedStudent.accessibilityPreferences?.clearReadingMode),
+      highContrastByDefault:
+        Boolean(selectedStudent.accessibilityPreferences?.highContrast),
+      dyslexicFontByDefault:
+        Boolean(selectedStudent.accessibilityPreferences?.dyslexicFont),
+      vigenciaSemestrePaedis: selectedStudent.vigenciaSemestrePaedis || '2026-1',
       ajustesAprobados: Array.isArray(selectedStudent.ajustesAprobados)
         ? selectedStudent.ajustesAprobados
         : [],
@@ -860,7 +843,12 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
       ...prev,
       ajustesAprobados: [
         ...prev.ajustesAprobados,
-        { tipo, descripcion, fechaAprobacion: new Date().toISOString() },
+        {
+          tipo,
+          descripcion,
+          fechaAprobacion: new Date().toISOString(),
+          semestreVigencia: prev.vigenciaSemestrePaedis || '2026-1',
+        },
       ],
     }));
     announce(`Ajuste agregado: ${tipo}`, 'polite');
@@ -902,6 +890,66 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
     }));
   };
 
+  /**
+   * Renovación Semestral con 1 Clic
+   * Calcula el periodo siguiente y extiende la vigencia de los ajustes aprobados.
+   */
+  const handleRenewSemester = async () => {
+    if (!selectedStudent) return;
+    const currentSem = formState.vigenciaSemestrePaedis || '2026-1';
+    let nextSem = '2026-2';
+    const match = currentSem.match(/^(\d{4})-(\d)$/);
+    if (match) {
+      const year = Number.parseInt(match[1], 10);
+      const sem = Number.parseInt(match[2], 10);
+      nextSem = sem === 1 ? `${year}-2` : `${year + 1}-1`;
+    }
+
+    const renewedAdjustments = formState.ajustesAprobados.map((adj) => ({
+      ...adj,
+      semestreVigencia: nextSem,
+      fechaAprobacion: new Date().toISOString(),
+    }));
+
+    const renewalNote = `[Renovación ${nextSem}]: Ajustes vigentes extendidos automáticamente para el periodo ${nextSem}.`;
+    const updatedNotes = formState.notasConfidencialesPaedis
+      ? `${formState.notasConfidencialesPaedis}\n${renewalNote}`
+      : renewalNote;
+
+    setFormState((prev) => ({
+      ...prev,
+      vigenciaSemestrePaedis: nextSem,
+      ajustesAprobados: renewedAdjustments,
+      notasConfidencialesPaedis: updatedNotes,
+      fichaDocenteNotificada: false,
+    }));
+
+    setIsSaving(true);
+    setStatusFeedback(null);
+    try {
+      const payload = {
+        vigenciaSemestrePaedis: nextSem,
+        renewForSemester: nextSem,
+        ajustesAprobados: renewedAdjustments,
+        notasConfidencialesPaedis: updatedNotes,
+        fichaDocenteNotificada: false,
+      };
+      const res = await api.updatePaedisCase(resolveStudentKey(selectedStudent), payload);
+      if (!res?.success) throw new Error(res?.message || 'Error al renovar semestre.');
+      if (onStudentUpdated && res.student) onStudentUpdated(res.student);
+
+      const msg = `Expediente renovado exitosamente para el periodo ${nextSem}.`;
+      setStatusFeedback({ type: 'success', text: msg });
+      announce(msg, 'polite');
+    } catch (err) {
+      const msg = err?.message || 'Error al renovar semestre.';
+      setStatusFeedback({ type: 'error', text: msg });
+      announce(msg, 'assertive');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const persistPaedisCase = async (notifyDocentes = false) => {
     if (!selectedStudent) return;
     setIsSaving(true);
@@ -910,10 +958,18 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
     try {
       const payload = {
         ...formState,
+        vigenciaSemestrePaedis: formState.vigenciaSemestrePaedis || '2026-1',
+        ajustesAprobados: formState.ajustesAprobados.map((a) => ({
+          ...a,
+          semestreVigencia: a.semestreVigencia || formState.vigenciaSemestrePaedis || '2026-1',
+        })),
         ...(notifyDocentes ? { fichaDocenteNotificada: true } : {}),
         accessibilityPreferences: {
           ...(selectedStudent.accessibilityPreferences || {}),
           voiceReader: Boolean(formState.voiceReaderByDefault),
+          clearReadingMode: Boolean(formState.clearReadingByDefault),
+          highContrast: Boolean(formState.highContrastByDefault),
+          dyslexicFont: Boolean(formState.dyslexicFontByDefault),
           screenReaderOptimized: true,
         },
       };
@@ -938,18 +994,18 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
 
   return (
     <section aria-labelledby="paedis-ops-heading" className="space-y-6 w-full max-w-full overflow-x-clip">
+      {/* CABECERA */}
       <div className="bg-white rounded-2xl p-6 border border-slate-300 border-t-4 border-t-[#002B49] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-amber-100 text-[#002B49] border border-amber-300">
-            <Lock className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
-            <span>Centro de Operaciones PAEDIS • Confidencial Ley N° 21.719</span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-300">
+            <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Centro de Operaciones PAEDIS • Gestión en 2 Capas (Ley N° 21.719)</span>
           </div>
           <h2 id="paedis-ops-heading" className="text-xl sm:text-2xl font-black text-slate-900">
             Gestión PAEDIS &amp; Ajustes Razonables ({DEFAULT_CAMPUS})
           </h2>
           <p className="text-xs sm:text-sm text-slate-600">
-            Ciclo de vida de adecuaciones académicas, asignación de tutores pares e intérpretes LSCh y
-            emisión de Ficha Docente Confidencial sin exponer datos clínicos sensibles.
+            Segregación estricta entre expediente clínico confidencial (Capa 1) y adecuaciones pedagógicas de aula por semestre (Capa 2).
           </p>
         </div>
 
@@ -958,35 +1014,73 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
             type="button"
             onClick={() => setIsDocenteModalOpen(true)}
             {...getVoiceProps('Abrir Ficha Docente Confidencial de Ajustes Razonables')}
-            className="min-h-[44px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 shadow-xs shrink-0 cursor-pointer"
+            className="min-h-[44px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 cursor-pointer shadow-xs shrink-0 focus-visible:ring-4 focus-visible:ring-amber-400"
           >
             <FileText className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
-            <span>Ficha Docente Confidencial</span>
+            <span>Ver Ficha Docente ({formState.vigenciaSemestrePaedis || '2026-1'})</span>
           </button>
         )}
       </div>
 
-      <PaedisKpiSummary analytics={analytics} getVoiceProps={getVoiceProps} />
+      <PaedisAnalyticsHeader analytics={analytics} getVoiceProps={getVoiceProps} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <PaedisStudentListSidebar
-          filteredStudents={filteredStudents}
-          selectedStudent={selectedStudent}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          caseFilter={caseFilter}
-          onCaseFilterChange={setCaseFilter}
-          onSelectStudent={setSelectedKey}
-          getVoiceProps={getVoiceProps}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* PANEL IZQUIERDO: LISTA DE ESTUDIANTES */}
+        <div className="lg:col-span-4 space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nombre, RUT o correo..."
+              aria-label="Buscar estudiante PAEDIS"
+              {...getVoiceProps('Buscar estudiante PAEDIS por nombre, RUT o correo')}
+              className="w-full min-h-[44px] pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+            />
+          </div>
 
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-300 shadow-xs p-5 sm:p-6 space-y-5">
+          <div
+            className="flex items-center gap-1 overflow-x-auto pb-1"
+            role="group"
+            aria-label="Filtros de estudiantes PAEDIS"
+          >
+            {CASE_FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setCaseFilter(f.id)}
+                {...getVoiceProps(`Filtrar por ${f.label}`)}
+                className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer whitespace-nowrap ${
+                  caseFilter === f.id
+                    ? 'bg-[#002B49] text-white border-[#002B49]'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <PaedisStudentList
+            students={filteredStudents}
+            selectedKey={resolveStudentKey(selectedStudent)}
+            onSelectStudent={(s) => setSelectedKey(resolveStudentKey(s))}
+            resolveStudentKey={resolveStudentKey}
+            inferBarrierCategory={inferBarrierCategory}
+            getVoiceProps={getVoiceProps}
+          />
+        </div>
+
+        {/* PANEL DERECHO: EXPEDIENTE EN 2 CAPAS */}
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-300 p-5 sm:p-6 shadow-xs space-y-6">
           {!selectedStudent ? (
-            <p className="text-sm text-slate-600 text-center py-10">
-              Selecciona un estudiante PAEDIS para gestionar sus ajustes razonables.
-            </p>
+            <div className="p-12 text-center text-slate-500 font-bold">
+              Selecciona un estudiante de la lista para gestionar su expediente.
+            </div>
           ) : (
             <>
+              {/* ENCABEZADO DEL CASO */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
                   <span className="text-xs font-bold text-[#002B49] uppercase tracking-wider">
@@ -1001,7 +1095,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 </div>
 
                 <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
                     Number(selectedStudent.attendanceRate ?? 100) < 75
                       ? 'bg-rose-50 text-rose-800 border-rose-300'
                       : 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -1015,7 +1109,7 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 <div
                   role="status"
                   aria-live="polite"
-                  className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 ${
+                  className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 ${
                     statusFeedback.type === 'success'
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
                       : 'bg-rose-50 border-rose-300 text-rose-950'
@@ -1030,68 +1124,79 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                <div>
-                  <label htmlFor="paedis-barrier" className="block text-xs font-bold text-slate-700 mb-1">
-                    Tipo de Barrera / Apoyo
-                  </label>
-                  <select
-                    id="paedis-barrier"
-                    value={formState.barreraPaedis}
-                    onChange={(e) => setFormState({ ...formState, barreraPaedis: e.target.value })}
-                    className="w-full min-h-[42px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
-                  >
-                    {BARRIER_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+              {/* CAPA 1: EXPEDIENTE CONFIDENCIAL (EXCLUSIVO COORDINADOR PAEDIS) */}
+              <div className="p-5 rounded-2xl bg-purple-50/50 border border-purple-200 space-y-4">
+                <div className="flex items-center justify-between border-b border-purple-200/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-purple-200 text-purple-950">
+                      <Lock className="w-4 h-4" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-purple-950 block">
+                        Capa 1: Expediente Clínico y Confidencial (Ley N° 21.719)
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-600 block">
+                        Exclusivo de Coordinación PAEDIS • Resguardo clínico estricto
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-purple-200 text-purple-950 border border-purple-300">
+                    Solo Coordinación
+                  </span>
                 </div>
 
-                <div>
-                  <label htmlFor="paedis-accreditation" className="block text-xs font-bold text-slate-700 mb-1">
-                    Acreditación Presentada
-                  </label>
-                  <select
-                    id="paedis-accreditation"
-                    value={formState.acreditacionPaedis}
-                    onChange={(e) => setFormState({ ...formState, acreditacionPaedis: e.target.value })}
-                    className="w-full min-h-[42px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
-                  >
-                    {ACCREDITATION_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  <div>
+                    <label htmlFor="paedis-barrier" className="block text-xs font-bold text-slate-700 mb-1">
+                      Tipo de Barrera / Necesidad
+                    </label>
+                    <select
+                      id="paedis-barrier"
+                      value={formState.barreraPaedis}
+                      onChange={(e) => setFormState({ ...formState, barreraPaedis: e.target.value })}
+                      className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
+                    >
+                      {BARRIER_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div>
-                  <label htmlFor="paedis-tutor" className="block text-xs font-bold text-slate-700 mb-1">
-                    Tutor PAEDIS Asignado
-                  </label>
-                  <select
-                    id="paedis-tutor"
-                    value={formState.tutorParAsignado}
-                    onChange={(e) => setFormState({ ...formState, tutorParAsignado: e.target.value })}
-                    className="w-full min-h-[42px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
-                  >
-                    {!SUPPORT_STAFF_OPTIONS.includes(formState.tutorParAsignado) && (
-                      <option value={formState.tutorParAsignado}>{formState.tutorParAsignado}</option>
-                    )}
-                    {SUPPORT_STAFF_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                  <div>
+                    <label htmlFor="paedis-accreditation" className="block text-xs font-bold text-slate-700 mb-1">
+                      Acreditación Presentada
+                    </label>
+                    <select
+                      id="paedis-accreditation"
+                      value={formState.acreditacionPaedis}
+                      onChange={(e) => setFormState({ ...formState, acreditacionPaedis: e.target.value })}
+                      className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
+                    >
+                      {ACCREDITATION_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <span className="text-xs font-bold text-[#002B49] inline-flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Registro Clínico &amp; Entrevista Inicial (Oculto en Ficha Docente)</span>
-                </span>
+                  <div>
+                    <label htmlFor="paedis-tutor" className="block text-xs font-bold text-slate-700 mb-1">
+                      Tutor PAEDIS Asignado
+                    </label>
+                    <select
+                      id="paedis-tutor"
+                      value={formState.tutorPaedisAsignado}
+                      onChange={(e) => setFormState({ ...formState, tutorPaedisAsignado: e.target.value })}
+                      className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
+                    >
+                      <option value="Sí">Sí (Tutor PAEDIS asignado)</option>
+                      <option value="No">No (Sin tutor asignado)</option>
+                    </select>
+                  </div>
+                </div>
 
                 <div>
                   <label htmlFor="paedis-diagnosis" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Diagnóstico o Condición Declarada
+                    Diagnóstico o Condición Declarada (Confidencial)
                   </label>
                   <input
                     id="paedis-diagnosis"
@@ -1100,14 +1205,14 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                     onChange={(e) =>
                       setFormState({ ...formState, diagnosticoDeclarado: e.target.value })
                     }
-                    placeholder="Ej. Baja visión bilateral, Hipoacusia moderada, TEA grado 1..."
-                    className="w-full min-h-[40px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-white"
+                    placeholder="Ej. Baja visión bilateral, Hipoacusia moderada, Condición del espectro autista..."
+                    className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-white"
                   />
                 </div>
 
                 <div>
                   <label htmlFor="paedis-notes" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Bitácora Confidencial de Entrevista PAEDIS
+                    Bitácora Confidencial de Acompañamiento y Entrevista PAEDIS
                   </label>
                   <textarea
                     id="paedis-notes"
@@ -1116,57 +1221,120 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
                     onChange={(e) =>
                       setFormState({ ...formState, notasConfidencialesPaedis: e.target.value })
                     }
-                    placeholder="Notas de entrevista de acogida, acuerdos de seguimiento y confidencialidad..."
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 bg-white"
+                    placeholder="Notas de acogida, acuerdos de seguimiento y confidencialidad..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 bg-white resize-none"
                   />
                 </div>
 
-                <div className="pt-2 border-t border-slate-200">
-                  <label
-                    htmlFor="paedis-voice-reader-default"
-                    aria-label="Activar lector de pantalla o voz asistida por defecto en el perfil"
-                    className="flex items-start gap-2.5 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      id="paedis-voice-reader-default"
-                      checked={Boolean(formState.voiceReaderByDefault)}
-                      onChange={(e) =>
-                        setFormState({ ...formState, voiceReaderByDefault: e.target.checked })
-                      }
-                      className="mt-0.5 w-4 h-4 text-[#002B49] rounded border-slate-300 focus:ring-[#002B49]"
-                    />
-                    <span className="text-xs text-slate-800 leading-snug">
-                      <strong className="block text-[#002B49]">
-                        Activar lector de pantalla / voz asistida por defecto en el perfil
-                      </strong>
-                      <span className="text-[11px] text-slate-500 block mt-0.5">
-                        Indispensable para estudiantes no videntes o con baja visión: al iniciar sesión, la plataforma se iniciará en modo lector sonoro de manera automática para no obligarles a buscar visualmente el botón en pantalla.
-                      </span>
-                    </span>
-                  </label>
+                {/* Pre-configuración de Accesibilidad Inicial */}
+                <div className="pt-3 border-t border-purple-200/80 space-y-2">
+                  <span className="text-xs font-bold text-slate-800 block">
+                    Perfil de Accesibilidad Inicial (Pre-activación automática en el inicio de sesión):
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <label className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-purple-200 cursor-pointer min-h-[44px]">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formState.voiceReaderByDefault)}
+                        onChange={(e) => setFormState({ ...formState, voiceReaderByDefault: e.target.checked })}
+                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                      />
+                      <span className="font-semibold text-slate-800">Lector de voz al iniciar</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-purple-200 cursor-pointer min-h-[44px]">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formState.clearReadingByDefault)}
+                        onChange={(e) => setFormState({ ...formState, clearReadingByDefault: e.target.checked })}
+                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                      />
+                      <span className="font-semibold text-slate-800">Lectura clara y resumida</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-purple-200 cursor-pointer min-h-[44px]">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formState.highContrastByDefault)}
+                        onChange={(e) => setFormState({ ...formState, highContrastByDefault: e.target.checked })}
+                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                      />
+                      <span className="font-semibold text-slate-800">Alto contraste visual</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-purple-200 cursor-pointer min-h-[44px]">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formState.dyslexicFontByDefault)}
+                        onChange={(e) => setFormState({ ...formState, dyslexicFontByDefault: e.target.checked })}
+                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                      />
+                      <span className="font-semibold text-slate-800">Tipografía de lectura cómoda</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <PaedisAdjustmentsManager
-                adjustments={formState.ajustesAprobados}
-                newAdjustment={newAdjustment}
-                onNewAdjustmentChange={setNewAdjustment}
-                onAddPreset={(p) => appendAdjustment(p.tipo, p.descripcion)}
-                onAddCustom={handleAddCustomAdjustment}
-                onRemoveAdjustment={handleRemoveAdjustment}
-                getVoiceProps={getVoiceProps}
-              />
+              {/* CAPA 2: AJUSTES RAZONABLES OPERATIVOS (AULA Y EVALUACIÓN - VIGENCIA SEMESTRAL) */}
+              <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-blue-100 text-[#002B49]">
+                      <BookOpen className="w-4 h-4" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-[#002B49] block">
+                        Capa 2: Ajustes Razonables Operativos (Aula &amp; Evaluación)
+                      </span>
+                      <span className="text-[11px] text-slate-600 font-medium">
+                        Medidas pedagógicas sin datos clínicos • Emitidas en Ficha Docente
+                      </span>
+                    </div>
+                  </div>
 
+                  {/* Renovación Semestral con 1 Clic */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block">Vigencia</span>
+                      <span className="text-xs font-black text-[#002B49] px-2.5 py-0.5 rounded bg-blue-50 border border-blue-200">
+                        {formState.vigenciaSemestrePaedis || '2026-1'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={handleRenewSemester}
+                      {...getVoiceProps('Renovar ajustes razonables para siguiente semestre')}
+                      className="min-h-[44px] px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer focus-visible:ring-4 focus-visible:ring-amber-400 disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Renovar para Siguiente Semestre</span>
+                    </button>
+                  </div>
+                </div>
+
+                <PaedisAdjustmentsManager
+                  adjustments={formState.ajustesAprobados}
+                  currentSemester={formState.vigenciaSemestrePaedis || '2026-1'}
+                  newAdjustment={newAdjustment}
+                  onNewAdjustmentChange={setNewAdjustment}
+                  onAddPreset={(p) => appendAdjustment(p.tipo, p.descripcion)}
+                  onAddCustom={handleAddCustomAdjustment}
+                  onRemoveAdjustment={handleRemoveAdjustment}
+                  getVoiceProps={getVoiceProps}
+                />
+              </div>
+
+              {/* BOTONES DE ACCIÓN */}
               <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => setIsDocenteModalOpen(true)}
                   {...getVoiceProps('Generar y previsualizar Ficha Docente Confidencial')}
-                  className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-[#002B49] font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-[#002B49] font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 cursor-pointer shadow-2xs"
                 >
-                  <FileText className="w-4 h-4" aria-hidden="true" />
-                  <span>Generar Ficha Docente</span>
+                  <FileText className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+                  <span>Generar Ficha Docente ({formState.vigenciaSemestrePaedis || '2026-1'})</span>
                 </button>
 
                 <button
@@ -1202,7 +1370,6 @@ export const PaedisCaseManagementSection = ({ students = [], onStudentUpdated, a
           });
         }}
         isSaving={isSaving}
-        tutorParAsignado={formState.tutorParAsignado}
         announce={announce}
         getVoiceProps={getVoiceProps}
       />

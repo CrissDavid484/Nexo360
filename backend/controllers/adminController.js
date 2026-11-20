@@ -1211,7 +1211,7 @@ function parseValidDate(rawDate, fallbackDate = null) {
   return Number.isNaN(parsed.getTime()) ? fallbackDate : parsed;
 }
 
-function sanitizeReasonableAdjustments(rawList) {
+function sanitizeReasonableAdjustments(rawList, defaultSemester = '2026-1') {
   if (!Array.isArray(rawList)) return [];
   return rawList
     .slice(0, 30)
@@ -1223,6 +1223,7 @@ function sanitizeReasonableAdjustments(rawList) {
         tipo,
         descripcion,
         fechaAprobacion: parseValidDate(item?.fechaAprobacion, new Date()),
+        semestreVigencia: sanitizeString(item?.semestreVigencia, 20) || defaultSemester,
       };
     })
     .filter(Boolean);
@@ -1248,7 +1249,7 @@ function sanitizeTeacherAcknowledgments(rawList) {
     .filter(Boolean);
 }
 
-function buildPaedisCaseUpdates(body) {
+function buildPaedisCaseUpdates(body, existingUser = null) {
   const updates = {};
   const stringFields = [
     ['diagnosticoDeclarado', 160],
@@ -1256,6 +1257,7 @@ function buildPaedisCaseUpdates(body) {
     ['acreditacionPaedis', 100],
     ['notasConfidencialesPaedis', 1000],
     ['tutorParAsignado', 120],
+    ['vigenciaSemestrePaedis', 20],
   ];
 
   for (const [key, maxLen] of stringFields) {
@@ -1269,8 +1271,25 @@ function buildPaedisCaseUpdates(body) {
     updates.tutorPaedisAsignado = isYes ? 'Sí' : 'No';
   }
 
+  // Renovación semestral con un clic
+  if (body.renewForSemester) {
+    const nextSem = sanitizeString(body.renewForSemester, 20) || '2026-2';
+    updates.vigenciaSemestrePaedis = nextSem;
+    updates.fechaRenovacionSemestral = new Date();
+    updates.acusesDocentes = [];
+    if (!Array.isArray(body.ajustesAprobados) && existingUser && Array.isArray(existingUser.ajustesAprobados)) {
+      updates.ajustesAprobados = existingUser.ajustesAprobados.map((a) => {
+        const item = typeof a.toObject === 'function' ? a.toObject() : { ...a };
+        item.semestreVigencia = nextSem;
+        return item;
+      });
+    }
+  }
+
+  const effectiveSemester = updates.vigenciaSemestrePaedis || (existingUser?.vigenciaSemestrePaedis || '2026-1');
+
   if (Array.isArray(body.ajustesAprobados)) {
-    updates.ajustesAprobados = sanitizeReasonableAdjustments(body.ajustesAprobados);
+    updates.ajustesAprobados = sanitizeReasonableAdjustments(body.ajustesAprobados, effectiveSemester);
   }
 
   if (Array.isArray(body.acusesDocentes)) {
@@ -1320,7 +1339,7 @@ exports.updatePaedisCase = async (req, res) => {
     }
 
     const body = req.body || {};
-    const updates = buildPaedisCaseUpdates(body);
+    const updates = buildPaedisCaseUpdates(body, user);
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         success: false,
