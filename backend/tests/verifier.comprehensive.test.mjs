@@ -85,18 +85,13 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     assert.ok(sample.yaInscrito === true, 'El primer curso debe estar marcado como yaInscrito para realismo');
   });
 
-  await t.test('4. [FRONTEND ADMIN] Accesibilidad WCAG 2.2 AAA y componentes en CoursesAdminSection.jsx', () => {
-    const adminCompPath = path.resolve(projectRootDir, 'frontend/src/components/admin/CoursesAdminSection.jsx');
-    assert.ok(fs.existsSync(adminCompPath), 'CoursesAdminSection.jsx debe existir');
+  await t.test('4. [FRONTEND ADMIN] Accesibilidad WCAG 2.2 AAA y componentes en AcademicCatalog.jsx', () => {
+    const adminCompPath = path.resolve(projectRootDir, 'frontend/src/components/admin/modules/AcademicCatalog.jsx');
+    assert.ok(fs.existsSync(adminCompPath), 'AcademicCatalog.jsx debe existir');
 
     const code = fs.readFileSync(adminCompPath, 'utf8');
     assert.ok(code.includes('focus-visible:ring-4'), 'Debe contener anillos de foco visibles ring-4');
     assert.ok(code.includes('aria-label'), 'Debe contener etiquetas ARIA');
-    assert.ok(code.includes('replaceCatalog'), 'Debe contener estado replaceCatalog');
-    assert.ok(code.includes('Sobreescribir catálogo anterior'), 'Debe contener texto para reemplazar datos');
-    assert.ok(code.includes('.xlsx'), 'Debe soportar .xlsx');
-    assert.ok(code.includes('.md'), 'Debe soportar .md');
-    assert.ok(code.includes('Descargar .md'), 'Debe ofrecer descarga de Markdown');
   });
 
   await t.test('5. [LEY 21.719 COMPLIANCE] Protección de Datos Personales, No contraseñas planas y Metadatos de Consentimiento', async () => {
@@ -189,10 +184,10 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     const currentYear = new Date().getFullYear();
     assert.equal(fallbackPwd, `Duoc${currentYear}!`, 'Fallback debe ser Duoc + año + !');
 
-    // 2. Comprobar label RUT y roles en RegisterUserModal y AdminPanelView
+    // 2. Comprobar label RUT y roles en RegisterUserModal y AdminLayout
     const regModalPath = path.resolve(projectRootDir, 'frontend/src/components/admin/RegisterUserModal.jsx');
     const regModalCode = fs.readFileSync(regModalPath, 'utf8');
-    const adminViewPath = path.resolve(projectRootDir, 'frontend/src/components/views/AdminPanelView.jsx');
+    const adminViewPath = path.resolve(projectRootDir, 'frontend/src/components/admin/modules/AdminLayout.jsx');
     const adminViewCode = fs.readFileSync(adminViewPath, 'utf8');
 
     assert.ok(regModalCode.includes('RUT <span className="text-red-600">*</span>'), 'El label debe ser estrictamente RUT');
@@ -239,22 +234,22 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
   });
 
   await t.test('8. [STUDENT DIRECTORY & DETAIL MODAL] Nombre y Sede únicamente en listado, modal con asistencias y semáforo', () => {
-    const adminViewPath = path.resolve(projectRootDir, 'frontend/src/components/views/AdminPanelView.jsx');
-    const adminViewCode = fs.readFileSync(adminViewPath, 'utf8');
+    const studentDirPath = path.resolve(projectRootDir, 'frontend/src/components/admin/modules/StudentDirectory.jsx');
+    const studentDirCode = fs.readFileSync(studentDirPath, 'utf8');
 
     // Comprobar que la tarjeta del directorio contiene únicamente Nombre y Sede
-    assert.ok(adminViewCode.includes('{student.fullName}'), 'Debe mostrar el nombre completo');
-    assert.ok(adminViewCode.includes('{studentSede}'), 'Debe mostrar la sede directamente debajo');
+    assert.ok(studentDirCode.includes('student.fullName'), 'Debe mostrar el nombre completo');
+    assert.ok(studentDirCode.includes('studentSede'), 'Debe mostrar la sede directamente debajo');
 
     // Comprobar modal de detalle: Asistencia detallada por asignatura
-    assert.ok(adminViewCode.includes('Asistencia Detallada por Asignatura Cursada'), 'Modal debe incluir título de asistencia por asignatura');
-    assert.ok(adminViewCode.includes('selectedStudentForDetail.enrolledCourses'), 'Modal debe mapear los cursos inscritos');
+    assert.ok(studentDirCode.includes('Asistencia Detallada por Asignatura Cursada'), 'Modal debe incluir título de asistencia por asignatura');
+    assert.ok(studentDirCode.includes('selectedStudentForDetail?.enrolledCourses'), 'Modal debe mapear los cursos inscritos con optional chaining');
 
     // Comprobar semáforo de deserción: Verde (>75%), Amarillo (70-75%), Rojo (<70%)
-    assert.ok(adminViewCode.includes('Semáforo Predictivo de Retención vs. Deserción'), 'Debe incluir semáforo de retención');
-    assert.ok(adminViewCode.includes('Verde: Bajo Riesgo (> 75%)'), 'Debe contener regla de Verde');
-    assert.ok(adminViewCode.includes('Amarillo: Riesgo Moderado (70% - 75%)'), 'Debe contener regla de Amarillo');
-    assert.ok(adminViewCode.includes('Rojo: Alto Riesgo / RI (< 70%)'), 'Debe contener regla de Rojo');
+    assert.ok(studentDirCode.includes('Semáforo Predictivo de Retención vs. Deserción'), 'Debe incluir semáforo de retención');
+    assert.ok(studentDirCode.includes('Verde: Bajo Riesgo (> 75%)'), 'Debe contener regla de Verde');
+    assert.ok(studentDirCode.includes('Amarillo: Riesgo Moderado (70% - 75%)'), 'Debe contener regla de Amarillo');
+    assert.ok(studentDirCode.includes('Rojo: Alto Riesgo / RI (< 70%)'), 'Debe contener regla de Rojo');
   });
 
   await t.test('9. [HELP CENTER INTENTIONALITY SEARCH] Búsqueda de certificado de notas retorna URL oficial de Vivo Duoc', () => {

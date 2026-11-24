@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import {
   PORTAL_INSC_URL,
-  TOMA_RAMOS_ESTUDIANTE,
   BLOQUES_HORARIOS_TOMA,
   TOMA_RAMOS_TUTORIAL_VIDEO,
   CARRERAS_DUOC,
@@ -38,6 +37,7 @@ import {
   getBoletinSemesterTitle,
   formatStudentNameForBoletin,
   MALLA_CURRICULAR_SEMANAL,
+  isSectionMatchingJornada,
 } from '../../data/tomaRamosData';
 import {
   SapSelectBoxIcon,
@@ -56,6 +56,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
 import { api } from '../../services/api';
 import { DEFAULT_CAMPUS, getStudentDisplayName, getStudentRut } from '../../utils/studentUtils';
+import { YouTubeTutorialPlayer } from '../common/YouTubeTutorialPlayer';
 
 const DIAS_GRILLA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -102,6 +103,38 @@ function findCourseCellMatch(courses, tipo, dia, bloqueId) {
   return null;
 }
 
+function parseSectionOrder(seccion) {
+  const str = String(seccion || '').trim().toUpperCase();
+  const match = str.match(/^(\d+)([A-Z]*)$/);
+  if (match) {
+    return { num: Number.parseInt(match[1], 10), suffix: match[2] || '' };
+  }
+  const numMatch = str.match(/(\d+)/);
+  return {
+    num: numMatch ? Number.parseInt(numMatch[1], 10) : Number.MAX_SAFE_INTEGER,
+    suffix: str,
+  };
+}
+
+function sortSectionsAscending(sections) {
+  if (!Array.isArray(sections)) return [];
+  return [...sections].sort((a, b) => {
+    const sa = parseSectionOrder(a?.seccion ?? a);
+    const sb = parseSectionOrder(b?.seccion ?? b);
+    if (sa.num !== sb.num) return sa.num - sb.num;
+    return sa.suffix.localeCompare(sb.suffix);
+  });
+}
+
+function normalizeCoursesSectionsOrder(courses) {
+  if (!Array.isArray(courses)) return [];
+  return courses.map((course) =>
+    Array.isArray(course?.secciones)
+      ? { ...course, secciones: sortSectionsAscending(course.secciones) }
+      : course
+  );
+}
+
 /**
  * Construye la carga académica inicial cuando el usuario elige "Modificación de Asignaturas".
  * Inscribe los ramos del paquete seleccionado (asignando una sección alternativa cuando exista
@@ -114,7 +147,7 @@ function buildInitialEnrolledForModificacion(pkg, coursesPool) {
 
   pkg.targetCourses.forEach((tc) => {
     const full = coursesPool.find((c) => c.sigla === tc.sigla);
-    const validSecs = (full?.secciones || []).filter((s) => !s.sinCupos);
+    const validSecs = sortSectionsAscending(full?.secciones || []).filter((s) => !s.sinCupos);
 
     const altSec = validSecs.find((sec) => {
       if (sec.seccion === tc.seccion) return false;
@@ -204,23 +237,23 @@ function getTargetCourseVoiceLabel(tc, hasExactMatch, hasWrongSection, currentSe
   return `Meta ${tc.sigla} ${tc.nombre}, sección ${tc.seccion}, ${stateLabel}`;
 }
 
-function TargetCourseStatusBadge({ tc, hasExactMatch, hasWrongSection, currentSelected }) {
+function TargetCourseStatusBadge({ tc, hasExactMatch, hasWrongSection }) {
   if (hasExactMatch) {
     return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
+      <span className="inline-block whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
         ✓ Meta lograda
       </span>
     );
   }
   if (hasWrongSection) {
     return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white">
-        Cambiar {currentSelected?.seccion} → {tc.seccion}
+      <span className="inline-block whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white">
+        Secc. incorrecta
       </span>
     );
   }
   return (
-    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-800">
+    <span className="inline-block whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-800">
       Pendiente ({tc.seccion})
     </span>
   );
@@ -265,10 +298,22 @@ export const TomaRamosSimulator = ({ onExit }) => {
     user?.vivoStudentProfile?.carrera ||
     'Ingeniería en Informática';
 
-  const studentFullName = getStudentDisplayName(user);
-  const studentRutFormatted = getStudentRut(user);
+  const rawUserFullName =
+    user?.fullName || user?.nombre || user?.name || user?.vivoStudentProfile?.nombre || '';
+  const studentFullName =
+    rawUserFullName && !rawUserFullName.includes('@') && rawUserFullName !== 'Estudiante Duoc UC'
+      ? rawUserFullName
+      : getStudentDisplayName(user);
+  const studentRutFormatted =
+    (typeof user?.rut === 'string' && user.rut.trim()) ||
+    (typeof user?.vivoStudentProfile?.rut === 'string' && user.vivoStudentProfile.rut.trim()) ||
+    getStudentRut(user);
   const studentRutRaw =
     String(studentRutFormatted).replace(/[.-]/g, '').toUpperCase() || '219876543';
+  const userCampus =
+    user?.campus || user?.sede || user?.vivoStudentProfile?.sede || '';
+  const userJornada =
+    user?.jornada || user?.vivoStudentProfile?.jornada || '';
 
   const matchedInitialCarrera =
     CARRERAS_DUOC.find(
@@ -282,7 +327,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
   const [selectedDifficulty, setSelectedDifficulty] = useState('facil');
 
   const [availableCourses, setAvailableCourses] = useState(() =>
-    getRandomCoursesForCareer(matchedInitialCarrera.nombre, 8, 'facil')
+    normalizeCoursesSectionsOrder(
+      getRandomCoursesForCareer(matchedInitialCarrera.nombre, 8, 'facil')
+    )
   );
 
   const [isPreFlowActive, setIsPreFlowActive] = useState(true);
@@ -395,7 +442,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
         if (!isMountedRef.current) return;
 
         if (res?.success && Array.isArray(res.courses) && res.courses.length > 0) {
-          const coursesList = appendDifficultyPracticas(res.courses, difficulty);
+          const coursesList = normalizeCoursesSectionsOrder(
+            appendDifficultyPracticas(res.courses, difficulty)
+          );
           setCursosSeleccionados([]);
           setAvailableCourses(coursesList);
           const pkgs = generateTargetPackages(coursesList, difficulty);
@@ -410,7 +459,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
       if (!isMountedRef.current) return;
 
-      const localRandom = getRandomCoursesForCareer(carreraName, 8, difficulty);
+      const localRandom = normalizeCoursesSectionsOrder(
+        getRandomCoursesForCareer(carreraName, 8, difficulty)
+      );
       setCursosSeleccionados([]);
       setAvailableCourses(localRandom);
       const pkgs = generateTargetPackages(localRandom, difficulty);
@@ -440,8 +491,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
         nombre: studentCareer.toUpperCase(),
         nombreCorto: studentCareer,
         escuela: 'Escuela Duoc UC',
-        sede: user?.campus || user?.sede || user?.vivoStudentProfile?.sede || DEFAULT_CAMPUS,
-        jornada: 'Diurno',
+        sede: userCampus || DEFAULT_CAMPUS,
+        jornada: userJornada || 'Diurno',
         periodo: '2026 - 002',
         creditosTotalesCurriculum: 418,
         creditosInscritosAprobados: 378,
@@ -457,7 +508,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
     refreshRandomCourses(match.nombre, 'facil').catch((err) => {
       console.warn('[TomaRamosSimulator] Error cargando ramos iniciales de carrera:', err);
     });
-  }, [studentCareer, user?.campus, user?.sede, user?.vivoStudentProfile?.sede, refreshRandomCourses]);
+  }, [studentCareer, userCampus, userJornada, refreshRandomCourses]);
 
   // Limpiar BD simulada al entrar y salir
   useEffect(() => {
@@ -899,6 +950,33 @@ export const TomaRamosSimulator = ({ onExit }) => {
     }, 4500);
   };
 
+  const handleScrollToSimulator = () => {
+    const target = preFlowModalRef.current || simulatorContainerRef.current;
+    if (!target) return;
+
+    if (simulatorContainerRef.current?.closest('[role="dialog"]')) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    const headerEl = document.querySelector('header');
+    // Ignorar el <header> interno de SICOL si el simulador corre sin UnifiedNavbar
+    const hasPageHeader = headerEl && !simulatorContainerRef.current?.contains(headerEl);
+    let headerHeight = 80;
+    if (hasPageHeader) {
+      headerHeight = headerEl.getBoundingClientRect().height || 80;
+    } else if (headerEl) {
+      headerHeight = 0;
+    }
+
+    const availableHeight = Math.max(window.innerHeight - headerHeight, 0);
+    const rect = target.getBoundingClientRect();
+    const topOffset = Math.max((availableHeight - rect.height) / 2, 16);
+    const top = Math.max(0, rect.top + window.scrollY - headerHeight - topOffset);
+
+    window.scrollTo({ top, behavior: 'smooth' });
+  };
+
   if (isUnregisteredUser) {
     return (
       <div
@@ -961,17 +1039,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
           </div>
 
           <div className="shrink-0 flex flex-wrap items-center gap-2.5">
-            {!isPreFlowActive && (
-              <button
-                type="button"
-                onClick={() => handleRepeatSimulation(simulationMode, false)}
-                {...getVoiceProps('Cambiar modo o dificultad del simulador')}
-                className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold text-xs flex items-center gap-2 border border-slate-200 transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
-                <span>Cambiar Modo / Dificultad</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleScrollToSimulator}
+              {...getVoiceProps('Simula tu toma de ramos, desplazarse al simulador')}
+              className="min-h-[44px] px-4 py-2.5 bg-[#FFB81C] hover:bg-amber-400 text-slate-950 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5 fill-current shrink-0" aria-hidden="true" />
+              <span>Simula tu toma de ramos</span>
+            </button>
 
             <a
               href={PORTAL_INSC_URL}
@@ -1031,17 +1107,13 @@ export const TomaRamosSimulator = ({ onExit }) => {
               </a>
             </div>
 
-            <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-sm">
-              <iframe
-                key={currentVideo.videoId}
-                src={currentVideo.embedUrl}
-                title={currentVideo.title}
-                className="w-full h-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            </div>
+            <YouTubeTutorialPlayer
+              embedUrl={currentVideo.embedUrl}
+              watchUrl={currentVideo.url}
+              title={currentVideo.title}
+              voiceProps={getVoiceProps('Abrir tutorial en YouTube en una nueva pestaña')}
+              containerClassName="rounded-2xl bg-slate-950 border border-slate-200 shadow-sm"
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200/80">
               <span className="flex items-center gap-2 font-medium">
@@ -1113,7 +1185,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
           ref={simulatorContainerRef}
           role="region"
           aria-label="Simulador Oficial de Toma de Ramos Duoc UC - Sede Alameda (SAP WebDynpro SICOL)"
-          className="relative flex-1 min-w-0 w-full min-h-[780px] rounded-2xl overflow-hidden border border-slate-300 shadow-xl bg-[#EEF3F8] text-slate-900 flex flex-col font-sans select-none"
+          className="relative flex-1 min-w-0 w-full min-h-[780px] scroll-mt-24 rounded-2xl overflow-hidden border border-slate-300 shadow-xl bg-[#EEF3F8] text-slate-900 flex flex-col font-sans select-none"
         >
         <div
           className={`flex-1 flex flex-col transition-all duration-300 ${
@@ -1205,7 +1277,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
           {step !== 'boletin' && (
             <>
-              <div className="bg-[#111C2D] text-white px-4 py-2 flex items-center justify-between">
+              <div className="bg-[#111C2D] text-white px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2.5">
                   <div className="flex items-baseline font-sans tracking-tight leading-none">
                     <span className="text-[#FFB81C] font-black text-lg">Duoc</span>
@@ -1218,10 +1290,23 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       : 'Toma de Ramos'}
                   </span>
                 </div>
-                {simulationMode === 'asistido' && !isPreFlowActive && (
-                  <span className="text-[11px] bg-white/10 text-amber-300 px-2.5 py-0.5 rounded font-semibold">
-                    Modo Guiado Activo
-                  </span>
+                {!isPreFlowActive && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleRepeatSimulation(simulationMode, false)}
+                      {...getVoiceProps('Cambiar modo o dificultad del simulador')}
+                      className="px-2.5 py-0.5 bg-white/10 hover:bg-white/20 text-white rounded font-semibold text-[11px] flex items-center gap-1.5 border border-white/15 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3 text-[#FFB81C]" aria-hidden="true" />
+                      <span>Cambiar Modo / Dificultad</span>
+                    </button>
+                    {simulationMode === 'asistido' && (
+                      <span className="text-[11px] bg-white/10 text-amber-300 px-2.5 py-0.5 rounded font-semibold">
+                        Modo Guiado Activo
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -1272,7 +1357,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                   <div className="font-sans italic font-bold text-sm sm:text-[15px] tracking-wide text-slate-950 flex flex-wrap items-center gap-x-6 gap-y-0.5 uppercase">
                     <span>{studentFullName}</span>
                     <span>RUT {studentRutRaw}</span>
-                    <span>PERIODO {carreraInfo.periodo || TOMA_RAMOS_ESTUDIANTE.periodo}</span>
+                    <span>PERIODO {carreraInfo.periodo || '2026 - 002'}</span>
                   </div>
                 </div>
 
@@ -1293,15 +1378,18 @@ export const TomaRamosSimulator = ({ onExit }) => {
                 <div className="px-3 pb-2 pt-1 grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-1 text-[10px] leading-snug text-slate-900">
                   <div className="md:col-span-3">
                     <div className="font-black text-slate-950">
-                      {carreraInfo.codigo || TOMA_RAMOS_ESTUDIANTE.codigoCarrera}{' '}
-                      {carreraInfo.nombre || TOMA_RAMOS_ESTUDIANTE.carrera}
+                      {carreraInfo.codigo || '1446114'}{' '}
+                      {carreraInfo.nombre || studentCareer.toUpperCase()}
                     </div>
-                    <div className="uppercase">{carreraInfo.sede || TOMA_RAMOS_ESTUDIANTE.sede}</div>
+                    <div className="uppercase">
+                      {userCampus || carreraInfo.sede || DEFAULT_CAMPUS}
+                    </div>
                     <div className="uppercase">
                       {(
                         selectedTargetPackage?.jornada ||
+                        userJornada ||
                         carreraInfo.jornada ||
-                        TOMA_RAMOS_ESTUDIANTE.jornada
+                        'DIURNO'
                       ).toUpperCase()}
                     </div>
                   </div>
@@ -1736,13 +1824,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
                               </div>
                             )}
 
-                            <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-950 font-medium">
-                              <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
-                              <span>
-                                <strong>Tip de selección:</strong> La forma más rápida de escoger tu sección es revisar la letra final: <strong>D</strong> para horario <strong>Diurno</strong> y <strong>V</strong> para horario <strong>Vespertino</strong>.
-                              </span>
-                            </div>
-
                             <div className="border border-[#A8C2D8] overflow-x-auto">
                               <table className="w-full text-left border-collapse min-w-[500px]">
                                 <thead className="bg-gradient-to-b from-[#DFE8F2] to-[#CAD9E9] border-b border-[#A8C2D8] text-slate-900 font-bold text-[10px]">
@@ -1766,14 +1847,23 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#D7E4F0] text-[10px]">
-                                  {currentAsignatura.secciones?.every((s) => s.sinCupos) ? (
-                                    <tr>
-                                      <td colSpan={6} className="p-3 text-slate-700 font-semibold bg-slate-50">
-                                        A esta asignatura ya no le quedan vacantes disponibles.
-                                      </td>
-                                    </tr>
-                                  ) : (
-                                    currentAsignatura.secciones?.map((sec, sIdx) => (
+                                  {(() => {
+                                    const jornada = selectedTargetPackage?.jornada;
+                                    const filteredSections = sortSectionsAscending(
+                                      jornada
+                                        ? currentAsignatura.secciones?.filter((sec) =>
+                                            isSectionMatchingJornada(sec, jornada)
+                                          )
+                                        : currentAsignatura.secciones
+                                    );
+                                    return filteredSections.every((s) => s.sinCupos) ? (
+                                      <tr>
+                                        <td colSpan={6} className="p-3 text-slate-700 font-semibold bg-slate-50">
+                                          A esta asignatura ya no le quedan vacantes disponibles.
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      filteredSections?.map((sec, sIdx) => (
                                       <tr
                                         key={sec.seccion}
                                         {...getVoiceProps(
@@ -1830,7 +1920,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                         </td>
                                       </tr>
                                     ))
-                                  )}
+                                  )})()}
                                 </tbody>
                               </table>
                             </div>
@@ -2308,9 +2398,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     <div className="text-xs font-mono font-bold text-slate-900 mt-2 space-y-0.5">
                       <p>
                         SEDE:{' '}
-                        {carreraInfo.sede
-                          ? carreraInfo.sede.replace(/^Sede\s+/i, '').toUpperCase()
-                          : 'ALAMEDA'}
+                        {(userCampus || carreraInfo.sede || DEFAULT_CAMPUS)
+                          .replace(/^Sede\s+/i, '')
+                          .toUpperCase()}
                         , N° 10
                       </p>
                     </div>
@@ -2343,15 +2433,16 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     </p>
                     <p>
                       Carrera: &nbsp;&nbsp;&nbsp;
-                      <strong>{carreraInfo.nombre || TOMA_RAMOS_ESTUDIANTE.carrera}</strong>
+                      <strong>{carreraInfo.nombre || studentCareer.toUpperCase()}</strong>
                     </p>
                     <p>
                       Jornada: &nbsp;&nbsp;&nbsp;
                       <strong>
                         {(
                           selectedTargetPackage?.jornada ||
+                          userJornada ||
                           carreraInfo.jornada ||
-                          TOMA_RAMOS_ESTUDIANTE.jornada
+                          'DIURNO'
                         ).toUpperCase()}
                       </strong>
                     </p>
@@ -2361,7 +2452,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
                       Rut: &nbsp;&nbsp;&nbsp;&nbsp;<strong>{studentRutFormatted}</strong>
                     </p>
                     <p>
-                      N° <strong>{carreraInfo.codigo || TOMA_RAMOS_ESTUDIANTE.codigoCarrera}</strong>
+                      N° <strong>{carreraInfo.codigo || '1446114'}</strong>
                     </p>
                   </div>
                 </div>
@@ -2562,8 +2653,8 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     Sede Alameda (SICOL).
                   </p>
                   <p>
-                    Duoc UC - Sede Alameda • Periodo{' '}
-                    {carreraInfo.periodo || TOMA_RAMOS_ESTUDIANTE.periodo}
+                    Duoc UC - {userCampus || carreraInfo.sede || DEFAULT_CAMPUS} • Periodo{' '}
+                    {carreraInfo.periodo || '2026 - 002'}
                   </p>
                 </div>
               </div>
@@ -2939,12 +3030,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
                         <span>{selectedTargetPackage.name}</span>
                       </div>
 
-                      <div className="bg-amber-50 px-4 py-2 flex items-center gap-2 border-b border-amber-200 text-xs text-amber-950 font-sans font-medium">
-                        <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
-                        <span>
-                          <strong>Tip institucional:</strong> La forma más fácil de escoger una sección es revisar su letra final: <strong>D</strong> para horario <strong>Diurno</strong> y <strong>V</strong> para horario <strong>Vespertino</strong>.
-                        </span>
-                      </div>
+                      {simulationMode === 'asistido' && (
+                        <div className="bg-amber-50 px-4 py-2 flex items-center gap-2 border-b border-amber-200 text-xs text-amber-950 font-sans font-medium">
+                          <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
+                          <span>
+                            <strong>Tip institucional:</strong> La forma más fácil de escoger una sección es revisar su letra final: <strong>D</strong> para horario <strong>Diurno</strong> y <strong>V</strong> para horario <strong>Vespertino</strong>.
+                          </span>
+                        </div>
+                      )}
 
                       <div className="bg-[#FFB81C] text-slate-950 px-4 py-1.5 grid grid-cols-12 font-black text-xs border-b border-black">
                         <div className="col-span-3 sm:col-span-2 border-r border-black pr-2">
@@ -3107,12 +3200,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
                     <span className="shrink-0">{carreraInfo.codigo || '1446114-6-D'}</span>
                     <span className="text-right">{selectedTargetPackage.name}</span>
                   </div>
-                  <div className="bg-amber-50 px-3 py-1.5 flex items-center gap-1.5 border-b border-amber-200 text-[11px] text-amber-950 font-sans font-medium">
-                    <Lightbulb className="w-3.5 h-3.5 text-amber-600 shrink-0" aria-hidden="true" />
-                    <span>
-                      <strong>Tip:</strong> Revisa la letra final (<strong>D</strong> = Diurno, <strong>V</strong> = Vespertino).
-                    </span>
-                  </div>
+                  {simulationMode === 'asistido' && (
+                    <div className="bg-amber-50 px-3 py-1.5 flex items-center gap-1.5 border-b border-amber-200 text-[11px] text-amber-950 font-sans font-medium">
+                      <Lightbulb className="w-3.5 h-3.5 text-amber-600 shrink-0" aria-hidden="true" />
+                      <span>
+                        <strong>Tip:</strong> Revisa la letra final (<strong>D</strong> = Diurno, <strong>V</strong> = Vespertino).
+                      </span>
+                    </div>
+                  )}
                   <div className="bg-[#FFB81C] text-slate-950 px-3 py-1 grid grid-cols-12 items-center font-black text-[11px] border-b border-black">
                     <div className="col-span-3 border-r border-black pr-1.5">Sigla:</div>
                     <div className="col-span-5 px-2">Nom. Asignatura:</div>
@@ -3146,9 +3241,11 @@ export const TomaRamosSimulator = ({ onExit }) => {
                           )}`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="font-bold text-slate-950 text-xs">{tc.sigla}</span>
-                              <span className="text-[10px] font-sans font-bold px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800">
+                            <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+                              <span className="font-bold text-slate-950 text-xs whitespace-nowrap">
+                                {tc.sigla}
+                              </span>
+                              <span className="text-[10px] font-sans font-bold px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 whitespace-nowrap shrink-0">
                                 Secc. {tc.seccion}
                               </span>
                             </div>
@@ -3158,10 +3255,22 @@ export const TomaRamosSimulator = ({ onExit }) => {
                                 tc={tc}
                                 hasExactMatch={hasExactMatch}
                                 hasWrongSection={hasWrongSection}
-                                currentSelected={currentSelected}
                               />
                             </div>
                           </div>
+
+                          {hasWrongSection && currentSelected && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-100/90 border border-amber-300 text-[10px] font-sans font-semibold text-amber-950">
+                              <AlertTriangle
+                                className="w-3 h-3 text-amber-700 shrink-0"
+                                aria-hidden="true"
+                              />
+                              <span className="leading-snug">
+                                Elegiste <strong>{currentSelected.seccion}</strong> — cambiar a{' '}
+                                <strong>{tc.seccion}</strong>
+                              </span>
+                            </div>
+                          )}
 
                           <div className="font-bold text-slate-900 uppercase text-[11px] leading-snug break-words">
                             {tc.nombre}

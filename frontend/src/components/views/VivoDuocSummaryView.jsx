@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { DEFAULT_CAMPUS } from '../../utils/studentUtils';
+import { YouTubeTutorialPlayer } from '../common/YouTubeTutorialPlayer';
 
 /**
  * Experiencia Vivo Duoc • Manual Interactivo de Instrucciones y Servicios Oficiales (Duoc UC - Sede Alameda)
@@ -167,21 +168,21 @@ export const VivoDuocSummaryView = () => {
   const activeService = serviciosVivo.find((s) => s.id === selectedServiceId) || serviciosVivo[0];
 
   return (
-    <section aria-labelledby="vivoduoc-view-title" className="space-y-6 w-full max-w-full overflow-x-clip">
+    <section aria-labelledby="vivoduoc-view-title" className="space-y-6 w-full max-w-none overflow-x-clip">
       {/* 1. Encabezado Oficial Accesible (WCAG 2.2 AAA: Contraste >= 7:1) */}
-      <header className="bg-white px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200 shadow-sm">
+      <header className="bg-neutral-0 px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-neutral-200 shadow-sm">
         <div>
-          <span className="text-xs font-black tracking-wider uppercase text-[#002B49] block mb-1">
+          <span className="text-xs font-black tracking-wider uppercase text-brand-navy block mb-1">
             Experiencia Vivo Duoc • {DEFAULT_CAMPUS} • Manual Institucional
           </span>
           <h2
             id="vivoduoc-view-title"
             {...getVoiceProps(`Guía y Manual de Botones de Experiencia Vivo para Duoc UC ${DEFAULT_CAMPUS}`)}
-            className="text-2xl sm:text-3xl font-black tracking-tight text-[#002B49]"
+            className="text-2xl sm:text-3xl font-black tracking-tight text-brand-navy"
           >
             Guía y Manual de Botones de Experiencia Vivo
           </h2>
-          <p className="text-xs sm:text-sm text-slate-700 font-medium mt-1.5 max-w-2xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-neutral-700 font-medium mt-1.5 max-w-2xl leading-relaxed">
             Conoce con exactitud qué realiza cada botón del portal oficial de Duoc UC - {DEFAULT_CAMPUS}, dónde encontrarlo en tu menú de alumno y cómo realizar tus trámites académicos sin contratiempos.
           </p>
         </div>
@@ -193,30 +194,30 @@ export const VivoDuocSummaryView = () => {
             rel="noopener noreferrer"
             aria-label="Abrir portal oficial Experiencia Vivo Duoc (abre en nueva pestaña)"
             {...getVoiceProps('Ir a Experiencia Vivo Duoc')}
-            className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs sm:text-sm inline-flex items-center gap-2 shadow-xs transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
+            className="min-h-[44px] px-5 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white rounded-xl font-bold text-xs sm:text-sm inline-flex items-center gap-2 shadow-xs transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] focus-visible:ring-offset-2"
           >
             <span>Ir a Experiencia Vivo</span>
-            <ExternalLink className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+            <ExternalLink className="w-4 h-4 text-brand-gold" aria-hidden="true" />
           </a>
         </div>
       </header>
 
       {/* 2. Manual Interactivo de Botones y Servicios */}
       <section aria-labelledby="manual-servicios-heading" className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
           <div>
             <h3
               id="manual-servicios-heading"
               {...getVoiceProps('Manual de Botones: ¿Qué hace cada opción?')}
-              className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight"
+              className="text-lg sm:text-xl font-bold text-neutral-900 tracking-tight"
             >
               Manual de Botones: ¿Qué hace cada opción?
             </h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
+            <p className="text-xs text-neutral-500 font-medium mt-0.5">
               Selecciona cualquiera de los 9 botones para ver su función detallada, ubicación en el menú y requisitos.
             </p>
           </div>
-          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/60">
+          <span className="text-xs font-semibold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200/60">
             9 Servicios Oficiales
           </span>
         </div>
@@ -242,14 +243,14 @@ export const VivoDuocSummaryView = () => {
                     {...getVoiceProps(`${srv.title}. ${srv.badge}`)}
                     className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
                       isSelected
-                        ? 'bg-[#002B49] text-white border-[#002B49] shadow-xs'
-                        : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/90 hover:border-slate-300'
+                        ? 'bg-brand-navy text-white border-brand-navy shadow-xs'
+                        : 'bg-neutral-0 hover:bg-neutral-50 text-slate-800 border-neutral-200/90 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? 'bg-amber-400 text-slate-950 font-bold' : 'bg-slate-100 text-[#002B49]'
+                          isSelected ? 'bg-amber-400 text-slate-950 font-bold' : 'bg-neutral-100 text-brand-navy'
                         }`}
                         aria-hidden="true"
                       >
@@ -261,7 +262,7 @@ export const VivoDuocSummaryView = () => {
                         </span>
                         <span
                           className={`text-[11px] font-medium block mt-0.5 ${
-                            isSelected ? 'text-amber-300' : 'text-slate-500'
+                            isSelected ? 'text-amber-300' : 'text-neutral-500'
                           }`}
                         >
                           {srv.badge}
@@ -271,7 +272,7 @@ export const VivoDuocSummaryView = () => {
 
                     <ChevronRight
                       className={`w-4 h-4 shrink-0 transition-transform ${
-                        isSelected ? 'text-amber-400 translate-x-1' : 'text-slate-400'
+                        isSelected ? 'text-amber-400 translate-x-1' : 'text-neutral-400'
                       }`}
                       aria-hidden="true"
                     />
@@ -282,19 +283,19 @@ export const VivoDuocSummaryView = () => {
           </div>
 
           {/* Panel de Detalle Explicativo (col-span-7) */}
-          <article className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-6 shadow-xs">
+          <article className="lg:col-span-7 bg-neutral-0 rounded-2xl border border-neutral-200 p-6 sm:p-8 space-y-6 shadow-xs">
             <header className="border-b border-slate-100 pb-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase text-amber-800 tracking-wide">
                   Ficha Técnica Institucional • {DEFAULT_CAMPUS}
                 </span>
-                <span className="px-2.5 py-0.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-full font-semibold text-xs">
+                <span className="px-2.5 py-0.5 bg-neutral-50 text-neutral-700 border border-neutral-200 rounded-full font-semibold text-xs">
                   {activeService.badge}
                 </span>
               </div>
               <h4
                 {...getVoiceProps(activeService.title)}
-                className="text-xl sm:text-2xl font-bold text-slate-900 mt-1"
+                className="text-xl sm:text-2xl font-bold text-neutral-900 mt-1"
               >
                 {activeService.title}
               </h4>
@@ -305,11 +306,11 @@ export const VivoDuocSummaryView = () => {
               {...getVoiceProps(`¿Qué hace exactamente este botón? ${activeService.queHace}`)}
               className="space-y-2"
             >
-              <h5 className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
+              <h5 className="text-xs font-black uppercase text-neutral-900 tracking-wider flex items-center gap-1.5">
                 <HelpCircle className="w-4 h-4 text-blue-900" aria-hidden="true" />
                 <span>¿Qué hace exactamente este botón?</span>
               </h5>
-              <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-medium bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-medium bg-neutral-50 p-3.5 rounded-xl border border-neutral-200">
                 {activeService.queHace}
               </p>
             </div>
@@ -319,7 +320,7 @@ export const VivoDuocSummaryView = () => {
               {...getVoiceProps(`¿Dónde encontrarlo en Experiencia Vivo? ${activeService.dondeEncontrarlo}`)}
               className="space-y-2"
             >
-              <h5 className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
+              <h5 className="text-xs font-black uppercase text-neutral-900 tracking-wider flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-amber-700" aria-hidden="true" />
                 <span>¿Dónde encontrarlo en Experiencia Vivo?</span>
               </h5>
@@ -333,7 +334,7 @@ export const VivoDuocSummaryView = () => {
               {...getVoiceProps(`Requisitos importantes y normativa: ${activeService.requisitos}`)}
               className="space-y-2"
             >
-              <h5 className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
+              <h5 className="text-xs font-black uppercase text-neutral-900 tracking-wider flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-emerald-800" aria-hidden="true" />
                 <span>Requisitos importantes y normativa:</span>
               </h5>
@@ -343,8 +344,8 @@ export const VivoDuocSummaryView = () => {
             </div>
 
             {/* Botón de acceso directo al servicio oficial */}
-            <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <span className="text-[11px] text-slate-600 font-medium">
+            <div className="pt-3 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-[11px] text-neutral-600 font-medium">
                 Enlace validado con los servidores oficiales de Duoc UC ({DEFAULT_CAMPUS}).
               </span>
               <a
@@ -352,10 +353,10 @@ export const VivoDuocSummaryView = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 {...getVoiceProps(activeService.btnText)}
-                className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-blue-950 text-white font-black text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 shadow-xs transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+                className="min-h-[44px] px-5 py-2.5 bg-brand-navy hover:bg-blue-950 text-white font-black text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 shadow-xs transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
               >
                 <span>{activeService.btnText}</span>
-                <ExternalLink className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+                <ExternalLink className="w-4 h-4 text-brand-gold" aria-hidden="true" />
               </a>
             </div>
           </article>
@@ -363,8 +364,8 @@ export const VivoDuocSummaryView = () => {
       </section>
 
       {/* 3. Video Demostrativo Oficial (Diseño Compacto y Amigable) */}
-      <article className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm max-w-4xl mx-auto">
-        <header className="px-5 py-3.5 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <article className="bg-neutral-0 rounded-2xl border border-neutral-200 overflow-hidden shadow-sm w-full max-w-none">
+        <header className="px-5 py-3.5 bg-neutral-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <span className="text-[10px] font-black uppercase text-amber-400 block tracking-wider">
               Material Audiovisual Complementario
@@ -382,7 +383,7 @@ export const VivoDuocSummaryView = () => {
             target="_blank"
             rel="noopener noreferrer"
             {...getVoiceProps('Ver tutorial de Experiencia Vivo en YouTube')}
-            className="min-h-[44px] px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 self-start sm:self-auto transition-colors"
+            className="min-h-[44px] px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 self-start sm:self-auto transition-colors"
           >
             <span>Ver en YouTube</span>
             <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
@@ -390,50 +391,86 @@ export const VivoDuocSummaryView = () => {
         </header>
 
         {/* Reproductor de Video en Tamaño Reducido y Proporcionado */}
-        <div className="p-4 sm:p-5 bg-slate-950">
-          <div className="relative aspect-video max-w-2xl mx-auto rounded-xl overflow-hidden shadow-lg border border-slate-800 bg-black">
-            <iframe
-              src="https://www.youtube-nocookie.com/embed/lQUsG0XCyRg?rel=0"
+        <div className="p-4 sm:p-5 bg-neutral-950">
+          <div className="max-w-2xl mx-auto">
+            <YouTubeTutorialPlayer
+              embedUrl="https://www.youtube.com/embed/lQUsG0XCyRg?rel=0&modestbranding=1"
+              watchUrl="https://www.youtube.com/watch?v=lQUsG0XCyRg"
               title="Video tutorial oficial de inducción a Experiencia Vivo Duoc UC"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full border-0"
+              voiceProps={getVoiceProps('Abrir tutorial en YouTube en una nueva pestaña')}
+              containerClassName="rounded-xl shadow-lg border border-slate-800 bg-neutral-900"
             />
           </div>
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="px-5 py-3 bg-neutral-50 border-t border-neutral-200 text-xs text-neutral-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <span>Video oficial Duoc UC para estudiantes de {DEFAULT_CAMPUS}.</span>
-          <span className="font-semibold text-[#002B49]">Subtítulos disponibles en el reproductor</span>
+          <span className="font-semibold text-brand-navy">Subtítulos disponibles en el reproductor</span>
         </div>
       </article>
 
       {/* 4. Sello de Acreditación Institucional */}
-      <footer className="p-5 bg-slate-900 text-white rounded-2xl border-2 border-[#FFB81C] flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div role="contentinfo" className="p-5 bg-neutral-900 text-white rounded-2xl border-2 border-brand-gold flex flex-col sm:flex-row items-center justify-between gap-4" aria-label="Información institucional y contacto">
         <div className="flex items-center gap-3">
-          <Award className="w-8 h-8 text-[#FFB81C] shrink-0" aria-hidden="true" />
+          <Award className="w-8 h-8 text-brand-gold shrink-0" aria-hidden="true" />
           <div>
             <p className="font-black text-sm text-white">
               7 AÑOS ACREDITADO • NIVEL DE EXCELENCIA
             </p>
-            <p className="text-xs text-slate-300 font-medium">
+            <p className="text-xs text-slate-200 font-medium">
               Comisión Nacional de Acreditación (CNA-Chile) hasta Octubre de 2031.
             </p>
           </div>
         </div>
 
-        <a
-          href="https://mesadeservicios.duoc.cl"
-          target="_blank"
-          rel="noopener noreferrer"
-          {...getVoiceProps('Abrir Mesa de Servicios Digitales Duoc UC')}
-          className="min-h-[44px] px-5 py-2 bg-[#FFB81C] hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl inline-flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white"
-          aria-label="Abrir Mesa de Servicios Digitales Duoc UC (abre en nueva pestaña)"
-        >
-          <HelpCircle className="w-4 h-4" aria-hidden="true" />
-          <span>Mesa de Servicios</span>
-        </a>
-      </footer>
+        <div className="space-y-3">
+          <a
+            href="https://mesadeservicios.duoc.cl"
+            target="_blank"
+            rel="noopener noreferrer"
+            {...getVoiceProps('Abrir Mesa de Servicios Digitales Duoc UC')}
+            className="min-h-[44px] px-5 py-2 bg-brand-gold hover:bg-amber-300 text-neutral-950 font-black text-xs rounded-xl inline-flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white"
+            aria-label="Abrir Mesa de Servicios Digitales Duoc UC (abre en nueva pestaña)"
+          >
+            <HelpCircle className="w-4 h-4" aria-hidden="true" />
+            <span>Mesa de Servicios</span>
+          </a>
+          <div className="text-xs text-slate-200 flex flex-wrap items-center gap-3">
+            <a
+              href="tel:+56233844555"
+              {...getVoiceProps('Llamar a Mesa de Servicios +56 2 3384 4555')}
+              className="text-amber-300 hover:text-amber-200 hover:underline font-semibold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            >
+              +56 2 3384 4555
+            </a>
+            <span className="text-slate-200" aria-hidden="true">|</span>
+            <a
+              href="https://wa.me/56232394230"
+              target="_blank"
+              rel="noopener noreferrer"
+              {...getVoiceProps('WhatsApp Mesa de Servicios +56 2 3239 4230')}
+              className="text-amber-300 hover:text-amber-200 hover:underline font-semibold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            >
+              WhatsApp: +56 2 3239 4230
+            </a>
+            <span className="text-slate-200" aria-hidden="true">|</span>
+            <span className="text-slate-200 font-medium">
+              Llamadas salientes:{' '}
+              <span className="text-amber-300 font-semibold">+56 600 088 2100</span>
+            </span>
+            <span className="text-slate-200" aria-hidden="true">|</span>
+            <a
+              href="https://www.duoc.cl"
+              target="_blank"
+              rel="noopener noreferrer"
+              {...getVoiceProps('Visitar sitio web oficial www.duoc.cl')}
+              className="text-amber-300 hover:text-amber-200 hover:underline font-semibold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            >
+              www.duoc.cl
+            </a>
+          </div>
+        </div>
+      </div>
     </section>
   );
 };

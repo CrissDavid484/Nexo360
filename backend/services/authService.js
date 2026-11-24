@@ -952,6 +952,14 @@ class AuthService {
     inMemoryUsers.set(cleanEmail, userData);
   }
 
+  updateUserFieldsInMemory(email, fields) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const mem = inMemoryUsers.get(cleanEmail);
+    if (!mem || !fields || typeof fields !== 'object') return null;
+    Object.assign(mem, fields);
+    return mem;
+  }
+
   generateJwt(user) {
     const payload = {
       id: user.id || user._id,

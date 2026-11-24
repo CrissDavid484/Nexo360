@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/qa.audit.test.js tests/excelParser.test.js tests/courses.admin.test.js tests/verifier.comprehensive.test.mjs tests/admin.registry.test.js tests/auth.scraper.ley21719.test.js tests/profileAccessibility.test.js",
+    "test": "node --test tests/qa.audit.test.js tests/excelParser.test.js tests/courses.admin.test.js tests/verifier.comprehensive.test.mjs tests/admin.registry.test.js tests/auth.scraper.ley21719.test.js tests/profileAccessibility.test.js tests/predictiveRisk.test.js tests/academicCalendar.snapshots.test.js",
     "parse:alameda": "node scripts/parseAlamedaMd.js"
   },
   "dependencies": {

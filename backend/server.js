@@ -7,6 +7,9 @@ const authRoutes = require('./routes/authRoutes');
 const moduleRoutes = require('./routes/moduleRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const courseRoutes = require('./routes/courseRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
+const simulatorSnapshotService = require('./services/simulatorSnapshotService');
+const academicCalendarService = require('./services/academicCalendarService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -37,6 +40,8 @@ const allowedOrigins = [
   process.env.FRONTEND_CONTAINER_URL,
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
 ].filter(Boolean);
 
 app.use(
@@ -93,6 +98,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {
@@ -128,6 +134,8 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     await connectDB();
+    await academicCalendarService.ensureSeedCalendars();
+    simulatorSnapshotService.startSnapshotScheduler();
   } catch (err) {
     console.error('[MongoDB Error] Fallo al conectar en inicio:', err.message);
   }

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import { DEFAULT_CAMPUS, getStudentDisplayName } from '../../utils/studentUtils';
+import { AcademicWeekBadge } from './AcademicWeekBadge';
 import logo03 from '../../assets/logo03.png';
 import {
   HelpCircle,
@@ -161,11 +162,11 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
 
   return (
     <header className="bg-white/95 backdrop-blur-md text-slate-900 sticky top-0 z-40 border-b border-slate-200/90 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)] transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-none px-4 sm:px-6 lg:px-6 xl:px-10">
         {/* ========================================================= */}
         {/* 1. MODO ESCRITORIO (>= 1024px / lg): Barra Clásica Centrada */}
         {/* ========================================================= */}
-        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 min-h-[70px] sm:h-20 py-2">
+        <div className="hidden lg:grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 xl:gap-4 min-h-[70px] sm:min-h-[80px] h-auto py-2">
           {/* Marca Institucional Oficial (Logo 03 - Prominente a la izquierda) */}
           <div className="flex items-center justify-self-start shrink-0">
             <button
@@ -180,7 +181,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 alt={`Nexo360 Duoc UC - ${DEFAULT_CAMPUS}`}
                 className="w-auto object-contain transition-all duration-200 group-hover:opacity-95 select-none"
                 style={{
-                  height: 'clamp(36px, 2.6vw + 16px, 48px)',
+                  height: 'clamp(32px, 2.4vw + 10px, 46px)',
                   aspectRatio: '1024 / 307',
                 }}
               />
@@ -188,12 +189,12 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
           </div>
 
           {/* Bloque Central: Navegación + Perfil de Usuario + Cerrar sesión */}
-          <div className="flex items-center justify-center justify-self-center">
-            <div className="flex items-center gap-2 lg:gap-2.5">
+          <div className="w-full flex items-center justify-center justify-self-center min-w-0 max-w-full">
+            <div className="w-full max-w-full flex items-center gap-1.5 xl:gap-2.5 flex-wrap justify-center">
               {/* Navegación Principal */}
               <nav
                 aria-label="Secciones principales del portal"
-                className="flex items-center gap-1 bg-slate-100/70 p-1 rounded-full border border-slate-200/70 shadow-2xs backdrop-blur-xs"
+                className="flex flex-wrap justify-center items-center gap-1 max-w-full bg-slate-100/70 p-1 rounded-3xl border border-slate-200/70 shadow-2xs backdrop-blur-xs"
               >
                 {/* Opción 1: Centro de Ayuda */}
                 <button
@@ -201,7 +202,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   onClick={() => onTabChange('centro-ayuda')}
                   aria-current={activeTab === 'centro-ayuda' ? 'page' : undefined}
                   {...getVoiceProps('Centro de Ayuda')}
-                  className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                  className={`min-h-[38px] flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
                     activeTab === 'centro-ayuda'
                       ? 'bg-[#002B49] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -228,7 +229,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                         ? `Simulaciones, seleccionado actualmente ${activeSimItem.label}`
                         : 'Simulaciones'
                     )}
-                    className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                    className={`min-h-[38px] flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
                       isSimActive
                         ? 'bg-[#002B49] text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -240,7 +241,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                       }`}
                       aria-hidden="true"
                     />
-                    <span className="truncate max-w-[150px]">
+                    <span className="truncate max-w-[130px] xl:max-w-[155px]">
                       {isSimActive && activeSimItem ? activeSimItem.label : 'Simulaciones'}
                     </span>
                     <ChevronDown
@@ -330,7 +331,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   onClick={() => onTabChange('tickets')}
                   aria-current={activeTab === 'tickets' ? 'page' : undefined}
                   {...getVoiceProps('Soporte TI')}
-                  className={`min-h-[38px] flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                  className={`min-h-[38px] flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
                     activeTab === 'tickets'
                       ? 'bg-[#002B49] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -357,7 +358,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   aria-haspopup="menu"
                   aria-expanded={isUserMenuOpen}
                   {...getVoiceProps(`Menú de cuenta de ${displayName}. Rol ${roleLabel}`)}
-                  className={`min-h-[40px] flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-full border transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
+                  className={`min-h-[40px] flex items-center gap-2 xl:gap-2.5 pl-1.5 pr-2.5 xl:pr-3 py-1 rounded-full border transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 ${
                     isUserMenuOpen || activeTab === 'perfil' || activeTab === 'admin-panel'
                       ? 'bg-slate-100/90 border-slate-300 shadow-2xs'
                       : 'bg-white hover:bg-slate-50 border-slate-200 shadow-2xs hover:border-slate-300'
@@ -381,7 +382,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                   )}
 
                   {/* Info de texto */}
-                  <div className="text-left hidden md:block">
+                  <div className="text-left hidden xl:block">
                     <span className="text-xs font-bold text-slate-800 block leading-tight max-w-[130px] truncate">
                       {displayName}
                     </span>
@@ -459,14 +460,14 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                             }}
                             className="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-amber-50 hover:bg-amber-100/80 text-amber-950 border border-amber-200/80 transition-colors cursor-pointer"
                           >
-                            <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                            <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center shrink-0">
                               <HelpCircle className="w-4 h-4" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <span className="text-xs font-bold block truncate">
                                 Volver al Portal Estudiantil
                               </span>
-                              <span className="text-[10px] text-amber-800/80 block truncate">
+                              <span className="text-[10px] text-amber-900 block truncate">
                                 Ir al Centro de Ayuda
                               </span>
                             </div>
@@ -534,24 +535,26 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 type="button"
                 onClick={logout}
                 {...getVoiceProps('Cerrar sesión')}
-                className="min-h-[38px] flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                className="nexo-logout-btn min-h-[38px] flex items-center justify-center gap-1.5 px-3 xl:px-3.5 py-1.5 rounded-full text-xs font-bold text-rose-700 hover:text-rose-800 bg-rose-50/80 hover:bg-rose-100/90 border border-rose-200/80 transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 whitespace-nowrap shrink-0"
                 aria-label="Cerrar sesión"
               >
-                <LogOut className="w-3.5 h-3.5 text-rose-600 shrink-0" aria-hidden="true" />
+                <LogOut className="w-3.5 h-3.5 text-rose-700 shrink-0" aria-hidden="true" />
                 <span>Cerrar sesión</span>
               </button>
             </div>
           </div>
 
-          {/* Lado Derecho: Balanceador simétrico de 1fr en desktop */}
-          <div className="justify-self-end" aria-hidden="true" />
+          {/* Lado Derecho: Semana Académica Duoc UC vigente */}
+          <div className="justify-self-end flex items-center shrink-0">
+            <AcademicWeekBadge />
+          </div>
         </div>
 
         {/* ========================================================= */}
         {/* 2. MODO MÓVIL Y TABLET (< 1024px / < lg): Barra + Dropdown */}
         {/* ========================================================= */}
         <div className="lg:hidden relative">
-          <div className="min-h-[56px] sm:min-h-[62px] py-1.5 flex items-center justify-between gap-3">
+          <div className="min-h-[56px] sm:min-h-[62px] py-1.5 flex items-center justify-between gap-2.5 flex-wrap">
             {/* Marca Institucional Oficial (Logo 03) */}
             <button
               type="button"
@@ -573,6 +576,9 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 }}
               />
             </button>
+
+            {/* Discreto en sm-md; también visible dentro del dropdown móvil */}
+            <AcademicWeekBadge compact className="hidden sm:inline-flex" />
 
             {/* Botón Disparador del Menú Desplegable */}
             <button
@@ -636,39 +642,42 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               className="absolute top-full left-0 right-0 sm:left-auto sm:right-0 sm:w-[380px] mt-1.5 bg-white rounded-2xl shadow-2xl border border-slate-200/90 max-h-[calc(100vh-76px)] overflow-hidden flex flex-col z-50 animate-fade-in"
             >
               {/* Cabecera Compacta del Usuario */}
-              <div className="p-3 bg-slate-50/90 border-b border-slate-100 flex items-center gap-2.5 shrink-0">
-                {user?.photo ? (
-                  <img
-                    src={user.photo}
-                    alt=""
-                    className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
-                  />
-                ) : (
-                  <div
-                    className="w-8 h-8 rounded-full bg-[#002B49] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs"
-                    aria-hidden="true"
-                  >
-                    {displayName.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-bold text-slate-900 block truncate">
-                    {displayName}
-                  </span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-semibold text-[#002B49]">
-                      {roleLabel}
+              <div className="p-3 bg-slate-50/90 border-b border-slate-100 space-y-2 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  {user?.photo ? (
+                    <img
+                      src={user.photo}
+                      alt=""
+                      className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className="w-8 h-8 rounded-full bg-[#002B49] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs"
+                      aria-hidden="true"
+                    >
+                      {displayName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-bold text-slate-900 block truncate">
+                      {displayName}
                     </span>
-                    <span className="text-[10px] text-slate-400">· {DEFAULT_CAMPUS}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-semibold text-[#002B49]">
+                        {roleLabel}
+                      </span>
+                      <span className="text-[10px] text-slate-400">· {DEFAULT_CAMPUS}</span>
+                    </div>
                   </div>
+                  {(activeTab === 'admin-panel' || activeTab === 'perfil') && (
+                    <span
+                      className="w-2 h-2 rounded-full bg-amber-500 shrink-0"
+                      title="Sección activa"
+                      aria-hidden="true"
+                    />
+                  )}
                 </div>
-                {(activeTab === 'admin-panel' || activeTab === 'perfil') && (
-                  <span
-                    className="w-2 h-2 rounded-full bg-amber-500 shrink-0"
-                    title="Sección activa"
-                    aria-hidden="true"
-                  />
-                )}
+                <AcademicWeekBadge compact className="w-full justify-center max-w-full !whitespace-normal text-center" />
               </div>
 
               {/* Cuerpo Desplazable de Enlaces y Opciones */}
@@ -897,7 +906,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                         {...getVoiceProps('Volver al Portal Estudiantil')}
                         className="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-amber-50 hover:bg-amber-100/90 text-amber-950 border border-amber-300 transition-colors cursor-pointer"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center shrink-0">
                           <HelpCircle className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -936,7 +945,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
               </div>
 
               {/* Pie Compacto: Cerrar Sesión + Respaldo */}
-              <div className="p-2.5 bg-slate-50/90 border-t border-slate-100 shrink-0 space-y-1.5">
+              <div className="px-2.5 pt-2.5 pb-20 bg-slate-50/90 border-t border-slate-100 shrink-0 space-y-1.5">
                 <button
                   type="button"
                   role="menuitem"
@@ -945,9 +954,9 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                     logout();
                   }}
                   {...getVoiceProps('Cerrar sesión')}
-                  className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-200/90 font-bold text-xs transition-colors cursor-pointer"
+                  className="nexo-logout-btn w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-200/90 font-bold text-xs transition-colors cursor-pointer"
                 >
-                  <LogOut className="w-4 h-4 shrink-0 text-rose-600" aria-hidden="true" />
+                  <LogOut className="w-4 h-4 shrink-0 text-rose-700" aria-hidden="true" />
                   <span>Cerrar sesión</span>
                 </button>
                 <p className="text-[10px] text-slate-400 text-center font-medium">

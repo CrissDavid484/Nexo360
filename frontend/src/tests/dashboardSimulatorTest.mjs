@@ -37,7 +37,9 @@ assert.ok(
   'DashboardPage must show required access control message for unregistered users'
 );
 assert.ok(
-  dashboardContent.includes('Hola,') && (dashboardContent.includes('user?.name') || dashboardContent.includes('userName') || dashboardContent.includes('displayGreetingName')),
+  dashboardContent.includes('Bienvenido a Nexo360, {userName}') &&
+    !dashboardContent.includes('Hola, {userName}') &&
+    (dashboardContent.includes('user?.name') || dashboardContent.includes('userName') || dashboardContent.includes('displayGreetingName')),
   'DashboardPage must have dynamic student greeting'
 );
 assert.ok(

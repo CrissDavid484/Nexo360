@@ -33,6 +33,10 @@ graphify-out/
 # Playwright CLI & output (may contain credentials/traces)
 .playwright/
 .playwright-cli/
+.playwright-mcp/
+playwright-test.mjs
+test-results/
+playwright-report/
 
 # Ponytail local
 *ponytail*

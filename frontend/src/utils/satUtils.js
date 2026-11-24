@@ -167,3 +167,98 @@ export function resolveTrafficLightColor(prediction) {
 export function getSatRiskBadgeMeta(riskLevel) {
   return resolveTrafficLightColor(riskLevel);
 }
+
+/**
+ * Calcula una explicación predictiva simple del riesgo de deserción basado en datos del estudiante.
+ * Usado por el Directorio de Estudiantes para mostrar el semáforo predictivo.
+ */
+export function explainPredictiveRisk(student) {
+  if (!student) {
+    return {
+      trafficLight: 'green',
+      riskLevel: 'BAJO',
+      graduationProbability: 90,
+      score: 15,
+      factors: ['Sin datos suficientes'],
+      key: 'verde',
+    };
+  }
+
+  // Extraer la asistencia más baja de las asignaturas
+  const courses = Array.isArray(student.enrolledCourses) ? student.enrolledCourses : [];
+  let minAttendance = 100;
+  let hasCourses = false;
+
+  for (const course of courses) {
+    const rate = extractCourseAttendanceRate(course);
+    if (rate < minAttendance) {
+      minAttendance = rate;
+      hasCourses = true;
+    }
+  }
+
+  // Si no hay cursos, usar attendanceRate general
+  if (!hasCourses) {
+    const generalRate = Number(student.attendanceRate ?? 100);
+    if (Number.isFinite(generalRate)) minAttendance = Math.max(0, Math.min(100, generalRate));
+  }
+
+  // Determinar semáforo y nivel de riesgo basado en umbrales RI (70% RI, 70-75% Preventivo, >75% Normal)
+  let trafficLight, riskLevel, key, graduationProbability, score, factors;
+
+  if (student.isPaedis) {
+    // Estudiantes PAEDIS tienen ajustes, no aplicar RI automático
+    trafficLight = 'green';
+    riskLevel = 'BAJO';
+    key = 'verde';
+    graduationProbability = 85;
+    score = 20;
+    factors = ['Ajustes PAEDIS vigentes (Ley 21.719)'];
+  } else if (minAttendance < 70) {
+    trafficLight = 'red';
+    riskLevel = 'ALTO';
+    key = 'rojo';
+    graduationProbability = 30;
+    score = 85;
+    factors = [
+      `Asistencia mínima: ${minAttendance}% (bajo umbral RI 70%)`,
+      'Riesgo inminente de Reprobación por Inasistencia',
+    ];
+    if (courses.some((c) => Number(c.consecutiveAbsences ?? 0) >= 3)) {
+      factors.push('≥3 inasistencias consecutivas en al menos una asignatura');
+    }
+  } else if (minAttendance < 75) {
+    trafficLight = 'yellow';
+    riskLevel = 'MEDIO';
+    key = 'amarillo';
+    graduationProbability = 60;
+    score = 55;
+    factors = [
+      `Asistencia mínima: ${minAttendance}% (zona preventiva 70-75%)`,
+      'Requiere seguimiento docente temprano',
+    ];
+  } else {
+    trafficLight = 'green';
+    riskLevel = 'BAJO';
+    key = 'verde';
+    graduationProbability = 88;
+    score = 15;
+    factors = [`Asistencia mínima: ${minAttendance}% (cumple normativa ≥75%)`];
+  }
+
+  // Ajustar por carga académica si hay cursos
+  if (courses.length > 5) {
+    score = Math.min(100, score + 5);
+    graduationProbability = Math.max(0, graduationProbability - 5);
+    factors.push(`Carga académica alta: ${courses.length} asignaturas`);
+  }
+
+  return {
+    trafficLight,
+    riskLevel,
+    graduationProbability,
+    score,
+    factors,
+    key,
+  };
+}

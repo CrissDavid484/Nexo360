@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm ci --ignore-scripts && npm cache clean --force
 
 # Copiar de forma explícita los archivos y directorios fuente requeridos
-COPY --chown=node:node index.html vite.config.js ./
+COPY --chown=node:node index.html vite.config.js tailwind.config.js postcss.config.js ./
 COPY --chown=node:node public ./public
 COPY --chown=node:node src ./src
 

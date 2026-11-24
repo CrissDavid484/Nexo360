@@ -125,6 +125,10 @@ async function extractImportPayload(input, periodo) {
 
   if (typeof input === 'string') {
     const trimmed = input.trim();
+    if (trimmed.startsWith('<?xml') || trimmed.startsWith('<')) {
+      const mdText = excelParserService.xmlToMarkdown(trimmed);
+      return fromParsed(excelParserService.parseMarkdownTable(mdText, { periodo }), 'XML', undefined, periodo);
+    }
     if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
       try {
         const parsed = JSON.parse(trimmed);
@@ -150,8 +154,15 @@ async function extractImportPayload(input, periodo) {
     const effectivePeriodo = input.periodo || periodo;
     const effectiveReplace = input.replace !== undefined ? Boolean(input.replace) : undefined;
 
-    if (input.markdown || input.md || input.textContent) {
-      const mdText = input.markdown || input.md || input.textContent;
+    if (input.xml || input.rawXml) {
+      const xmlStr = input.xml || input.rawXml;
+      const mdText = excelParserService.xmlToMarkdown(xmlStr);
+      const mdRes = excelParserService.parseMarkdownTable(mdText, { periodo: effectivePeriodo });
+      return fromParsed(mdRes, 'XML', effectiveReplace, effectivePeriodo);
+    }
+
+    if (input.markdown || input.md || input.rawMarkdown || input.textContent) {
+      const mdText = input.markdown || input.md || input.rawMarkdown || input.textContent;
       const mdRes = excelParserService.parseMarkdownTable(mdText, { periodo: effectivePeriodo });
       return fromParsed(mdRes, 'MARKDOWN', effectiveReplace, effectivePeriodo);
     }
@@ -165,7 +176,12 @@ async function extractImportPayload(input, periodo) {
         replace: false,
         periodo: effectivePeriodo,
       });
-      const sourceFormat = filename.endsWith('.md') ? 'MARKDOWN' : 'XLSX';
+      const lowerFilename = filename.toLowerCase();
+      const sourceFormat = lowerFilename.endsWith('.xml')
+        ? 'XML'
+        : lowerFilename.endsWith('.md')
+        ? 'MARKDOWN'
+        : 'XLSX';
       return fromParsed(uploadRes, sourceFormat, effectiveReplace, effectivePeriodo);
     }
 
@@ -360,6 +376,21 @@ const courseService = {
       totalSecciones: c.totalSecciones,
       totalAsignaturas: c.asignaturasUnicas.size,
     }));
+  },
+
+  /**
+   * Retorna conteo de secciones por jornada (D/V/ambiguous) para métricas del catálogo.
+   */
+  async getCatalogSectionCounts() {
+    let all = inMemoryCourses;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        all = await CourseOffering.find({}, { seccion: 1 }).lean();
+      } catch (err) {
+        console.warn('[courseService] Fallback a memoria para conteo D/V:', err.message);
+      }
+    }
+    return countSectionKinds(all);
   },
 
   /**

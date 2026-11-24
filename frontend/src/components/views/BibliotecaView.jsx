@@ -23,6 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { DEFAULT_CAMPUS, splitStudentName, getStudentRut } from '../../utils/studentUtils';
 import { isSpeechSupported, speak, stopSpeech } from '../../utils/speechService';
+import { YouTubeTutorialPlayer } from '../common/YouTubeTutorialPlayer';
 import {
   LIBCAL_ALAMEDA_CONFIG,
   BIBLIOTECA_ALAMEDA_CATEGORIES,
@@ -215,12 +216,12 @@ export const BibliotecaView = () => {
   const currentAccessibleUrl = getLibCalAccessibleUrl(currentCategory.gid);
 
   return (
-    <section aria-labelledby="biblioteca-view-title" className="space-y-6 w-full max-w-full overflow-x-clip">
+    <section aria-labelledby="biblioteca-view-title" className="space-y-6 w-full max-w-none overflow-x-clip">
       {/* 1. Encabezado Oficial con Acceso a Rutas Oficiales LibCal */}
-      <div className="bg-white px-6 sm:px-8 py-6 rounded-3xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-slate-200/90 shadow-xs">
+      <div className="bg-neutral-0 px-6 sm:px-8 py-6 rounded-3xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-neutral-200/90 shadow-xs">
         <div className="space-y-1.5 max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-[#002B49] bg-slate-100 px-3 py-1 rounded-full border border-slate-200/80">
+            <span className="text-xs font-bold text-brand-navy bg-neutral-100 px-3 py-1 rounded-full border border-neutral-200/80">
               Bibliotecas Duoc UC • {DEFAULT_CAMPUS}
             </span>
             <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
@@ -231,15 +232,15 @@ export const BibliotecaView = () => {
           <h2
             id="biblioteca-view-title"
             {...getVoiceProps(`Reserva de salas de estudio y lentes VR en Duoc UC ${DEFAULT_CAMPUS}`)}
-            className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900"
+            className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900"
           >
             Reserva de salas de estudio y lentes VR
           </h2>
 
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+          <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-normal">
             Prepara y practica tu reserva para <strong>Duoc UC - {DEFAULT_CAMPUS}</strong>. Consulta los espacios disponibles de{' '}
-            <strong className="text-slate-900">Salas de estudio</strong> y{' '}
-            <strong className="text-slate-900">Lentes VR</strong>, o accede directamente a las plataformas oficiales de reserva y check-in.
+            <strong className="text-neutral-900">Salas de estudio</strong> y{' '}
+            <strong className="text-neutral-900">Lentes VR</strong>, o accede directamente a las plataformas oficiales de reserva y check-in.
           </p>
         </div>
 
@@ -251,10 +252,10 @@ export const BibliotecaView = () => {
             rel="noopener noreferrer"
             aria-label="Abrir portal oficial de reserva de espacios en Biblioteca Alameda (nueva pestaña)"
             {...getVoiceProps('Ir a Portal Oficial de Reserva Alameda')}
-            className="min-h-[44px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
+            className="min-h-[44px] px-4 py-2 bg-brand-navy hover:bg-brand-navyDark text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy"
           >
             <span>Portal Oficial Alameda</span>
-            <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
+            <ExternalLink className="w-4 h-4 text-brand-gold shrink-0" aria-hidden="true" />
           </a>
 
           <a
@@ -263,10 +264,10 @@ export const BibliotecaView = () => {
             rel="noopener noreferrer"
             aria-label={`Abrir versión accesible oficial para ${currentCategory.name} (nueva pestaña)`}
             {...getVoiceProps(`Abrir versión accesible oficial para ${currentCategory.name}`)}
-            className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs flex items-center gap-2 border border-slate-300 transition-all active:scale-[0.98]"
+            className="min-h-[44px] px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl font-bold text-xs flex items-center gap-2 border border-slate-300 transition-all active:scale-[0.98]"
           >
             <span>Modo Accesible Oficial</span>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-600 shrink-0" aria-hidden="true" />
+            <ExternalLink className="w-3.5 h-3.5 text-neutral-600 shrink-0" aria-hidden="true" />
           </a>
 
           <a
@@ -286,12 +287,12 @@ export const BibliotecaView = () => {
       {/* 2. Video Tutorial Oficial + 4 Pasos Clave */}
       <article
         aria-labelledby="biblioteca-tutorial-heading"
-        className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs space-y-6"
+        className="bg-neutral-0 rounded-3xl border border-neutral-200/90 p-6 sm:p-8 shadow-xs space-y-6"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-2xl bg-slate-100 text-[#002B49] flex items-center justify-center shrink-0"
+              className="w-10 h-10 rounded-2xl bg-neutral-100 text-brand-navy flex items-center justify-center shrink-0"
               aria-hidden="true"
             >
               <Play className="w-5 h-5 fill-current" aria-hidden="true" />
@@ -300,11 +301,11 @@ export const BibliotecaView = () => {
               <h3
                 id="biblioteca-tutorial-heading"
                 {...getVoiceProps(`Cómo hacer tu reserva paso a paso en Duoc UC ${DEFAULT_CAMPUS}`)}
-                className="text-lg sm:text-xl font-bold text-slate-900"
+                className="text-lg sm:text-xl font-bold text-neutral-900"
               >
                 Guía oficial paso a paso y video explicativo
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-neutral-500">
                 Instrucciones institucionales para Biblioteca Alameda y check-in con código alfanumérico.
               </p>
             </div>
@@ -318,7 +319,7 @@ export const BibliotecaView = () => {
               {...getVoiceProps(
                 isSpeaking ? 'Silenciar instrucciones de reserva' : 'Escuchar instrucciones de reserva'
               )}
-              className="min-h-[38px] px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-slate-200 cursor-pointer"
+              className="min-h-[38px] px-3.5 py-1.5 bg-neutral-50 hover:bg-neutral-100 text-neutral-800 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-neutral-200 cursor-pointer"
             >
               {isSpeaking ? (
                 <>
@@ -327,7 +328,7 @@ export const BibliotecaView = () => {
                 </>
               ) : (
                 <>
-                  <Volume2 className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+                  <Volume2 className="w-4 h-4 text-brand-navy" aria-hidden="true" />
                   <span>Escuchar</span>
                 </>
               )}
@@ -339,10 +340,10 @@ export const BibliotecaView = () => {
               rel="noopener noreferrer"
               aria-label="Abrir video tutorial en YouTube (nueva pestaña)"
               {...getVoiceProps('Ver video tutorial en YouTube')}
-              className="min-h-[38px] px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-slate-200"
+              className="min-h-[38px] px-3.5 py-1.5 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-neutral-200"
             >
               <span>Ver en YouTube</span>
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+              <ExternalLink className="w-3.5 h-3.5 text-neutral-400" aria-hidden="true" />
             </a>
           </div>
         </div>
@@ -351,21 +352,18 @@ export const BibliotecaView = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Video */}
           <div className="lg:col-span-6 space-y-3">
-            <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-xs">
-              <iframe
-                src={LIBCAL_ALAMEDA_CONFIG.urls.videoTutorial}
-                title="Video tutorial oficial: Cómo reservar una sala de estudio en Biblioteca Duoc UC"
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            </div>
-            <p className="text-xs text-slate-700 font-medium flex items-center gap-2 bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200/80">
+            <YouTubeTutorialPlayer
+              embedUrl={LIBCAL_ALAMEDA_CONFIG.urls.videoTutorial}
+              watchUrl={LIBCAL_ALAMEDA_CONFIG.urls.videoWatch}
+              title="Video tutorial oficial: Cómo reservar una sala de estudio en Biblioteca Duoc UC"
+              voiceProps={getVoiceProps('Abrir tutorial en YouTube en una nueva pestaña')}
+              containerClassName="rounded-2xl bg-neutral-950 border border-neutral-200 shadow-xs"
+            />
+            <p className="text-xs text-neutral-700 font-medium flex items-center gap-2 bg-neutral-50 px-3.5 py-2.5 rounded-xl border border-neutral-200/80">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
               <span>
                 Subtítulos accesibles disponibles con la tecla{' '}
-                <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[11px] font-semibold">
+                <kbd className="px-1.5 py-0.5 bg-neutral-0 border border-neutral-200 rounded text-[11px] font-semibold">
                   C
                 </kbd>{' '}
                 o el botón <strong>CC</strong> en el reproductor.
@@ -380,21 +378,21 @@ export const BibliotecaView = () => {
               {...getVoiceProps(
                 'Paso 1: Elige Salas de estudio o Lentes VR según lo que requieras para tu jornada en Sede Alameda.'
               )}
-              className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col justify-between hover:bg-slate-50 transition-colors"
+              className="p-4 bg-neutral-50/70 border border-neutral-200/80 rounded-2xl flex flex-col justify-between hover:bg-neutral-50 transition-colors"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="w-7 h-7 rounded-full bg-[#002B49] text-[#FFB81C] font-bold text-xs flex items-center justify-center">
+                  <span className="w-7 h-7 rounded-full bg-brand-navy text-brand-gold font-bold text-xs flex items-center justify-center">
                     1
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 bg-neutral-0 px-2 py-0.5 rounded border border-neutral-200">
                     Recurso
                   </span>
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">
+                <h4 className="font-bold text-neutral-900 text-sm mb-1">
                   Salas de estudio o Lentes VR
                 </h4>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                <p className="text-xs text-neutral-600 leading-relaxed font-normal">
                   Selecciona la categoría: Salas de estudio 1 a 4 o visores de Realidad Virtual.
                 </p>
               </div>
@@ -405,21 +403,21 @@ export const BibliotecaView = () => {
               {...getVoiceProps(
                 `Paso 2: En Duoc UC ${DEFAULT_CAMPUS}, selecciona la sala y el bloque disponible de 60 minutos.`
               )}
-              className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col justify-between hover:bg-slate-50 transition-colors"
+              className="p-4 bg-neutral-50/70 border border-neutral-200/80 rounded-2xl flex flex-col justify-between hover:bg-neutral-50 transition-colors"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="w-7 h-7 rounded-full bg-[#002B49] text-[#FFB81C] font-bold text-xs flex items-center justify-center">
+                  <span className="w-7 h-7 rounded-full bg-brand-navy text-brand-gold font-bold text-xs flex items-center justify-center">
                     2
                   </span>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                     {DEFAULT_CAMPUS}
                   </span>
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">
+                <h4 className="font-bold text-neutral-900 text-sm mb-1">
                   Bloque de 60 minutos
                 </h4>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                <p className="text-xs text-neutral-600 leading-relaxed font-normal">
                   Elige tu sala y bloque horario disponible (50 minutos de uso + 10 de recambio).
                 </p>
               </div>
@@ -430,21 +428,21 @@ export const BibliotecaView = () => {
               {...getVoiceProps(
                 'Paso 3: Confirma con tu correo institucional. Recibirás tu código de reserva alfanumérico como 2VF.'
               )}
-              className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col justify-between hover:bg-slate-50 transition-colors"
+              className="p-4 bg-neutral-50/70 border border-neutral-200/80 rounded-2xl flex flex-col justify-between hover:bg-neutral-50 transition-colors"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="w-7 h-7 rounded-full bg-[#002B49] text-[#FFB81C] font-bold text-xs flex items-center justify-center">
+                  <span className="w-7 h-7 rounded-full bg-brand-navy text-brand-gold font-bold text-xs flex items-center justify-center">
                     3
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 bg-neutral-0 px-2 py-0.5 rounded border border-neutral-200">
                     Código 2VF
                   </span>
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">
+                <h4 className="font-bold text-neutral-900 text-sm mb-1">
                   Correo y código oficial
                 </h4>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                <p className="text-xs text-neutral-600 leading-relaxed font-normal">
                   Recibirás en tu correo institucional tu código alfanumérico corto (ej. <strong>2VF</strong>) para el ingreso.
                 </p>
               </div>
@@ -455,21 +453,21 @@ export const BibliotecaView = () => {
               {...getVoiceProps(
                 `Paso 4: Registra tu Check-in al llegar a Sede Alameda antes de 15 minutos para que la sala no se libere automáticamente.`
               )}
-              className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col justify-between hover:bg-slate-50 transition-colors"
+              className="p-4 bg-neutral-50/70 border border-neutral-200/80 rounded-2xl flex flex-col justify-between hover:bg-neutral-50 transition-colors"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="w-7 h-7 rounded-full bg-[#002B49] text-[#FFB81C] font-bold text-xs flex items-center justify-center">
+                  <span className="w-7 h-7 rounded-full bg-brand-navy text-brand-gold font-bold text-xs flex items-center justify-center">
                     4
                   </span>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                     15 Minutos
                   </span>
                 </div>
-                <h4 className="font-bold text-slate-900 text-sm mb-1">
+                <h4 className="font-bold text-neutral-900 text-sm mb-1">
                   Check-in obligatorio
                 </h4>
-                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                <p className="text-xs text-neutral-600 leading-relaxed font-normal">
                   Al llegar al espacio, pulsa Check-in e ingresa tu código de ingreso. Tienes hasta 15 min de tolerancia.
                 </p>
               </div>
@@ -479,7 +477,7 @@ export const BibliotecaView = () => {
       </article>
 
       {/* 3. Barra de Control de Pestañas (Reserva de Espacios vs Check-in & Códigos) */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-neutral-0 p-3 rounded-2xl border border-neutral-200/90 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label="Secciones del módulo de biblioteca" className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -487,13 +485,13 @@ export const BibliotecaView = () => {
             aria-selected={activeTab === 'reserva'}
             onClick={() => setActiveTab('reserva')}
             {...getVoiceProps('Pestaña Consulta y Simulación de Reserva de Espacios')}
-            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy ${
               activeTab === 'reserva'
-                ? 'bg-[#002B49] text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                ? 'bg-brand-navy text-white shadow-xs'
+                : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
             }`}
           >
-            <Calendar className={`w-4 h-4 ${activeTab === 'reserva' ? 'text-[#FFB81C]' : 'text-slate-500'}`} />
+            <Calendar className={`w-4 h-4 ${activeTab === 'reserva' ? 'text-brand-gold' : 'text-neutral-500'}`} />
             <span>Reserva de Espacios (Simulador Alameda)</span>
           </button>
 
@@ -503,10 +501,10 @@ export const BibliotecaView = () => {
             aria-selected={activeTab === 'checkin'}
             onClick={() => setActiveTab('checkin')}
             {...getVoiceProps('Pestaña Check-in Oficial y Gestión de Código de Reserva')}
-            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy ${
               activeTab === 'checkin'
-                ? 'bg-[#002B49] text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                ? 'bg-brand-navy text-white shadow-xs'
+                : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
             }`}
           >
             <LogIn className={`w-4 h-4 ${activeTab === 'checkin' ? 'text-emerald-400' : 'text-emerald-600'}`} />
@@ -516,15 +514,15 @@ export const BibliotecaView = () => {
 
         {/* Recordatorio de Código Rápido en Barra */}
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium hidden md:inline">Tu código activo:</span>
-          <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200 font-mono font-bold text-[#002B49]">
+          <span className="text-neutral-500 font-medium hidden md:inline">Tu código activo:</span>
+          <div className="flex items-center gap-1.5 bg-neutral-100 px-3 py-1 rounded-xl border border-neutral-200 font-mono font-bold text-brand-navy">
             <span>{savedBookingCode || '2VF'}</span>
             <button
               type="button"
               onClick={() => handleCopyCode(savedBookingCode)}
               title="Copiar código al portapapeles"
               aria-label={`Copiar código de reserva ${savedBookingCode}`}
-              className="text-slate-400 hover:text-slate-800 p-0.5 rounded cursor-pointer"
+              className="text-neutral-400 hover:text-neutral-800 p-0.5 rounded cursor-pointer"
             >
               {codeCopied ? (
                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -540,13 +538,13 @@ export const BibliotecaView = () => {
       {activeTab === 'reserva' && (
         <article
           aria-label={`Simulador interactivo de Bibliotecas Duoc UC ${DEFAULT_CAMPUS}`}
-          className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs space-y-6"
+          className="bg-neutral-0 rounded-3xl border border-neutral-200/90 overflow-hidden shadow-xs space-y-6"
         >
           {/* Barra Institucional Superior */}
           <div className="bg-[#111111] text-white px-6 py-4 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <span className="font-serif font-black text-xl tracking-tight text-white block leading-none">
-                Duoc<span className="text-[#FFB81C]">UC</span>
+                Duoc<span className="text-brand-gold">UC</span>
               </span>
               <span className="text-xs text-slate-300 font-medium">
                 Bibliotecas • {DEFAULT_CAMPUS}
@@ -564,7 +562,7 @@ export const BibliotecaView = () => {
                 {...getVoiceProps('Consúltanos en Bibliotecas Duoc UC')}
                 className="text-slate-300 hover:text-white flex items-center gap-1.5"
               >
-                <HelpCircle className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                <HelpCircle className="w-3.5 h-3.5 text-brand-gold" aria-hidden="true" />
                 <span>Consúltanos</span>
               </a>
             </div>
@@ -572,7 +570,7 @@ export const BibliotecaView = () => {
 
           {/* Selector de Categorías LibCal Oficiales: Salas de estudio (gid=31398) vs Lentes VR (gid=52104) */}
           <div className="px-6 sm:px-8 pt-2">
-            <div className="bg-slate-50 p-2 rounded-2xl border border-slate-200/90">
+            <div className="bg-neutral-50 p-2 rounded-2xl border border-neutral-200/90">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {BIBLIOTECA_ALAMEDA_CATEGORIES.map((category) => {
                   const isSelected = category.id === selectedCategoryId;
@@ -586,33 +584,33 @@ export const BibliotecaView = () => {
                       {...getVoiceProps(`${category.name}. ${category.description}`)}
                       className={`min-h-[56px] p-3 rounded-xl text-left flex items-start gap-3 transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-[#002B49] text-white shadow-xs'
-                          : 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-200/80'
+                          ? 'bg-brand-navy text-white shadow-xs'
+                          : 'bg-neutral-0 hover:bg-neutral-100 text-neutral-800 border border-neutral-200/80'
                       }`}
                     >
                       <div
                         className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                          isSelected ? 'bg-white/15 text-[#FFB81C]' : 'bg-slate-100 text-slate-700'
+                          isSelected ? 'bg-neutral-0/15 text-brand-gold' : 'bg-neutral-100 text-neutral-700'
                         }`}
                       >
                         <Icon className="w-5 h-5" aria-hidden="true" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
-                          <span className={`text-xs font-bold block truncate ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                          <span className={`text-xs font-bold block truncate ${isSelected ? 'text-white' : 'text-neutral-900'}`}>
                             {category.name}
                           </span>
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               isSelected
-                                ? 'bg-white/20 text-white'
-                                : 'bg-slate-100 text-slate-600'
+                                ? 'bg-neutral-0/20 text-white'
+                                : 'bg-neutral-100 text-neutral-600'
                             }`}
                           >
                             {category.type === 'vr-headset' ? 'Visores VR' : 'Salas Grupales'}
                           </span>
                         </div>
-                        <p className={`text-[11px] mt-0.5 leading-snug line-clamp-1 ${isSelected ? 'text-slate-200' : 'text-slate-500'}`}>
+                        <p className={`text-[11px] mt-0.5 leading-snug line-clamp-1 ${isSelected ? 'text-slate-200' : 'text-neutral-500'}`}>
                           {category.capacityLabel} • {category.equipmentSummary}
                         </p>
                       </div>
@@ -626,41 +624,41 @@ export const BibliotecaView = () => {
           {/* PASO 1: GRILLA HORARIA DE DISPONIBILIDAD */}
           {reservaStep === 'grid' && (
             <div className="px-6 sm:px-8 pb-8 space-y-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-200 pb-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-neutral-200 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+                  <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-700">
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div>
                     <h3
                       {...getVoiceProps(`Espacios para ${currentCategory.name}`)}
-                      className="text-base font-bold text-slate-900"
+                      className="text-base font-bold text-neutral-900"
                     >
                       {currentCategory.name}
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-neutral-500">
                       Duoc UC - {DEFAULT_CAMPUS} • Fecha: lunes, noviembre 16, 2026
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/80">
+                  <span className="text-xs font-semibold text-neutral-600 bg-neutral-100 px-3 py-1 rounded-full border border-neutral-200/80">
                     Capacidad máxima: {currentCategory.maxCapacity} {currentCategory.maxCapacity > 1 ? 'estudiantes' : 'estudiante'}
                   </span>
                 </div>
               </div>
 
               {/* Tabla de Horarios */}
-              <div className="overflow-x-auto border-2 border-slate-200 rounded-2xl shadow-xs">
+              <div className="overflow-x-auto border-2 border-neutral-200 rounded-2xl shadow-xs">
                 <table className="w-full text-xs text-left border-collapse min-w-[780px]">
                   <thead>
-                    <tr className="bg-slate-100 border-b border-slate-200 text-slate-800 font-bold">
-                      <th scope="col" className="p-3.5 sticky left-0 bg-slate-100 z-10 w-64 border-r border-slate-200">
+                    <tr className="bg-neutral-100 border-b border-neutral-200 text-neutral-800 font-bold">
+                      <th scope="col" className="p-2 sm:p-3.5 sticky left-0 bg-neutral-100 z-10 w-[124px] max-w-[128px] sm:w-56 sm:max-w-none lg:w-64 border-r border-neutral-200">
                         Espacio / Recurso
                       </th>
                       {BIBLIOTECA_TIME_SLOTS.map((slot) => (
-                        <th key={slot} scope="col" className="p-2 text-center border-r border-slate-200 whitespace-nowrap">
+                        <th key={slot} scope="col" className="p-2 text-center border-r border-neutral-200 whitespace-nowrap">
                           {slot}
                         </th>
                       ))}
@@ -668,16 +666,16 @@ export const BibliotecaView = () => {
                   </thead>
                   <tbody>
                     {currentCategory.spaces.map((space) => (
-                      <tr key={space.id} className="border-b border-slate-200 hover:bg-slate-50/50">
-                        <td className="p-3.5 font-bold text-slate-900 sticky left-0 bg-white border-r border-slate-200 z-10 whitespace-nowrap">
-                          <div className="flex items-center justify-between gap-2">
+                      <tr key={space.id} className="border-b border-neutral-200 hover:bg-neutral-50/50">
+                        <td className="p-2 sm:p-3.5 font-bold text-neutral-900 sticky left-0 bg-neutral-0 border-r border-neutral-200 z-10 w-[124px] max-w-[128px] sm:w-56 sm:max-w-none lg:w-64 whitespace-normal sm:whitespace-nowrap">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
                             <div>
                               <span className="block">{space.name}</span>
-                              <span className="text-[10px] text-slate-500 font-normal block">
+                              <span className="text-[10px] text-neutral-500 font-normal block">
                                 Capacidad: {space.capacity} {space.capacity > 1 ? 'personas' : 'persona'}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1 text-slate-500 text-xs">
+                            <div className="flex items-center gap-1 text-neutral-500 text-xs">
                               {space.accessible && <span title="Accesible">♿</span>}
                               {space.power && <span title="Tomas eléctricas">🔌</span>}
                               {space.screen && <span title="Pantalla / visor">🖥️</span>}
@@ -701,7 +699,7 @@ export const BibliotecaView = () => {
                           }
 
                           return (
-                            <td key={time} className="p-1.5 text-center border-r border-slate-200">
+                            <td key={time} className="p-1.5 text-center border-r border-neutral-200">
                               <button
                                 type="button"
                                 disabled={isOccupied}
@@ -723,7 +721,7 @@ export const BibliotecaView = () => {
               </div>
 
               {/* Leyenda de Colores */}
-              <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-bold text-slate-700 pt-1">
+              <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-bold text-neutral-700 pt-1">
                 <div className="flex items-center gap-2">
                   <span className="w-5 h-4 rounded bg-emerald-600 inline-block shadow-2xs" />
                   <span>Disponible</span>
@@ -740,16 +738,16 @@ export const BibliotecaView = () => {
 
               {/* Resumen del bloque seleccionado */}
               {selectedSlot && (
-                <div className="bg-slate-50 border-2 border-slate-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in">
+                <div className="bg-neutral-50 border-2 border-slate-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#002B49] text-[#FFB81C] flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-brand-navy text-brand-gold flex items-center justify-center shrink-0">
                       <Clock className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                      <p className="text-xs text-neutral-500 font-bold uppercase tracking-wider">
                         Espacio &amp; Bloque Seleccionado
                       </p>
-                      <p className="font-extrabold text-slate-900 text-sm sm:text-base">
+                      <p className="font-extrabold text-neutral-900 text-sm sm:text-base">
                         {selectedSlot.roomName} ({currentCategory.shortName}): {selectedSlot.time}, {selectedSlot.date}
                       </p>
                     </div>
@@ -761,7 +759,7 @@ export const BibliotecaView = () => {
                       onClick={() => setSelectedSlot(null)}
                       aria-label="Descartar selección"
                       {...getVoiceProps('Descartar selección de horario')}
-                      className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs border border-slate-300 flex items-center gap-1.5 cursor-pointer"
+                      className="min-h-[44px] px-3.5 py-2 bg-neutral-0 hover:bg-neutral-100 text-neutral-700 rounded-xl font-bold text-xs border border-slate-300 flex items-center gap-1.5 cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4 text-rose-500" />
                       <span className="hidden sm:inline">Descartar</span>
@@ -771,7 +769,7 @@ export const BibliotecaView = () => {
                       type="button"
                       onClick={() => setReservaStep('form')}
                       {...getVoiceProps('Hacer una reserva con el horario seleccionado')}
-                      className="min-h-[44px] flex-1 sm:flex-initial px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-extrabold text-sm rounded-xl shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                      className="min-h-[44px] flex-1 sm:flex-initial px-6 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white font-extrabold text-sm rounded-xl shadow-xs transition-all active:scale-[0.98] cursor-pointer"
                     >
                       Continuar con la reserva
                     </button>
@@ -784,12 +782,12 @@ export const BibliotecaView = () => {
           {/* PASO 2: FORMULARIO COORDINADO CON LA BD */}
           {reservaStep === 'form' && (
             <div className="p-6 sm:p-10 space-y-6">
-              <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5 border-b border-slate-100 pb-3">
-                <span className="text-[#002B49]">Biblioteca Duoc UC</span>
+              <div className="text-xs font-bold text-neutral-600 flex items-center gap-1.5 border-b border-slate-100 pb-3">
+                <span className="text-brand-navy">Biblioteca Duoc UC</span>
                 <span>/</span>
-                <span className="text-[#002B49]">{DEFAULT_CAMPUS}</span>
+                <span className="text-brand-navy">{DEFAULT_CAMPUS}</span>
                 <span>/</span>
-                <span className="text-slate-800">{currentCategory.name}</span>
+                <span className="text-neutral-800">{currentCategory.name}</span>
               </div>
 
               <div>
@@ -799,15 +797,15 @@ export const BibliotecaView = () => {
                 >
                   Detalles de la reserva
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                <p className="text-xs sm:text-sm text-neutral-600 mt-1">
                   Verifica tus datos institucionales para generar tu código oficial de check-in (ej. 2VF).
                 </p>
               </div>
 
               {/* Resumen del bloque */}
-              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <div className="overflow-x-auto border border-neutral-200 rounded-xl">
                 <table className="w-full text-xs text-left min-w-[500px]">
-                  <thead className="bg-slate-100 border-b border-slate-200 text-slate-800 font-bold">
+                  <thead className="bg-neutral-100 border-b border-neutral-200 text-neutral-800 font-bold">
                     <tr>
                       <th className="p-3">Recurso</th>
                       <th className="p-3">Tipo de Espacio</th>
@@ -818,16 +816,16 @@ export const BibliotecaView = () => {
                   </thead>
                   <tbody>
                     <tr className="border-b border-slate-100">
-                      <td className="p-3 font-bold text-slate-900">{selectedSlot.roomName}</td>
-                      <td className="p-3 text-slate-600">{currentCategory.name}</td>
-                      <td className="p-3 text-slate-800 font-medium">{selectedSlot.time}</td>
-                      <td className="p-3 text-slate-800 font-medium">{selectedSlot.date}</td>
+                      <td className="p-3 font-bold text-neutral-900">{selectedSlot.roomName}</td>
+                      <td className="p-3 text-neutral-600">{currentCategory.name}</td>
+                      <td className="p-3 text-neutral-800 font-medium">{selectedSlot.time}</td>
+                      <td className="p-3 text-neutral-800 font-medium">{selectedSlot.date}</td>
                       <td className="p-3 text-right">
                         <button
                           type="button"
                           onClick={() => setReservaStep('grid')}
                           {...getVoiceProps('Cambiar horario y volver a la grilla')}
-                          className="min-h-[38px] px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 cursor-pointer"
+                          className="min-h-[38px] px-3.5 py-1.5 bg-neutral-0 hover:bg-neutral-100 text-neutral-700 font-bold text-xs rounded-lg border border-slate-300 cursor-pointer"
                         >
                           Cambiar
                         </button>
@@ -839,13 +837,13 @@ export const BibliotecaView = () => {
 
               {/* Formulario */}
               <form onSubmit={handleConfirmReservation} className="space-y-4 max-w-2xl">
-                <h4 className="text-sm font-bold text-slate-900 pt-2">
+                <h4 className="text-sm font-bold text-neutral-900 pt-2">
                   Datos de contacto institucional (Sincronizados con tu sesión):
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="res-nombre" className="block text-xs font-bold text-slate-700 mb-1">
+                    <label htmlFor="res-nombre" className="block text-xs font-bold text-neutral-700 mb-1">
                       Nombre *
                     </label>
                     <input
@@ -855,13 +853,13 @@ export const BibliotecaView = () => {
                       value={formData.nombre}
                       onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                       {...getVoiceProps(`Nombre, ${formData.nombre}`)}
-                      className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                      className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-neutral-50 focus:bg-neutral-0 focus:ring-2 focus:ring-[#002B49]"
                       placeholder="Nombre"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="res-apellido" className="block text-xs font-bold text-slate-700 mb-1">
+                    <label htmlFor="res-apellido" className="block text-xs font-bold text-neutral-700 mb-1">
                       Apellido *
                     </label>
                     <input
@@ -871,14 +869,14 @@ export const BibliotecaView = () => {
                       value={formData.apellido}
                       onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
                       {...getVoiceProps(`Apellido, ${formData.apellido}`)}
-                      className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                      className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-neutral-50 focus:bg-neutral-0 focus:ring-2 focus:ring-[#002B49]"
                       placeholder="Apellido"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="res-email" className="block text-xs font-bold text-slate-700 mb-1">
+                  <label htmlFor="res-email" className="block text-xs font-bold text-neutral-700 mb-1">
                     Correo institucional Duoc UC *
                   </label>
                   <input
@@ -888,12 +886,12 @@ export const BibliotecaView = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     {...getVoiceProps(`Correo institucional, ${formData.email}`)}
-                    className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                    className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-neutral-50 focus:bg-neutral-0 focus:ring-2 focus:ring-[#002B49]"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="res-rut" className="block text-xs font-bold text-slate-700 mb-1">
+                  <label htmlFor="res-rut" className="block text-xs font-bold text-neutral-700 mb-1">
                     RUT Institucional (ejemplo 21.987.654-3) *
                   </label>
                   <input
@@ -903,15 +901,15 @@ export const BibliotecaView = () => {
                     value={formData.rut}
                     onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
                     {...getVoiceProps(`RUT institucional, ${formData.rut}`)}
-                    className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#002B49]"
+                    className="w-full min-h-[44px] px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-neutral-50 focus:bg-neutral-0 focus:ring-2 focus:ring-[#002B49]"
                   />
                 </div>
 
-                <div className="flex items-center gap-3 pt-4">
+                <div className="flex flex-wrap items-center gap-3 pt-4">
                   <button
                     type="submit"
                     {...getVoiceProps('Confirmar reserva y generar código de check-in')}
-                    className="min-h-[44px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                    className="min-h-[44px] px-6 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition-all active:scale-[0.98] cursor-pointer"
                   >
                     Confirmar Reserva (Generar Código)
                   </button>
@@ -919,7 +917,7 @@ export const BibliotecaView = () => {
                     type="button"
                     onClick={() => setReservaStep('grid')}
                     {...getVoiceProps('Volver a la Grilla de Selección')}
-                    className="min-h-[44px] px-5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 cursor-pointer"
+                    className="min-h-[44px] px-5 py-2.5 bg-neutral-0 hover:bg-neutral-100 text-neutral-700 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 cursor-pointer"
                   >
                     Volver a la Grilla
                   </button>
@@ -941,7 +939,7 @@ export const BibliotecaView = () => {
                 </h3>
               </div>
 
-              <p className="text-xs sm:text-sm text-slate-700 max-w-2xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-neutral-700 max-w-2xl leading-relaxed">
                 Tu solicitud para <strong>{confirmedBooking.roomName}</strong> en Duoc UC - {DEFAULT_CAMPUS} está lista. Aquí tienes tu código para registrar tu ingreso al llegar:
               </p>
 
@@ -952,7 +950,7 @@ export const BibliotecaView = () => {
                     Tu Código de Ingreso
                   </span>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-3xl font-black font-mono tracking-widest text-[#002B49]">
+                    <span className="text-3xl font-black font-mono tracking-widest text-brand-navy">
                       {confirmedBooking.code}
                     </span>
                     <button
@@ -984,7 +982,7 @@ export const BibliotecaView = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   {...getVoiceProps('Abrir pantalla oficial de check-in')}
-                  className="min-h-[42px] px-4 py-2 bg-[#002B49] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs shrink-0"
+                  className="min-h-[42px] px-4 py-2 bg-brand-navy text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs shrink-0"
                 >
                   <LogIn className="w-4 h-4 text-emerald-400" />
                   <span>Check-in Oficial</span>
@@ -994,11 +992,11 @@ export const BibliotecaView = () => {
 
               {/* Información espacial y de usuario */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl">
-                <div className="p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-2">
-                  <h4 className="text-sm font-extrabold text-slate-900 border-b border-slate-200 pb-2">
+                <div className="p-5 bg-neutral-50 border-2 border-neutral-200 rounded-2xl space-y-2">
+                  <h4 className="text-sm font-extrabold text-neutral-900 border-b border-neutral-200 pb-2">
                     Detalles del Espacio
                   </h4>
-                  <div className="text-xs space-y-1 text-slate-700">
+                  <div className="text-xs space-y-1 text-neutral-700">
                     <p><strong>Sede:</strong> Duoc UC - {DEFAULT_CAMPUS}</p>
                     <p><strong>Categoría:</strong> {confirmedBooking.categoryName}</p>
                     <p><strong>Espacio:</strong> {confirmedBooking.roomName}</p>
@@ -1007,11 +1005,11 @@ export const BibliotecaView = () => {
                   </div>
                 </div>
 
-                <div className="p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-2">
-                  <h4 className="text-sm font-extrabold text-slate-900 border-b border-slate-200 pb-2">
+                <div className="p-5 bg-neutral-50 border-2 border-neutral-200 rounded-2xl space-y-2">
+                  <h4 className="text-sm font-extrabold text-neutral-900 border-b border-neutral-200 pb-2">
                     Datos del Estudiante
                   </h4>
-                  <div className="text-xs space-y-1 text-slate-700">
+                  <div className="text-xs space-y-1 text-neutral-700">
                     <p><strong>Nombre:</strong> {confirmedBooking.nombre} {confirmedBooking.apellido}</p>
                     <p><strong>Correo:</strong> {confirmedBooking.email}</p>
                     <p><strong>RUT:</strong> {confirmedBooking.rut}</p>
@@ -1038,7 +1036,7 @@ export const BibliotecaView = () => {
                   type="button"
                   onClick={() => setReservaStep('grid')}
                   {...getVoiceProps('Hacer otra simulación de reserva')}
-                  className="min-h-[44px] px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs sm:text-sm rounded-xl border border-slate-300 cursor-pointer"
                 >
                   Hacer otra simulación
                 </button>
@@ -1052,7 +1050,7 @@ export const BibliotecaView = () => {
       {activeTab === 'checkin' && (
         <article
           aria-label="Panel de Check-in y gestión de código de reserva"
-          className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-10 shadow-xs space-y-8"
+          className="bg-neutral-0 rounded-3xl border border-neutral-200/90 p-6 sm:p-10 shadow-xs space-y-8"
         >
           <div className="max-w-2xl mx-auto text-center space-y-3">
             <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
@@ -1065,7 +1063,7 @@ export const BibliotecaView = () => {
             >
               Registra tu Ingreso (Check-in) en Biblioteca Alameda
             </h3>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
               Ingresa el código alfanumérico enviado a tu correo institucional (ej. <strong>2VF</strong>) para confirmar tu asistencia presencial y activar tu espacio de estudio.
             </p>
           </div>
@@ -1090,24 +1088,24 @@ export const BibliotecaView = () => {
                       setReservaStep('grid');
                     }}
                     {...getVoiceProps('Volver a Reserva')}
-                    className="min-h-[40px] px-5 py-2 bg-[#002B49] text-white font-bold text-xs rounded-xl cursor-pointer"
+                    className="min-h-[40px] px-5 py-2 bg-brand-navy text-white font-bold text-xs rounded-xl cursor-pointer"
                   >
                     Volver a Reserva
                   </button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handlePerformCheckin} className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+              <form onSubmit={handlePerformCheckin} className="space-y-4 bg-neutral-50 p-6 rounded-2xl border border-neutral-200">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label htmlFor="input-checkin-code" className="text-xs font-bold text-slate-700">
+                    <label htmlFor="input-checkin-code" className="text-xs font-bold text-neutral-700">
                       Código de reserva (ej: 2VF) *
                     </label>
                     {savedBookingCode && (
                       <button
                         type="button"
                         onClick={() => setCheckinInputCode(savedBookingCode)}
-                        className="text-[11px] font-bold text-[#002B49] hover:underline cursor-pointer"
+                        className="text-[11px] font-bold text-brand-navy hover:underline cursor-pointer"
                       >
                         Usar mi código ({savedBookingCode})
                       </button>
@@ -1122,7 +1120,7 @@ export const BibliotecaView = () => {
                     placeholder="Ej. 2VF"
                     maxLength={10}
                     {...getVoiceProps(`Código de confirmación${checkinInputCode ? `, ${checkinInputCode}` : ''}`)}
-                    className="w-full min-h-[48px] px-4 py-2 text-center text-2xl font-mono font-black uppercase tracking-widest border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-[#002B49] bg-white"
+                    className="w-full min-h-[48px] px-4 py-2 text-center text-2xl font-mono font-black uppercase tracking-widest border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-[#002B49] bg-neutral-0"
                   />
                 </div>
 
@@ -1141,9 +1139,9 @@ export const BibliotecaView = () => {
                     rel="noopener noreferrer"
                     onClick={() => handleCopyCode(checkinInputCode || savedBookingCode)}
                     {...getVoiceProps('Copiar código e ir a pantalla oficial de Check-in')}
-                    className="w-full min-h-[46px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                    className="w-full min-h-[46px] px-6 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                   >
-                    <ExternalLink className="w-4 h-4 text-[#FFB81C]" />
+                    <ExternalLink className="w-4 h-4 text-brand-gold" />
                     <span>Copiar e ir a Check-in Oficial</span>
                   </a>
                 </div>
@@ -1152,7 +1150,7 @@ export const BibliotecaView = () => {
           </div>
 
           {/* Tarjetas de Apoyo: Regla de los 15 Minutos y Gestión de Cancelación */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl mx-auto pt-4 border-t border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-none pt-4 border-t border-neutral-200">
             {/* Regla de los 15 minutos */}
             <div className="p-5 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2">
               <div className="flex items-center gap-2.5 text-amber-950 font-bold text-sm">
@@ -1167,7 +1165,7 @@ export const BibliotecaView = () => {
             {/* Cancelación Oportuna */}
             <div className="p-5 bg-blue-50/80 border border-blue-200 rounded-2xl space-y-2">
               <div className="flex items-center gap-2.5 text-blue-950 font-bold text-sm">
-                <Info className="w-5 h-5 text-[#002B49] shrink-0" />
+                <Info className="w-5 h-5 text-brand-navy shrink-0" />
                 <h4>¿No vas a poder asistir? Cancela a tiempo</h4>
               </div>
               <p className="text-xs text-blue-900 leading-relaxed">
@@ -1178,7 +1176,7 @@ export const BibliotecaView = () => {
                   href={LIBCAL_ALAMEDA_CONFIG.urls.alamedaSpaces}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-bold text-[#002B49] hover:underline inline-flex items-center gap-1"
+                  className="text-xs font-bold text-brand-navy hover:underline inline-flex items-center gap-1"
                 >
                   <span>Gestionar reservas en Portal Alameda</span>
                   <ExternalLink className="w-3 h-3" />
@@ -1190,7 +1188,7 @@ export const BibliotecaView = () => {
       )}
 
       {/* 6. Barra Institucional Inferior */}
-      <footer className="bg-slate-50 border border-slate-200/90 rounded-2xl px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+      <footer className="bg-neutral-50 border border-neutral-200/90 rounded-2xl px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-500">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
           <span>Bibliotecas Duoc UC • Sede Alameda • Ley N° 21.719</span>
@@ -1201,7 +1199,7 @@ export const BibliotecaView = () => {
             target="_blank"
             rel="noopener noreferrer"
             {...getVoiceProps('Ir a bibliotecas.duoc.cl reserva de sala')}
-            className="hover:text-slate-900 underline"
+            className="hover:text-neutral-900 underline"
           >
             bibliotecas.duoc.cl/reserva-sala
           </a>

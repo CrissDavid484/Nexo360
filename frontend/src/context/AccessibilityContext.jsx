@@ -322,38 +322,20 @@ export const AccessibilityProvider = ({ children }) => {
   }, [fontSize, announce]);
 
   const toggleHighContrast = useCallback(() => {
-    const next = !highContrast;
-    const applyChange = () => {
-      setHighContrast(next);
+    setHighContrast((prev) => {
+      const next = !prev;
       announce(next ? 'Modo de alto contraste activado' : 'Modo de alto contraste desactivado');
-    };
+      return next;
+    });
 
-    // Si el usuario tiene activo movimiento reducido, cambio instantáneo
-    if (reducedMotion) {
-      applyChange();
-      return;
-    }
-
-    // Cortina de transición elegante (View Transition API nativa o fallback)
-    if (typeof document !== 'undefined' && document.startViewTransition) {
-      setIsCurtainAnimating(true);
-      const transition = document.startViewTransition(applyChange);
-      transition.finished
-        .catch((error) => console.error('Error en transición de accesibilidad:', error))
-        .finally(() => {
-          setIsCurtainAnimating(false);
-        });
-    } else {
-      if (curtainToggleTimerRef.current) clearTimeout(curtainToggleTimerRef.current);
+    if (!reducedMotion) {
       if (curtainEndTimerRef.current) clearTimeout(curtainEndTimerRef.current);
-
       setIsCurtainAnimating(true);
-      curtainToggleTimerRef.current = setTimeout(applyChange, 200);
       curtainEndTimerRef.current = setTimeout(() => {
         setIsCurtainAnimating(false);
-      }, 500);
+      }, 350);
     }
-  }, [highContrast, reducedMotion, announce]);
+  }, [reducedMotion, announce]);
 
   const toggleDyslexicFont = useCallback(() => {
     const next = !dyslexicFont;

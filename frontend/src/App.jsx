@@ -81,44 +81,92 @@ export const App = () => {
       {/* 2.4 Observador global de navegación por teclado (Flechas + Tab) */}
       <KeyboardNavigationObserver />
 
-      {/* 3. Contenido Principal Rutas */}
-      <Suspense
-        fallback={
-          <div className="flex-1 flex items-center justify-center p-12" role="status" aria-live="polite">
-            <div className="text-center">
-              <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3" aria-hidden="true"></div>
-              <p className="text-slate-600 font-semibold text-sm">Cargando módulo de Nexo360...</p>
-            </div>
-          </div>
-        }
+      {/* 2.5 Filtros SVG calibrados para daltonismo (fuera del flujo visual para no alterar position: fixed) */}
+      <svg
+        width="0"
+        height="0"
+        aria-hidden="true"
+        className="fixed pointer-events-none opacity-0"
       >
-        <Routes>
-          <Route path="/" element={<RootRoute />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/reset-password" element={<LoginPage initialMode="reset" />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/toma-ramos"
-            element={
-              <ProtectedRoute>
-                <TomaRamosSimulator onExit={() => (window.location.href = '/dashboard')} />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/simulador" element={<Navigate to="/toma-ramos" replace />} />
-          <Route path="/simulador-toma-ramos" element={<Navigate to="/toma-ramos" replace />} />
-          
-          {/* 4. Ruta 404 Institucional: Página no encontrada */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Suspense>
+        <defs>
+          <filter id="nexo-cb-protanopia" colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="
+                0.78  0.22  0.00  0  0
+                0.34  0.44  0.22  0  0
+                0.00  0.30  0.70  0  0
+                0     0     0     1  0
+              "
+            />
+          </filter>
+
+          <filter id="nexo-cb-deuteranopia" colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="
+                 0.75  0.00  0.25  0  0
+                 0.45  0.20  0.35  0  0
+                -0.20  0.45  0.75  0  0
+                 0     0     0     1  0
+              "
+            />
+          </filter>
+
+          <filter id="nexo-cb-tritanopia" colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="
+                0.950  0.050  0.000  0  0
+                0.000  0.433  0.567  0  0
+                0.000  0.475  0.525  0  0
+                0.000  0.000  0.000  1  0
+              "
+            />
+          </filter>
+        </defs>
+      </svg>
+
+      {/* 3. Contenido Principal Rutas */}
+      <div id="nexo-cb-canvas" className="flex-1 flex flex-col w-full min-w-0">
+        <Suspense
+          fallback={
+            <div className="flex-1 flex items-center justify-center p-12" role="status" aria-live="polite">
+              <div className="text-center">
+                <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3" aria-hidden="true"></div>
+                <p className="text-slate-600 font-semibold text-sm">Cargando módulo de Nexo360...</p>
+              </div>
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<RootRoute />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset-password" element={<LoginPage initialMode="reset" />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/toma-ramos"
+              element={
+                <ProtectedRoute>
+                  <TomaRamosSimulator onExit={() => (window.location.href = '/dashboard')} />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/simulador" element={<Navigate to="/toma-ramos" replace />} />
+            <Route path="/simulador-toma-ramos" element={<Navigate to="/toma-ramos" replace />} />
+            
+            {/* 4. Ruta 404 Institucional: Página no encontrada */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
+      </div>
     </div>
   );
 };

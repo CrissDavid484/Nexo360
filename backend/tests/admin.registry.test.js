@@ -382,19 +382,19 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(renewRes.body?.student?.ajustesAprobados?.[0]?.semestreVigencia, '2026-2');
     assert.equal(renewRes.body?.student?.acusesDocentes?.length, 0, 'Debe reiniciar acuses para el nuevo semestre');
 
-    // 3. Verificar integración en Frontend AdminPanelView y PaedisCaseManagementSection
+    // 3. Verificar integración en Frontend AdminLayout y PaedisManagement
     const paedisCompPath = path.resolve(
       __dirname,
-      '../../frontend/src/components/admin/PaedisCaseManagementSection.jsx'
+      '../../frontend/src/components/admin/modules/PaedisManagement.jsx'
     );
     const adminViewPath = path.resolve(
       __dirname,
-      '../../frontend/src/components/views/AdminPanelView.jsx'
+      '../../frontend/src/components/admin/modules/AdminLayout.jsx'
     );
-    assert.ok(fs.existsSync(paedisCompPath), 'PaedisCaseManagementSection.jsx debe existir');
+    assert.ok(fs.existsSync(paedisCompPath), 'PaedisManagement.jsx debe existir');
     const adminViewCode = fs.readFileSync(adminViewPath, 'utf8');
-    assert.ok(adminViewCode.includes('PaedisCaseManagementSection'));
-    assert.ok(adminViewCode.includes('Gestión PAEDIS & Ajustes'));
+    assert.ok(adminViewCode.includes('PaedisManagement'));
+    assert.ok(adminViewCode.includes('Gestión PAEDIS'));
   });
 
   test('9. Registro Institucional: Nombres separados, Contraseña inicial (RUT + inicial apellido), Dominio institucional, Perfil PAEDIS automático y Correo de bienvenida', async () => {

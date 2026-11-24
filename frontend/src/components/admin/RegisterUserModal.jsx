@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Loader2,
@@ -20,6 +21,7 @@ import {
   buildInitialPasswordPreview,
 } from '../../utils/studentUtils';
 import {
+  BASE_ACCESSIBILITY_PREFERENCES,
   DISABILITY_PROFILES,
   COLOR_BLIND_MODES,
   getDisabilityProfileMeta,
@@ -45,6 +47,7 @@ function createInitialFormState(defaultCampus) {
     staffRole: 'coordinador_paedis',
     career: '',
     campus: defaultCampus || 'Sede Alameda',
+    attendanceRate: '88.9',
   };
 }
 
@@ -64,15 +67,24 @@ function parseEmailLocalChange(rawValue, currentDomain) {
   return { emailLocal: rawValue, emailDomain: currentDomain };
 }
 
-function resolveEffectiveRole(form) {
+function resolveEffectiveRole(form, customDomainRole = '') {
+  if (form.emailDomain === 'otro') {
+    if (customDomainRole === 'student') {
+      return form.isPaedis ? 'estudiante_paedis' : 'estudiante';
+    }
+    return form.staffRole || 'coordinador_paedis';
+  }
   if (!isStudentDomain(form.emailDomain)) {
     return form.staffRole;
   }
   return form.isPaedis ? 'estudiante_paedis' : 'estudiante';
 }
 
-function validateStudentOrStaffFields({ form, careerQuery, isAdmin }) {
-  if (isStudentDomain(form.emailDomain)) {
+function validateStudentOrStaffFields({ form, careerQuery, isAdmin, customDomainRole = '' }) {
+  const treatsAsStudent =
+    form.emailDomain === 'otro' ? customDomainRole === 'student' : isStudentDomain(form.emailDomain);
+
+  if (treatsAsStudent) {
     const effectiveCareer = (form.career || careerQuery || '').trim();
     if (!effectiveCareer) {
       return 'Por favor, selecciona o escribe una carrera Duoc UC.';
@@ -89,7 +101,7 @@ function validateStudentOrStaffFields({ form, careerQuery, isAdmin }) {
   return '';
 }
 
-function validateRegistrationForm({ form, careerQuery, isAdmin, isCoordinator = false }) {
+function validateRegistrationForm({ form, careerQuery, isAdmin, isCoordinator = false, customDomain = '', customDomainRole = '' }) {
   if (!form.firstName.trim()) {
     return 'Por favor, ingresa el nombre del usuario.';
   }
@@ -99,7 +111,7 @@ function validateRegistrationForm({ form, careerQuery, isAdmin, isCoordinator = 
 
   const emailLocal = form.emailLocal.trim();
   if (!emailLocal || emailLocal.includes('@')) {
-    return 'Ingresa un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl o @duoc.cl).';
+    return 'Ingresa un correo institucional Duoc UC válido (@duocuc.cl, @profesor.duoc.cl, @duoc.cl o dominio personalizado).';
   }
   if (!/^[a-zA-Z0-9._%+-]{1,64}$/.test(emailLocal)) {
     return 'La parte local del correo solo puede contener letras, números y los símbolos . _ % + -.';
@@ -109,12 +121,28 @@ function validateRegistrationForm({ form, careerQuery, isAdmin, isCoordinator = 
     return 'El rol Coordinador PAEDIS solo tiene autorización para registrar cuentas de estudiantes (@duocuc.cl).';
   }
 
+  // Validación para dominio personalizado
+  const isCustomDomain = form.emailDomain === 'otro';
+  const effectiveCustomDomain = (customDomain || form.customDomain || '').trim().toLowerCase();
+  if (isCustomDomain) {
+    if (!isAdmin) {
+      return 'Solo un Administrador puede registrar usuarios con dominio personalizado.';
+    }
+    if (!customDomainRole) {
+      return 'Debe seleccionar si el usuario es Estudiante o Administrativo para el dominio personalizado.';
+    }
+    const domainRegex = new RegExp('^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    if (!effectiveCustomDomain || !domainRegex.test(effectiveCustomDomain)) {
+      return 'El dominio personalizado debe tener un formato válido (ej. externo.cl).';
+    }
+  }
+
   const rut = form.rut.trim();
-  if (!rut || !/\d/.test(rut)) {
+  if (!rut || !new RegExp('\\d').test(rut)) {
     return 'Por favor, ingresa un RUT válido (ej. 20.123.456-7).';
   }
 
-  const roleError = validateStudentOrStaffFields({ form, careerQuery, isAdmin });
+  const roleError = validateStudentOrStaffFields({ form, careerQuery, isAdmin, customDomainRole });
   if (roleError) {
     return roleError;
   }
@@ -126,19 +154,25 @@ function validateRegistrationForm({ form, careerQuery, isAdmin, isCoordinator = 
   return '';
 }
 
-function buildRegistrationPayload({ form, careerQuery }) {
+function buildRegistrationPayload({ form, careerQuery, customDomain = '', customDomainRole = '' }) {
   const firstName = form.firstName.trim();
   const paternalLastName = form.paternalLastName.trim();
   const maternalLastName = form.maternalLastName.trim();
-  const isStudent = isStudentDomain(form.emailDomain);
-  const role = resolveEffectiveRole(form);
+  const isCustomDomain = form.emailDomain === 'otro';
+  const isStudent = isCustomDomain
+    ? customDomainRole === 'student'
+    : isStudentDomain(form.emailDomain);
+  const effectiveDomain = isCustomDomain
+    ? (customDomain || form.customDomain || '').trim().toLowerCase()
+    : form.emailDomain;
+  const role = resolveEffectiveRole(form, customDomainRole);
 
   const payload = {
     firstName,
     paternalLastName,
     maternalLastName,
     fullName: composeFullName({ firstName, paternalLastName, maternalLastName }),
-    email: `${form.emailLocal.trim().toLowerCase()}@${form.emailDomain}`,
+    email: `${form.emailLocal.trim().toLowerCase()}@${effectiveDomain}`,
     rut: form.rut.trim(),
     role,
     career: isStudent ? (form.career || careerQuery || '').trim() : '',
@@ -151,6 +185,13 @@ function buildRegistrationPayload({ form, careerQuery }) {
         'Gestión académica, acompañamiento PAEDIS y prevención de deserción estudiantil según Ley N° 21.719 de Chile',
     },
   };
+
+  if (isStudent && form.attendanceRate !== undefined && form.attendanceRate !== '') {
+    const parsedRate = parseFloat(form.attendanceRate);
+    if (!isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 100) {
+      payload.attendanceRate = parsedRate;
+    }
+  }
 
   if (isStudent && form.isPaedis) {
     payload.disabilityProfile = form.disabilityProfile || 'ninguna';
@@ -224,7 +265,7 @@ function CareerComboboxField({
           type="button"
           onClick={onToggleOpen}
           {...getVoiceProps('Desplegar lista de carreras')}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded-lg"
+          className="absolute right-2.5 top-0.5 -translate-y-0.5 text-slate-400 hover:text-slate-700 p-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] rounded-lg"
           aria-label="Desplegar lista de carreras"
         >
           <ChevronDown className="w-4 h-4" aria-hidden="true" />
@@ -491,6 +532,10 @@ export const RegisterUserModal = ({
   const [careerQuery, setCareerQuery] = useState('');
   const [isCareerDropdownOpen, setIsCareerDropdownOpen] = useState(false);
   const [localError, setLocalError] = useState('');
+  // Estado para dominio personalizado
+  const [customDomain, setCustomDomain] = useState('');
+  // Estado para "Estudiante o Administrativo" cuando se selecciona "Otro"
+  const [customDomainRole, setCustomDomainRole] = useState(''); // 'student' | 'staff'
 
   const modalRef = useRef(null);
   const internalCloseBtnRef = useRef(null);
@@ -503,6 +548,8 @@ export const RegisterUserModal = ({
       setCareerQuery('');
       setIsCareerDropdownOpen(false);
       setLocalError('');
+      setCustomDomain('');
+      setCustomDomainRole('');
     }
   }, [isOpen, defaultCampus]);
 
@@ -514,6 +561,7 @@ export const RegisterUserModal = ({
 
   useOnClickOutside(careerDropdownRef, () => setIsCareerDropdownOpen(false), {
     enabled: isOpen && isCareerDropdownOpen,
+    ignoreSelector: '#accessibility-panel',
   });
 
   useAccessibleModal({
@@ -530,11 +578,21 @@ export const RegisterUserModal = ({
   }, [sortedCareers, careerQuery]);
 
   const availableDomains = useMemo(
-    () => (isCoordinator ? ['duocuc.cl'] : INSTITUTIONAL_DOMAINS),
-    [isCoordinator]
+    () => {
+      const baseDomains = isCoordinator ? ['duocuc.cl'] : INSTITUTIONAL_DOMAINS;
+      // Solo administradores pueden usar la opción "Otro"
+      if (isAdmin) {
+        return [...baseDomains, 'otro'];
+      }
+      return baseDomains;
+    },
+    [isCoordinator, isAdmin]
   );
 
-  const isStudent = isStudentDomain(form.emailDomain);
+  const isCustomDomainSelected = form.emailDomain === 'otro';
+  const isStudent = isCustomDomainSelected
+    ? customDomainRole === 'student'
+    : isStudentDomain(form.emailDomain);
   const passwordPreview = useMemo(
     () => buildInitialPasswordPreview(form.rut, form.paternalLastName),
     [form.rut, form.paternalLastName]
@@ -559,6 +617,14 @@ export const RegisterUserModal = ({
 
   const handleDomainSelectChange = (nextDomain) => {
     const effectiveDomain = isCoordinator ? 'duocuc.cl' : nextDomain;
+    if (effectiveDomain === 'otro') {
+      // Cuando se selecciona "Otro", establecer el dominio temporalmente
+      setForm((prev) => ({
+        ...prev,
+        emailDomain: 'otro',
+      }));
+      return;
+    }
     if (!isStudentDomain(effectiveDomain)) {
       setIsCareerDropdownOpen(false);
     }
@@ -590,6 +656,8 @@ export const RegisterUserModal = ({
       careerQuery,
       isAdmin,
       isCoordinator,
+      customDomain,
+      customDomainRole,
     });
     if (validationError) {
       setLocalError(validationError);
@@ -597,19 +665,22 @@ export const RegisterUserModal = ({
       return;
     }
 
-    const payload = buildRegistrationPayload({ form, careerQuery });
+    const payload = buildRegistrationPayload({ form, careerQuery, customDomain, customDomainRole });
     await onSubmitUser?.(payload);
   };
 
   if (!isOpen) return null;
 
   const displayedError = localError || serverError;
+  const effectiveDomainPreview = isCustomDomainSelected
+    ? customDomain || 'dominio-personalizado'
+    : form.emailDomain;
   const fullEmailPreview =
     form.emailLocal.trim() && !form.emailLocal.includes('@')
-      ? `${form.emailLocal.trim().toLowerCase()}@${form.emailDomain}`
+      ? `${form.emailLocal.trim().toLowerCase()}@${effectiveDomainPreview}`
       : '';
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
@@ -649,14 +720,15 @@ export const RegisterUserModal = ({
         <form
           noValidate
           onSubmit={(e) => {
+            e.preventDefault();
             handleSubmit(e).catch((err) => {
               console.error('[RegisterUserModal] Error al enviar formulario:', err);
             });
           }}
           className="space-y-4 text-xs sm:text-sm"
         >
-          {/* 1. Identidad en 3 campos separados */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* 1. Identidad en 3 campos separados */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <label htmlFor="create-first-name" className="text-xs font-semibold text-slate-700">
                 Nombre <span className="text-red-600">*</span>
@@ -771,53 +843,141 @@ export const RegisterUserModal = ({
                 className={INPUT_CLASS}
               />
             </div>
+
+            {/* Campo de dominio personalizado cuando se selecciona "Otro" */}
+            {isCustomDomainSelected && (
+              <div className="sm:col-span-3 space-y-3">
+                <div className="space-y-1">
+                  <label htmlFor="create-custom-domain" className="text-xs font-semibold text-slate-700">
+                    Dominio personalizado <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    id="create-custom-domain"
+                    type="text"
+                    required
+                    value={customDomain}
+                    onChange={(e) => setCustomDomain(e.target.value.toLowerCase().trim())}
+                    placeholder="ej. externo.cl"
+                    {...getVoiceProps('Dominio personalizado para el correo institucional')}
+                    className={`${INPUT_CLASS} text-slate-900`}
+                  />
+                  <span className="text-[11px] text-slate-500 font-medium block">
+                    El dominio se normalizará automáticamente (ej. "externo.cl" → "@externo.cl")
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    <span className="text-red-600">*</span> ¿Estudiante o Administrativo?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-label="Tipo de usuario para dominio personalizado">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={customDomainRole === 'student'}
+                      onClick={() => setCustomDomainRole('student')}
+                      {...getVoiceProps('Registrar como estudiante con dominio personalizado')}
+                      className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        customDomainRole === 'student'
+                          ? 'bg-brand-navy text-white border-brand-navy shadow-xs'
+                          : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50'
+                        }`}
+                    >
+                      Estudiante
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={customDomainRole === 'staff'}
+                      onClick={() => setCustomDomainRole('staff')}
+                      {...getVoiceProps('Registrar como personal administrativo/docente con dominio personalizado')}
+                      className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        customDomainRole === 'staff'
+                          ? 'bg-brand-navy text-white border-brand-navy shadow-xs'
+                          : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50'
+                        }`}
+                    >
+                      Administrativo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 3. Lógica condicional por dominio: Estudiante (@duocuc.cl) vs Staff (@profesor.duoc.cl / @duoc.cl) */}
-          {isStudent ? (
-            <>
-              <PaedisStudentSection
-                form={form}
-                onPaedisToggle={(isPaedis) => setForm((prev) => ({ ...prev, isPaedis }))}
-                onDisabilityChange={handleDisabilityChange}
-                onColorBlindChange={(colorBlindMode) =>
-                  setForm((prev) => ({ ...prev, colorBlindMode }))
-                }
-                onVoiceReaderDefaultChange={(enableVoiceReaderByDefault) =>
-                  setForm((prev) => ({ ...prev, enableVoiceReaderByDefault }))
-                }
-                getVoiceProps={getVoiceProps}
-              />
+          <div>
+            {isStudent ? (
+              <div>
+                <PaedisStudentSection
+                  form={form}
+                  onPaedisToggle={(isPaedis) => setForm((prev) => ({ ...prev, isPaedis }))}
+                  onDisabilityChange={handleDisabilityChange}
+                  onColorBlindChange={(colorBlindMode) =>
+                    setForm((prev) => ({ ...prev, colorBlindMode }))
+                  }
+                  onVoiceReaderDefaultChange={(enableVoiceReaderByDefault) =>
+                    setForm((prev) => ({ ...prev, enableVoiceReaderByDefault }))
+                  }
+                  getVoiceProps={getVoiceProps}
+                />
 
-              <CareerComboboxField
-                careerQuery={careerQuery}
-                selectedCareer={form.career}
-                filteredCareers={filteredCareers}
-                isOpen={isCareerDropdownOpen}
-                dropdownRef={careerDropdownRef}
-                onQueryChange={(value) => {
-                  setCareerQuery(value);
-                  setForm((prev) => ({ ...prev, career: value }));
-                  setIsCareerDropdownOpen(true);
-                }}
-                onSelectCareer={(careerName) => {
-                  setCareerQuery(careerName);
-                  setForm((prev) => ({ ...prev, career: careerName }));
-                  setIsCareerDropdownOpen(false);
-                }}
-                onToggleOpen={() => setIsCareerDropdownOpen((prev) => !prev)}
-                onOpen={() => setIsCareerDropdownOpen(true)}
+                <CareerComboboxField
+                  careerQuery={careerQuery}
+                  selectedCareer={form.career}
+                  filteredCareers={filteredCareers}
+                  isOpen={isCareerDropdownOpen}
+                  dropdownRef={careerDropdownRef}
+                  onQueryChange={(value) => {
+                    setCareerQuery(value);
+                    setForm((prev) => ({ ...prev, career: value }));
+                    setIsCareerDropdownOpen(true);
+                  }}
+                  onSelectCareer={(careerName) => {
+                    setCareerQuery(careerName);
+                    setForm((prev) => ({ ...prev, career: careerName }));
+                    setIsCareerDropdownOpen(false);
+                  }}
+                  onToggleOpen={() => setIsCareerDropdownOpen((prev) => !prev)}
+                  onOpen={() => setIsCareerDropdownOpen(true)}
+                  getVoiceProps={getVoiceProps}
+                />
+
+                <div className="mt-3 p-3.5 sm:p-4 rounded-2xl bg-slate-50/80 border border-slate-200/90 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <label htmlFor="create-student-attendance" className="text-xs font-semibold text-slate-700">
+                      Asistencia inicial estimada (%)
+                    </label>
+                    <span className="text-[10px] font-bold text-brand-navy bg-brand-gold/20 px-2 py-0.5 rounded-md border border-brand-gold/40">
+                      Simulación BD Duoc UC
+                    </span>
+                  </div>
+                  <input
+                    id="create-student-attendance"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={form.attendanceRate || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, attendanceRate: e.target.value }))}
+                    placeholder="Ej. 88.9"
+                    {...getVoiceProps('Porcentaje de asistencia inicial para el estudiante')}
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Se generará automáticamente su carga académica de asignaturas oficiales y registro de asistencia según su carrera, dejándolo operativo para simulaciones y el modelo predictivo.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <StaffRoleSection
+                staffRole={form.staffRole}
+                isAdmin={isAdmin}
+                onStaffRoleChange={(staffRole) => setForm((prev) => ({ ...prev, staffRole }))}
                 getVoiceProps={getVoiceProps}
               />
-            </>
-          ) : (
-            <StaffRoleSection
-              staffRole={form.staffRole}
-              isAdmin={isAdmin}
-              onStaffRoleChange={(staffRole) => setForm((prev) => ({ ...prev, staffRole }))}
-              getVoiceProps={getVoiceProps}
-            />
-          )}
+            )}
+          </div>
 
           {/* 4. Sede Institucional */}
           <div className="space-y-1">
@@ -925,6 +1085,9 @@ export const RegisterUserModal = ({
       </div>
     </div>
   );
+
+  // Portal en document.body para preservar position: fixed frente a filters en #nexo-cb-canvas
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default RegisterUserModal;

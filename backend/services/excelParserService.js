@@ -392,7 +392,166 @@ async function wipeAllData() {
 }
 
 /**
- * Procesa un archivo o buffer subido (.xlsx, .xls, .md, .json).
+ * Decodifica entidades XML básicas y referencias numéricas.
+ */
+function decodeXmlEntities(str) {
+  return String(str || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number.parseInt(dec, 10)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function stripTagsAndClean(raw) {
+  return decodeXmlEntities(String(raw || '').replace(/<[^>]+>/g, ''))
+    .replace(/\r?\n+/g, ' ')
+    .replace(/\|/g, '\\|')
+    .trim();
+}
+
+function parseSpreadsheetMlRows(xml) {
+  const rowMatches = xml.match(/<(?:[a-zA-Z0-9_-]+:)?Row\b[^>]*>[\s\S]*?<\/(?:[a-zA-Z0-9_-]+:)?Row>/gi);
+  if (!rowMatches || rowMatches.length === 0) return null;
+
+  const matrix = [];
+  for (const rowXml of rowMatches) {
+    const row = [];
+    const cellRegex = /<(?:[a-zA-Z0-9_-]+:)?Cell\b([^>]*)>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?Cell>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(rowXml)) !== null) {
+      const attrs = cellMatch[1] || '';
+      const idxAttr = attrs.match(/(?:[a-zA-Z0-9_-]+:)?Index=["'](\d+)["']/i);
+      if (idxAttr) {
+        const targetIdx = Math.max(0, Number.parseInt(idxAttr[1], 10) - 1);
+        while (row.length < targetIdx) row.push('');
+      }
+      const dataMatch = cellMatch[2].match(/<(?:[a-zA-Z0-9_-]+:)?Data\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?Data>/i);
+      row.push(stripTagsAndClean(dataMatch ? dataMatch[1] : cellMatch[2]));
+    }
+    if (row.some((v) => v !== '')) matrix.push(row);
+  }
+  return matrix.length >= 2 ? matrix : null;
+}
+
+function extractXmlAttributes(attrString) {
+  const result = {};
+  const attrRegex = /([a-zA-Z_][\w:.-]*)\s*=\s*["']([^"']*)["']/g;
+  let m;
+  while ((m = attrRegex.exec(attrString || '')) !== null) {
+    const key = m[1].includes(':') ? m[1].split(':').pop() : m[1];
+    result[key] = decodeXmlEntities(m[2]).replace(/\|/g, '\\|').trim();
+  }
+  return result;
+}
+
+function parseGenericXmlRecords(xml) {
+  const cleaned = xml
+    .replace(/<\?[\s\S]*?\?>/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .trim();
+  const rootMatch = cleaned.match(/^<([a-zA-Z_][\w:.-]*)\b[^>]*>([\s\S]*)<\/\1\s*>$/);
+  const body = rootMatch ? rootMatch[2] : cleaned;
+
+  const preferredNames = ['curso', 'asignatura', 'oferta', 'offering', 'course', 'section', 'seccion', 'row', 'record', 'registro', 'item'];
+  const tagCounts = new Map();
+  const directChildRegex = /<([a-zA-Z_][\w:.-]*)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/g;
+  const children = [];
+  let m;
+  while ((m = directChildRegex.exec(body)) !== null) {
+    const tag = m[1];
+    children.push({ tag, attrs: m[2] || '', inner: m[3] || '' });
+    tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+  }
+  if (children.length === 0) return [];
+
+  let recordTag = children.find((c) => preferredNames.includes(c.tag.toLowerCase()))?.tag;
+  if (!recordTag) {
+    let bestCount = 0;
+    for (const [tag, cnt] of tagCounts.entries()) {
+      if (cnt > bestCount) {
+        bestCount = cnt;
+        recordTag = tag;
+      }
+    }
+  }
+
+  const recordNodes = children.filter((c) => c.tag === recordTag);
+  const hasNestedContainer =
+    recordNodes.length === 1 &&
+    !preferredNames.includes(recordTag.toLowerCase()) &&
+    /<[a-zA-Z_][\w:.-]*\b[^>]*>[\s\S]*?<[a-zA-Z_]/.test(recordNodes[0].inner);
+  if (hasNestedContainer) {
+    const nested = parseGenericXmlRecords(`<${recordNodes[0].tag}>${recordNodes[0].inner}</${recordNodes[0].tag}>`);
+    if (nested.length > 0) return nested;
+  }
+
+  return recordNodes.map((node) => {
+    const obj = { ...extractXmlAttributes(node.attrs) };
+    const fieldRegex = /<([a-zA-Z_][\w:.-]*)\b[^>]*?(?:\/>|>([\s\S]*?)<\/\1>)/g;
+    let fm;
+    while ((fm = fieldRegex.exec(node.inner)) !== null) {
+      const rawKey = fm[1].includes(':') ? fm[1].split(':').pop() : fm[1];
+      const val = stripTagsAndClean(fm[2] || '');
+      if (val !== '' || !(rawKey in obj)) {
+        obj[rawKey] = val;
+      }
+    }
+    return obj;
+  });
+}
+
+/**
+ * Convierte un archivo o texto XML (SpreadsheetML de Excel o XML estructurado con nodos de curso/oferta)
+ * a una tabla Markdown estándar lista para parseMarkdownTable.
+ */
+function xmlToMarkdown(xmlContent) {
+  const xml = String(xmlContent || '').trim();
+  if (!xml) return '';
+
+  const spreadsheetRows = parseSpreadsheetMlRows(xml);
+  if (spreadsheetRows) {
+    const [headers, ...dataRows] = spreadsheetRows;
+    const cleanHeaders = headers.map((h, i) => h || `Col${i + 1}`);
+    const headerLine = `| ${cleanHeaders.join(' | ')} |`;
+    const separatorLine = `| ${cleanHeaders.map(() => ':-:').join(' | ')} |`;
+    const bodyLines = dataRows.map((row) => {
+      const cells = cleanHeaders.map((_, idx) => String(row[idx] || '').trim());
+      return `| ${cells.join(' | ')} |`;
+    });
+    return [headerLine, separatorLine, ...bodyLines].join('\n');
+  }
+
+  const records = parseGenericXmlRecords(xml);
+  if (!records || records.length === 0) return '';
+
+  const headers = [];
+  const headerSet = new Set();
+  for (const rec of records) {
+    for (const key of Object.keys(rec)) {
+      if (!headerSet.has(key)) {
+        headerSet.add(key);
+        headers.push(key);
+      }
+    }
+  }
+  if (headers.length === 0) return '';
+
+  const headerLine = `| ${headers.join(' | ')} |`;
+  const separatorLine = `| ${headers.map(() => ':-:').join(' | ')} |`;
+  const bodyLines = records.map((rec) => {
+    const cells = headers.map((h) => String(rec[h] || '').trim());
+    return `| ${cells.join(' | ')} |`;
+  });
+
+  return [headerLine, separatorLine, ...bodyLines].join('\n');
+}
+
+/**
+ * Procesa un archivo o buffer subido (.xlsx, .xls, .xml, .md, .json).
  */
 async function processCatalogUpload({
   buffer,
@@ -401,14 +560,20 @@ async function processCatalogUpload({
   replace = false,
   periodo = '2026 - 002',
 }) {
-  const isXlsx = filename && (filename.endsWith('.xlsx') || filename.endsWith('.xls'));
-  const isMd = filename && (filename.endsWith('.md') || filename.endsWith('.markdown'));
-  const isJson = filename && filename.endsWith('.json');
+  const lowerName = String(filename || '').toLowerCase();
+  const isXlsx = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+  const isXml = lowerName.endsWith('.xml');
+  const isMd = lowerName.endsWith('.md') || lowerName.endsWith('.markdown');
+  const isJson = lowerName.endsWith('.json');
 
   let parsedResult;
 
   if (isXlsx && buffer) {
     parsedResult = parseXlsxBuffer(buffer, { periodo });
+  } else if (isXml) {
+    const xmlStr = textContent || (buffer ? buffer.toString('utf8') : '');
+    const mdContent = xmlToMarkdown(xmlStr);
+    parsedResult = parseMarkdownTable(mdContent, { periodo });
   } else if (isMd || textContent) {
     const content = textContent || (buffer ? buffer.toString('utf8') : '');
     parsedResult = parseMarkdownTable(content, { periodo });
@@ -422,7 +587,7 @@ async function processCatalogUpload({
       consolidated: consolidateSections(normalized),
     };
   } else {
-    throw new Error('Formato de archivo no soportado. Debe ser .xlsx, .xls, .md o .json');
+    throw new Error('Formato de archivo no soportado. Debe ser .xml, .xlsx, .xls, .md o .json');
   }
 
   if (replace) {
@@ -439,6 +604,7 @@ module.exports = {
   normalizeRowToOffering,
   consolidateSections,
   xlsxToMarkdown,
+  xmlToMarkdown,
   parseXlsxBuffer,
   parseMarkdownTable,
   wipePeriodData,

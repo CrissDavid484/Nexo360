@@ -6,6 +6,8 @@ const authService = require('../services/authService');
 const emailService = require('../services/emailService');
 const courseService = require('../services/courseService');
 const satAlertService = require('../services/satAlertService');
+const simulatorSnapshotService = require('../services/simulatorSnapshotService');
+const academicCalendarService = require('../services/academicCalendarService');
 const { calculatePredictiveRisk } = require('../services/predictiveRiskService');
 const { careerCatalog, sedeCatalog } = require('../services/catalogService');
 const {
@@ -28,6 +30,11 @@ const ROLE_LABELS = Object.freeze({
   estudiante_paedis: 'Estudiante Regular • PAEDIS',
   estudiante: 'Estudiante Regular Duoc UC',
   coordinador_paedis: 'Coordinador/a PAEDIS e Inclusión',
+  profesor: 'Docente Duoc UC',
+  director: 'Directivo Institucional',
+  subdirector: 'Subdirectivo Institucional',
+  administrativo: 'Personal Administrativo',
+  tutor_par: 'Tutor Par',
 });
 
 const ALLOWED_ROLES = Object.freeze([
@@ -194,7 +201,10 @@ async function findUserByIdOrEmail(rawIdentifier) {
  */
 exports.getMetrics = async (req, res) => {
   try {
-    const allUsers = await authService.getAllUsers();
+    const [allUsers, latestSnapshot] = await Promise.all([
+      authService.getAllUsers(),
+      simulatorSnapshotService.getLatestSnapshot(),
+    ]);
     const totalUsers = allUsers.length;
     const students = allUsers.filter(
       (u) =>
@@ -210,18 +220,17 @@ exports.getMetrics = async (req, res) => {
     const paedisCount = paedisStudents.length;
     const paedisPercentage = Math.round((paedisCount / totalStudents) * 100);
 
-    const simulatorUsersCount = students.filter((s) => s.hasUsedSimulator).length;
-    const simulatorUsagePercentage = Math.round((simulatorUsersCount / totalStudents) * 100);
-    const totalSimulatorInteractions = allUsers.reduce(
-      (acc, u) => acc + (u.simulatorUsageCount || 0),
-      0
-    );
-
     const statusDistribution = {
       activo: students.filter((s) => s.academicStatus === 'activo').length,
       desercion: students.filter((s) => s.academicStatus === 'desercion').length,
       titulado: students.filter((s) => s.academicStatus === 'titulado').length,
     };
+
+    const careerDistribution = {};
+    students.forEach((s) => {
+      const career = s.career || s.carrera || 'Sin carrera';
+      careerDistribution[career] = (careerDistribution[career] || 0) + 1;
+    });
 
     let altoRiesgo = 0;
     let medioRiesgo = 0;
@@ -246,7 +255,15 @@ exports.getMetrics = async (req, res) => {
 
     let recentActivity = [];
     if (mongoose.connection.readyState === 1) {
-      recentActivity = await ActivityLog.find({}).sort({ createdAt: -1 }).limit(10).lean();
+      try {
+        recentActivity = await ActivityLog.find({})
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .select('action userName userEmail details createdAt')
+          .lean();
+      } catch (logErr) {
+        console.warn('[AdminController] Fallback logs en memoria:', logErr.message);
+      }
     }
     if (!recentActivity || recentActivity.length === 0) {
       recentActivity = authService.getRecentLogs(10);
@@ -260,13 +277,34 @@ exports.getMetrics = async (req, res) => {
         totalFaculty: totalUsers - totalStudents,
         paedisCount,
         paedisPercentage,
-        simulatorUsersCount,
-        simulatorUsagePercentage,
-        totalSimulatorInteractions,
+        simulatorUsersCount: latestSnapshot.simulatorUsersCount ?? 0,
+        simulatorUsagePercentage: latestSnapshot.simulatorUsagePercentage ?? 0,
+        totalSimulatorInteractions: latestSnapshot.totalSimulatorInteractions ?? 0,
         statusDistribution,
         riskSummary: { altoRiesgo, medioRiesgo, bajoRiesgo },
         a11yPreferencesStats,
         recentActivity,
+        careerDistribution,
+        careerBreakdown: latestSnapshot.careerBreakdown || [],
+        topDemandedSections: latestSnapshot.topDemandedSections || [],
+        simulatorWeeklyUsage: latestSnapshot.simulatorWeeklyUsage || {},
+        simulatorAdoption: latestSnapshot.simulatorAdoption || {
+          startedOnlyTotal: 0,
+          completedTotal: 0,
+          startedOnlyWeekly: [],
+          completedWeekly: [],
+        },
+        paedisTrendYear: latestSnapshot.paedisTrendYear || new Date().getFullYear(),
+        paedisMonthlyTrend: latestSnapshot.paedisMonthlyTrend || {},
+        paedisMonthlySeries: latestSnapshot.paedisMonthlySeries || [],
+        simulatorSnapshotMeta: {
+          id: latestSnapshot._id || latestSnapshot.slotDateKey,
+          slot: latestSnapshot.slot,
+          slotDateKey: latestSnapshot.slotDateKey,
+          capturedAt: latestSnapshot.capturedAt,
+          timezone: latestSnapshot.timezone || simulatorSnapshotService.CHILE_TIMEZONE,
+          nextScheduledCut: simulatorSnapshotService.getNextScheduledCut(),
+        },
       },
     });
   } catch {
@@ -274,6 +312,34 @@ exports.getMetrics = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error al compilar las métricas del panel de administración.',
+    });
+  }
+};
+
+/**
+ * GET /api/admin/simulator-snapshots
+ * Lista el último snapshot e historial reciente de cortes programados (03:00 / 15:00 America/Santiago).
+ */
+exports.getSimulatorSnapshots = async (req, res) => {
+  try {
+    const limit = Number.parseInt(String(req.query?.limit || 20), 10);
+    const latest = await simulatorSnapshotService.getLatestSnapshot();
+    const history = await simulatorSnapshotService.listSnapshots(limit);
+    return res.status(200).json({
+      success: true,
+      latest,
+      history,
+      schedule: {
+        slots: simulatorSnapshotService.SCHEDULED_SLOTS,
+        timezone: simulatorSnapshotService.CHILE_TIMEZONE,
+        nextScheduledCut: simulatorSnapshotService.getNextScheduledCut(),
+      },
+    });
+  } catch {
+    console.error('[AdminController] Error al consultar snapshots del simulador.');
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar snapshots programados del simulador.',
     });
   }
 };
@@ -534,6 +600,98 @@ function validateCreateStudentRequest(body, reqUser) {
   return { email, role, isStaffRole, isPaedis, identity, profileSetup };
 }
 
+function generateSimulatedStudentCourses(career = '', inputRate = null) {
+  const cLower = String(career).toLowerCase();
+  let courseTemplates;
+
+  if (cLower.includes('informática') || cLower.includes('analista') || cLower.includes('software')) {
+    courseTemplates = [
+      { sigla: 'ASY1101', nombre: 'Fundamentos de Arquitectura de Sistemas', seccion: '001D', creditos: 10, total: 24, prof: 'Rodrigo Silva', sala: 'Laboratorio TI 201' },
+      { sigla: 'PRY1102', nombre: 'Taller de Programación Orientada a Objetos', seccion: '002D', creditos: 10, total: 28, prof: 'Claudia Muñoz', sala: 'Laboratorio TI 202' },
+      { sigla: 'MAT1101', nombre: 'Nivelación Matemática', seccion: '001D', creditos: 8, total: 32, prof: 'Patricio Morales', sala: 'Aula Magna 301' },
+      { sigla: 'INU5101', nombre: 'Inglés Intermedio I', seccion: '003D', creditos: 10, total: 20, prof: 'Jennifer Adams', sala: 'Laboratorio Idiomas 1' },
+      { sigla: 'BDY2101', nombre: 'Bases de Datos Relacionales', seccion: '001D', creditos: 10, total: 24, prof: 'Mauricio Castro', sala: 'Laboratorio TI 204' },
+    ];
+  } else if (cLower.includes('telecom') || cLower.includes('red') || cLower.includes('infraestructura')) {
+    courseTemplates = [
+      { sigla: 'RED1101', nombre: 'Fundamentos de Redes y Conectividad', seccion: '001D', creditos: 10, total: 24, prof: 'Yasser Guerra', sala: 'Laboratorio Redes 101' },
+      { sigla: 'TEL1102', nombre: 'Introducción a Telecomunicaciones', seccion: '002D', creditos: 10, total: 24, prof: 'Gonzalo Oyarzún', sala: 'Laboratorio Telecom' },
+      { sigla: 'OCY1104', nombre: 'Ciberseguridad Ofensiva', seccion: '001D', creditos: 10, total: 20, prof: 'José Erasmo Matus', sala: 'Laboratorio Seguridad' },
+      { sigla: 'MAT1101', nombre: 'Nivelación Matemática', seccion: '001D', creditos: 8, total: 32, prof: 'Patricio Morales', sala: 'Aula Magna 301' },
+      { sigla: 'INU5101', nombre: 'Inglés Intermedio I', seccion: '003D', creditos: 10, total: 20, prof: 'Jennifer Adams', sala: 'Laboratorio Idiomas 1' },
+    ];
+  } else if (cLower.includes('construc') || cLower.includes('obra') || cLower.includes('dibujo')) {
+    courseTemplates = [
+      { sigla: 'DBO1101', nombre: 'Dibujo Arquitectónico y Planimetría', seccion: '001D', creditos: 10, total: 28, prof: 'Marcelo Fernández', sala: 'Taller Planos 102' },
+      { sigla: 'TEC1102', nombre: 'Tecnología y Resistencia de Materiales', seccion: '002D', creditos: 10, total: 24, prof: 'Andrea Valenzuela', sala: 'Laboratorio Estructuras' },
+      { sigla: 'MAT1101', nombre: 'Nivelación Matemática', seccion: '001D', creditos: 8, total: 32, prof: 'Patricio Morales', sala: 'Aula Magna 301' },
+      { sigla: 'OBR1103', nombre: 'Gestión y Seguridad en Obras', seccion: '001D', creditos: 10, total: 22, prof: 'Esteban Reyes', sala: 'Aula 205' },
+    ];
+  } else if (cLower.includes('admin') || cLower.includes('gestión') || cLower.includes('comercial')) {
+    courseTemplates = [
+      { sigla: 'ADM1101', nombre: 'Fundamentos de Administración Moderna', seccion: '001D', creditos: 10, total: 24, prof: 'Carlos Henríquez', sala: 'Aula 304' },
+      { sigla: 'CON1102', nombre: 'Contabilidad General y Financiera', seccion: '002D', creditos: 10, total: 28, prof: 'Loreto Sanhueza', sala: 'Laboratorio Contable' },
+      { sigla: 'MAT1101', nombre: 'Nivelación Matemática', seccion: '001D', creditos: 8, total: 32, prof: 'Patricio Morales', sala: 'Aula Magna 301' },
+      { sigla: 'INU5101', nombre: 'Inglés Intermedio I', seccion: '003D', creditos: 10, total: 20, prof: 'Jennifer Adams', sala: 'Laboratorio Idiomas 1' },
+    ];
+  } else {
+    courseTemplates = [
+      { sigla: 'INI1101', nombre: 'Introducción al Área de Especialidad', seccion: '001D', creditos: 10, total: 24, prof: 'Docente Titular', sala: 'Aula Central 201' },
+      { sigla: 'HER1102', nombre: 'Herramientas Digitales y Productividad', seccion: '002D', creditos: 10, total: 24, prof: 'Coordinador Académico', sala: 'Laboratorio General' },
+      { sigla: 'MAT1101', nombre: 'Nivelación Matemática', seccion: '001D', creditos: 8, total: 32, prof: 'Patricio Morales', sala: 'Aula Magna 301' },
+      { sigla: 'INU5101', nombre: 'Inglés Intermedio I', seccion: '003D', creditos: 10, total: 20, prof: 'Jennifer Adams', sala: 'Laboratorio Idiomas 1' },
+    ];
+  }
+
+  const targetRate = typeof inputRate === 'number' && !isNaN(inputRate) && inputRate >= 0 && inputRate <= 100
+    ? inputRate
+    : 88.9;
+
+  let totalAttended = 0;
+  let totalClasses = 0;
+
+  const enrolledCourses = courseTemplates.map((t, idx) => {
+    const variance = (idx % 2 === 0 ? 1 : -1) * (2.5 + (idx * 0.8));
+    const coursePct = Math.min(100, Math.max(50, Math.round((targetRate + variance) * 10) / 10));
+    const attended = Math.min(t.total, Math.round((t.total * coursePct) / 100));
+    const exactPct = Math.round((attended / t.total) * 1000) / 10;
+
+    totalAttended += attended;
+    totalClasses += t.total;
+
+    return {
+      sigla: t.sigla,
+      nombre: t.nombre,
+      seccion: t.seccion,
+      creditos: t.creditos,
+      attendanceRate: exactPct,
+      porcentajeAsistencia: exactPct,
+      clasesRegistradas: t.total,
+      asistencias: attended,
+      profesor: t.prof,
+      sala: t.sala,
+    };
+  });
+
+  const courseAttendance = enrolledCourses.map((c) => ({
+    courseCode: c.sigla,
+    courseName: c.nombre,
+    totalSessions: c.clasesRegistradas,
+    attendedSessions: c.asistencias,
+    attendancePercentage: c.porcentajeAsistencia,
+    consecutiveAbsences: c.porcentajeAsistencia < 70 ? 3 : 0,
+    lateCount: c.porcentajeAsistencia < 80 ? 2 : 1,
+    missedKeySession: false,
+    paedisJustified: false,
+  }));
+
+  const globalRate = totalClasses > 0
+    ? Math.round((totalAttended / totalClasses) * 1000) / 10
+    : targetRate;
+
+  return { enrolledCourses, courseAttendance, attendanceRate: globalRate };
+}
+
 function buildNewUserDocument({
   body,
   email,
@@ -550,6 +708,24 @@ function buildNewUserDocument({
   const selectedCampus = sanitizeString(body.campus || body.sede, 80) || DEFAULT_SEDE;
   const roleLabel =
     sanitizeString(body.roleLabel, 120) || ROLE_LABELS[role] || 'Estudiante Duoc UC';
+
+  const isStudentRole = role === 'estudiante' || role === 'estudiante_paedis';
+  let initialCourses = Array.isArray(body.enrolledCourses) && body.enrolledCourses.length > 0
+    ? body.enrolledCourses
+    : [];
+  let initialCourseAttendance = Array.isArray(body.courseAttendance) && body.courseAttendance.length > 0
+    ? body.courseAttendance
+    : [];
+  let calculatedAttendance = typeof body.attendanceRate === 'number'
+    ? body.attendanceRate
+    : (parseFloat(body.attendanceRate) || 88.9);
+
+  if (isStudentRole && initialCourses.length === 0) {
+    const generated = generateSimulatedStudentCourses(selectedCareer, calculatedAttendance);
+    initialCourses = generated.enrolledCourses;
+    initialCourseAttendance = generated.courseAttendance;
+    calculatedAttendance = generated.attendanceRate;
+  }
 
   return {
     email,
@@ -569,7 +745,7 @@ function buildNewUserDocument({
     barreraPaedis: profileSetup.barreraPaedis,
     academicStatus: 'activo',
     statusReason: 'Registrado por Administrador en Nexo360',
-    attendanceRate: 88.9,
+    attendanceRate: calculatedAttendance,
     career: selectedCareer,
     carrera: selectedCareer,
     campus: selectedCampus,
@@ -583,7 +759,8 @@ function buildNewUserDocument({
     diagnosticoDeclarado: sanitizeString(body.diagnosticoDeclarado, 160) || '',
     ajustesAprobados: Array.isArray(body.ajustesAprobados) ? body.ajustesAprobados : [],
     accessibilityPreferences: profileSetup.accessibilityPreferences,
-    enrolledCourses: Array.isArray(body.enrolledCourses) ? body.enrolledCourses : [],
+    enrolledCourses: initialCourses,
+    courseAttendance: initialCourseAttendance,
     consentimientoLey21719: {
       aceptado: true,
       fechaAceptacion: body.consentimientoLey21719?.fechaAceptacion || new Date(),
@@ -811,6 +988,94 @@ exports.updateStudentStatus = async (req, res) => {
 };
 
 /**
+ * PATCH /api/admin/users/:id/role
+ */
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rawRole = sanitizeString(req.body?.role, 40)?.toLowerCase() || '';
+    const validRoles = UserProfile.schema.path('role').enumValues || [
+      'admin',
+      'administrador',
+      'estudiante_paedis',
+      'estudiante',
+      'tutor_par',
+      'profesor',
+      'director',
+      'subdirector',
+      'coordinador_paedis',
+      'administrativo',
+    ];
+
+    if (!validRoles.includes(rawRole)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rol institucional no válido.',
+      });
+    }
+
+    const targetUser = await findUserByIdOrEmail(id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado para actualización de rol.',
+      });
+    }
+
+    const actorId = String(req.user?._id || req.user?.id || '');
+    const targetDocId = targetUser._id || targetUser.id || id;
+    if (
+      (actorId && String(targetDocId) === actorId) ||
+      (req.user?.email && targetUser.email && req.user.email.toLowerCase() === targetUser.email.toLowerCase())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'No puede modificar su propio rol mientras está en sesión.',
+      });
+    }
+
+    const roleLabel = ROLE_LABELS[rawRole] || 'Personal Administrativo';
+    const isPaedis = rawRole === 'estudiante_paedis';
+    let updatedUser = null;
+
+    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(targetDocId))) {
+      updatedUser = await UserProfile.findByIdAndUpdate(
+        targetDocId,
+        {
+          $set: {
+            role: rawRole,
+            roleLabel,
+            isPaedis,
+          },
+        },
+        { returnDocument: 'after', runValidators: true }
+      );
+    } else {
+      authService.updateUserFieldsInMemory(targetUser.email, { role: rawRole, roleLabel, isPaedis });
+      updatedUser = { ...targetUser, role: rawRole, roleLabel, isPaedis };
+    }
+
+    await logAdminAction(req.user, {
+      action: 'student_updated_by_admin',
+      details: `Rol de ${targetUser.fullName || targetUser.email} actualizado a "${roleLabel}".`,
+      metadata: { targetEmail: targetUser.email, role: rawRole },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Rol actualizado a "${roleLabel}" correctamente.`,
+      user: updatedUser ? authService.formatUserResponse(updatedUser) : null,
+    });
+  } catch {
+    console.error('[AdminController] Error al actualizar rol de usuario.');
+    return res.status(500).json({
+      success: false,
+      message: 'Error al actualizar el rol del usuario.',
+    });
+  }
+};
+
+/**
  * DELETE /api/admin/students/:id
  */
 exports.deleteStudent = async (req, res) => {
@@ -852,7 +1117,10 @@ exports.deleteStudent = async (req, res) => {
  */
 exports.getCoursesSummary = async (req, res) => {
   try {
-    const careers = await courseService.getCareersSummary();
+    const [careers, sections] = await Promise.all([
+      courseService.getCareersSummary(),
+      courseService.getCatalogSectionCounts(),
+    ]);
     const totalSecciones = careers.reduce((acc, c) => acc + c.totalSecciones, 0);
     const totalAsignaturas = careers.reduce((acc, c) => acc + c.totalAsignaturas, 0);
 
@@ -862,6 +1130,10 @@ exports.getCoursesSummary = async (req, res) => {
         totalSecciones,
         totalAsignaturas,
         totalCarreras: careers.length,
+        totalCourses: totalSecciones,
+        diurnas: sections?.D ?? 0,
+        vespertinas: sections?.V ?? 0,
+        ambiguas: sections?.ambiguous ?? 0,
         periodoActivo: '2026 - 002',
         careers,
       },
@@ -881,8 +1153,20 @@ exports.getCoursesSummary = async (req, res) => {
  */
 exports.importCourses = async (req, res) => {
   try {
-    const { rows, markdown, md, fileBase64, base64, textContent, replace, periodo } = req.body || {};
-    const payload = rows || markdown || md || fileBase64 || base64 || textContent || req.body;
+    const {
+      rows,
+      markdown,
+      md,
+      rawMarkdown,
+      xml,
+      rawXml,
+      fileBase64,
+      base64,
+      textContent,
+      replace,
+      periodo,
+    } = req.body || {};
+    const payload = rows || markdown || md || rawMarkdown || xml || rawXml || fileBase64 || base64 || textContent || req.body;
 
     if (!payload || (Array.isArray(payload) && payload.length === 0)) {
       return res.status(400).json({
@@ -1430,6 +1714,104 @@ exports.updatePaedisCase = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error al guardar el expediente PAEDIS.',
+    });
+  }
+};
+
+/**
+ * GET /api/admin/academic-calendar
+ * Lista los calendarios académicos almacenados en MongoDB y la semana actual calculada.
+ */
+exports.getAcademicCalendars = async (req, res) => {
+  try {
+    const calendars = await academicCalendarService.getAllCalendars();
+    const current = academicCalendarService.resolveAcademicWeekStatus(new Date(), calendars);
+    return res.status(200).json({
+      success: true,
+      current,
+      calendars,
+    });
+  } catch {
+    console.error('[AdminController] Error al obtener calendarios académicos.');
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar el calendario académico.',
+    });
+  }
+};
+
+/**
+ * POST /api/admin/academic-calendar/import
+ * Procesa un PDF oficial o JSON de programación académica (soporta ?dryRun=true) y actualiza MongoDB.
+ */
+exports.importAcademicCalendar = async (req, res) => {
+  try {
+    const { fileBase64, base64, fileName, textContent, calendar } = req.body || {};
+    const isDryRun = ['true', '1'].includes(String(req.query?.dryRun).toLowerCase());
+
+    let parsedResult;
+    if (calendar && typeof calendar === 'object' && calendar.year) {
+      parsedResult = {
+        calendar,
+        detectedFields: ['Calendario estructurado'],
+        warnings: [],
+      };
+    } else if (fileBase64 || base64 || textContent) {
+      const rawB64 = String(fileBase64 || base64 || '').replace(/^data:[^;]+;base64,/i, '').trim();
+      const buf = rawB64 ? Buffer.from(rawB64, 'base64') : null;
+      if (rawB64 && (!buf || buf.length === 0)) {
+        return res.status(400).json({
+          success: false,
+          message: 'El archivo PDF adjunto está vacío o mal codificado.',
+        });
+      }
+      parsedResult = academicCalendarService.parseAcademicCalendarPdf({
+        buffer: buf,
+        textContent: textContent || '',
+        fileName: fileName || 'calendario-academico.pdf',
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe adjuntar un archivo PDF de Programación Académica válido.',
+      });
+    }
+
+    if (isDryRun) {
+      return res.status(200).json({
+        success: true,
+        dryRun: true,
+        preview: parsedResult,
+      });
+    }
+
+    const saved = await academicCalendarService.saveAcademicCalendar(
+      parsedResult.calendar,
+      req.user?.email || 'admin'
+    );
+    const calendars = await academicCalendarService.getAllCalendars();
+    const current = academicCalendarService.resolveAcademicWeekStatus(new Date(), calendars);
+
+    await logAdminAction(req.user, {
+      action: 'IMPORT',
+      details: `Calendario Académico ${saved.year} actualizado desde ${saved.sourceFileName || 'PDF'}.`,
+      metadata: {
+        year: saved.year,
+        sourceFileName: saved.sourceFileName,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Calendario Académico ${saved.year} actualizado en MongoDB correctamente.`,
+      calendar: saved,
+      current,
+    });
+  } catch (err) {
+    console.error('[AdminController] Error al importar calendario académico:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'No se pudo procesar el PDF de programación académica.',
     });
   }
 };

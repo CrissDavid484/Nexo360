@@ -14,6 +14,28 @@ export const INSTITUTIONAL_DOMAINS = ['duocuc.cl', 'profesor.duoc.cl', 'duoc.cl'
 export const STUDENT_DOMAINS = ['duocuc.cl'];
 export const STAFF_DOMAINS = ['profesor.duoc.cl', 'duoc.cl'];
 
+// Dominios personalizados permitidos (para opción "Otro" en registro)
+// Estos se validan solo cuando los registra un administrador
+export const CUSTOM_DOMAINS_REGISTRY = new Set();
+
+/**
+ * Registra un dominio personalizado como válido para registro institucional.
+ * Solo debe llamarse por un administrador autenticado.
+ */
+export function registerCustomDomain(domain) {
+  const normalized = normalizeDomainInput(domain);
+  if (normalized) {
+    CUSTOM_DOMAINS_REGISTRY.add(normalized);
+  }
+}
+
+/**
+ * Verifica si un dominio está registrado como dominio personalizado válido.
+ */
+export function isCustomDomainRegistered(domain) {
+  return CUSTOM_DOMAINS_REGISTRY.has(normalizeDomainInput(domain));
+}
+
 function normalizeDomainInput(domainOrEmail = '') {
   const clean = String(domainOrEmail || '').trim().toLowerCase();
   const atIndex = clean.lastIndexOf('@');

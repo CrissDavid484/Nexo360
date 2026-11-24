@@ -14,12 +14,14 @@ router.use(verifyToken);
 // Métricas de uso de la plataforma, estadísticas PAEDIS y predicción
 // Autorizado para Administradores y Coordinadores PAEDIS
 router.get('/metrics', requireAdminOrCoordinator, adminController.getMetrics);
+router.get('/simulator-snapshots', requireAdminOrCoordinator, adminController.getSimulatorSnapshots);
 
 // Gestión y directorio de estudiantes con cálculo predictivo
 // Consulta, alta y actualización de estado compartida; eliminación exclusiva para Administrador
 router.get('/students', requireAdminOrCoordinator, adminController.getStudents);
 router.post('/students', requireAdminOrCoordinator, adminController.createStudent);
 router.put('/students/:id/status', requireAdminOrCoordinator, adminController.updateStudentStatus);
+router.patch('/users/:id/role', requireAdmin, adminController.updateUserRole);
 router.delete('/students/:id', requireAdmin, adminController.deleteStudent);
 
 // Gestión y carga de asignaturas/oferta académica para Toma de Ramos (Excel/MD/DB)
@@ -46,6 +48,10 @@ router.delete('/sedes/:id', requireAdmin, adminController.deleteSede);
 router.get('/sat-alerts', requireAdminOrCoordinator, adminController.getSatAlerts);
 router.patch('/sat-alerts/:userId/simulate', requireAdminOrCoordinator, adminController.simulateSatCourse);
 router.patch('/sat-alerts/:userId/intervention', requireAdminOrCoordinator, adminController.updateSatIntervention);
+
+// Gestión de Calendario Académico Duoc UC (PDF 2026-2027)
+router.get('/academic-calendar', requireAdminOrCoordinator, adminController.getAcademicCalendars);
+router.post('/academic-calendar/import', requireAdmin, adminController.importAcademicCalendar);
 
 // Bitácora de Auditoría Institucional (ActivityLog) - Exclusivo para Administrador (Ley N° 21.719)
 router.get('/activity-logs', requireAdmin, adminController.getActivityLogs);

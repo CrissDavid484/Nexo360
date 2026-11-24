@@ -17,6 +17,15 @@ function getVisibleFocusables(container) {
   );
 }
 
+// Check if element is part of AccessibilityBar (allow focus escape to it)
+function isAccessibilityBarElement(element) {
+  if (!element) return false;
+  // Check if element is the AccessibilityBar FAB or panel
+  const a11yPanel = document.getElementById('accessibility-panel');
+  if (!a11yPanel) return false;
+  return a11yPanel.contains(element) || element.id === 'accessibility-panel';
+}
+
 /**
  * Hook WCAG 2.2 para modales accesibles:
  * - Trap cíclico de foco con Tab / Shift+Tab
@@ -64,12 +73,29 @@ export function useAccessibleModal({
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
 
+      // Allow focus to escape to AccessibilityBar (z-index 9999)
+      const a11yPanel = document.getElementById('accessibility-panel');
+      const a11yIsOpen = a11yPanel && a11yPanel.querySelector('[aria-expanded="true"]');
+      const a11yFAB = a11yPanel?.querySelector('.a11y-fab-btn');
+
       if (event.shiftKey && (document.activeElement === first || !containerRef.current.contains(document.activeElement))) {
-        event.preventDefault();
-        last.focus();
+        // Shift+Tab from first element - allow escape to AccessibilityBar FAB if open
+        if (a11yFAB && a11yIsOpen) {
+          event.preventDefault();
+          a11yFAB.focus();
+        } else {
+          event.preventDefault();
+          last.focus();
+        }
       } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
+        // Tab from last element - allow escape to AccessibilityBar FAB if open
+        if (a11yFAB && a11yIsOpen) {
+          event.preventDefault();
+          a11yFAB.focus();
+        } else {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
 

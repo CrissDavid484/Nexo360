@@ -209,7 +209,7 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
       );
       assert.ok(!a11yBar.includes('SlidersHorizontal'));
       assert.ok(a11yBar.includes('Ajustes de accesibilidad'));
-      assert.ok(a11yBar.includes('fixed bottom-5 right-0 z-50'));
+      assert.ok(a11yBar.includes('fixed bottom-5 right-0 z-[9999]'));
       assert.ok(a11yBar.includes('rounded-l-full border border-r-0 shadow-lg'));
       assert.ok(a11yBar.includes('max-w-0 opacity-0'));
       assert.ok(a11yBar.includes('max-w-[260px] opacity-100'));
@@ -237,12 +237,9 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
       // 5. Cero tabIndex={0} en contenedores no interactivos en componentes críticos
       for (const relPath of [
         'components/auth/MfaPrompt.jsx',
-        'components/admin/CoursesAdminSection.jsx',
         'components/admin/CoursesCatalogTable.jsx',
-        'components/admin/EarlyWarningSatSection.jsx',
-        'components/admin/PaedisCaseManagementSection.jsx',
         'components/simulation/TomaRamosSimulator.jsx',
-        'components/views/AdminPanelView.jsx',
+        'components/admin/modules/AdminLayout.jsx',
       ]) {
         const content = readFrontendFile(relPath);
         assert.ok(

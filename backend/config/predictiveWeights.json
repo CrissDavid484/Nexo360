@@ -1,0 +1,79 @@
+{
+  "version": "2.0",
+  "description": "Pesos configurables para el Motor Predictivo de Deserción Académica (Nexo360). Suma debe ser 1.0.",
+  "weights": {
+    "attendance": 0.45,
+    "paedis": 0.20,
+    "simulator": 0.15,
+    "trend": 0.10,
+    "load": 0.10
+  },
+  "thresholds": {
+    "riskLevels": {
+      "alto": {
+        "minScore": 60,
+        "trafficLight": "red",
+        "label": "Alto Riesgo",
+        "description": "Requiere intervención inmediata (Ficha 360 en <48h)"
+      },
+      "medio": {
+        "minScore": 35,
+        "maxScore": 59,
+        "trafficLight": "yellow",
+        "label": "Riesgo Moderado",
+        "description": "Seguimiento docente + invitación a Simulador"
+      },
+      "bajo": {
+        "maxScore": 34,
+        "trafficLight": "green",
+        "label": "Bajo Riesgo",
+        "description": "Monitoreo rutinario"
+      }
+    },
+    "attendance": {
+      "ri": 70,
+      "alert": 75,
+      "regular": 80
+    }
+  },
+  "nextBestAction": {
+    "rules": [
+      {
+        "condition": "riskLevel === 'ALTO' && coursesInRI.length > 0",
+        "action": "Llamar al estudiante + Agendar seguimiento con Tutor PAEDIS + Abrir Ficha 360 (SLA 48h)",
+        "priority": 1,
+        "slaHours": 48
+      },
+      {
+        "condition": "riskLevel === 'ALTO' && isPaedis === true && tutorPaedisAsignado === 'No'",
+        "action": "Asignar Tutor PAEDIS urgente + Notificar a coordinación + Ficha 360",
+        "priority": 2,
+        "slaHours": 24
+      },
+      {
+        "condition": "riskLevel === 'ALTO' && hasUsedSimulator === false",
+        "action": "Invitar a Simulador de Toma de Ramos + Recordar importancia de planificación horaria + Ficha 360",
+        "priority": 3,
+        "slaHours": 48
+      },
+      {
+        "condition": "riskLevel === 'MEDIO' && effectiveAttendance <= 75",
+        "action": "Seguimiento docente en asignaturas críticas + Invitación a Simulador + Monitoreo semanal",
+        "priority": 4,
+        "slaHours": 72
+      },
+      {
+        "condition": "riskLevel === 'MEDIO' && isPaedis === true && ajustesCount === 0",
+        "action": "Evaluar ajustes razonables PAEDIS pendientes + Coordinar con Tutor PAEDIS",
+        "priority": 5,
+        "slaHours": 72
+      },
+      {
+        "condition": "riskLevel === 'BAJO' && hasUsedSimulator === false",
+        "action": "Invitación proactiva a Simulador de Toma de Ramos (prevención)",
+        "priority": 6,
+        "slaHours": 168
+      }
+    ]
+  }
+}

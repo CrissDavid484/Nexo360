@@ -23,13 +23,28 @@ export function useOnClickOutside(ref, handler, options = {}) {
       if (ignoreSelector && typeof target.closest === 'function' && target.closest(ignoreSelector)) {
         return;
       }
+      // Si el elemento fue re-renderizado o mutado en el DOM durante el evento,
+      // verificar si la ruta compuesta del click se originó dentro del contenedor o selector ignorado.
+      if (typeof event.composedPath === 'function') {
+        const path = event.composedPath();
+        if (path.includes(container)) return;
+        if (ignoreSelector) {
+          for (const el of path) {
+            if (el && typeof el.matches === 'function' && el.matches(ignoreSelector)) {
+              return;
+            }
+          }
+        }
+      }
 
       handlerRef.current?.(event);
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown, { passive: true });
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
     };
   }, [ref, enabled, ignoreSelector]);
 }

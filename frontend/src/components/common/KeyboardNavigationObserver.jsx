@@ -9,6 +9,8 @@ const FOCUSABLE_INTERACTIVE_SELECTOR = [
   '[role="tab"]:not([aria-disabled="true"])',
   '[role="menuitem"]:not([aria-disabled="true"])',
   '[role="switch"]:not([aria-disabled="true"])',
+  '[role="button"]:not([aria-disabled="true"])',
+  '[tabindex="0"]:not([disabled]):not([aria-disabled="true"])',
 ].join(', ');
 
 const HORIZONTAL_NATIVE_INPUT_TYPES = new Set([
@@ -124,18 +126,19 @@ export const KeyboardNavigationObserver = () => {
 
       const isForward = event.key === 'ArrowDown' || event.key === 'ArrowRight';
       const currentIndex = focusables.indexOf(activeEl);
-      // Si el foco no está en un control interactivo (p. ej. leyendo texto o párrafos con NVDA), no interceptar
+      let targetIndex;
       if (currentIndex === -1) {
-        return;
+        targetIndex = isForward ? 0 : focusables.length - 1;
+      } else {
+        const step = isForward ? 1 : -1;
+        targetIndex = (currentIndex + step + focusables.length) % focusables.length;
       }
-
-      const step = isForward ? 1 : -1;
-      const targetIndex = (currentIndex + step + focusables.length) % focusables.length;
 
       const nextTarget = focusables[targetIndex];
       if (nextTarget) {
         event.preventDefault();
         nextTarget.focus();
+        nextTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
       }
     };
 

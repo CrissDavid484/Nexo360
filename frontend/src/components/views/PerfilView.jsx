@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Camera,
   ShieldCheck,
@@ -17,6 +18,9 @@ import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
 import { api } from '../../services/api';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
 import { getDisabilityProfileMeta } from '../../utils/accessibilityProfiles';
 import {
   DEFAULT_CAMPUS,
@@ -147,7 +151,7 @@ const PasswordInputRow = ({
   voiceLabel,
 }) => (
   <div>
-    <label htmlFor={id} className="block text-xs font-semibold text-slate-700 mb-1.5">
+    <label htmlFor={id} className="block text-xs font-semibold text-neutral-700 mb-1.5">
       {label}
     </label>
     <div className="relative">
@@ -162,13 +166,13 @@ const PasswordInputRow = ({
         aria-describedby={hintId}
         aria-label={voiceLabel}
         required
-        className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 pr-10 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+        className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 pr-10 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
       />
       <button
         type="button"
         onClick={onToggleShow}
         aria-label={showValue ? `Ocultar ${label.toLowerCase()}` : `Ver ${label.toLowerCase()}`}
-        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-700 cursor-pointer"
+        className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-neutral-700 cursor-pointer"
       >
         {showValue ? (
           <EyeOff className="w-4 h-4" aria-hidden="true" />
@@ -178,7 +182,7 @@ const PasswordInputRow = ({
       </button>
     </div>
     {hint && (
-      <p id={hintId} className="text-[11px] text-slate-500 mt-1">
+      <p id={hintId} className="text-[11px] text-neutral-500 mt-1">
         {hint}
       </p>
     )}
@@ -486,7 +490,7 @@ export const PerfilView = () => {
     : null;
 
   return (
-    <section aria-labelledby="perfil-view-heading" className="space-y-6 max-w-4xl mx-auto w-full overflow-x-clip">
+    <section aria-labelledby="perfil-view-heading" className="space-y-6 w-full max-w-none overflow-x-clip">
       {mustChangePassword && (
         <div
           role="status"
@@ -505,7 +509,7 @@ export const PerfilView = () => {
             type="button"
             onClick={handleOpenPasswordModal}
             {...getVoiceProps('Actualizar contraseña inicial')}
-            className="min-h-[38px] px-3.5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs rounded-xl shrink-0 transition-colors cursor-pointer"
+            className="min-h-[38px] px-3.5 py-2 bg-brand-navy hover:bg-brand-navyDark text-white font-semibold text-xs rounded-xl shrink-0 transition-colors cursor-pointer"
           >
             Cambiar contraseña
           </button>
@@ -557,42 +561,42 @@ export const PerfilView = () => {
       )}
 
       {/* TARJETA DE PERFIL PRINCIPAL */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-9 shadow-sm">
+      <div className="bg-neutral-0 rounded-3xl border border-neutral-200 p-6 sm:p-9 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-8">
           <div className="space-y-6 flex-1">
             <div>
-              <span className="text-xs font-semibold text-[#002B49] bg-slate-100 px-3 py-1 rounded-full inline-block mb-2">
+              <span className="text-xs font-semibold text-brand-navy bg-neutral-100 px-3 py-1 rounded-full inline-block mb-2">
                 {roleLabel}
               </span>
               <h2
                 id="perfil-view-heading"
                 {...getVoiceProps(headingVoiceText)}
-                className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight"
+                className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight"
               >
                 {profile.nombre}
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+              <p className="text-xs sm:text-sm text-neutral-500 font-medium mt-1">
                 {profileSubtitle}
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100 text-xs sm:text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-neutral-100 text-xs sm:text-sm">
               <div
                 {...getVoiceProps(`Correo institucional: ${profile.emailDuoc || profile.email}`)}
-                className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
+                className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/60"
               >
-                <span className="text-slate-500 font-medium block text-xs">Correo institucional</span>
-                <span className="text-slate-900 font-semibold text-sm block mt-0.5 truncate">
+                <span className="text-neutral-500 font-medium block text-xs">Correo institucional</span>
+                <span className="text-neutral-900 font-semibold text-sm block mt-0.5 truncate">
                   {profile.emailDuoc || profile.email}
                 </span>
               </div>
 
               <div
                 {...getVoiceProps(`RUT institucional: ${profile.rut}`)}
-                className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
+                className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/60"
               >
-                <span className="text-slate-500 font-medium block text-xs">RUT institucional</span>
-                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                <span className="text-neutral-500 font-medium block text-xs">RUT institucional</span>
+                <span className="text-neutral-900 font-semibold text-sm block mt-0.5">
                   {profile.rut}
                 </span>
               </div>
@@ -600,10 +604,10 @@ export const PerfilView = () => {
               {!hideCareer && (
                 <div
                   {...getVoiceProps(`Carrera: ${careerLabel}`)}
-                  className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
+                  className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/60"
                 >
-                  <span className="text-slate-500 font-medium block text-xs">Carrera</span>
-                  <span className="text-slate-900 font-semibold text-sm block mt-0.5 truncate">
+                  <span className="text-neutral-500 font-medium block text-xs">Carrera</span>
+                  <span className="text-neutral-900 font-semibold text-sm block mt-0.5 truncate">
                     {careerLabel}
                   </span>
                 </div>
@@ -611,40 +615,40 @@ export const PerfilView = () => {
 
               <div
                 {...getVoiceProps(`Sede institucional: Duoc UC ${campusLabel}`)}
-                className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
+                className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/60"
               >
-                <span className="text-slate-500 font-medium block text-xs">Sede institucional</span>
-                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                <span className="text-neutral-500 font-medium block text-xs">Sede institucional</span>
+                <span className="text-neutral-900 font-semibold text-sm block mt-0.5">
                   Duoc UC - {campusLabel}
                 </span>
               </div>
 
               <div
                 {...getVoiceProps(`Dirección particular: ${profile.direccion || profile.address}`)}
-                className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
+                className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/60"
               >
-                <span className="text-slate-500 font-medium block text-xs">Dirección particular</span>
-                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                <span className="text-neutral-500 font-medium block text-xs">Dirección particular</span>
+                <span className="text-neutral-900 font-semibold text-sm block mt-0.5">
                   {profile.direccion || profile.address}
                 </span>
               </div>
 
               <div
                 {...getVoiceProps(`Teléfono personal: ${profile.telefonoPersonal || profile.phone}`)}
-                className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60"
+                className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/60"
               >
-                <span className="text-slate-500 font-medium block text-xs">Teléfono personal</span>
-                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                <span className="text-neutral-500 font-medium block text-xs">Teléfono personal</span>
+                <span className="text-neutral-900 font-semibold text-sm block mt-0.5">
                   {profile.telefonoPersonal || profile.phone}
                 </span>
               </div>
 
               <div
                 {...getVoiceProps(`Correo personal: ${profile.emailPersonal || profile.personalEmail || 'Por actualizar'}`)}
-                className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/60 sm:col-span-2"
+                className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/60 sm:col-span-2"
               >
-                <span className="text-slate-500 font-medium block text-xs">Correo personal</span>
-                <span className="text-slate-900 font-semibold text-sm block mt-0.5">
+                <span className="text-neutral-500 font-medium block text-xs">Correo personal</span>
+                <span className="text-neutral-900 font-semibold text-sm block mt-0.5">
                   {profile.emailPersonal || profile.personalEmail || 'Por actualizar'}
                 </span>
               </div>
@@ -660,9 +664,9 @@ export const PerfilView = () => {
                 }}
                 aria-haspopup="dialog"
                 {...getVoiceProps(editButtonLabel)}
-                className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+                className="min-h-[44px] px-5 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
               >
-                <Pencil className="w-3.5 h-3.5 text-[#FFB81C]" aria-hidden="true" />
+                <Pencil className="w-3.5 h-3.5 text-brand-gold" aria-hidden="true" />
                 <span>{editButtonLabel}</span>
               </button>
 
@@ -671,9 +675,9 @@ export const PerfilView = () => {
                 onClick={handleOpenPasswordModal}
                 aria-haspopup="dialog"
                 {...getVoiceProps('Cambiar contraseña')}
-                className="min-h-[44px] px-5 py-2.5 bg-white hover:bg-slate-50 text-[#002B49] border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+                className="min-h-[44px] px-5 py-2.5 bg-neutral-0 hover:bg-neutral-50 text-brand-navy border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
               >
-                <KeyRound className="w-3.5 h-3.5 text-[#002B49]" aria-hidden="true" />
+                <KeyRound className="w-3.5 h-3.5 text-brand-navy" aria-hidden="true" />
                 <span>Cambiar contraseña</span>
               </button>
             </div>
@@ -684,7 +688,7 @@ export const PerfilView = () => {
             <label
               htmlFor="foto-perfil-upload"
               {...getVoiceProps('Cambiar fotografía de perfil, formatos JPG, PNG o WEBP hasta 2 megabytes')}
-              className="w-32 h-36 rounded-2xl border border-dashed border-slate-300 hover:border-[#002B49] bg-slate-50 hover:bg-slate-100/70 flex flex-col items-center justify-center p-1.5 text-center cursor-pointer transition-all overflow-hidden relative group focus-within:ring-2 focus-within:ring-[#002B49]"
+              className="w-32 h-36 rounded-2xl border border-dashed border-slate-300 hover:border-brand-navy bg-neutral-50 hover:bg-neutral-100/70 flex flex-col items-center justify-center p-1.5 text-center cursor-pointer transition-all overflow-hidden relative group focus-within:ring-2 focus-within:ring-[#002B49]"
             >
               {profile.photo || user?.photo ? (
                 <div className="relative w-full h-full rounded-xl overflow-hidden">
@@ -694,17 +698,17 @@ export const PerfilView = () => {
                     className="w-full h-full object-cover rounded-xl"
                   />
                   <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2 text-center">
-                    <Camera className="w-5 h-5 mb-1 text-[#FFB81C]" aria-hidden="true" />
+                    <Camera className="w-5 h-5 mb-1 text-brand-gold" aria-hidden="true" />
                     <span className="text-[11px] font-semibold leading-tight">Cambiar foto</span>
                   </div>
                 </div>
               ) : (
                 <>
                   <Camera
-                    className="w-7 h-7 text-slate-400 group-hover:text-[#002B49] transition-colors mb-2"
+                    className="w-7 h-7 text-neutral-400 group-hover:text-brand-navy transition-colors mb-2"
                     aria-hidden="true"
                   />
-                  <span className="text-xs font-semibold text-slate-700 group-hover:text-[#002B49]">
+                  <span className="text-xs font-semibold text-neutral-700 group-hover:text-brand-navy">
                     Cambiar foto
                   </span>
                 </>
@@ -719,7 +723,7 @@ export const PerfilView = () => {
                 aria-label="Subir nueva fotografía de perfil (JPG, PNG o WEBP)"
               />
             </label>
-            <span className="text-[11px] text-slate-400 mt-2 text-center">
+            <span className="text-[11px] text-neutral-400 mt-2 text-center">
               {isPhotoUploading ? 'Guardando...' : 'JPG o PNG (máx. 2 MB)'}
             </span>
           </div>
@@ -728,19 +732,19 @@ export const PerfilView = () => {
 
       {/* TARJETA: Acompañamiento y Ajustes Académicos (Solo visible si el estudiante cuenta con perfil PAEDIS activo) */}
       {Boolean(profile.isPaedis || profile.role === 'estudiante_paedis') && (
-        <article className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-sky-50 text-[#002B49] flex items-center justify-center shrink-0" aria-hidden="true">
+        <article className="bg-neutral-0 rounded-3xl border border-neutral-200 p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="flex items-center gap-3 border-b border-neutral-100 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-brand-navy flex items-center justify-center shrink-0" aria-hidden="true">
               <HeartHandshake className="w-5 h-5" aria-hidden="true" />
             </div>
             <div>
               <h3
                 {...getVoiceProps(`Acompañamiento e inclusión académica PAEDIS en ${campusLabel}`)}
-                className="text-lg font-bold text-slate-900"
+                className="text-lg font-bold text-neutral-900"
               >
                 Acompañamiento e inclusión académica (PAEDIS)
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-neutral-500">
                 {clearReadingMode
                   ? `Apoyos PAEDIS activos en ${campusLabel}.`
                   : `Estado de apoyos registrados en ${campusLabel} para el periodo académico vigente.`}
@@ -750,12 +754,12 @@ export const PerfilView = () => {
 
           <div
             {...getVoiceProps('Estado en programa PAEDIS: Adscrito o adscrita con ajustes académicos activos')}
-            className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/70"
+            className="p-4 rounded-2xl bg-neutral-50/70 border border-neutral-200/70"
           >
-            <span className="text-xs font-medium text-slate-500 block mb-1">
+            <span className="text-xs font-medium text-neutral-500 block mb-1">
               Estado en programa PAEDIS
             </span>
-            <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <p className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
               <span>Adscrito/a con ajustes académicos activos</span>
             </p>
@@ -767,16 +771,16 @@ export const PerfilView = () => {
               className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/80 space-y-2"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-[#002B49] flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+                <span className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-brand-navy" aria-hidden="true" />
                   <span>Perfil de accesibilidad PAEDIS</span>
                 </span>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white text-[#002B49] border border-sky-200">
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-neutral-0 text-brand-navy border border-sky-200">
                   {disabilityMeta.barrera}
                 </span>
               </div>
-              <p className="text-sm font-bold text-slate-900">{disabilityMeta.label}</p>
-              <p className="text-xs text-slate-700 leading-relaxed">
+              <p className="text-sm font-bold text-neutral-900">{disabilityMeta.label}</p>
+              <p className="text-xs text-neutral-700 leading-relaxed">
                 {clearReadingMode
                   ? disabilityMeta.summary
                   : `${disabilityMeta.summary} ${disabilityMeta.autoAdaptationHint}`}
@@ -785,11 +789,11 @@ export const PerfilView = () => {
           )}
 
           <div className="space-y-3 pt-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+            <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block">
               Ajustes académicos registrados
             </span>
             {Array.isArray(profile.ajustesAprobados) && profile.ajustesAprobados.length === 0 ? (
-              <div className="p-4 bg-slate-50/70 border border-slate-200/70 rounded-xl text-xs text-slate-600">
+              <div className="p-4 bg-neutral-50/70 border border-neutral-200/70 rounded-xl text-xs text-neutral-600">
                 {clearReadingMode
                   ? 'Sin ajustes individuales registrados. Usa el menú de accesibilidad cuando lo necesites.'
                   : 'No registras ajustes individuales en este momento. Puedes utilizar las preferencias de lectura en la barra superior cuando lo necesites.'}
@@ -804,10 +808,10 @@ export const PerfilView = () => {
                   <div
                     key={ajuste.tipo}
                     {...getVoiceProps(`${ajuste.tipo}. ${ajuste.descripcion}`)}
-                    className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl text-xs"
+                    className="p-4 bg-neutral-50/80 border border-neutral-200/80 rounded-2xl text-xs"
                   >
-                    <span className="font-bold text-slate-900 block text-sm">{ajuste.tipo}</span>
-                    <span className="text-slate-600 block mt-1 leading-relaxed">{ajuste.descripcion}</span>
+                    <span className="font-bold text-neutral-900 block text-sm">{ajuste.tipo}</span>
+                    <span className="text-neutral-600 block mt-1 leading-relaxed">{ajuste.descripcion}</span>
                   </div>
                 ))}
               </div>
@@ -817,30 +821,32 @@ export const PerfilView = () => {
       )}
 
       {/* MODAL PARA EDITAR DATOS DE PERFIL Y SEDE */}
-      {isEditing && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-edit-profile-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleCloseModal();
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in"
-        >
+      {isEditing &&
+        (() => {
+          const editModal = (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-edit-profile-title"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) handleCloseModal();
+              }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in"
+            >
           <div
             ref={modalRef}
-            className="bg-white w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-200 animate-scale-in max-h-[90vh] flex flex-col"
+            className="bg-neutral-0 w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-xl border border-neutral-200 animate-scale-in max-h-[90vh] flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4 shrink-0">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-4 mb-4 shrink-0">
               <div>
                 <h3
                   id="modal-edit-profile-title"
                   {...getVoiceProps(`${editModalTitle} para Duoc UC ${campusLabel}`)}
-                  className="text-lg font-bold text-slate-900"
+                  className="text-lg font-bold text-neutral-900"
                 >
                   {editModalTitle}
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-neutral-500 mt-0.5">
                   {editModalSubtitle}
                 </p>
               </div>
@@ -849,7 +855,7 @@ export const PerfilView = () => {
                 onClick={handleCloseModal}
                 aria-label="Cerrar ventana"
                 {...getVoiceProps('Cerrar ventana de edición')}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -857,7 +863,7 @@ export const PerfilView = () => {
 
             <form onSubmit={handleSave} className="space-y-4 overflow-y-auto pr-1">
               <div>
-                <label htmlFor="edit-fullname" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label htmlFor="edit-fullname" className="block text-xs font-semibold text-neutral-700 mb-1.5">
                   Nombre completo
                 </label>
                 <input
@@ -867,13 +873,13 @@ export const PerfilView = () => {
                   value={editForm.fullName}
                   onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
                   {...getVoiceProps(`Nombre completo, ${editForm.fullName}`)}
-                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
                   required
                 />
               </div>
 
               <div>
-                <label htmlFor="edit-rut" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label htmlFor="edit-rut" className="block text-xs font-semibold text-neutral-700 mb-1.5">
                   RUT institucional (ej. 21.987.654-3)
                 </label>
                 <input
@@ -882,7 +888,7 @@ export const PerfilView = () => {
                   value={editForm.rut}
                   onChange={(e) => setEditForm({ ...editForm, rut: e.target.value })}
                   {...getVoiceProps(`RUT institucional, ${editForm.rut}`)}
-                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
                   required
                 />
               </div>
@@ -890,7 +896,7 @@ export const PerfilView = () => {
               <div className={hideCareer ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
                 {!hideCareer && (
                   <div>
-                    <label htmlFor="edit-career" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    <label htmlFor="edit-career" className="block text-xs font-semibold text-neutral-700 mb-1.5">
                       Carrera
                     </label>
                     <select
@@ -898,7 +904,7 @@ export const PerfilView = () => {
                       value={editForm.career}
                       onChange={(e) => setEditForm({ ...editForm, career: e.target.value })}
                       {...getVoiceProps(`Carrera seleccionada: ${editForm.career}`)}
-                      className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                      className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
                       required
                     >
                       {CARRERAS_DUOC_LIST.map((c) => (
@@ -909,7 +915,7 @@ export const PerfilView = () => {
                 )}
 
                 <div>
-                  <label htmlFor="edit-campus" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label htmlFor="edit-campus" className="block text-xs font-semibold text-neutral-700 mb-1.5">
                     Sede Institucional
                   </label>
                   <select
@@ -917,7 +923,7 @@ export const PerfilView = () => {
                     value={editForm.campus}
                     onChange={(e) => setEditForm({ ...editForm, campus: e.target.value })}
                     {...getVoiceProps(`Sede seleccionada: ${editForm.campus}`)}
-                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
                     required
                   >
                     {SEDES_DUOC.map((s) => (
@@ -928,7 +934,7 @@ export const PerfilView = () => {
               </div>
 
               <div>
-                <label htmlFor="edit-direccion" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                <label htmlFor="edit-direccion" className="block text-xs font-semibold text-neutral-700 mb-1.5">
                   Dirección particular
                 </label>
                 <input
@@ -937,14 +943,14 @@ export const PerfilView = () => {
                   value={editForm.direccion}
                   onChange={(e) => setEditForm({ ...editForm, direccion: e.target.value })}
                   {...getVoiceProps(`Dirección particular, ${editForm.direccion}`)}
-                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                  className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="edit-telefono" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label htmlFor="edit-telefono" className="block text-xs font-semibold text-neutral-700 mb-1.5">
                     Teléfono personal
                   </label>
                   <input
@@ -953,13 +959,13 @@ export const PerfilView = () => {
                     value={editForm.telefonoPersonal}
                     onChange={(e) => setEditForm({ ...editForm, telefonoPersonal: e.target.value })}
                     {...getVoiceProps(`Teléfono personal, ${editForm.telefonoPersonal}`)}
-                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
                     required
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="edit-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label htmlFor="edit-email" className="block text-xs font-semibold text-neutral-700 mb-1.5">
                     Correo personal
                   </label>
                   <input
@@ -968,18 +974,18 @@ export const PerfilView = () => {
                     value={editForm.emailPersonal}
                     onChange={(e) => setEditForm({ ...editForm, emailPersonal: e.target.value })}
                     {...getVoiceProps(`Correo personal, ${editForm.emailPersonal || 'campo vacío'}`)}
-                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-[#002B49] rounded-xl text-slate-900 font-medium transition-all shadow-2xs"
+                    className="w-full min-h-[44px] text-xs sm:text-sm px-3.5 py-2.5 bg-neutral-50/70 hover:bg-neutral-50 focus:bg-neutral-0 border border-neutral-200 focus:border-brand-navy rounded-xl text-neutral-900 font-medium transition-all shadow-2xs"
                     required
                   />
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end gap-2.5 border-t border-slate-100">
+              <div className="pt-4 flex justify-end gap-2.5 border-t border-neutral-100">
                 <button
                   type="button"
                   onClick={handleCloseModal}
                   {...getVoiceProps('Cancelar edición')}
-                  className="min-h-[44px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -987,7 +993,7 @@ export const PerfilView = () => {
                   type="submit"
                   disabled={isSaving}
                   {...getVoiceProps('Guardar cambios del perfil')}
-                  className="min-h-[44px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 bg-brand-navy hover:bg-brand-navyDark text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 cursor-pointer"
                 >
                   {isSaving ? 'Guardando...' : 'Guardar cambios'}
                 </button>
@@ -995,33 +1001,37 @@ export const PerfilView = () => {
             </form>
           </div>
         </div>
-      )}
+          );
+          return typeof document !== 'undefined' ? createPortal(editModal, document.body) : editModal;
+        })()}
 
       {/* MODAL PARA CAMBIAR CONTRASEÑA */}
-      {isPasswordModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-change-password-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleClosePasswordModal();
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in"
-        >
+      {isPasswordModalOpen &&
+        (() => {
+          const passwordModal = (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-change-password-title"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) handleClosePasswordModal();
+              }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in"
+            >
           <div
             ref={passwordModalRef}
-            className="bg-white w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-200 animate-scale-in max-h-[90vh] flex flex-col"
+            className="bg-neutral-0 w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-xl border border-neutral-200 animate-scale-in max-h-[90vh] flex flex-col"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4 shrink-0">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-4 mb-4 shrink-0">
               <div>
                 <h3
                   id="modal-change-password-title"
                   {...getVoiceProps('Cambiar contraseña de acceso institucional')}
-                  className="text-lg font-bold text-slate-900"
+                  className="text-lg font-bold text-neutral-900"
                 >
                   Cambiar contraseña
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-neutral-500 mt-0.5">
                   {clearReadingMode
                     ? 'Define una nueva contraseña de acceso.'
                     : 'Ingresa tu contraseña actual y define una nueva clave segura.'}
@@ -1032,7 +1042,7 @@ export const PerfilView = () => {
                 onClick={handleClosePasswordModal}
                 aria-label="Cerrar ventana"
                 {...getVoiceProps('Cerrar ventana de cambio de contraseña')}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -1102,12 +1112,12 @@ export const PerfilView = () => {
                 voiceLabel="Confirmar nueva contraseña"
               />
 
-              <div className="pt-4 flex justify-end gap-2.5 border-t border-slate-100">
+              <div className="pt-4 flex justify-end gap-2.5 border-t border-neutral-100">
                 <button
                   type="button"
                   onClick={handleClosePasswordModal}
                   {...getVoiceProps('Cancelar cambio de contraseña')}
-                  className="min-h-[44px] px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1116,7 +1126,7 @@ export const PerfilView = () => {
                   disabled={isChangingPassword}
                   aria-busy={isChangingPassword}
                   {...getVoiceProps('Guardar nueva contraseña')}
-                  className="min-h-[44px] px-5 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 inline-flex items-center gap-2 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 bg-brand-navy hover:bg-brand-navyDark text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all disabled:opacity-60 inline-flex items-center gap-2 cursor-pointer"
                 >
                   {isChangingPassword ? (
                     <>
@@ -1131,7 +1141,11 @@ export const PerfilView = () => {
             </form>
           </div>
         </div>
-      )}
+          );
+          return typeof document !== 'undefined'
+            ? createPortal(passwordModal, document.body)
+            : passwordModal;
+        })()}
     </section>
   );
 };

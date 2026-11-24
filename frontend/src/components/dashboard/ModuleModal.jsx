@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   ArrowLeft,
@@ -21,6 +22,78 @@ const TomaRamosSimulator = lazyLoad(
   () => import('../simulation/TomaRamosSimulator'),
   'TomaRamosSimulator'
 );
+
+function escapeHtml(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeArticleHtml(html) {
+  if (typeof html !== 'string') return '';
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<script\b[^>]*\/?>/gi, '')
+    .replace(/<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g, (_tag, tagName, attrs) => {
+      const cleanAttrs = attrs
+        .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/gi, '')
+        .replace(
+          /\s+(href|src|action|formaction|xlink:href)\s*=\s*(["'])\s*(?:j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t|vbscript|data:text\/html)\s*:[^"']*\2/gi,
+          ' $1=$2#$2'
+        )
+        .replace(
+          /\s+(href|src|action|formaction|xlink:href)\s*=\s*(?:j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t|vbscript|data:text\/html)\s*:[^\s>]+/gi,
+          ' $1="#"'
+        );
+      return `<${tagName}${cleanAttrs}>`;
+    });
+}
+
+function normalizeEmbeddedYouTubeHtml(html) {
+  if (typeof html !== 'string') return '';
+  const sanitized = sanitizeArticleHtml(html);
+  if (!/<iframe\b/i.test(sanitized)) return sanitized;
+
+  return sanitized.replace(
+    /<iframe\b([^>]*)>(\s*<\/iframe>)?/gi,
+    (_fullTag, rawAttrs, closingTag) => {
+      const isSelfClosing = !closingTag && /\/\s*$/.test(rawAttrs);
+      let updatedAttrs = rawAttrs.replace(/\s*\/\s*$/, '');
+      let watchUrl = '';
+
+      updatedAttrs = updatedAttrs.replace(
+        /src=(["'])(?:https?:)?\/\/(?:www\.)?(?:youtube-nocookie|youtube)\.com\/embed\/([A-Za-z0-9_-]+)([^"']*)\1/i,
+        (_match, quote, videoId, query) => {
+          let cleanQuery = query || '';
+          if (!/[?&]rel=/.test(cleanQuery)) {
+            cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}rel=0`;
+          }
+          if (!/[?&]modestbranding=/.test(cleanQuery)) {
+            cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}modestbranding=1`;
+          }
+          watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+          return `src=${quote}https://www.youtube.com/embed/${videoId}${cleanQuery}${quote}`;
+        }
+      );
+
+      if (!/\breferrerpolicy\s*=/i.test(updatedAttrs)) {
+        updatedAttrs += ' referrerpolicy="strict-origin-when-cross-origin"';
+      }
+
+      const iframeHtml = isSelfClosing
+        ? `<iframe${updatedAttrs} />`
+        : `<iframe${updatedAttrs}>${closingTag || '</iframe>'}`;
+
+      if (!watchUrl) return iframeHtml;
+
+      return `${iframeHtml}<p class="mt-2 mb-3 text-xs"><a href="${watchUrl}" target="_blank" rel="noopener noreferrer">Abrir tutorial en YouTube</a></p>`;
+    }
+  );
+}
 
 function resolveModalHeader(category, activeTramite, activeArticle, clearReadingMode) {
   let headerData;
@@ -108,7 +181,10 @@ export const ModuleModal = ({
     initialFocusRef: closeButtonRef,
   });
 
-  useOnClickOutside(modalRef, onClose, { enabled: Boolean(category) });
+  useOnClickOutside(modalRef, onClose, {
+    enabled: Boolean(category),
+    ignoreSelector: '#accessibility-panel',
+  });
 
   if (!category) return null;
 
@@ -132,12 +208,15 @@ export const ModuleModal = ({
     announce(`Abriendo guía completa: ${art.title}`, 'polite');
   };
 
-  const rawArticleHtml = activeArticle?.body || `<p>${activeArticle?.summary || ''}</p>`;
+  const rawArticleHtml =
+    activeArticle?.body || `<p>${escapeHtml(activeArticle?.summary || '')}</p>`;
   const simplifiedArticleHtml = activeArticle ? simplifyArticleHtml(rawArticleHtml) : '';
   const isClearReadingArticle = Boolean(
     clearReadingMode && !showFullArticleText && simplifiedArticleHtml
   );
-  const renderedArticleHtml = isClearReadingArticle ? simplifiedArticleHtml : rawArticleHtml;
+  const renderedArticleHtml = normalizeEmbeddedYouTubeHtml(
+    isClearReadingArticle ? simplifiedArticleHtml : rawArticleHtml
+  );
   const articleToggleLabel = isClearReadingArticle ? 'Ver texto completo' : 'Ver resumen claro';
 
   const rawInstructions =
@@ -150,7 +229,7 @@ export const ModuleModal = ({
   const renderModalBody = () => {
     if (showSimulator) {
       return (
-        <div className="overflow-y-auto max-h-[82vh] animate-fade-in">
+        <div className="flex-1 min-h-0 overflow-y-auto max-h-[82vh] animate-fade-in">
           <Suspense
             fallback={
               <div className="p-12 text-center font-semibold text-slate-600">
@@ -169,7 +248,7 @@ export const ModuleModal = ({
         /* =========================================================
            VISTA 1: GUÍA COMPLETA (LEER GUÍA SIN SALIR DE NEXO360)
            ========================================================= */
-        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto animate-fade-in">
+        <div className="flex-1 min-h-0 p-4 sm:p-8 space-y-6 overflow-y-auto animate-fade-in">
           {/* Barra superior de navegación interna */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-100">
             <button
@@ -248,7 +327,7 @@ export const ModuleModal = ({
 
               {/* Cuerpo del artículo renderizado con formato enriquecido y accesible */}
               <div
-                className="prose prose-slate max-w-none text-slate-800 text-sm sm:text-base leading-relaxed font-normal
+                className="nexo-article-prose prose prose-slate max-w-none text-slate-800 text-sm sm:text-base leading-relaxed font-normal
                   [&_p]:mb-3.5 [&_p]:leading-relaxed
                   [&_strong]:text-slate-950 [&_strong]:font-bold
                   [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ul]:my-3
@@ -331,7 +410,7 @@ export const ModuleModal = ({
         /* =========================================================
            VISTA 2: DETALLE DEL TRÁMITE / APARTADO (LISTA DE GUÍAS)
            ========================================================= */
-        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto animate-fade-in">
+        <div className="flex-1 min-h-0 p-4 sm:p-8 space-y-6 overflow-y-auto animate-fade-in">
           <button
             type="button"
             onClick={() => setActiveTramite(null)}
@@ -392,10 +471,10 @@ export const ModuleModal = ({
               </div>
             )}
 
-            {/* Pasos a seguir */}
+            {/* Pasos a seguir - Con badges numerados y espaciado generoso */}
             <div
               {...getVoiceProps(`Cómo realizar este trámite. ${displayedInstructions}`)}
-              className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl border border-slate-200/80 space-y-4"
+              className="bg-slate-50/80 p-5 sm:p-6 rounded-2xl border border-slate-200/80 space-y-5"
             >
               <div className="flex items-center gap-2.5">
                 <div
@@ -409,9 +488,69 @@ export const ModuleModal = ({
                 </h3>
               </div>
 
-              <p className="whitespace-pre-line text-slate-700 leading-relaxed text-sm sm:text-base">
-                {displayedInstructions}
-              </p>
+              {(() => {
+                // Separar las instrucciones en pasos numerados
+                const steps = displayedInstructions
+                  .split('\n')
+                  .map(line => line.trim())
+                  .filter(line => line.length > 0)
+                  .map(line => {
+                    // Detectar si la línea ya empieza con número
+                    const match = line.match(/^(\d+)[\.\:\)]\s*(.*)/);
+                    if (match) {
+                      return { number: parseInt(match[1]), text: match[2] };
+                    }
+                    // Si no tiene número, asignar secuencialmente
+                    return { text: line };
+                  });
+
+                let stepCounter = 0;
+                return steps.map((step, idx) => {
+                  const stepNum = step.number || ++stepCounter;
+                  const stepText = step.text || step;
+                  return (
+                    <div
+                      key={`${idx}-${stepNum}`}
+                      className="flex gap-3 p-3 bg-white rounded-xl border border-slate-200/80 shadow-xs"
+                    >
+                      <span
+                        className="flex-shrink-0 w-7 h-7 rounded-full bg-[#002B49] text-[#FFB81C] font-bold text-xs flex items-center justify-center"
+                        aria-label={`Paso ${stepNum}`}
+                      >
+                        {stepNum}
+                      </span>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <p className="text-slate-700 leading-relaxed text-sm sm:text-base whitespace-pre-wrap">
+                          {stepText}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* Acción principal hacia el portal oficial inmediatamente después de los pasos */}
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <a
+                  href={activeTramite.link || activeTramite.directUrl || 'https://www.duoc.cl'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  {...getVoiceProps(activeTramite.actionLabel || 'Ir al portal oficial para este trámite')}
+                  className="min-h-[46px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                >
+                  <span>{activeTramite.actionLabel || 'Ir al portal oficial para este trámite'}</span>
+                  <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTramite(null)}
+                  {...getVoiceProps('Ver otros trámites')}
+                  className="min-h-[46px] px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Ver otros trámites
+                </button>
+              </div>
 
               <div className="pt-2 border-t border-slate-200/70 flex items-start gap-2.5 text-xs text-slate-600">
                 <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
@@ -480,29 +619,6 @@ export const ModuleModal = ({
                 </div>
               </div>
             )}
-
-            {/* Acción principal hacia el portal oficial */}
-            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <a
-                href={activeTramite.link || activeTramite.directUrl || 'https://www.duoc.cl'}
-                target="_blank"
-                rel="noopener noreferrer"
-                {...getVoiceProps(activeTramite.actionLabel || 'Ir al portal oficial para este trámite')}
-                className="min-h-[46px] px-6 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-              >
-                <span>{activeTramite.actionLabel || 'Ir al portal oficial para este trámite'}</span>
-                <ExternalLink className="w-4 h-4 text-[#FFB81C] shrink-0" aria-hidden="true" />
-              </a>
-
-              <button
-                type="button"
-                onClick={() => setActiveTramite(null)}
-                {...getVoiceProps('Ver otros trámites')}
-                className="min-h-[46px] px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-semibold hover:bg-slate-50 transition-colors"
-              >
-                Ver otros trámites
-              </button>
-            </div>
           </article>
         </div>
       );
@@ -512,7 +628,7 @@ export const ModuleModal = ({
       /* =========================================================
          VISTA 3: LISTA DE TRÁMITES DE LA CATEGORÍA
          ========================================================= */
-      <div className="overflow-y-auto p-6 sm:p-8 space-y-4 animate-fade-in">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 space-y-4 animate-fade-in">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {category.submodules.map((sub) => {
             const subDescription = clearReadingMode
@@ -568,32 +684,35 @@ export const ModuleModal = ({
     );
   };
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
       aria-describedby="modal-description"
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 pb-20 sm:p-6 sm:pb-4 animate-fade-in"
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-300 border-t-4 border-t-[#002B49] overflow-hidden flex flex-col max-h-[92vh] my-auto animate-scale-in"
+        className="relative w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-300 overflow-hidden flex flex-col max-h-[calc(100dvh-7.5rem)] sm:max-h-[92vh] my-0 sm:my-auto animate-scale-in"
       >
         {/* Cabecera institucional limpia y calmada */}
-        <header className="bg-white text-slate-900 px-6 sm:px-8 py-5 flex items-start justify-between border-b border-slate-200 shrink-0">
-          <div className="pr-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#002B49] block mb-1">
+        <header className="bg-white text-slate-900 px-4 py-3 sm:px-8 sm:py-5 flex items-start justify-between border-b border-slate-200 shrink-0">
+          <div className="pr-2 min-w-0 flex-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#002B49] block mb-1 truncate sm:whitespace-normal">
               {eyebrow}
             </span>
             <h2
               id="modal-title"
               {...getVoiceProps(`${title}. ${description}`)}
-              className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-snug"
+              className="text-base sm:text-2xl font-bold tracking-tight text-slate-900 leading-snug"
             >
               {title}
             </h2>
-            <p id="modal-description" className="text-slate-600 text-xs sm:text-sm mt-1 leading-relaxed">
+            <p
+              id="modal-description"
+              className="text-slate-600 text-xs sm:text-sm mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none"
+            >
               {description}
             </p>
           </div>
@@ -604,7 +723,7 @@ export const ModuleModal = ({
             onClick={onClose}
             aria-label="Cerrar ventana"
             {...getVoiceProps('Cerrar ventana')}
-            className="min-h-[40px] min-w-[40px] p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors ml-4 shrink-0 flex items-center justify-center"
+            className="min-h-[40px] min-w-[40px] p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors ml-3 sm:ml-4 shrink-0 flex items-center justify-center"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
@@ -614,13 +733,13 @@ export const ModuleModal = ({
         {renderModalBody()}
 
         {/* Pie del Modal */}
-        <footer className="bg-slate-50 px-6 sm:px-8 py-3.5 border-t border-slate-200/80 flex items-center justify-between gap-4 text-xs text-slate-500 shrink-0">
-          <div className="flex items-center gap-2">
+        <footer className="bg-slate-50 px-4 py-2.5 sm:px-8 sm:py-3.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 sm:gap-4 text-xs text-slate-500 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
             <Info className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-            <span>Centro de Ayuda • Duoc UC - Sede Alameda</span>
+            <span className="truncate sm:whitespace-normal">Centro de Ayuda • Duoc UC - Sede Alameda</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             {activeArticle && (
               <button
                 type="button"
@@ -644,4 +763,7 @@ export const ModuleModal = ({
       </div>
     </div>
   );
+
+  // Portal en document.body para preservar position: fixed frente a filters en #nexo-cb-canvas
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

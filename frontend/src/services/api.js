@@ -27,9 +27,15 @@ const request = async (path, { method = 'GET', body, auth = true, timeoutMs = DE
     });
 
     const contentType = response.headers.get('content-type') || '';
-    const data = contentType.includes('application/json')
-      ? await response.json()
-      : { success: false, message: await response.text() };
+    let data;
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const textBody = await response.text();
+      data = response.ok
+        ? { success: true, text: textBody, markdown: textBody }
+        : { success: false, message: textBody };
+    }
 
     if (!response.ok) {
       return {
@@ -181,6 +187,16 @@ export const api = {
   async deleteStudent(id) {
     return request(`/admin/students/${encodeURIComponent(id)}`, {
       method: 'DELETE',
+    });
+  },
+
+  /**
+   * Actualizar rol institucional de un usuario (solo Administrador)
+   */
+  async updateUserRole(id, role) {
+    return request(`/admin/users/${encodeURIComponent(id)}/role`, {
+      method: 'PATCH',
+      body: { role },
     });
   },
 
@@ -382,10 +398,22 @@ export const api = {
    * Importación masiva de asignaturas desde Excel/CSV o Markdown procesado en el Panel Admin
    * Soporta sobreescritura limpia del catálogo con replace: true por defecto
    */
-  async importAdminCourses(rows, replace = true, rawMarkdown = null, { dryRun = false } = {}) {
+  async importAdminCourses(
+    rows = null,
+    replace = true,
+    rawMarkdown = null,
+    { dryRun = false, xml = null, fileBase64 = null, filename = null } = {}
+  ) {
+    const body = { replace };
+    if (Array.isArray(rows) && rows.length > 0) body.rows = rows;
+    if (rawMarkdown) body.markdown = rawMarkdown;
+    if (xml) body.xml = xml;
+    if (fileBase64) body.fileBase64 = fileBase64;
+    if (filename) body.filename = filename;
+
     return request(`/admin/courses/import${dryRun ? '?dryRun=true' : ''}`, {
       method: 'POST',
-      body: { rows, replace, rawMarkdown },
+      body,
     });
   },
 
@@ -442,5 +470,37 @@ export const api = {
       method: 'PATCH',
       body: payload,
     });
+  },
+
+  /**
+   * Consultar semana y semestre académico Duoc UC vigente
+   */
+  async getCurrentAcademicCalendar(date) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+    return request(`/calendar/current${qs}`);
+  },
+
+  /**
+   * Consultar calendarios académicos almacenados en MongoDB (Admin / Coordinador)
+   */
+  async getAdminAcademicCalendars() {
+    return request('/admin/academic-calendar');
+  },
+
+  /**
+   * Previsualizar (?dryRun=true) o guardar Calendario Académico desde PDF (Solo Administrador)
+   */
+  async importAdminAcademicCalendar(payload, { dryRun = false } = {}) {
+    return request(`/admin/academic-calendar/import${dryRun ? '?dryRun=true' : ''}`, {
+      method: 'POST',
+      body: payload,
+    });
+  },
+
+  /**
+   * Consultar snapshots programados del Simulador Toma de Ramos (03:00 y 15:00)
+   */
+  async getAdminSimulatorSnapshots(limit = 20) {
+    return request(`/admin/simulator-snapshots?limit=${encodeURIComponent(limit)}`);
   },
 };

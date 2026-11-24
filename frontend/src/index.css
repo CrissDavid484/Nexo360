@@ -6,6 +6,104 @@
    ESTILOS GLOBALES, ANIMACIONES Y ACCESIBILIDAD VISUAL (NEXO360)
    ========================================================================== */
 
+/* CSS Custom Properties — Design Tokens Duoc UC (single source of truth) */
+:root {
+  /* Brand institucional (Duoc UC Sede Alameda) */
+  --brand-navy: #002B49;
+  --brand-navy-dark: #001D33;
+  --brand-navy-light: #073B5E;
+  --brand-gold: #FFB81C;
+  --brand-gold-dark: #E6A500;
+  --brand-gold-light: #FFF3C7;
+
+  /* Neutral scale (baja sobrecarga sensorial) */
+  --neutral-0: #FFFFFF;
+  --neutral-25: #FCFCFD;
+  --neutral-50: #EEF2F6;
+  --neutral-100: #E2E8F0;
+  --neutral-200: #CBD5E1;
+  --neutral-300: #94A3B8;
+  --neutral-400: #64748B;
+  --neutral-500: #475569;
+  --neutral-600: #334155;
+  --neutral-700: #1E293B;
+  --neutral-800: #0F172A;
+  --neutral-900: #070B12;
+  --neutral-950: #030509;
+
+  /* Semantic (WCAG 2.2 AA) */
+  --semantic-success-50: #ECFDF5;
+  --semantic-success-100: #D1FAE5;
+  --semantic-success-500: #10B981;
+  --semantic-success-600: #059669;
+  --semantic-success-900: #064E3B;
+  --semantic-warning-50: #FFFCF0;
+  --semantic-warning-100: #FEF3C7;
+  --semantic-warning-500: #F59E0B;
+  --semantic-warning-600: #D97706;
+  --semantic-warning-900: #78350F;
+  --semantic-error-50: #FEF2F2;
+  --semantic-error-100: #FEE2E2;
+  --semantic-error-500: #EF4444;
+  --semantic-error-600: #DC2626;
+  --semantic-error-900: #7F1D1D;
+  --semantic-info-50: #EEF2FF;
+  --semantic-info-100: #E0E7FF;
+  --semantic-info-500: #6366F1;
+  --semantic-info-600: #4F46E5;
+  --semantic-info-900: #312E81;
+
+  /* Alto Contraste WCAG 2.2 AAA */
+  --hc-bg: #070B12;
+  --hc-bg-elevated: #0F172A;
+  --hc-bg-secondary: #1E293B;
+  --hc-fg: #FFFFFF;
+  --hc-fg-muted: #E2E8F0;
+  --hc-primary: #FFB81C;
+  --hc-primary-fg: #05080F;
+  --hc-border: #334155;
+  --hc-border-focus: #FFB81C;
+  --hc-success: #7DD3FC;
+  --hc-warning: #FDE047;
+  --hc-error: #FCA5A5;
+  --hc-focus-ring: #FFB81C;
+
+  /* Border radius */
+  --radius-sm: 0.375rem;
+  --radius-default: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Sombras */
+  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.03);
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
+  --shadow-default: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 20px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+
+  /* Transiciones */
+  --transition-fast: 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition-default: 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition-slow: 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Alto Contraste — sobreecritura de variables */
+html.high-contrast {
+  --brand-navy: #1E293B;
+  --brand-gold: #FFB81C;
+  --neutral-50: #1E293B;
+  --neutral-100: #1E293B;
+  --neutral-200: #334155;
+  --neutral-900: #FFFFFF;
+  --semantic-success-500: #7DD3FC;
+  --semantic-warning-500: #FDE047;
+  --semantic-error-500: #FCA5A5;
+  --semantic-info-500: #7DD3FC;
+}
+
 /* 1. Indicador de Foco Accesible y Amigable (WCAG 2.2 SC 2.4.13) */
 *:focus-visible {
   outline: 2px solid #002B49 !important;
@@ -196,7 +294,40 @@ html.font-size-xlarge {
   font-size: 21.5px;
 }
 
-/* 4. Tipografía amigable para Dislexia */
+/* 4. Tipografía amigable para Dislexia - @font-face con @fontsource/opendyslexic verificado */
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-400-normal.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-400-normal.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-700-normal.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-700-normal.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-400-italic.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-400-italic.woff') format('woff');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-700-italic.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.3.0/files/opendyslexic-latin-700-italic.woff') format('woff');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 html.font-dyslexic,
 html.font-dyslexic body,
 html.font-dyslexic * {
@@ -236,7 +367,7 @@ html.high-contrast .bg-white\/80 {
   border-color: #334155 !important;
 }
 
-/* Superficies secundarias, píldoras inactivas y contenedores internos */
+/* Superficies secundarias, píldoras inactivas y contenedores internos (slate legacy + neutral tokens) */
 html.high-contrast .bg-slate-50,
 html.high-contrast .bg-slate-50\/50,
 html.high-contrast .bg-slate-50\/70,
@@ -246,44 +377,185 @@ html.high-contrast .bg-slate-100,
 html.high-contrast .bg-slate-100\/70,
 html.high-contrast .bg-slate-100\/80,
 html.high-contrast .bg-slate-100\/90,
-html.high-contrast .bg-slate-200 {
+html.high-contrast .bg-slate-200,
+html.high-contrast .bg-neutral-0,
+html.high-contrast .bg-neutral-50,
+html.high-contrast .bg-neutral-50\/50,
+html.high-contrast .bg-neutral-50\/70,
+html.high-contrast .bg-neutral-50\/80,
+html.high-contrast .bg-neutral-100,
+html.high-contrast .bg-neutral-100\/70,
+html.high-contrast .bg-neutral-100\/80,
+html.high-contrast .bg-neutral-100\/90,
+html.high-contrast .bg-neutral-200 {
   background-color: #1E293B !important;
   background-image: none !important;
   color: #FFFFFF !important;
   border-color: #475569 !important;
 }
 
+/* Texto jerárquico en Alto Contraste (slate legacy + neutral tokens) */
+html.high-contrast .text-slate-950,
+html.high-contrast .text-slate-900,
+html.high-contrast .text-slate-800,
+html.high-contrast .text-slate-700,
+html.high-contrast .text-neutral-900,
+html.high-contrast .text-neutral-800,
+html.high-contrast .text-neutral-700,
+html.high-contrast .text-neutral-600,
+html.high-contrast .text-neutral-500,
+html.high-contrast .text-neutral-400,
+html.high-contrast .text-neutral-300 {
+  color: #FFFFFF !important;
+}
+
+html.high-contrast .text-slate-500,
+html.high-contrast .text-slate-400,
+html.high-contrast .text-neutral-500,
+html.high-contrast .text-neutral-400,
+html.high-contrast .text-neutral-300 {
+  color: #E2E8F0 !important;
+}
+
+/* Bordes y divisores en Alto Contraste (slate legacy + neutral tokens) */
+html.high-contrast .border-slate-100,
+html.high-contrast .border-slate-200,
+html.high-contrast .border-slate-300,
+html.high-contrast .border-neutral-100,
+html.high-contrast .border-neutral-200,
+html.high-contrast .border-neutral-300,
+html.high-contrast hr {
+  border-color: #334155 !important;
+}
+
+/* Colores de marca en Alto Contraste */
+html.high-contrast .bg-brand-navy,
+html.high-contrast .bg-brand-navyDark,
+html.high-contrast a.bg-brand-navy,
+html.high-contrast .hover\:bg-brand-navy:hover {
+  background-color: #1E293B !important;
+  color: #FFB81C !important;
+  border-color: #FFB81C !important;
+  font-weight: 700 !important;
+}
+
+html.high-contrast .text-brand-navy {
+  color: #FFB81C !important;
+}
+
+html.high-contrast .border-brand-navy {
+  border-color: #FFB81C !important;
+}
+
+html.high-contrast .bg-brand-gold {
+  background-color: #FFB81C !important;
+  color: #05080F !important;
+  border-color: #FFB81C !important;
+  font-weight: 700 !important;
+}
+
+html.high-contrast .border-brand-gold {
+  border-color: #FFB81C !important;
+}
+
+html.high-contrast .text-brand-gold {
+  color: #FFB81C !important;
+}
+
 /* Estados hover de filas, pestañas inactivas y botones secundarios */
 html.high-contrast .hover\:bg-white:hover,
 html.high-contrast .hover\:bg-white\/70:hover,
+html.high-contrast .hover\:bg-white\/80:hover,
+html.high-contrast .hover\:bg-white\/90:hover,
+html.high-contrast .hover\:bg-neutral-50:hover,
+html.high-contrast .hover\:bg-neutral-100:hover,
+html.high-contrast .hover\:bg-neutral-200:hover,
 html.high-contrast .hover\:bg-slate-50:hover,
 html.high-contrast .hover\:bg-slate-50\/50:hover,
+html.high-contrast .hover\:bg-slate-50\/60:hover,
 html.high-contrast .hover\:bg-slate-50\/90:hover,
 html.high-contrast .hover\:bg-slate-100:hover,
 html.high-contrast .hover\:bg-slate-100\/80:hover,
-html.high-contrast .hover\:bg-slate-200\/80:hover {
+html.high-contrast .hover\:bg-slate-200\/80:hover,
+html.high-contrast .hover\:bg-amber-100\/80:hover,
+html.high-contrast .hover\:bg-amber-100\/90:hover {
   background-color: #334155 !important;
   color: #FFB81C !important;
   border-color: #FFB81C !important;
 }
 
-/* Etiquetas de estado e íconos con fondos suaves */
+html.high-contrast nav button:not([aria-current="page"]):hover span,
+html.high-contrast nav button:not([aria-current="page"]):hover svg {
+  color: #FFB81C !important;
+}
+
+/* Etiquetas de estado — SEMÁNTICA PRESERVADA en Alto Contraste (WCAG 1.4.1) */
+/* Éxito (Verde) -> Cian alto contraste + borde sólido + check */
 html.high-contrast .bg-emerald-50,
 html.high-contrast .bg-emerald-50\/80,
 html.high-contrast .bg-emerald-100,
+html.high-contrast [class*="bg-emerald-"]:where(:not([class*="hover:bg-emerald-"]):not([class*="bg-emerald-500"]):not([class*="bg-emerald-600"]):not([class*="bg-emerald-700"]):not([class*="bg-emerald-800"]):not([class*="bg-emerald-900"])) {
+  background-color: #05080F !important;
+  color: #7DD3FC !important;
+  border: 2px solid #7DD3FC !important;
+}
+
+/* Info (Azul/Celeste/Índigo) -> Azul alto contraste + borde sólido + icono info */
 html.high-contrast .bg-sky-50,
 html.high-contrast .bg-sky-50\/70,
 html.high-contrast .bg-sky-50\/80,
 html.high-contrast .bg-blue-50,
+html.high-contrast .bg-blue-50\/90,
 html.high-contrast .bg-blue-100,
+html.high-contrast .bg-indigo-50,
+html.high-contrast .bg-indigo-100,
+html.high-contrast [class*="bg-sky-"]:where(:not([class*="hover:bg-sky-"]):not([class*="bg-sky-500"]):not([class*="bg-sky-600"]):not([class*="bg-sky-700"]):not([class*="bg-sky-800"]):not([class*="bg-sky-900"])),
+html.high-contrast [class*="bg-blue-"]:where(:not([class*="hover:bg-blue-"]):not([class*="dark:bg-blue-"]):not([class*="bg-blue-500"]):not([class*="bg-blue-600"]):not([class*="bg-blue-700"]):not([class*="bg-blue-800"]):not([class*="bg-blue-900"])),
+html.high-contrast [class*="bg-indigo-"]:where(:not([class*="hover:bg-indigo-"]):not([class*="bg-indigo-500"]):not([class*="bg-indigo-600"]):not([class*="bg-indigo-700"]):not([class*="bg-indigo-800"]):not([class*="bg-indigo-900"])) {
+  background-color: #05080F !important;
+  color: #7DD3FC !important;
+  border: 2px solid #7DD3FC !important;
+}
+
+/* Advertencia (Ámbar/Amarillo) -> Amarillo alto contraste + borde sólido + icono alerta */
 html.high-contrast .bg-amber-50,
 html.high-contrast .bg-amber-50\/70,
 html.high-contrast .bg-amber-100,
+html.high-contrast [class*="bg-amber-"]:where(:not([class*="hover:bg-amber-"]):not([class*="bg-amber-400"]):not([class*="bg-amber-500"]):not([class*="bg-amber-600"]):not([class*="bg-amber-700"]):not([class*="bg-amber-800"]):not([class*="bg-amber-900"])) {
+  background-color: #05080F !important;
+  color: #FDE047 !important;
+  border: 2px solid #FDE047 !important;
+}
+
+/* Error/Peligro (Rojo/Rosa) -> Rojo alto contraste + borde sólido + icono error */
+html.high-contrast .bg-red-50:not(.nexo-logout-btn),
+html.high-contrast .bg-red-100:not(.nexo-logout-btn),
+html.high-contrast .bg-rose-50:not(.nexo-logout-btn),
+html.high-contrast .bg-rose-100:not(.nexo-logout-btn),
+html.high-contrast [class*="bg-red-"]:where(:not(.nexo-logout-btn):not([class*="hover:bg-red-"]):not([class*="bg-red-500"]):not([class*="bg-red-600"]):not([class*="bg-red-700"]):not([class*="bg-red-800"]):not([class*="bg-red-900"])),
+html.high-contrast [class*="bg-rose-"]:where(:not(.nexo-logout-btn):not([class*="hover:bg-rose-"]):not([class*="bg-rose-500"]):not([class*="bg-rose-600"]):not([class*="bg-rose-700"]):not([class*="bg-rose-800"]):not([class*="bg-rose-900"])) {
+  background-color: #05080F !important;
+  color: #FCA5A5 !important;
+  border: 2px solid #FCA5A5 !important;
+}
+
+/* PAEDIS/Justificado (Púrpura) -> Magenta alto contraste + borde sólido + icono candado */
 html.high-contrast .bg-purple-50,
-html.high-contrast .bg-purple-100 {
-  background-color: #1E293B !important;
-  color: #FFB81C !important;
-  border: 1px solid #FFB81C !important;
+html.high-contrast .bg-purple-50\/50,
+html.high-contrast .bg-purple-100,
+html.high-contrast [class*="bg-purple-"]:where(:not([class*="hover:bg-purple-"]):not([class*="bg-purple-500"]):not([class*="bg-purple-600"]):not([class*="bg-purple-700"]):not([class*="bg-purple-800"]):not([class*="bg-purple-900"])) {
+  background-color: #05080F !important;
+  color: #F472B6 !important;
+  border: 2px solid #F472B6 !important;
+}
+
+/* Estados deshabilitados - siempre distinguibles */
+html.high-contrast :disabled,
+html.high-contrast [aria-disabled="true"],
+html.high-contrast .disabled {
+  opacity: 0.5 !important;
+  filter: grayscale(100%) !important;
+  cursor: not-allowed !important;
 }
 
 /* Contenedores institucionales e íconos con fondo #002B49 */
@@ -341,13 +613,100 @@ html.high-contrast .text-\[\#002B49\],
 html.high-contrast .text-amber-600,
 html.high-contrast .text-amber-700,
 html.high-contrast .text-amber-800,
+html.high-contrast .text-amber-800\/80,
 html.high-contrast .text-amber-900,
+html.high-contrast .text-amber-950,
 html.high-contrast .text-emerald-600,
 html.high-contrast .text-emerald-700,
 html.high-contrast .text-emerald-800,
+html.high-contrast .text-emerald-950,
 html.high-contrast .text-sky-800,
-html.high-contrast .text-blue-700 {
+html.high-contrast .text-blue-700,
+html.high-contrast .text-indigo-700,
+html.high-contrast .text-indigo-950 {
   color: #FFB81C !important;
+}
+
+html.high-contrast .text-blue-800,
+html.high-contrast .text-blue-900,
+html.high-contrast .text-blue-950,
+html.high-contrast .text-sky-900,
+html.high-contrast .text-indigo-800,
+html.high-contrast .text-indigo-900 {
+  color: #7DD3FC !important;
+}
+
+html.high-contrast .bg-\[\#FFB81C\]:not(.a11y-toggle-tile),
+html.high-contrast .bg-amber-400,
+html.high-contrast .bg-amber-500,
+html.high-contrast .bg-brand-gold,
+html.high-contrast .bg-\[\#FFB81C\]:not(.a11y-toggle-tile) *,
+html.high-contrast .bg-amber-400 *,
+html.high-contrast .bg-amber-500 *,
+html.high-contrast .bg-brand-gold *,
+html.high-contrast .bg-\[\#FFB81C\]:not(.a11y-toggle-tile) .text-slate-950,
+html.high-contrast .bg-\[\#FFB81C\]:not(.a11y-toggle-tile) .text-neutral-950,
+html.high-contrast .bg-amber-400 .text-slate-950,
+html.high-contrast .bg-amber-400 .text-neutral-950,
+html.high-contrast .bg-amber-500 .text-slate-950,
+html.high-contrast .bg-amber-500 .text-neutral-950,
+html.high-contrast .bg-brand-gold .text-slate-950,
+html.high-contrast .bg-brand-gold .text-neutral-950,
+html.high-contrast .bg-\[\#FFB81C\]:not(.a11y-toggle-tile) svg,
+html.high-contrast .bg-amber-400 svg,
+html.high-contrast .bg-amber-500 svg,
+html.high-contrast .bg-brand-gold svg {
+  color: #05080F !important;
+}
+
+html.high-contrast .nexo-article-prose {
+  color: #E2E8F0 !important;
+}
+
+html.high-contrast .nexo-article-prose strong,
+html.high-contrast .nexo-article-prose h2,
+html.high-contrast .nexo-article-prose h3 {
+  color: #FFFFFF !important;
+}
+
+html.high-contrast .nexo-article-prose p,
+html.high-contrast .nexo-article-prose li,
+html.high-contrast .nexo-article-prose td {
+  color: #E2E8F0 !important;
+}
+
+html.high-contrast .nexo-article-prose a {
+  color: #FFB81C !important;
+}
+
+html.high-contrast .nexo-article-prose th {
+  background-color: #1E293B !important;
+  color: #FFFFFF !important;
+  border-color: #475569 !important;
+}
+
+html.high-contrast .text-red-600,
+html.high-contrast .text-red-700,
+html.high-contrast .text-rose-600,
+html.high-contrast .text-rose-700,
+html.high-contrast .text-rose-950 {
+  color: #FCA5A5 !important;
+}
+
+html.high-contrast .text-purple-700,
+html.high-contrast .text-purple-800,
+html.high-contrast .text-purple-900,
+html.high-contrast .text-purple-950 {
+  color: #F472B6 !important;
+}
+
+html.high-contrast .fill-neutral-800 {
+  fill: #FFFFFF !important;
+}
+
+html.high-contrast .fill-neutral-500,
+html.high-contrast .fill-neutral-600 {
+  fill: #E2E8F0 !important;
 }
 
 /* Bordes y divisores claros pero sin saturar */
@@ -372,7 +731,31 @@ html.high-contrast .hover\:bg-\[\#002B49\]:hover * {
   color: #05080F !important;
 }
 
-/* Estilos dedicados para el botón flotante de Ajustes de accesibilidad y sus opciones en modo oscuro */
+/* Botón Cerrar Sesión en Modo Oscuro / Alto Contraste (Escritorio y Móvil) */
+html.high-contrast #root button.nexo-logout-btn,
+html.high-contrast .nexo-logout-btn.nexo-logout-btn {
+  background-color: #991B1B !important;
+  color: #FFFFFF !important;
+  border: 2px solid #FCA5A5 !important;
+}
+
+html.high-contrast #root button.nexo-logout-btn:hover,
+html.high-contrast .nexo-logout-btn.nexo-logout-btn:hover,
+html.high-contrast #root button.nexo-logout-btn:focus-visible,
+html.high-contrast .nexo-logout-btn.nexo-logout-btn:focus-visible {
+  background-color: #B91C1C !important;
+  color: #FFFFFF !important;
+  border-color: #FECACA !important;
+}
+
+html.high-contrast #root button.nexo-logout-btn *,
+html.high-contrast .nexo-logout-btn.nexo-logout-btn *,
+html.high-contrast #root button.nexo-logout-btn svg,
+html.high-contrast #root button.nexo-logout-btn span {
+  color: #FFFFFF !important;
+}
+
+/* Estilos dedicados para el botón flotante de Ajustes de accesibilidad y sus tiles activos */
 .a11y-fab-btn:focus-visible {
   border-radius: 9999px 0 0 9999px !important;
 }
@@ -385,9 +768,46 @@ html.high-contrast .a11y-fab-btn {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7) !important;
 }
 
+html.high-contrast .a11y-fab-btn:hover {
+  background-color: #273549 !important;
+  color: #FFFFFF !important;
+}
+
 html.high-contrast .a11y-fab-badge {
   background-color: #FFB81C !important;
   color: #05080F !important;
+}
+
+/* Tiles activos en amarillo institucional (#FFB81C) con texto e íconos en azul Duoc (#002B49) */
+.a11y-toggle-tile[aria-pressed="true"],
+.a11y-toggle-tile[aria-pressed="true"]:hover,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"],
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"]:hover {
+  background-color: #FFB81C !important;
+  border: 2px solid #002B49 !important;
+  color: #002B49 !important;
+}
+
+.a11y-toggle-tile[aria-pressed="true"] *,
+.a11y-toggle-tile[aria-pressed="true"] svg,
+.a11y-toggle-tile[aria-pressed="true"] path,
+.a11y-toggle-tile[aria-pressed="true"] circle,
+.a11y-toggle-tile[aria-pressed="true"] line,
+.a11y-toggle-tile[aria-pressed="true"] span,
+.a11y-toggle-tile[aria-pressed="true"] div,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] *,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] svg,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] path,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] circle,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] line,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] span,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] div {
+  color: #002B49 !important;
+}
+
+.a11y-toggle-tile[aria-pressed="true"] svg,
+html.high-contrast .a11y-toggle-tile[aria-pressed="true"] svg {
+  stroke: currentColor !important;
 }
 
 html.high-contrast .a11y-option-btn {
@@ -418,7 +838,7 @@ html.high-contrast img[src*="logo03"] {
    6. THEME SWITCH SOL / LUNA / NUBES / ESTRELLAS (Optimizado para 60/120 FPS)
    ========================================================================== */
 .theme-switch {
-  --toggle-size: 16px;
+  --toggle-size: 15px;
   /* El tamaño base se escala limpiamente en ems mediante font-size */
   --container-width: 5.625em;
   --container-height: 2.5em;
@@ -436,6 +856,7 @@ html.high-contrast img[src*="logo03"] {
   --back-clouds-color: #AACADF;
   --transition: 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   --circle-transition: 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: relative;
   display: inline-block;
   flex-shrink: 0;
   user-select: none;
@@ -476,7 +897,21 @@ html.high-contrast img[src*="logo03"] {
 }
 
 .theme-switch__checkbox {
-  display: none;
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.theme-switch:focus-within .theme-switch__container {
+  outline: 2px solid #002B49;
+  outline-offset: 2px;
+}
+
+html.high-contrast .theme-switch:focus-within .theme-switch__container {
+  outline: 3px solid #FFB81C;
+  outline-offset: 2px;
 }
 
 .theme-switch__circle-container {
@@ -701,16 +1136,71 @@ html.reduced-motion *::after {
 }
 
 /* ==========================================================================
-   10. MODOS DE DALTONISMO (PALETAS SEGURAS OKABE-ITO + INDICADORES DE BORDE)
+   10. MODOS DE DALTONISMO (FILTROS SVG + PALETAS OKABE-ITO + INDICADORES DE BORDE)
    ========================================================================== */
 
-/* 10.1 Protanopia (déficit rojo): Rojo -> Vermilion/Naranjo punteado; Verde -> Azul sólido; Ámbar -> Amarillo alto contraste */
+/* Filtros SVG sobre #nexo-cb-canvas (nunca sobre html/body para preservar position: fixed) */
+html.cb-protanopia #nexo-cb-canvas {
+  filter: url(#nexo-cb-protanopia);
+}
+
+html.cb-deuteranopia #nexo-cb-canvas {
+  filter: url(#nexo-cb-deuteranopia);
+}
+
+html.cb-tritanopia #nexo-cb-canvas {
+  filter: url(#nexo-cb-tritanopia);
+}
+
+/* Realce de foco y bordes de tarjetas distintivos por modo (Light & Dark/HC) */
+html.cb-protanopia *:focus-visible {
+  outline-color: #0072B2 !important;
+  box-shadow: 0 0 0 4px rgba(213, 94, 0, 0.45) !important;
+}
+
+html.cb-deuteranopia *:focus-visible {
+  outline-color: #4F46E5 !important;
+  box-shadow: 0 0 0 4px rgba(230, 159, 0, 0.45) !important;
+}
+
+html.cb-tritanopia *:focus-visible {
+  outline-color: #BE185D !important;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.45) !important;
+}
+
+html.cb-protanopia .uiverse-bento-card {
+  border-color: #0072B2 !important;
+}
+
+html.cb-deuteranopia .uiverse-bento-card {
+  border-color: #4F46E5 !important;
+  border-style: solid !important;
+}
+
+html.cb-tritanopia .uiverse-bento-card {
+  border-color: #0F766E !important;
+}
+
+html.high-contrast.cb-protanopia .uiverse-bento-card {
+  border-color: #38BDF8 !important;
+}
+
+html.high-contrast.cb-deuteranopia .uiverse-bento-card {
+  border-color: #A78BFA !important;
+  border-style: solid !important;
+}
+
+html.high-contrast.cb-tritanopia .uiverse-bento-card {
+  border-color: #FB7185 !important;
+}
+
+/* 10.1 Protanopia (déficit rojo): Rojo -> Vermilion/Naranjo sólido; Verde -> Azul sólido; Ámbar -> Amarillo alto contraste */
 html.cb-protanopia .bg-red-50,
 html.cb-protanopia .bg-red-100 {
   background-color: #FFF1E6 !important;
   color: #9A3412 !important;
   border-color: #D55E00 !important;
-  border-style: dashed !important;
+  border-style: solid !important;
   border-width: 2px !important;
 }
 
@@ -728,7 +1218,7 @@ html.cb-protanopia .text-red-900 {
 html.cb-protanopia .border-red-200,
 html.cb-protanopia .border-red-300 {
   border-color: #D55E00 !important;
-  border-style: dashed !important;
+  border-style: solid !important;
 }
 
 html.cb-protanopia .bg-emerald-50,
@@ -763,7 +1253,7 @@ html.cb-protanopia .bg-amber-100 {
   background-color: #FEF9C3 !important;
   color: #713F12 !important;
   border-color: #B45309 !important;
-  border-style: dotted !important;
+  border-style: solid !important;
   border-width: 2px !important;
 }
 
@@ -778,13 +1268,13 @@ html.cb-protanopia .text-amber-900 {
   color: #713F12 !important;
 }
 
-/* 10.2 Deuteranopia (déficit verde): Rojo -> Vermilion guionado; Verde -> Azul sólido; Ámbar -> Dorado doble borde; Info -> Índigo */
+/* 10.2 Deuteranopia (déficit verde): Rojo -> Vermilion sólido; Verde -> Azul sólido; Ámbar -> Dorado sólido; Info -> Índigo */
 html.cb-deuteranopia .bg-red-50,
 html.cb-deuteranopia .bg-red-100 {
   background-color: #FFF0E5 !important;
   color: #9A3412 !important;
   border-color: #D55E00 !important;
-  border-style: dashed !important;
+  border-style: solid !important;
   border-width: 2px !important;
 }
 
@@ -802,7 +1292,7 @@ html.cb-deuteranopia .text-red-900 {
 html.cb-deuteranopia .border-red-200,
 html.cb-deuteranopia .border-red-300 {
   border-color: #D55E00 !important;
-  border-style: dashed !important;
+  border-style: solid !important;
 }
 
 html.cb-deuteranopia .bg-emerald-50,
@@ -862,13 +1352,13 @@ html.cb-deuteranopia .bg-blue-100 {
   border-color: #4F46E5 !important;
 }
 
-/* 10.3 Tritanopia (déficit azul-amarillo): Rojo -> Magenta guionado; Verde -> Cian profundo sólido; Ámbar -> Coral punteado; Azul -> Pizarra oscura */
+/* 10.3 Tritanopia (déficit azul-amarillo): Rojo -> Magenta sólido; Verde -> Cian profundo sólido; Ámbar -> Coral sólido; Azul -> Pizarra oscura */
 html.cb-tritanopia .bg-red-50,
 html.cb-tritanopia .bg-red-100 {
   background-color: #FCE7F3 !important;
   color: #831843 !important;
   border-color: #BE185D !important;
-  border-style: dashed !important;
+  border-style: solid !important;
   border-width: 2px !important;
 }
 
@@ -886,7 +1376,7 @@ html.cb-tritanopia .text-red-900 {
 html.cb-tritanopia .border-red-200,
 html.cb-tritanopia .border-red-300 {
   border-color: #BE185D !important;
-  border-style: dashed !important;
+  border-style: solid !important;
 }
 
 html.cb-tritanopia .bg-emerald-50,
@@ -921,7 +1411,7 @@ html.cb-tritanopia .bg-amber-100 {
   background-color: #FFEDD5 !important;
   color: #9A3412 !important;
   border-color: #D55E00 !important;
-  border-style: dotted !important;
+  border-style: solid !important;
   border-width: 2px !important;
 }
 
@@ -963,7 +1453,7 @@ html.high-contrast.cb-deuteranopia .bg-red-100 {
   background-color: #1E293B !important;
   color: #FF9F68 !important;
   border-color: #FF9F68 !important;
-  border-style: dashed !important;
+  border-style: solid !important;
 }
 
 html.high-contrast.cb-protanopia .text-red-600,
@@ -997,7 +1487,7 @@ html.high-contrast.cb-deuteranopia .bg-amber-100 {
   background-color: #1E293B !important;
   color: #FDE047 !important;
   border-color: #FDE047 !important;
-  border-style: dotted !important;
+  border-style: solid !important;
 }
 
 html.high-contrast.cb-tritanopia .bg-red-50,
@@ -1005,7 +1495,7 @@ html.high-contrast.cb-tritanopia .bg-red-100 {
   background-color: #1E293B !important;
   color: #F472B6 !important;
   border-color: #F472B6 !important;
-  border-style: dashed !important;
+  border-style: solid !important;
 }
 
 html.high-contrast.cb-tritanopia .bg-emerald-50,
@@ -1021,7 +1511,22 @@ html.high-contrast.cb-tritanopia .bg-amber-100 {
   background-color: #1E293B !important;
   color: #FDBA74 !important;
   border-color: #FDBA74 !important;
-  border-style: dotted !important;
+  border-style: solid !important;
+}
+
+html.high-contrast.cb-protanopia *:focus-visible {
+  outline-color: #7DD3FC !important;
+  box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.45) !important;
+}
+
+html.high-contrast.cb-deuteranopia *:focus-visible {
+  outline-color: #FDE047 !important;
+  box-shadow: 0 0 0 5px rgba(253, 224, 71, 0.45) !important;
+}
+
+html.high-contrast.cb-tritanopia *:focus-visible {
+  outline-color: #5EEAD4 !important;
+  box-shadow: 0 0 0 5px rgba(94, 234, 212, 0.45) !important;
 }
 
 /* ==========================================================================
@@ -1066,6 +1571,83 @@ html.clear-reading-mode .uiverse-status-pill {
   .overflow-x-auto {
     scrollbar-width: thin;
     overscroll-behavior-x: contain;
+  }
+}
+
+/* Estabilidad móvil al combinar xlarge + OpenDyslexic + Alto Contraste + Lectura Clara */
+#accessibility-panel {
+  max-width: 100vw;
+}
+
+#accessibility-panel [role="dialog"] {
+  max-width: calc(100vw - 1.5rem);
+}
+
+#accessibility-panel .a11y-toggle-tile,
+#accessibility-panel select,
+#accessibility-panel button {
+  min-width: 0;
+  max-width: 100%;
+}
+
+html.font-size-xlarge #accessibility-panel > button > span:first-of-type,
+html.font-dyslexic #accessibility-panel > button > span:first-of-type {
+  font-size: min(0.8125rem, 13.5px) !important;
+  letter-spacing: 0.01em !important;
+  word-spacing: 0.03em !important;
+}
+
+html.font-dyslexic .theme-switch,
+html.font-dyslexic .theme-switch * {
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  line-height: normal !important;
+}
+
+@media (max-width: 440px) {
+  html.font-size-xlarge.font-dyslexic #accessibility-panel .a11y-tiles-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  html.font-size-xlarge,
+  html.font-size-xlarge body,
+  html.font-dyslexic,
+  html.font-dyslexic body,
+  html.clear-reading-mode,
+  html.clear-reading-mode body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
+  html.font-size-xlarge header,
+  html.font-dyslexic header,
+  html.clear-reading-mode header,
+  html.font-size-xlarge main,
+  html.font-dyslexic main,
+  html.clear-reading-mode main {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  html.font-size-xlarge main :where(p, li, h1, h2, h3, h4),
+  html.font-dyslexic main :where(p, li, h1, h2, h3, h4),
+  html.clear-reading-mode main :where(p, li, h1, h2, h3, h4) {
+    overflow-wrap: break-word;
+    max-width: 100%;
+  }
+
+  html.font-size-xlarge main :where(a, button, span),
+  html.font-dyslexic main :where(a, button, span),
+  html.clear-reading-mode main :where(a, button, span) {
+    overflow-wrap: break-word;
+  }
+
+  html.font-size-xlarge.font-dyslexic #nexo-mobile-dropdown-menu [role="status"] {
+    font-size: 0.7rem !important;
+    letter-spacing: 0.01em !important;
+    word-spacing: 0.03em !important;
   }
 }
 

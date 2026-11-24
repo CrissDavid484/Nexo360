@@ -15,11 +15,18 @@ import {
   ShieldCheck,
   Save,
 } from 'lucide-react';
-import { api } from '../../services/api';
-import { useAccessibility } from '../../context/AccessibilityContext';
-import { useAccessibleModal } from '../../hooks/useAccessibleModal';
-import { useOnClickOutside } from '../../hooks/useOnClickOutside';
-import { DEFAULT_CAMPUS } from '../../utils/studentUtils';
+import { api } from '@services/api';
+import { useAccessibility } from '@context/AccessibilityContext';
+import { useAccessibleModal } from '@hooks/useAccessibleModal';
+import { useOnClickOutside } from '@hooks/useOnClickOutside';
+import { DEFAULT_CAMPUS } from '@utils/studentUtils';
+import { ADMIN_THEME } from '@components/admin/adminTheme';
+import { Card } from '@components/ui/Card';
+import { Badge } from '@components/ui/Badge';
+import { Button } from '@components/ui/Button';
+import { Input } from '@components/ui/Input';
+import { Select } from '@components/ui/Select';
+import { Modal } from '@components/ui/Modal';
 
 const BARRIER_OPTIONS = [
   'Visual / Sensorial',
@@ -127,7 +134,6 @@ function extractSourceCourses(student) {
 function mergeCourseAcknowledgments(student) {
   const rawAcks = Array.isArray(student?.acusesDocentes) ? student.acusesDocentes : [];
   const existingMap = new Map(rawAcks.map((ack) => [String(ack.sigla || '').toUpperCase(), ack]));
-
   const seen = new Set();
   const merged = [];
 
@@ -201,10 +207,6 @@ function computePaedisAnalytics(paedisStudents) {
   };
 }
 
-/**
- * Genera el texto oficial de la Ficha Docente Confidencial (Capa 2: Operativa)
- * garantizando la omisión estricta de diagnósticos clínicos según la Ley N° 21.719.
- */
 function buildDocenteConfidentialText(
   student,
   adjustments = [],
@@ -239,7 +241,6 @@ function buildDocenteConfidentialText(
     `Estudiante: ${student?.fullName || student?.nombre || ''}`,
     `RUT: ${student?.rut || 'No informado'} | Correo: ${student?.email || ''}`,
     `Carrera: ${student?.career || student?.carrera || ''}`,
-    `Tutor PAEDIS Asignado: ${student?.tutorPaedisAsignado || 'Sí'}`,
     '',
     '[CAPA 2: AJUSTES OPERATIVOS DE AULA Y EVALUACIÓN]',
     '[AVISO DE PRIVACIDAD LEY N° 21.719]',
@@ -259,75 +260,81 @@ function buildDocenteConfidentialText(
 function PaedisAnalyticsHeader({ analytics, getVoiceProps }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-      <div
+      <Card
+        variant="interactive"
+        padding="md"
         {...getVoiceProps(
           `Total estudiantes PAEDIS: ${analytics.total}. Cobertura de ajustes: ${analytics.coveragePct} por ciento.`
         )}
-        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-[#002B49] p-4 shadow-xs space-y-2"
+        className="bg-white rounded-2xl border border-neutral-300 border-t-4 border-t-brand-navy p-4 shadow-xs space-y-2"
       >
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">
             Estudiantes PAEDIS Activos
           </span>
-          <HeartHandshake className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+          <HeartHandshake className="w-4 h-4 text-brand-navy" aria-hidden="true" />
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-black text-slate-900">{analytics.total}</span>
-          <span className="text-xs font-semibold text-slate-600">estudiantes activos</span>
+          <span className="text-3xl font-black text-neutral-900">{analytics.total}</span>
+          <span className="text-xs font-semibold text-neutral-600">estudiantes activos</span>
         </div>
-        <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-700 pt-1 border-t border-slate-100">
+        <div className="grid grid-cols-2 gap-1 text-[11px] text-neutral-700 pt-1 border-t border-neutral-100">
           <span>Visual: <strong>{analytics.barrierCounts['Visual / Sensorial'] || 0}</strong></span>
           <span>Auditiva: <strong>{analytics.barrierCounts['Auditiva / LSCh'] || 0}</strong></span>
           <span>Motora: <strong>{analytics.barrierCounts['Física / Motora'] || 0}</strong></span>
           <span>Neurodivergencia: <strong>{analytics.barrierCounts['Neurodivergencia'] || 0}</strong></span>
         </div>
-      </div>
+      </Card>
 
-      <div
+      <Card
+        variant="interactive"
+        padding="md"
         {...getVoiceProps(
           `Cobertura de ajustes razonables: ${analytics.coveragePct} por ciento. ${analytics.notifiedCount} fichas docentes notificadas.`
         )}
-        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-emerald-600 p-4 shadow-xs space-y-2"
+        className="bg-white rounded-2xl border border-neutral-300 border-t-4 border-t-emerald-600 p-4 shadow-xs space-y-2"
       >
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">
             Tasa de Cobertura de Ajustes
           </span>
           <ShieldCheck className="w-4 h-4 text-emerald-700" aria-hidden="true" />
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-black text-emerald-950">{analytics.coveragePct}%</span>
-          <span className="text-xs font-semibold text-slate-600">
+          <span className="text-xs font-semibold text-neutral-600">
             ({analytics.withAdjustments}/{analytics.total}) con ajustes
           </span>
         </div>
-        <p className="text-[11px] text-slate-600 pt-1 border-t border-slate-100">
+        <p className="text-[11px] text-neutral-600 pt-1 border-t border-neutral-100">
           {analytics.notifiedCount} ficha(s) docente(s) confidenciales emitidas este periodo.
         </p>
-      </div>
+      </Card>
 
-      <div
+      <Card
+        variant="interactive"
+        padding="md"
         {...getVoiceProps(
           `Adopción del simulador: ${analytics.simAdopted} de ${analytics.total} estudiantes lo han utilizado.`
         )}
-        className="bg-white rounded-2xl border border-slate-300 border-t-4 border-t-amber-500 p-4 shadow-xs space-y-2 sm:col-span-2 lg:col-span-1"
+        className="bg-white rounded-2xl border border-neutral-300 border-t-4 border-t-amber-500 p-4 shadow-xs space-y-2 sm:col-span-2 lg:col-span-1"
       >
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">
             Simulador Toma de Ramos
           </span>
           <BookOpen className="w-4 h-4 text-amber-800" aria-hidden="true" />
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-black text-amber-950">{analytics.simAdopted}</span>
-          <span className="text-xs font-semibold text-slate-600">de {analytics.total} usan el simulador</span>
+          <span className="text-xs font-semibold text-neutral-600">de {analytics.total} usan el simulador</span>
         </div>
-        <p className="text-[11px] text-slate-600 pt-1 border-t border-slate-100">
+        <p className="text-[11px] text-neutral-600 pt-1 border-t border-neutral-100">
           {analytics.simAtRisk > 0
             ? `${analytics.simAtRisk} estudiante(s) en alerta temprana utilizan la herramienta.`
             : 'Fomenta la inscripción oportuna y sin choques de horario.'}
         </p>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -342,14 +349,14 @@ function PaedisStudentList({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+      <div className="flex items-center justify-between text-xs font-bold text-neutral-700 px-1">
         <span>Estudiantes PAEDIS</span>
-        <span className="text-slate-500 font-semibold">{students.length} registrados</span>
+        <span className="text-neutral-500 font-semibold">{students.length} registrados</span>
       </div>
 
       <div className="space-y-1.5 max-h-[580px] overflow-y-auto pr-1">
         {students.length === 0 ? (
-          <div className="p-6 text-center text-xs text-slate-600 bg-white rounded-2xl border border-slate-300">
+          <div className="p-6 text-center text-xs text-neutral-600 bg-white rounded-2xl border border-neutral-300">
             No se encontraron estudiantes para este filtro.
           </div>
         ) : (
@@ -370,21 +377,21 @@ function PaedisStudentList({
                 {...getVoiceProps(
                   `Estudiante ${s.fullName || s.nombre}, barrera ${barrier}, ${adjustmentsCount} ajustes, periodo ${semester}`
                 )}
-                className={`w-full min-h-[44px] text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                className={`w-full min-h-[44px] text-left block p-3.5 rounded-2xl border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold ${
                   isSelected
-                    ? 'bg-[#002B49] text-white border-[#002B49] shadow-sm ring-2 ring-[#FFB81C]'
-                    : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200 shadow-2xs'
+                    ? 'bg-brand-navy text-white border-brand-navy shadow-sm ring-2 ring-brand-gold'
+                    : 'bg-white hover:bg-neutral-50 text-neutral-900 border-neutral-200 shadow-2xs'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`text-xs font-black truncate ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                  <span className={`text-xs font-black truncate ${isSelected ? 'text-white' : 'text-neutral-900'}`}>
                     {s.fullName || s.nombre}
                   </span>
                   <span
-                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                    className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
                       isSelected
-                        ? 'bg-white/20 text-[#FFB81C]'
-                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        ? 'bg-white/20 text-brand-gold'
+                        : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
                     }`}
                   >
                     {semester}
@@ -393,16 +400,16 @@ function PaedisStudentList({
 
                 <div className="flex items-center justify-between gap-2 mt-1">
                   <span
-                    className={`text-[10px] font-semibold truncate ${
-                      isSelected ? 'text-amber-300' : 'text-slate-600'
+                    className={`text-xs font-semibold truncate ${
+                      isSelected ? 'text-amber-300' : 'text-neutral-600'
                     }`}
                   >
                     {barrier}
                   </span>
                   {hasFicha && (
                     <span
-                      className={`text-[10px] font-black uppercase px-1.5 py-0.2 rounded ${
-                        isSelected ? 'bg-emerald-400 text-slate-950' : 'bg-emerald-100 text-emerald-950'
+                      className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${
+                        isSelected ? 'bg-emerald-400 text-neutral-950' : 'bg-emerald-100 text-emerald-950'
                       }`}
                     >
                       Ficha OK
@@ -410,7 +417,7 @@ function PaedisStudentList({
                   )}
                 </div>
 
-                <div className={`text-[11px] truncate mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                <div className={`text-xs truncate mt-1 ${isSelected ? 'text-neutral-300' : 'text-neutral-500'}`}>
                   {s.career || s.carrera} • {adjustmentsCount} ajuste(s)
                 </div>
               </button>
@@ -435,31 +442,32 @@ function PaedisAdjustmentsManager({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">
           Ajustes Razonables Aprobados ({adjustments.length}) • Periodo {currentSemester}
         </h4>
-        <span className="text-[11px] text-slate-500">
+        <span className="text-[11px] text-neutral-500">
           Aprobación rápida por botón o medida pedagógica personalizada
         </span>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
         {ADJUSTMENT_PRESETS.map((preset) => (
-          <button
+          <Button
             key={preset.tipo}
-            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => onAddPreset(preset)}
             {...getVoiceProps(`Agregar ajuste rápido: ${preset.tipo}`)}
-            className="min-h-[44px] px-3 py-1.5 bg-blue-50 hover:bg-[#002B49] text-[#002B49] hover:text-white border border-blue-200 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="min-h-[44px] px-3 py-1.5 bg-blue-50 hover:bg-brand-navy text-brand-navy hover:text-white border border-blue-200 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" aria-hidden="true" />
             <span>{preset.tipo}</span>
-          </button>
+          </Button>
         ))}
       </div>
 
       {adjustments.length === 0 ? (
-        <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <p className="text-xs text-neutral-500 italic bg-neutral-50 p-3 rounded-xl border border-neutral-200">
           Sin ajustes aprobados para este periodo. Selecciona un ajuste rápido o registra una medida abajo.
         </p>
       ) : (
@@ -467,57 +475,57 @@ function PaedisAdjustmentsManager({
           {adjustments.map((adj) => (
             <li
               key={`${adj.tipo}-${adj.descripcion}`}
-              className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3"
+              className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 flex items-start justify-between gap-3"
             >
               <div className="space-y-1 text-xs min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <strong className="text-[#002B49]">{adj.tipo}</strong>
+                  <strong className="text-brand-navy">{adj.tipo}</strong>
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-200">
                     Vigencia: {adj.semestreVigencia || currentSemester}
                   </span>
                 </div>
-                <p className="text-slate-700 leading-relaxed">{adj.descripcion}</p>
+                <p className="text-neutral-700 leading-relaxed">{adj.descripcion}</p>
               </div>
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => onRemoveAdjustment(adj)}
-                aria-label={`Revocar ajuste ${adj.tipo}`}
                 {...getVoiceProps(`Revocar ajuste ${adj.tipo}`)}
-                className="min-h-[44px] px-3 py-1.5 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                className="min-h-[42px] px-3 py-1.5 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Revocar</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
       )}
 
       <form onSubmit={onAddCustom} className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
-        <input
+        <Input
           type="text"
           value={newAdjustment.tipo}
           onChange={(e) => onNewAdjustmentChange({ ...newAdjustment, tipo: e.target.value })}
           placeholder="Nombre del ajuste (ej. Pausas sensoriales)"
           aria-label="Nombre del ajuste personalizado"
-          className="sm:col-span-4 min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
+          className="sm:col-span-4 min-h-[44px] px-3 py-2 border border-neutral-300 rounded-xl text-xs text-neutral-900"
         />
-        <input
+        <Input
           type="text"
           value={newAdjustment.descripcion}
           onChange={(e) => onNewAdjustmentChange({ ...newAdjustment, descripcion: e.target.value })}
           placeholder="Descripción pedagógica para el docente en aula..."
           aria-label="Descripción del ajuste personalizado"
-          className="sm:col-span-6 min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
+          className="sm:col-span-6 min-h-[44px] px-3 py-2 border border-neutral-300 rounded-xl text-xs text-neutral-900"
         />
-        <button
+        <Button
           type="submit"
           {...getVoiceProps('Agregar ajuste razonable personalizado')}
-          className="sm:col-span-2 min-h-[44px] px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer"
+          className="sm:col-span-2 min-h-[44px] px-4 py-2 bg-brand-navy hover:bg-brand-navyDark text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
           <span>Añadir</span>
-        </button>
+        </Button>
       </form>
     </div>
   );
@@ -569,125 +577,96 @@ function DocenteSheetModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="docente-sheet-title"
-      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Ficha Docente Confidencial • ${currentSemester}`}
+      size="xl"
+      initialFocusRef={closeBtnRef}
     >
-      <div
-        ref={modalRef}
-        className="relative bg-white w-full max-w-3xl rounded-3xl border border-slate-300 border-t-4 border-t-[#002B49] shadow-2xl overflow-hidden my-auto max-h-[85vh] flex flex-col"
-      >
-        <header className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-slate-50 shrink-0">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                <Lock className="w-3 h-3" aria-hidden="true" />
-                <span>Capa 2: Ficha Docente Confidencial • Ley N° 21.719</span>
-              </span>
-            </div>
-            <h3 id="docente-sheet-title" className="text-lg sm:text-xl font-black text-slate-900 truncate">
-              Ficha de Ajustes Razonables para Docentes de Aula
-            </h3>
-            <p className="text-xs text-slate-600 mt-0.5 truncate">
-              Resumen pedagógico para docentes de {student.fullName || student.nombre} ({student.career}) • Periodo {currentSemester}
+      <div className="space-y-5">
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-950 flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <strong>Privacidad Clínica Resguardada (Ley N° 21.719):</strong> Esta ficha omite
+            automáticamente el diagnóstico clínico declarado y las notas privadas de entrevista (Capa 1),
+            exhibiendo solo las adecuaciones pedagógicas aplicables en clase y certámenes (Capa 2).
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs">
+          <div>
+            <span className="text-neutral-500 font-semibold block">Estudiante</span>
+            <strong className="text-neutral-900">{student.fullName || student.nombre}</strong>
+          </div>
+          <div>
+            <span className="text-neutral-500 font-semibold block">RUT • Sede</span>
+            <strong className="text-neutral-900">
+              {student.rut || 'Sin RUT'} • {student.campus || DEFAULT_CAMPUS}
+            </strong>
+          </div>
+          <div>
+            <span className="text-neutral-500 font-semibold block">Periodo de Vigencia</span>
+            <strong className="text-brand-navy font-black">Semestre {currentSemester}</strong>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-navy">
+            Adecuaciones Pedagógicas Aprobadas ({adjustments.length})
+          </h4>
+          {adjustments.length === 0 ? (
+            <p className="text-xs text-neutral-500 italic bg-neutral-50 p-3 rounded-xl border border-neutral-200">
+              No hay ajustes razonables aprobados todavía para este periodo.
             </p>
-          </div>
-          <button
-            ref={closeBtnRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar Ficha Docente Confidencial"
-            {...getVoiceProps('Cerrar Ficha Docente Confidencial')}
-            className="min-h-[44px] min-w-[44px] p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-200 bg-white border border-slate-200 shadow-2xs transition-colors cursor-pointer flex items-center justify-center shrink-0"
-          >
-            <X className="w-5 h-5" aria-hidden="true" />
-          </button>
-        </header>
+          ) : (
+            <ul className="space-y-2">
+              {adjustments.map((adj) => (
+                <li
+                  key={`${adj.tipo}-${adj.descripcion}`}
+                  className="p-3.5 rounded-xl bg-white border border-neutral-200 text-xs flex items-start gap-2.5"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
+                  <div>
+                    <strong className="text-neutral-900 block">{adj.tipo}</strong>
+                    <span className="text-neutral-700 block mt-0.5">{adj.descripcion}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-        <div className="p-6 space-y-5 overflow-y-auto">
-          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-950 flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
-            <div>
-              <strong>Privacidad Clínica Resguardada (Ley N° 21.719):</strong> Esta ficha omite
-              automáticamente el diagnóstico clínico declarado y las notas privadas de entrevista (Capa 1),
-              exhibiendo solo las adecuaciones pedagógicas aplicables en clase y certámenes (Capa 2).
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-            <div>
-              <span className="text-slate-500 font-semibold block">Estudiante</span>
-              <strong className="text-slate-900">{student.fullName || student.nombre}</strong>
-            </div>
-            <div>
-              <span className="text-slate-500 font-semibold block">RUT • Sede</span>
-              <strong className="text-slate-900">
-                {student.rut || 'Sin RUT'} • {student.campus || DEFAULT_CAMPUS}
-              </strong>
-            </div>
-            <div>
-              <span className="text-slate-500 font-semibold block">Periodo de Vigencia</span>
-              <strong className="text-[#002B49] font-black">Semestre {currentSemester}</strong>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#002B49]">
-              Adecuaciones Pedagógicas Aprobadas ({adjustments.length})
-            </h4>
-            {adjustments.length === 0 ? (
-              <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
-                No hay ajustes razonables aprobados todavía para este periodo.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {adjustments.map((adj) => (
-                  <li
-                    key={`${adj.tipo}-${adj.descripcion}`}
-                    className="p-3.5 rounded-xl bg-white border border-slate-200 text-xs flex items-start gap-2.5"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
-                    <div>
-                      <strong className="text-slate-900 block">{adj.tipo}</strong>
-                      <span className="text-slate-700 block mt-0.5">{adj.descripcion}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#002B49]">
-              Trazabilidad de Acuse de Recibo Docente por Asignatura
-            </h4>
-            {acknowledgments.length === 0 ? (
-              <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                Sin asignaturas inscritas sincronizadas aún para trazabilidad individual; la Ficha Docente
-                cubre toda la carga académica vigente del periodo.
-              </p>
-            ) : (
-              <div className="border border-slate-200 rounded-xl overflow-x-auto">
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-navy">
+            Trazabilidad de Acuse de Recibo Docente por Asignatura
+          </h4>
+          {acknowledgments.length === 0 ? (
+            <p className="text-xs text-neutral-600 bg-neutral-50 p-3 rounded-xl border border-neutral-200">
+              Sin asignaturas inscritas sincronizadas aún para trazabilidad individual; la Ficha Docente
+              cubre toda la carga académica vigente del periodo.
+            </p>
+          ) : (
+            <Card variant="outlined" padding="md">
+              <div className="border border-neutral-200 rounded-xl overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse min-w-[480px]">
-                  <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                  <thead className="bg-neutral-100 text-neutral-700 font-bold border-b border-neutral-200">
                     <tr>
                       <th scope="col" className="p-2.5">Sigla</th>
                       <th scope="col" className="p-2.5">Asignatura / Docente</th>
                       <th scope="col" className="p-2.5 text-right">Acuse Docente</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-neutral-100">
                     {acknowledgments.map((ack) => (
                       <tr key={ack.sigla}>
-                        <td className="p-2.5 font-mono font-bold text-[#002B49]">{ack.sigla}</td>
+                        <td className="p-2.5 font-mono font-bold text-brand-navy">{ack.sigla}</td>
                         <td className="p-2.5">
-                          <span className="font-semibold text-slate-900 block">{ack.nombre}</span>
-                          <span className="text-[11px] text-slate-500">{ack.profesor}</span>
+                          <span className="font-semibold text-neutral-900 block">{ack.nombre}</span>
+                          <span className="text-[11px] text-neutral-500">{ack.profesor}</span>
                         </td>
                         <td className="p-2.5 text-right">
-                          <button
+                          <Button
                             type="button"
                             onClick={() => onToggleAck(ack.sigla)}
                             aria-pressed={ack.confirmado}
@@ -697,53 +676,49 @@ function DocenteSheetModal({
                             className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                               ack.confirmado
                                 ? 'bg-emerald-50 text-emerald-950 border-emerald-300'
-                                : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                : 'bg-neutral-100 text-neutral-700 border-neutral-300 hover:bg-neutral-200'
                             }`}
                           >
                             {ack.confirmado ? 'Acuse Confirmado ✓' : 'Marcar Acuse'}
-                          </button>
+                          </Button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
+            </Card>
+          )}
         </div>
 
-        <footer className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <button
+        <footer className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-neutral-200 bg-neutral-50">
+          <Button
             type="button"
             onClick={handleDownloadTxt}
             {...getVoiceProps('Descargar Ficha Docente Confidencial en formato texto seguro')}
-            className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 cursor-pointer shadow-2xs"
+            className="min-h-[44px] px-4 py-2 inline-flex items-center gap-2"
           >
             <Download className="w-4 h-4" aria-hidden="true" />
             <span>Descargar Ficha (.txt)</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             disabled={isSaving}
             onClick={onConfirmNotify}
             {...getVoiceProps('Emitir y notificar Ficha Docente a los profesores')}
-            className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+            className="min-h-[44px] px-5 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white inline-flex items-center gap-2"
           >
-            <ShieldCheck className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+            <ShieldCheck className="w-4 h-4 text-brand-gold" aria-hidden="true" />
             <span>{isSaving ? 'Notificando...' : 'Notificar a Docentes de Aula'}</span>
-          </button>
+          </Button>
         </footer>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-/**
- * Componente Principal del Centro de Operaciones PAEDIS
- * Estructurado en 2 Capas (Capa 1: Confidencial, Capa 2: Operativa) y Renovación Semestral
- */
-export const PaedisCaseManagementSection = ({
+export const PaedisManagement = ({
   students = [],
   onStudentUpdated,
   announce: announceProp,
@@ -767,7 +742,6 @@ export const PaedisCaseManagementSection = ({
     // Capa 1: Expediente Confidencial
     barreraPaedis: 'Visual / Sensorial',
     acreditacionPaedis: 'Credencial RND SENADIS / COMPIN',
-    tutorPaedisAsignado: 'Sí',
     diagnosticoDeclarado: '',
     notasConfidencialesPaedis: '',
     voiceReaderByDefault: false,
@@ -806,19 +780,15 @@ export const PaedisCaseManagementSection = ({
     setFormState({
       barreraPaedis: inferBarrierCategory(selectedStudent),
       acreditacionPaedis: selectedStudent.acreditacionPaedis || 'Credencial RND SENADIS / COMPIN',
-      tutorPaedisAsignado: selectedStudent.tutorPaedisAsignado || 'Sí',
       diagnosticoDeclarado: selectedStudent.diagnosticoDeclarado || '',
       notasConfidencialesPaedis: selectedStudent.notasConfidencialesPaedis || '',
       voiceReaderByDefault:
         typeof selectedStudent.accessibilityPreferences?.voiceReader === 'boolean'
           ? selectedStudent.accessibilityPreferences.voiceReader
           : isVisual,
-      clearReadingByDefault:
-        Boolean(selectedStudent.accessibilityPreferences?.clearReadingMode),
-      highContrastByDefault:
-        Boolean(selectedStudent.accessibilityPreferences?.highContrast),
-      dyslexicFontByDefault:
-        Boolean(selectedStudent.accessibilityPreferences?.dyslexicFont),
+      clearReadingByDefault: Boolean(selectedStudent.accessibilityPreferences?.clearReadingMode),
+      highContrastByDefault: Boolean(selectedStudent.accessibilityPreferences?.highContrast),
+      dyslexicFontByDefault: Boolean(selectedStudent.accessibilityPreferences?.dyslexicFont),
       vigenciaSemestrePaedis: selectedStudent.vigenciaSemestrePaedis || '2026-1',
       ajustesAprobados: Array.isArray(selectedStudent.ajustesAprobados)
         ? selectedStudent.ajustesAprobados
@@ -994,30 +964,30 @@ export const PaedisCaseManagementSection = ({
   return (
     <section aria-labelledby="paedis-ops-heading" className="space-y-6 w-full max-w-full overflow-x-clip">
       {/* CABECERA */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-300 border-t-4 border-t-[#002B49] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className={`${ADMIN_THEME.cardSurface} border-t-4 border-t-brand-navy flex flex-col lg:flex-row lg:items-center justify-between gap-4`}>
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-300">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-900 border border-purple-200">
             <Lock className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Centro de Operaciones PAEDIS • Gestión en 2 Capas (Ley N° 21.719)</span>
           </div>
-          <h2 id="paedis-ops-heading" className="text-xl sm:text-2xl font-black text-slate-900">
-            Gestión PAEDIS &amp; Ajustes Razonables ({DEFAULT_CAMPUS})
+          <h2 id="paedis-ops-heading" className={ADMIN_THEME.moduleTitle}>
+            Gestión PAEDIS & Ajustes Razonables ({DEFAULT_CAMPUS})
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600">
+          <p className={ADMIN_THEME.moduleSubtitle}>
             Segregación estricta entre expediente clínico confidencial (Capa 1) y adecuaciones pedagógicas de aula por semestre (Capa 2).
           </p>
         </div>
 
         {selectedStudent && (
-          <button
+          <Button
             type="button"
             onClick={() => setIsDocenteModalOpen(true)}
             {...getVoiceProps('Abrir Ficha Docente Confidencial de Ajustes Razonables')}
-            className="min-h-[44px] px-4 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 cursor-pointer shadow-xs shrink-0 focus-visible:ring-4 focus-visible:ring-amber-400"
+            className="min-h-[42px] px-4 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 cursor-pointer shadow-xs shrink-0 focus-visible:ring-4 focus-visible:ring-amber-400"
           >
-            <FileText className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+            <FileText className="w-4 h-4 text-brand-gold" aria-hidden="true" />
             <span>Ver Ficha Docente ({formState.vigenciaSemestrePaedis || '2026-1'})</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -1027,7 +997,7 @@ export const PaedisCaseManagementSection = ({
         {/* PANEL IZQUIERDO: LISTA DE ESTUDIANTES */}
         <div className="lg:col-span-4 space-y-3">
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
             <input
               type="text"
               value={searchQuery}
@@ -1035,7 +1005,7 @@ export const PaedisCaseManagementSection = ({
               placeholder="Buscar por nombre, RUT o correo..."
               aria-label="Buscar estudiante PAEDIS"
               {...getVoiceProps('Buscar estudiante PAEDIS por nombre, RUT o correo')}
-              className="w-full min-h-[44px] pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+              className={`w-full pl-10 pr-3 ${ADMIN_THEME.controlInput}`}
             />
           </div>
 
@@ -1045,19 +1015,20 @@ export const PaedisCaseManagementSection = ({
             aria-label="Filtros de estudiantes PAEDIS"
           >
             {CASE_FILTERS.map((f) => (
-              <button
+              <Button
                 key={f.id}
-                type="button"
+                variant={caseFilter === f.id ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setCaseFilter(f.id)}
                 {...getVoiceProps(`Filtrar por ${f.label}`)}
-                className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer whitespace-nowrap ${
+                className={`min-h-[42px] px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
                   caseFilter === f.id
-                    ? 'bg-[#002B49] text-white border-[#002B49]'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    ? 'bg-brand-navy text-white border-brand-navy'
+                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
                 }`}
               >
                 {f.label}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -1072,23 +1043,23 @@ export const PaedisCaseManagementSection = ({
         </div>
 
         {/* PANEL DERECHO: EXPEDIENTE EN 2 CAPAS */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-300 p-5 sm:p-6 shadow-xs space-y-6">
+        <div className={`lg:col-span-8 ${ADMIN_THEME.cardSurface} space-y-6`}>
           {!selectedStudent ? (
-            <div className="p-12 text-center text-slate-500 font-bold">
+            <div className="p-12 text-center text-neutral-500 font-bold">
               Selecciona un estudiante de la lista para gestionar su expediente.
             </div>
           ) : (
             <>
               {/* ENCABEZADO DEL CASO */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 pb-4">
                 <div>
-                  <span className="text-xs font-bold text-[#002B49] uppercase tracking-wider">
+                  <span className={`${ADMIN_THEME.cardLabel} text-brand-navy block`}>
                     Expediente Estudiantil • {selectedStudent.rut || 'Sin RUT'}
                   </span>
-                  <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                  <h3 className={ADMIN_THEME.sectionTitle}>
                     {selectedStudent.fullName || selectedStudent.nombre}
                   </h3>
-                  <p className="text-xs text-slate-600">
+                  <p className={ADMIN_THEME.metaText}>
                     {selectedStudent.career || selectedStudent.carrera} • {selectedStudent.email}
                   </p>
                 </div>
@@ -1134,7 +1105,7 @@ export const PaedisCaseManagementSection = ({
                       <span className="text-xs font-black uppercase tracking-wider text-purple-950 block">
                         Capa 1: Expediente Clínico y Confidencial (Ley N° 21.719)
                       </span>
-                      <span className="text-[11px] font-medium text-slate-600 block">
+                      <span className="text-[11px] font-medium text-neutral-600 block">
                         Exclusivo de Coordinación PAEDIS • Resguardo clínico estricto
                       </span>
                     </div>
@@ -1144,73 +1115,51 @@ export const PaedisCaseManagementSection = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   <div>
-                    <label htmlFor="paedis-barrier" className="block text-xs font-bold text-slate-700 mb-1">
+                    <label htmlFor="paedis-barrier" className="block text-xs font-bold text-neutral-700 mb-1">
                       Tipo de Barrera / Necesidad
                     </label>
-                    <select
+                    <Select
                       id="paedis-barrier"
                       value={formState.barreraPaedis}
                       onChange={(e) => setFormState({ ...formState, barreraPaedis: e.target.value })}
-                      className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
-                    >
-                      {BARRIER_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                      options={BARRIER_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+                      className={`w-full ${ADMIN_THEME.controlInput}`}
+                    />
                   </div>
 
                   <div>
-                    <label htmlFor="paedis-accreditation" className="block text-xs font-bold text-slate-700 mb-1">
+                    <label htmlFor="paedis-accreditation" className="block text-xs font-bold text-neutral-700 mb-1">
                       Acreditación Presentada
                     </label>
-                    <select
+                    <Select
                       id="paedis-accreditation"
                       value={formState.acreditacionPaedis}
                       onChange={(e) => setFormState({ ...formState, acreditacionPaedis: e.target.value })}
-                      className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
-                    >
-                      {ACCREDITATION_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="paedis-tutor" className="block text-xs font-bold text-slate-700 mb-1">
-                      Tutor PAEDIS Asignado
-                    </label>
-                    <select
-                      id="paedis-tutor"
-                      value={formState.tutorPaedisAsignado}
-                      onChange={(e) => setFormState({ ...formState, tutorPaedisAsignado: e.target.value })}
-                      className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 bg-white"
-                    >
-                      <option value="Sí">Sí (Tutor PAEDIS asignado)</option>
-                      <option value="No">No (Sin tutor asignado)</option>
-                    </select>
+                      options={ACCREDITATION_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+                      className={`w-full ${ADMIN_THEME.controlInput}`}
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="paedis-diagnosis" className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label htmlFor="paedis-diagnosis" className="block text-xs font-semibold text-neutral-700 mb-1">
                     Diagnóstico o Condición Declarada (Confidencial)
                   </label>
-                  <input
+                  <Input
                     id="paedis-diagnosis"
-                    type="text"
                     value={formState.diagnosticoDeclarado}
                     onChange={(e) =>
                       setFormState({ ...formState, diagnosticoDeclarado: e.target.value })
                     }
                     placeholder="Ej. Baja visión bilateral, Hipoacusia moderada, Condición del espectro autista..."
-                    className="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-white"
+                    className="w-full min-h-[44px] px-3 py-2 border border-neutral-300 rounded-xl text-xs font-medium text-neutral-900 bg-white"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="paedis-notes" className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label htmlFor="paedis-notes" className="block text-xs font-semibold text-neutral-700 mb-1">
                     Bitácora Confidencial de Acompañamiento y Entrevista PAEDIS
                   </label>
                   <textarea
@@ -1221,13 +1170,13 @@ export const PaedisCaseManagementSection = ({
                       setFormState({ ...formState, notasConfidencialesPaedis: e.target.value })
                     }
                     placeholder="Notas de acogida, acuerdos de seguimiento y confidencialidad..."
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900 bg-white resize-none"
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-xs text-neutral-900 bg-white resize-none"
                   />
                 </div>
 
                 {/* Pre-configuración de Accesibilidad Inicial */}
                 <div className="pt-3 border-t border-purple-200/80 space-y-2">
-                  <span className="text-xs font-bold text-slate-800 block">
+                  <span className="text-xs font-bold text-neutral-800 block">
                     Perfil de Accesibilidad Inicial (Pre-activación automática en el inicio de sesión):
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -1236,9 +1185,9 @@ export const PaedisCaseManagementSection = ({
                         type="checkbox"
                         checked={Boolean(formState.voiceReaderByDefault)}
                         onChange={(e) => setFormState({ ...formState, voiceReaderByDefault: e.target.checked })}
-                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                        className="w-4 h-4 text-brand-navy rounded border-neutral-300"
                       />
-                      <span className="font-semibold text-slate-800">Lector de voz al iniciar</span>
+                      <span className="font-semibold text-neutral-800">Lector de voz al iniciar</span>
                     </label>
 
                     <label className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-purple-200 cursor-pointer min-h-[44px]">
@@ -1246,9 +1195,9 @@ export const PaedisCaseManagementSection = ({
                         type="checkbox"
                         checked={Boolean(formState.clearReadingByDefault)}
                         onChange={(e) => setFormState({ ...formState, clearReadingByDefault: e.target.checked })}
-                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                        className="w-4 h-4 text-brand-navy rounded border-neutral-300"
                       />
-                      <span className="font-semibold text-slate-800">Lectura clara y resumida</span>
+                      <span className="font-semibold text-neutral-800">Lectura clara y resumida</span>
                     </label>
 
                     <label className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-purple-200 cursor-pointer min-h-[44px]">
@@ -1256,9 +1205,9 @@ export const PaedisCaseManagementSection = ({
                         type="checkbox"
                         checked={Boolean(formState.highContrastByDefault)}
                         onChange={(e) => setFormState({ ...formState, highContrastByDefault: e.target.checked })}
-                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                        className="w-4 h-4 text-brand-navy rounded border-neutral-300"
                       />
-                      <span className="font-semibold text-slate-800">Alto contraste visual</span>
+                      <span className="font-semibold text-neutral-800">Alto contraste visual</span>
                     </label>
 
                     <label className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-purple-200 cursor-pointer min-h-[44px]">
@@ -1266,26 +1215,26 @@ export const PaedisCaseManagementSection = ({
                         type="checkbox"
                         checked={Boolean(formState.dyslexicFontByDefault)}
                         onChange={(e) => setFormState({ ...formState, dyslexicFontByDefault: e.target.checked })}
-                        className="w-4 h-4 text-[#002B49] rounded border-slate-300"
+                        className="w-4 h-4 text-brand-navy rounded border-neutral-300"
                       />
-                      <span className="font-semibold text-slate-800">Tipografía de lectura cómoda</span>
+                      <span className="font-semibold text-neutral-800">Tipografía de lectura cómoda</span>
                     </label>
                   </div>
                 </div>
               </div>
 
               {/* CAPA 2: AJUSTES RAZONABLES OPERATIVOS (AULA Y EVALUACIÓN - VIGENCIA SEMESTRAL) */}
-              <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 space-y-4 shadow-2xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="p-5 rounded-2xl bg-white border-2 border-neutral-200 space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-blue-100 text-[#002B49]">
+                    <div className="p-1.5 rounded-lg bg-blue-100 text-brand-navy">
                       <BookOpen className="w-4 h-4" aria-hidden="true" />
                     </div>
                     <div>
-                      <span className="text-xs font-black uppercase tracking-wider text-[#002B49] block">
-                        Capa 2: Ajustes Razonables Operativos (Aula &amp; Evaluación)
+                      <span className="text-xs font-black uppercase tracking-wider text-brand-navy block">
+                        Capa 2: Ajustes Razonables Operativos (Aula & Evaluación)
                       </span>
-                      <span className="text-[11px] text-slate-600 font-medium">
+                      <span className="text-[11px] text-neutral-600 font-medium">
                         Medidas pedagógicas sin datos clínicos • Emitidas en Ficha Docente
                       </span>
                     </div>
@@ -1294,12 +1243,12 @@ export const PaedisCaseManagementSection = ({
                   {/* Renovación Semestral con 1 Clic */}
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="text-right">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block">Vigencia</span>
-                      <span className="text-xs font-black text-[#002B49] px-2.5 py-0.5 rounded bg-blue-50 border border-blue-200">
+                      <span className="text-[10px] font-bold text-neutral-500 uppercase block">Vigencia</span>
+                      <span className="text-xs font-black text-brand-navy px-2.5 py-0.5 rounded bg-blue-50 border border-blue-200">
                         {formState.vigenciaSemestrePaedis || '2026-1'}
                       </span>
                     </div>
-                    <button
+                    <Button
                       type="button"
                       disabled={isSaving}
                       onClick={handleRenewSemester}
@@ -1308,7 +1257,7 @@ export const PaedisCaseManagementSection = ({
                     >
                       <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                       <span>Renovar para Siguiente Semestre</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -1325,31 +1274,31 @@ export const PaedisCaseManagementSection = ({
               </div>
 
               {/* BOTONES DE ACCIÓN */}
-              <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                <button
+              <div className="pt-4 border-t border-neutral-200 flex flex-wrap items-center justify-between gap-3">
+                <Button
                   type="button"
                   onClick={() => setIsDocenteModalOpen(true)}
                   {...getVoiceProps('Generar y previsualizar Ficha Docente Confidencial')}
-                  className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-[#002B49] font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 cursor-pointer shadow-2xs"
+                  className="min-h-[44px] px-4 py-2 bg-white hover:bg-neutral-50 border border-neutral-300 text-brand-navy font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 cursor-pointer shadow-2xs"
                 >
-                  <FileText className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+                  <FileText className="w-4 h-4 text-brand-navy" aria-hidden="true" />
                   <span>Generar Ficha Docente ({formState.vigenciaSemestrePaedis || '2026-1'})</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
                   disabled={isSaving}
                   onClick={() => {
                     persistPaedisCase(false).catch((err) => {
-                      console.error('[PaedisCaseManagementSection] Error guardando:', err);
+                      console.error('[PaedisCaseManagement] Error guardando:', err);
                     });
                   }}
                   {...getVoiceProps('Guardar cambios del expediente PAEDIS')}
-                  className="min-h-[44px] px-5 py-2.5 bg-[#002B49] hover:bg-[#001D33] text-white font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+                  className="min-h-[44px] px-5 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
                 >
-                  <Save className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
+                  <Save className="w-4 h-4 text-brand-gold" aria-hidden="true" />
                   <span>{isSaving ? 'Guardando...' : 'Guardar Expediente PAEDIS'}</span>
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -1365,7 +1314,7 @@ export const PaedisCaseManagementSection = ({
         onToggleAck={handleToggleTeacherAck}
         onConfirmNotify={() => {
           persistPaedisCase(true).catch((err) => {
-            console.error('[PaedisCaseManagementSection] Error notificando ficha:', err);
+            console.error('[PaedisCaseManagement] Error notificando ficha:', err);
           });
         }}
         isSaving={isSaving}
@@ -1375,3 +1324,5 @@ export const PaedisCaseManagementSection = ({
     </section>
   );
 };
+
+export default PaedisManagement;

@@ -15,14 +15,14 @@ export const PORTAL_INSC_URL =
 export const TOMA_RAMOS_TUTORIAL_VIDEO = {
   videoId: '2vwT2RCj3FA',
   url: 'https://www.youtube.com/watch?v=2vwT2RCj3FA',
-  embedUrl: 'https://www.youtube-nocookie.com/embed/2vwT2RCj3FA?rel=0',
+  embedUrl: 'https://www.youtube.com/embed/2vwT2RCj3FA?rel=0&modestbranding=1',
   title: 'Inscripción de Asignaturas (Toma de Ramos Oficial Duoc UC)',
   duracion: '3:49 min',
   canal: 'Duoc UC Institucional',
   modificacionVideo: {
     videoId: 'TjOySUq7F3w',
     url: 'https://www.youtube.com/watch?v=TjOySUq7F3w&t=13s',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/TjOySUq7F3w?start=13&rel=0',
+    embedUrl: 'https://www.youtube.com/embed/TjOySUq7F3w?start=13&rel=0&modestbranding=1',
     title: 'Modificación de Asignaturas Duoc UC',
     duracion: '1:50 min',
   },
@@ -819,7 +819,8 @@ const fillPackageCourses = ({ courses, selected, occupiedSlots, limit, filterBlo
       (sec) =>
         !sec.sinCupos &&
         (sec.bloques || []).length > 0 &&
-        isSectionMatchingJornada(sec, jornada)
+        isSectionMatchingJornada(sec, jornada) &&
+        (!filterBlock || sec.bloques.some((b) => filterBlock(b.bloqueId)))
     );
 
     const orderedSections = filterBlock

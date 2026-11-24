@@ -123,4 +123,50 @@ describe('Excel & Markdown Parser Service (excelParserService)', () => {
     assert.ok(sample.periodo === '2026 - 002', 'El periodo debe ser 2026 - 002');
     assert.ok(Array.isArray(sample.bloques), 'Bloques debe ser un arreglo');
   });
+
+  test('7. Conversión de XML (genérico y SpreadsheetML) a Markdown y parseo (xmlToMarkdown)', () => {
+    const genericXml = `<?xml version="1.0" encoding="UTF-8"?>
+<oferta>
+  <curso sede="ALAMEDA" carrera="INGENIERÍA EN INFORMÁTICA">
+    <sigla>ASY4131</sigla>
+    <nombre>ARQUITECTURA DE SISTEMAS</nombre>
+    <seccion>ASY4131-001D</seccion>
+    <horario>Lu 8:31:00 - 9:50:00</horario>
+    <docente>DOCENTE DUOC</docente>
+  </curso>
+</oferta>`;
+    const mdGeneric = excelParser.xmlToMarkdown(genericXml);
+    assert.ok(mdGeneric.includes('| sede | carrera | sigla |'));
+    const parsedGeneric = excelParser.parseMarkdownTable(mdGeneric);
+    assert.strictEqual(parsedGeneric.offerings.length, 1);
+    assert.strictEqual(parsedGeneric.offerings[0].sigla, 'ASY4131');
+
+    const spreadsheetXml = `<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Oferta">
+    <Table>
+      <Row>
+        <Cell><Data ss:Type="String">Sede</Data></Cell>
+        <Cell><Data ss:Type="String">Carrera</Data></Cell>
+        <Cell><Data ss:Type="String">Sigla</Data></Cell>
+        <Cell><Data ss:Type="String">Nombre</Data></Cell>
+        <Cell><Data ss:Type="String">Seccion</Data></Cell>
+        <Cell><Data ss:Type="String">Horario</Data></Cell>
+      </Row>
+      <Row>
+        <Cell><Data ss:Type="String">ALAMEDA</Data></Cell>
+        <Cell><Data ss:Type="String">INGENIERÍA EN INFORMÁTICA</Data></Cell>
+        <Cell><Data ss:Type="String">PGY2121</Data></Cell>
+        <Cell><Data ss:Type="String">ARQUITECTURA CLOUD</Data></Cell>
+        <Cell><Data ss:Type="String">PGY2121-002V</Data></Cell>
+        <Cell><Data ss:Type="String">Ma 19:01:00 - 20:20:00</Data></Cell>
+      </Row>
+    </Table>
+  </Worksheet>
+</Workbook>`;
+    const mdSheet = excelParser.xmlToMarkdown(spreadsheetXml);
+    const parsedSheet = excelParser.parseMarkdownTable(mdSheet);
+    assert.strictEqual(parsedSheet.offerings.length, 1);
+    assert.strictEqual(parsedSheet.offerings[0].sigla, 'PGY2121');
+  });
 });

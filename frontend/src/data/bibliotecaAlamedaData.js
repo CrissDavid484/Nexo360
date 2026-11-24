@@ -14,7 +14,7 @@ export const LIBCAL_ALAMEDA_CONFIG = {
     accessibleBase: 'https://duoc.libcal.com/r/accessible',
     checkin: 'https://duoc.libcal.com/r/checkin',
     consultas: 'https://bibliotecas.duoc.cl',
-    videoTutorial: 'https://www.youtube-nocookie.com/embed/SxU_2BFHVI4?rel=0',
+    videoTutorial: 'https://www.youtube.com/embed/SxU_2BFHVI4?rel=0&modestbranding=1',
     videoWatch: 'https://www.youtube.com/watch?v=SxU_2BFHVI4',
   },
 };
