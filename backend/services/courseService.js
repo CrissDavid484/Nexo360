@@ -20,7 +20,7 @@ try {
  */
 function loadDefaultSeedOfferings() {
   if (Array.isArray(alamedaSeedData) && alamedaSeedData.length > 0) {
-    return [...alamedaSeedData];
+    return alamedaSeedData;
   }
   const fallbackRows = require('../data/seedCourseRows.json');
   return fallbackRows.map((row) => normalizeRowToOffering(row));
@@ -95,7 +95,7 @@ async function fetchMatchingOfferings({ carrera, periodo = '2026 - 002', jornada
     }
   }
 
-  if (carrera) {
+  if (items === inMemoryCourses && carrera) {
     const careerLower = carrera.toLowerCase();
     items = items.filter((it) => (it.carrera || '').toLowerCase().includes(careerLower));
   }

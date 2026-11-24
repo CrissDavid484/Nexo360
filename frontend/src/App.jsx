@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { lazyLoad } from './utils/lazyLoad';
 import { SkipLink } from './components/common/SkipLink';
@@ -19,6 +19,15 @@ const TomaRamosSimulator = lazyLoad(
   () => import('./components/simulation/TomaRamosSimulator'),
   'TomaRamosSimulator'
 );
+
+const TomaRamosRoute = () => {
+  const navigate = useNavigate();
+  return (
+    <ProtectedRoute>
+      <TomaRamosSimulator onExit={() => navigate('/dashboard')} />
+    </ProtectedRoute>
+  );
+};
 
 // Componente para proteger las rutas privadas institucionales
 const ProtectedRoute = ({ children }) => {
@@ -151,14 +160,7 @@ export const App = () => {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/toma-ramos"
-              element={
-                <ProtectedRoute>
-                  <TomaRamosSimulator onExit={() => (window.location.href = '/dashboard')} />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/toma-ramos" element={<TomaRamosRoute />} />
             <Route path="/simulador" element={<Navigate to="/toma-ramos" replace />} />
             <Route path="/simulador-toma-ramos" element={<Navigate to="/toma-ramos" replace />} />
             

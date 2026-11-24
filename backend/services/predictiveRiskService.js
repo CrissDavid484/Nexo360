@@ -11,13 +11,23 @@
 const fs = require('fs');
 const path = require('path');
 
-// Cargar pesos desde configuración externa (hot-reload en cada llamada)
+// Cargar pesos desde configuración externa con caché en memoria (TTL 10s para hot-reload sin sobrecarga de I/O)
+let _cachedWeights = null;
+let _lastWeightsRead = 0;
+
 function loadWeightsConfig() {
+  const now = Date.now();
+  if (_cachedWeights && now - _lastWeightsRead < 10000) {
+    return _cachedWeights;
+  }
   const configPath = path.join(__dirname, '..', 'config', 'predictiveWeights.json');
   try {
     const raw = fs.readFileSync(configPath, 'utf-8');
-    return JSON.parse(raw);
+    _cachedWeights = JSON.parse(raw);
+    _lastWeightsRead = now;
+    return _cachedWeights;
   } catch (err) {
+    if (_cachedWeights) return _cachedWeights;
     console.warn('[predictiveRiskService] No se pudo leer predictiveWeights.json, usando defaults:', err.message);
     return {
       weights: { attendance: 0.45, paedis: 0.20, simulator: 0.15, trend: 0.10, load: 0.10 },
