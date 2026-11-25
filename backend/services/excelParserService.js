@@ -414,22 +414,22 @@ function stripTagsAndClean(raw) {
 }
 
 function parseSpreadsheetMlRows(xml) {
-  const rowMatches = xml.match(/<(?:[a-zA-Z0-9_-]+:)?Row\b[^>]*>[\s\S]*?<\/(?:[a-zA-Z0-9_-]+:)?Row>/gi);
+  const rowMatches = xml.match(/<(?:\w+:)?Row\b[^>]*>[\s\S]*?<\/(?:\w+:)?Row>/gi);
   if (!rowMatches || rowMatches.length === 0) return null;
 
   const matrix = [];
   for (const rowXml of rowMatches) {
     const row = [];
-    const cellRegex = /<(?:[a-zA-Z0-9_-]+:)?Cell\b([^>]*)>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?Cell>/gi;
+    const cellRegex = /<(?:\w+:)?Cell\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?Cell>/gi;
     let cellMatch;
     while ((cellMatch = cellRegex.exec(rowXml)) !== null) {
       const attrs = cellMatch[1] || '';
-      const idxAttr = attrs.match(/(?:[a-zA-Z0-9_-]+:)?Index=["'](\d+)["']/i);
+      const idxAttr = attrs.match(/(?:\w+:)?Index=["'](\d+)["']/i);
       if (idxAttr) {
         const targetIdx = Math.max(0, Number.parseInt(idxAttr[1], 10) - 1);
         while (row.length < targetIdx) row.push('');
       }
-      const dataMatch = cellMatch[2].match(/<(?:[a-zA-Z0-9_-]+:)?Data\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?Data>/i);
+      const dataMatch = cellMatch[2].match(/<(?:\w+:)?Data\b[^>]*>([\s\S]*?)<\/(?:\w+:)?Data>/i);
       row.push(stripTagsAndClean(dataMatch ? dataMatch[1] : cellMatch[2]));
     }
     if (row.some((v) => v !== '')) matrix.push(row);
@@ -439,7 +439,7 @@ function parseSpreadsheetMlRows(xml) {
 
 function extractXmlAttributes(attrString) {
   const result = {};
-  const attrRegex = /([a-zA-Z_][\w:.-]*)\s*=\s*["']([^"']*)["']/g;
+  const attrRegex = /([a-zA-Z_][\w.-]*)\s*=\s*["']([^"']*)["']/g;
   let m;
   while ((m = attrRegex.exec(attrString || '')) !== null) {
     const key = m[1].includes(':') ? m[1].split(':').pop() : m[1];

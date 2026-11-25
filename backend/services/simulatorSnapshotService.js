@@ -252,7 +252,7 @@ function buildCareerBreakdown(students) {
 }
 
 function resolveWeekBucketIndex(rawDate, nowMs) {
-  const parsed = rawDate ? new Date(rawDate).getTime() : NaN;
+  const parsed = rawDate ? new Date(rawDate).getTime() : Number.NaN;
   if (!Number.isFinite(parsed)) return 0;
   const diffDays = Math.max(0, Math.floor((nowMs - parsed) / 86400000));
   const weeksAgo = Math.floor(diffDays / 7);

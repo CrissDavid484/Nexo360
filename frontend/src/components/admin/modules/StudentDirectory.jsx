@@ -560,7 +560,7 @@ export const StudentDirectory = ({
       const sede = (s.campus || s.sede || '').toUpperCase().trim();
       if (sede) sedes.add(sede);
     });
-    return [{ id: 'all', label: 'Todas' }, ...Array.from(sedes).sort().map((s) => ({ id: s, label: s }))];
+    return [{ id: 'all', label: 'Todas' }, ...Array.from(sedes).sort((a, b) => a.localeCompare(b)).map((s) => ({ id: s, label: s }))];
   }, [students]);
 
   const YEAR_FILTERS = useMemo(() => [{ id: 'all', label: 'Todos' }], []);
@@ -621,7 +621,8 @@ export const StudentDirectory = ({
         })
         .filter((s) => {
           if (filterYear === 'all') return true;
-          return true;
+          const studentYear = s.year || s.nivel || s.ano || '';
+          return String(studentYear) === String(filterYear);
         })
         .sort((a, b) => {
           const nameA = (a.fullName || a.nombre || a.email || '').trim();
@@ -742,7 +743,7 @@ export const StudentDirectory = ({
         <div className="flex flex-wrap items-center gap-2 border-b border-neutral-100 pb-4" role="group" aria-label="Filtrar usuarios">
           {userSegment === 'students' && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <label className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Estado:</label>
+              <span className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Estado:</span>
               <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrar por estado académico">
                 {STUDENT_STATUS_FILTERS.map((f) => (
                   <Button
@@ -763,8 +764,9 @@ export const StudentDirectory = ({
 
           {/* Sede - Select */}
           <div className="flex items-center gap-1.5">
-            <label className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Sede:</label>
+            <label htmlFor="student-filter-sede" className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Sede:</label>
             <select
+              id="student-filter-sede"
               value={filterSede}
               onChange={(e) => setFilterSede(e.target.value)}
               {...getVoiceProps('Filtrar usuarios por sede')}
@@ -780,8 +782,9 @@ export const StudentDirectory = ({
           {userSegment === 'students' && (
             <>
               <div className="flex items-center gap-1.5">
-                <label className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Carrera:</label>
+                <label htmlFor="student-filter-career" className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Carrera:</label>
                 <select
+                  id="student-filter-career"
                   value={filterCareer}
                   onChange={(e) => setFilterCareer(e.target.value)}
                   {...getVoiceProps('Filtrar estudiantes por carrera')}
@@ -796,8 +799,9 @@ export const StudentDirectory = ({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <label className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Año:</label>
+                <label htmlFor="student-filter-year" className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Año:</label>
                 <select
+                  id="student-filter-year"
                   value={filterYear}
                   onChange={(e) => setFilterYear(e.target.value)}
                   {...getVoiceProps('Filtrar estudiantes por año')}

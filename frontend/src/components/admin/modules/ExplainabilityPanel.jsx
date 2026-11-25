@@ -89,11 +89,14 @@ export const ExplainabilityPanel = ({
       aria-modal="true"
       aria-labelledby="explainability-title"
       className="fixed inset-0 z-50 flex items-center justify-end bg-neutral-900/60 backdrop-blur-sm animate-fade-in"
-      onClick={() => onClose()}
     >
       <div
+        className="fixed inset-0 -z-10"
+        aria-hidden="true"
+        onClick={onClose}
+      />
+      <div
         className="w-full max-w-xl lg:max-w-2xl h-full bg-white rounded-tl-3xl rounded-bl-3xl shadow-2xl border-l border-neutral-200 flex flex-col animate-slide-in-right"
-        onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between p-6 border-b border-neutral-100 sticky top-0 bg-white z-10 rounded-tl-3xl">
           <div className="flex items-center gap-3">

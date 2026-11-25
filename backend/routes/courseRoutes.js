@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const courseService = require('../services/courseService');
 const adminController = require('../controllers/adminController');
-const { optionalToken, verifyToken, requireAdminOrCoordinator } = require('../middleware/authMiddleware');
+const { optionalToken, verifyToken, requireAdmin, requireAdminOrCoordinator } = require('../middleware/authMiddleware');
 
 router.use(optionalToken);
 
@@ -71,8 +71,8 @@ router.get('/careers', async (req, res) => {
 
 /**
  * POST /api/courses/import
- * Soporte de carga e importación para administradores y coordinadores PAEDIS
+ * Soporte de carga e importación exclusivo para administradores
  */
-router.post('/import', verifyToken, requireAdminOrCoordinator, adminController.importCourses);
+router.post('/import', verifyToken, requireAdmin, adminController.importCourses);
 
 module.exports = router;

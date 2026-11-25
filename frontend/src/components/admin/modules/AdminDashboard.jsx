@@ -298,6 +298,7 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
           return (
             <div
               key={item.career}
+              role="button"
               tabIndex={0}
               onMouseEnter={() => setHoveredIndex(idx)}
               onMouseLeave={() => setHoveredIndex(null)}

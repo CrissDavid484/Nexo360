@@ -36,17 +36,17 @@ function escapeHtml(text) {
 function sanitizeArticleHtml(html) {
   if (typeof html !== 'string') return '';
   return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<script\b[^>]*\/?>/gi, '')
     .replace(/<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g, (_tag, tagName, attrs) => {
       const cleanAttrs = attrs
-        .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/gi, '')
+        .replace(/\s+on[a-z]+=(?:"[^"]*"|'[^']*'|\S+)/gi, '')
         .replace(
-          /\s+(href|src|action|formaction|xlink:href)\s*=\s*(["'])\s*(?:j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t|vbscript|data:text\/html)\s*:[^"']*\2/gi,
+          /\s+(href|src|action|formaction|xlink:href)=(["'])\s*(?:javascript|vbscript|data:text\/html):[^"']*\2/gi,
           ' $1=$2#$2'
         )
         .replace(
-          /\s+(href|src|action|formaction|xlink:href)\s*=\s*(?:j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t|vbscript|data:text\/html)\s*:[^\s>]+/gi,
+          /\s+(href|src|action|formaction|xlink:href)=(?:javascript|vbscript|data:text\/html):[^\s>]+/gi,
           ' $1="#"'
         );
       return `<${tagName}${cleanAttrs}>`;
@@ -62,11 +62,11 @@ function normalizeEmbeddedYouTubeHtml(html) {
     /<iframe\b([^>]*)>(\s*<\/iframe>)?/gi,
     (_fullTag, rawAttrs, closingTag) => {
       const isSelfClosing = !closingTag && /\/\s*$/.test(rawAttrs);
-      let updatedAttrs = rawAttrs.replace(/\s*\/\s*$/, '');
+      let updatedAttrs = rawAttrs.replace(/\/\s*$/, '').trimEnd();
       let watchUrl = '';
 
       updatedAttrs = updatedAttrs.replace(
-        /src=(["'])(?:https?:)?\/\/(?:www\.)?(?:youtube-nocookie|youtube)\.com\/embed\/([A-Za-z0-9_-]+)([^"']*)\1/i,
+        /src=(["'])(?:https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]+)([^"']*)\1/i,
         (_match, quote, videoId, query) => {
           let cleanQuery = query || '';
           if (!/[?&]rel=/.test(cleanQuery)) {
@@ -498,7 +498,7 @@ export const ModuleModal = ({
                     // Detectar si la línea ya empieza con número
                     const match = line.match(/^(\d+)[\.\:\)]\s*(.*)/);
                     if (match) {
-                      return { number: parseInt(match[1]), text: match[2] };
+                      return { number: Number.parseInt(match[1], 10), text: match[2] };
                     }
                     // Si no tiene número, asignar secuencialmente
                     return { text: line };

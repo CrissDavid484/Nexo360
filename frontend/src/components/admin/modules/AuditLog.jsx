@@ -142,7 +142,7 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
         if (!actorStr.includes(actorFilter)) return false;
       }
       if (fromTime || toTime) {
-        const t = entry.createdAt ? new Date(entry.createdAt).getTime() : NaN;
+        const t = entry.createdAt ? new Date(entry.createdAt).getTime() : Number.NaN;
         if (Number.isFinite(t)) {
           if (fromTime && t < fromTime) return false;
           if (toTime && t > toTime) return false;

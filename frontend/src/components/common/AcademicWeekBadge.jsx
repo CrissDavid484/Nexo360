@@ -41,14 +41,18 @@ export const AcademicWeekBadge = ({ compact = false, className = '' }) => {
 
   useEffect(() => {
     let mounted = true;
-    fetchAcademicWeekOnce().then((data) => {
-      if (mounted && data) setStatus(data);
-    });
+    fetchAcademicWeekOnce()
+      .then((data) => {
+        if (mounted && data) setStatus(data);
+      })
+      .catch(() => {});
 
     const handleRefresh = () => {
-      fetchAcademicWeekOnce(false).then((data) => {
-        if (mounted && data) setStatus(data);
-      });
+      fetchAcademicWeekOnce(false)
+        .then((data) => {
+          if (mounted && data) setStatus(data);
+        })
+        .catch(() => {});
     };
 
     window.addEventListener('nexo360:calendar-updated', handleRefresh);

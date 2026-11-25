@@ -767,7 +767,7 @@ class AuthService {
           total,
           page: safePage,
           limit: safeLimit,
-          actions: distinctActions.filter(Boolean).sort(),
+          actions: distinctActions.filter(Boolean).sort((a, b) => a.localeCompare(b)),
         };
       } catch {
         console.warn('[AuthService] Fallback a memoria consultando ActivityLog.');
@@ -777,7 +777,7 @@ class AuthService {
     const allLogs = this.getRecentLogs(inMemoryLogs.length || IN_MEMORY_LOG_CAP);
     const actions = Array.from(
       new Set(allLogs.map((entry) => entry.action).filter(Boolean))
-    ).sort();
+    ).sort((a, b) => a.localeCompare(b));
     const searchRx = escapedQ ? new RegExp(escapedQ, 'i') : null;
     const filtered = allLogs.filter((entry) => {
       if (safeAction && entry.action !== safeAction) return false;

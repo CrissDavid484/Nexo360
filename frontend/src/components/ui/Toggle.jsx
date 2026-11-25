@@ -68,6 +68,7 @@ export const Toggle = React.forwardRef(
               borderColor: checked ? '#002B49' : '#CBD5E1',
             }}
           >
+            <span className="sr-only">{label || 'Interruptor'}</span>
             <span
               className={`transition-transform duration-200 rounded-full bg-white shadow-sm ${thumbSizeStyles[size]} ${
                 checked ? 'translate-x-full' : 'translate-x-0'

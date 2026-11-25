@@ -187,8 +187,8 @@ function buildRegistrationPayload({ form, careerQuery, customDomain = '', custom
   };
 
   if (isStudent && form.attendanceRate !== undefined && form.attendanceRate !== '') {
-    const parsedRate = parseFloat(form.attendanceRate);
-    if (!isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 100) {
+    const parsedRate = Number.parseFloat(form.attendanceRate);
+    if (!Number.isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 100) {
       payload.attendanceRate = parsedRate;
     }
   }
@@ -867,10 +867,10 @@ export const RegisterUserModal = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700">
+                  <span id="custom-domain-role-label" className="text-xs font-semibold text-slate-700 block">
                     <span className="text-red-600">*</span> ¿Estudiante o Administrativo?
-                  </label>
-                  <div className="grid grid-cols-2 gap-2" role="group" aria-label="Tipo de usuario para dominio personalizado">
+                  </span>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="custom-domain-role-label">
                     <button
                       type="button"
                       role="radio"

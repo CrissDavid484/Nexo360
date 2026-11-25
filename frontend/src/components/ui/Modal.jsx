@@ -83,7 +83,6 @@ export const Modal = React.forwardRef(
           ref={setCombinedRef}
           tabIndex={-1}
           className={`relative z-10 w-full ${sizeStyles[size]} max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-neutral-200 animate-scale-in overflow-hidden ${className}`}
-          onClick={(e) => e.stopPropagation()}
           {...props}
         >
           {(title || showClose) && (

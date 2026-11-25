@@ -131,7 +131,7 @@ export const CatalogEntitiesPanel = ({ canManage, requestConfirm, notify }) => {
 
   const loadAll = useCallback(async () => {
     setIsLoading(true);
-    const results = await Promise.allSettled(Object.keys(ENTITY_KINDS).map(loadKind));
+    const results = await Promise.allSettled(Object.keys(ENTITY_KINDS).map((kind) => loadKind(kind)));
     results.forEach((r) => {
       if (r.status === 'rejected') console.warn('[CatalogEntitiesPanel] Error cargando listado:', r.reason);
     });

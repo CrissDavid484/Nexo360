@@ -643,7 +643,7 @@ function generateSimulatedStudentCourses(career = '', inputRate = null) {
     ];
   }
 
-  const targetRate = typeof inputRate === 'number' && !isNaN(inputRate) && inputRate >= 0 && inputRate <= 100
+  const targetRate = typeof inputRate === 'number' && !Number.isNaN(inputRate) && inputRate >= 0 && inputRate <= 100
     ? inputRate
     : 88.9;
 
@@ -718,7 +718,7 @@ function buildNewUserDocument({
     : [];
   let calculatedAttendance = typeof body.attendanceRate === 'number'
     ? body.attendanceRate
-    : (parseFloat(body.attendanceRate) || 88.9);
+    : (Number.parseFloat(body.attendanceRate) || 88.9);
 
   if (isStudentRole && initialCourses.length === 0) {
     const generated = generateSimulatedStudentCourses(selectedCareer, calculatedAttendance);
