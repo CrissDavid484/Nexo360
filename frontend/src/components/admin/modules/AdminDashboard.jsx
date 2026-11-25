@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
 import {
   Users,
   HeartHandshake,
@@ -209,6 +209,8 @@ const DonutChart = ({ data, colors, size = 184, strokeWidth = 28, getVoiceProps 
 
 const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [mousePos, setMousePos] = useState(null);
+  const containerRef = useRef(null);
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -224,8 +226,53 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
 
   const hoveredItem = hoveredIndex !== null ? sortedItems[hoveredIndex] : null;
 
+  const handleMouseMove = useCallback((e) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setMousePos({
+      x,
+      y,
+      containerWidth: rect.width,
+      containerHeight: rect.height,
+    });
+  }, []);
+
+  const tooltipWidth = mousePos
+    ? Math.min(480, Math.max(280, mousePos.containerWidth - 24))
+    : 480;
+  const halfWidth = tooltipWidth / 2;
+  const minLeft = halfWidth + 8;
+  const maxLeft = mousePos ? Math.max(minLeft, mousePos.containerWidth - halfWidth - 8) : minLeft;
+  const left = mousePos ? Math.min(Math.max(mousePos.x, minLeft), maxLeft) : 0;
+  const isBelow = mousePos ? mousePos.y < 130 : false;
+  const caretOffset = mousePos
+    ? Math.min(Math.max(mousePos.x - left, -halfWidth + 24), halfWidth - 24)
+    : 0;
+
+  const tooltipStyle = mousePos
+    ? {
+        left: `${left}px`,
+        top: isBelow ? `${mousePos.y + 16}px` : `${mousePos.y - 12}px`,
+        transform: isBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+        width: `${tooltipWidth}px`,
+      }
+    : {
+        left: '50%',
+        top: '28px',
+        transform: 'translateX(-50%)',
+        width: 'min(480px, calc(100% - 24px))',
+      };
+
   return (
     <div
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => {
+        setHoveredIndex(null);
+        setMousePos(null);
+      }}
       {...getVoiceProps(
         `Matrícula Sede Alameda por carrera: ${sortedItems
           .filter((i) => i.total > 0)
@@ -249,12 +296,26 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
         </div>
       </div>
 
-      {/* Globo flotante de información (Absolute Popover sin desplazar layout ni provocar parpadeo) */}
+      {/* Globo flotante dinámico interactivo (sigue la posición del cursor sin parpadeo) */}
       {hoveredItem && (
         <div
           role="tooltip"
-          className="pointer-events-none absolute top-7 left-2 right-2 sm:left-4 sm:right-4 z-30 p-3.5 rounded-2xl bg-[#002B49]/95 dark:bg-slate-900/95 text-white backdrop-blur-md shadow-2xl text-xs space-y-2 border border-sky-400/40 dark:border-sky-500/40 animate-fade-in"
+          className="pointer-events-none absolute z-40 p-3.5 rounded-2xl bg-[#002B49]/95 dark:bg-slate-900/95 text-white backdrop-blur-md shadow-2xl text-xs space-y-2 border border-sky-400/40 dark:border-sky-500/40 transition-[top,left] duration-75 ease-out animate-fade-in"
+          style={tooltipStyle}
         >
+          {/* Flecha/indicador visual apuntando hacia el cursor */}
+          {mousePos && (
+            <div
+              className={`absolute w-3 h-3 bg-[#002B49] dark:bg-slate-900 rotate-45 ${
+                isBelow
+                  ? '-top-1.5 border-l border-t border-sky-400/40 dark:border-sky-500/40'
+                  : '-bottom-1.5 border-r border-b border-sky-400/40 dark:border-sky-500/40'
+              }`}
+              style={{ left: `calc(50% + ${caretOffset}px - 6px)` }}
+              aria-hidden="true"
+            />
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/15 pb-1.5">
             <div>
               <p className="font-black text-sm leading-tight text-white">{hoveredItem.career}</p>
@@ -289,7 +350,13 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
       )}
 
       {/* Horizontal bars list */}
-      <div className="nexo-print-expand max-h-[340px] overflow-y-auto pr-1 space-y-2">
+      <div
+        className="nexo-print-expand max-h-[340px] overflow-y-auto pr-1 space-y-2"
+        onScroll={() => {
+          setHoveredIndex(null);
+          setMousePos(null);
+        }}
+      >
         {sortedItems.map((item, idx) => {
           const paedisPct = (item.paedisTotal / maxTotal) * 100;
           const regularPct = (item.regularTotal / maxTotal) * 100;
@@ -300,10 +367,23 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
               key={item.career}
               role="button"
               tabIndex={0}
-              onMouseEnter={() => setHoveredIndex(idx)}
-              onMouseLeave={() => setHoveredIndex(null)}
-              onFocus={() => setHoveredIndex(idx)}
-              onBlur={() => setHoveredIndex(null)}
+              onMouseEnter={(e) => {
+                setHoveredIndex(idx);
+                handleMouseMove(e);
+              }}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={() => {
+                setHoveredIndex(null);
+                setMousePos(null);
+              }}
+              onFocus={() => {
+                setHoveredIndex(idx);
+                setMousePos(null);
+              }}
+              onBlur={() => {
+                setHoveredIndex(null);
+                setMousePos(null);
+              }}
               className={`grid grid-cols-[minmax(110px,42%)_1fr_36px] items-center gap-3 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-gold ${
                 isHovered
                   ? 'bg-blue-50/90 dark:bg-blue-900/30'

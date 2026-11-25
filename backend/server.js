@@ -34,24 +34,43 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configuración CORS estricta para desarrollo local y contenedores Docker
-const allowedOrigins = [
+// Configuración CORS para desarrollo local, Render y Cloudflare Pages
+const rawFrontendOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_CONTAINER_URL,
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5174',
-].filter(Boolean);
+]
+  .filter(Boolean)
+  .flatMap((entry) => entry.split(',').map((u) => u.trim().replace(/\/+$/, '')))
+  .filter(Boolean);
+
+const allowedOrigins = [...new Set(rawFrontendOrigins)];
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Permitir peticiones same-origin o herramientas internas sin cabecera Origin
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+
+      let isPagesDev = false;
+      try {
+        const { hostname } = new URL(normalizedOrigin);
+        isPagesDev = hostname.endsWith('.pages.dev');
+      } catch {
+        isPagesDev = false;
+      }
+
       if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        (process.env.NODE_ENV !== 'production' && origin.endsWith(':5173'))
+        allowedOrigins.includes(normalizedOrigin) ||
+        isPagesDev ||
+        (process.env.NODE_ENV !== 'production' && normalizedOrigin.endsWith(':5173'))
       ) {
         return callback(null, true);
       }
