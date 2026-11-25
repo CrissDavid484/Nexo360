@@ -44,3 +44,14 @@ playwright-report/
 # Antigravity y herramientas locales de agentes
 .agents/
 .gitattributes
+
+# Dependencias locales de herramientas en raíz (Playwright)
+/package.json
+/package-lock.json
+
+# Herramientas de análisis y guías internas
+/sonar-project.properties
+/DEPLOY_VPS.md
+
+# Scripts utilitarios puntuales
+backend/scripts/syncPasswords.js
