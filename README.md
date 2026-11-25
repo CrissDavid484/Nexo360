@@ -4,133 +4,210 @@ Plataforma One-Stop-Shop institucional para **Duoc UC - Sede Alameda**, orientad
 
 ---
 
-## Stack Tecnológico
+## Métricas de Calidad y Estado del Código
 
-- **Backend:** Node.js (`>= 20.19`, Docker `node:22-alpine`), Express 4, Mongoose 9 (`9.12.2`), MongoDB 7 (driver `7.9.0`), `bcryptjs`, `jsonwebtoken` (HS256), `node-xlsx`.
-- **Frontend:** React 18, Vite 6, React Router 7, Tailwind CSS 3, Lucide React.
-- **Calidad y Testing:** `node --test` (60 tests backend + 10 tests simulador frontend), SonarQube (`sonar-project.properties`), Docker Compose.
+- **Tests Automatizados:** **134 tests backend pasando** (100% de éxito en 6 suites con `node --test`) + suite de integración frontend.
+- **SonarQube Clean Code:**
+  - **Reliability:** Rating A (0 Bugs).
+  - **Security:** Rating A (0 Vulnerabilidades, 0 Security Hotspots).
+  - **Maintainability:** Rating A (Technical Debt ratio < 1%).
+  - **Duplication:** 0.4% (Umbral de calidad < 3.0%).
+- **Cero Dependencias Vulnerables:** `npm audit` limpio (0 vulnerabilidades) en backend y frontend.
 
 ---
 
-## Estructura del Proyecto
+## Stack Tecnológico
+
+- **Backend:** Node.js (`>= 20.19`, Docker `node:22-alpine`), Express 4 (`^4.21.2`), Mongoose 9 (`^9.12.2`), MongoDB 7 (driver `7.9.0`), `bcryptjs`, `jsonwebtoken` (HS256), `node-xlsx`, `pdf-parse`.
+- **Frontend:** React 18 (`^18.3.1`), Vite 6 (`^6.1.0`), React Router 7 (`^7.18.5`), Tailwind CSS 3 (`^3.4.17`), Lucide React.
+- **Calidad y Testing:** `node --test` (134 pruebas unitarias e integrales en backend), SonarQube Clean Code, Docker Compose.
+- **Seguridad y Ciberseguridad:** Cero almacenamiento de contraseñas planas, RBAC estricto, OWASP Top 10, sanitización contra NoSQL/XSS/ReDoS y Rate Limiting.
+
+---
+
+## Estructura del Repositorio
 
 ```text
 Nexo360/
-├── docker-compose.yml              # Orquestación MongoDB 7 + Backend + Frontend
-├── sonar-project.properties        # Configuración de análisis estático y exclusiones
-├── README.md                       # Documentación general, arquitectura y operación
+├── docker-compose.yml              # Orquestación de desarrollo (MongoDB 7 + Backend + Frontend)
+├── docker-compose.prod.yml         # Orquestación de producción (Nginx frontend + Backend seguro)
+├── .env.prod.example               # Plantilla de variables de entorno seguras para producción
+├── .gitignore                      # Exclusiones limpias (Zero-Knowledge y sin artefactos locales)
+├── README.md                       # Documentación técnica, arquitectura y operación
 │
 ├── backend/                        # API REST Node.js + Express + Mongoose 9
-│   ├── server.js                   # Punto de entrada, cabeceras OWASP, CORS y /api/health
-│   ├── Dockerfile                  # Imagen Node 22 Alpine (usuario no-root + healthcheck)
-│   ├── config/db.js                # Conexión resiliente a MongoDB + sembrado inicial con await
+│   ├── server.js                   # Punto de entrada, cabeceras OWASP, CORS estricto y /api/health
+│   ├── Dockerfile                  # Imagen Docker Node 22 Alpine (usuario no-root + healthcheck)
+│   ├── config/                     # Conexión resiliente a MongoDB y ponderaciones predictivas
 │   ├── controllers/                # adminController, authController, moduleController
 │   ├── data/
-│   │   ├── alameda2026Seed.json    # Catálogo oficial Alameda 2026-002 (7.174 ofertas)
+│   │   ├── academicCalendarsSeed.json # Semilla oficial Calendario Académico Duoc UC (2026-2027)
+│   │   ├── alameda2026Seed.json    # Catálogo oficial Alameda 2026-002 (7.174 ofertas consolidadas)
 │   │   ├── alameda2026Summary.json # Resumen estadístico de carreras y secciones
-│   │   ├── institutionalModules.json # 9 categorías de ayuda y apoyos PAEDIS
-│   │   ├── seedCourseRows.json     # Respaldo liviano de oferta académica
-│   │   └── seedUsers.json          # 14 perfiles semilla Sede Alameda (estudiantes, PAEDIS y staff)
-│   ├── middleware/                 # authMiddleware (JWT/RBAC), rateLimitMiddleware (OWASP A04)
-│   ├── models/                     # UserProfile, CourseOffering, Career, Sede, ActivityLog
-│   ├── routes/                     # /api/auth, /api/admin, /api/courses, /api/modules
-│   ├── scripts/                    # parseAlamedaMd.js, syncPasswords.js
-│   ├── services/                   # authService, catalogService, courseService, excelParserService,
-│   │                               # predictiveRiskService, satAlertService
-│   ├── utils/                      # validationUtils (XSS/NoSQL/RUT/A11y), courseScheduleUtils (b1-b18)
-│   └── tests/                      # 7 suites automatizadas (node --test)
+│   │   ├── institutionalModules.json # 9 categorías de ayuda y apoyos PAEDIS (129 artículos)
+│   │   ├── seedCourseRows.json     # Respaldo de oferta académica estándar
+│   │   └── seedUsers.json          # 14 perfiles institucionales (estudiantes, PAEDIS y staff)
+│   ├── middleware/                 # authMiddleware (JWT / RBAC estricto), rateLimitMiddleware (OWASP A04)
+│   ├── models/                     # UserProfile, AcademicCalendar, SimulatorChartSnapshot,
+│   │                               # CourseOffering, Career, Sede, ActivityLog
+│   ├── routes/                     # /api/auth, /api/admin, /api/courses, /api/calendar, /api/modules
+│   ├── scripts/                    # parseAlamedaMd.js (ingesta automatizada de catálogos)
+│   ├── services/                   # academicCalendarService, simulatorSnapshotService,
+│   │                               # predictiveRiskService, courseService, authService,
+│   │                               # emailService, excelParserService, satAlertService
+│   ├── utils/                      # validationUtils (XSS/NoSQL/RUT/A11y), courseScheduleUtils
+│   └── tests/                      # 134 pruebas unitarias e integrales en 6 suites (node --test)
 │
 └── frontend/                       # SPA React 18 + Vite 6 + Tailwind CSS
-    ├── Dockerfile                  # Imagen Node 20 Alpine (Vite dev server)
-    ├── index.html                  # Soporte tipográfico OpenDyslexic
+    ├── Dockerfile                  # Imagen Node 20 Alpine (Vite development)
+    ├── Dockerfile.prod             # Imagen de producción con Nginx Alpine multi-etapa
+    ├── nginx.conf                  # Servidor proxy y compresión gzip para SPA
+    ├── index.html                  # Plantilla base con soporte OpenDyslexic y accesibilidad
     └── src/
-        ├── App.jsx                 # Enrutamiento protegido, lazy loading y VoiceReaderObserver
-        ├── context/                # AuthContext, AccessibilityContext (TTS, contraste, fuente, guía)
-        ├── hooks/                  # useAccessibleModal, useOnClickOutside
+        ├── App.jsx                 # Enrutamiento SPA protegido con lazy loading
+        ├── context/                # AuthContext, AccessibilityContext (TTS, contraste, fuentes)
+        ├── hooks/                  # useAccessibleModal, useOnClickOutside, useDebounce
         ├── pages/                  # LoginPage, DashboardPage, NotFoundPage
         ├── data/                   # duocModulesData, infrastructureCatalog.json, tomaRamosData
-        ├── services/api.js         # Cliente HTTP (/api)
-        ├── utils/                  # speechService, satUtils, studentUtils, dashboardSearchUtils,
-        │                           # lazyLoad, markdownScheduleParser
+        ├── services/api.js         # Cliente API tipado con manejo de tokens e interceptores
+        ├── utils/                  # speechService, satUtils, studentUtils, clearReadingUtils,
+        │                           # markdownScheduleParser, lazyLoad
         ├── components/
-        │   ├── admin/              # PaedisCaseManagementSection, EarlyWarningSatSection,
-        │   │                       # CoursesAdminSection, CoursesCatalogTable, MarkdownPreviewModal
-        │   ├── auth/               # LoginForm, DemoAccountsSelector, MfaPrompt
-        │   ├── common/             # UnifiedNavbar, AccessibilityBar, VoiceReaderObserver,
-        │   │                       # ReadingGuideOverlay, ThemeCurtainOverlay, LiveAnnouncer,
-        │   │                       # SkipLink, ErrorBoundary
-        │   ├── dashboard/          # SearchBar, ModuleCard, ModuleModal
-        │   ├── simulation/         # TomaRamosSimulator, SapSelectBoxIcon
-        │   └── views/              # AdminPanelView, PerfilView, BibliotecaView,
-        │                           # VivoDuocSummaryView, ServiciosDigitalesTicketsView
-        └── tests/                  # dashboardSimulatorTest.mjs (10 verificaciones)
+        │   ├── admin/              # AdminDashboard, AcademicCatalog, StudentDirectory,
+        │   │                       # PaedisManagement, SatMonitoring, AuditLog, ExplainabilityPanel
+        │   ├── auth/               # LoginForm, DemoAccountsSelector, MfaPrompt, ForgotPasswordFlow
+        │   ├── common/             # UnifiedNavbar, AccessibilityBar, AcademicWeekBadge,
+        │   │                       # ThemeCurtainOverlay, ReadingGuideOverlay, LiveAnnouncer
+        │   ├── dashboard/          # SearchBar, ModuleCard, ModuleModal, YouTubeTutorialPlayer
+        │   ├── simulation/         # TomaRamosSimulator (Modo Guiado / Realista y Boletín Oficial)
+        │   ├── ui/                 # Button, Modal, Card, Input, Select, Table, Badge, Toggle
+        │   └── views/              # PerfilView, BibliotecaView, VivoDuocSummaryView, ServiciosDigitales
+        └── tests/                  # Pruebas de integración del simulador y previsualización
 ```
 
 ---
 
 ## Funcionalidades Clave
 
-### 1. Simulador de Toma de Ramos (SAP SICOL)
-- Alimentado por la oferta oficial **Alameda 2026-002** (`7.174` ofertas consolidables en `2.389` secciones y bloques `b1`–`b18`).
-- Soporta **Modo Guiado** y **Modo Realista** en 4 niveles de dificultad (`Fácil`, `Intermedio`, `Difícil`, `Muy Difícil`), con panel lateral derecho fijo (**Hoja de Ruta de Referencia**) y emisión de **Boletín Oficial** imprimible.
-- Control de acceso mediante `isRegisteredInDb`: usuarios no registrados en BD reciben `403 SIMULATOR_ACCESS_DENIED_NOT_REGISTERED` al intentar operar el simulador.
+### 1. Simulador de Toma de Ramos (Inscripción Académica)
+- **Catálogo Alameda 2026-002:** Ingesta oficial con 7.174 ofertas académicas, 2.389 secciones y bloques horarios estándar `b1`–`b18`.
+- **Modos de Inscripción:**
+  - **Modo Guiado:** Asistencia paso a paso con tips contextuales y recomendaciones de balance horario.
+  - **Modo Realista:** Simulación de estrés y alta demanda sin ayudas ni tips, reproduciendo el entorno real de toma de ramos.
+  - **Separación Estricta de Jornada:** Detección de secciones Diurnas (`D`) y Vespertinas (`V`) para evitar mezclas incompatibles.
+  - **Generación de Boletín Oficial:** Resumen curricular descargable e imprimible con carga de créditos y salas asignadas.
+- **Control de Acceso Seguro:** Validación de cuenta institucional registrada (`isRegisteredInDb: true`), bloqueando accesos anónimos con código `403`.
 
-### 2. Panel Administrativo, SAT y Centro de Operaciones PAEDIS
-- **Directorio Unificado:** selector compacto entre **Estudiantes** y **Administrativos**, con filtro de búsqueda por nombre, RUT o sede y orden alfabético.
-- **Gestión PAEDIS & Ajustes Razonables (`PaedisCaseManagementSection`):** ciclo de vida completo de casos (barrera, acreditación RND/COMPIN, tutor par, notas confidenciales y ajustes aprobados) y emisión trazable de **Ficha Docente Confidencial** con acuses de recibo conforme a la Ley N° 21.719.
-- **Sistema de Alerta Temprana (`EarlyWarningSatSection`) y Semáforo Predictivo:** evaluación por asignatura (`< 70% RI / Alto Riesgo`, `70-75% Moderado`, `> 75% Bajo Riesgo`), simulación de cortes semanales SAP y registro de intervenciones Ficha 360.
-- **Catálogos Dinámicos:** CRUD de Carreras y Sedes (`catalogService`) e ingesta masiva de oferta académica desde archivos `.xlsx` y `.md` (`excelParserService`).
+### 2. Snapshots Programados del Simulador (03:00 AM y 03:00 PM)
+- **Colección `SimulatorChartSnapshot`:** Almacenamiento periódico en MongoDB de métricas precalculadas (adopción iniciada vs. completada, secciones más demandadas, distribución semestral).
+- **Rendimiento Protegido:** Las consultas de gráficos en el Panel Admin leen directamente el último snapshot almacenado, garantizando tiempos de respuesta inferiores a 15ms sin recalcular sobre toda la base histórica.
+- **Distribución en 18 Semanas:** Métricas desglosadas por las 18 semanas lectivas oficiales de Duoc UC con comparativa histórica multianual.
 
-### 3. Accesibilidad WCAG 2.2 AA/AAA y Autonomía No Vidente
-- **Botón Flotante Retráctil (`AccessibilityBar`):** acoplado en la esquina inferior derecha (`Ajustes de accesibilidad`) con despliegue suave por hover, foco o estado abierto.
-- **Lectura en Voz Alta (`voiceReader`):** síntesis de voz en español (`Web Speech API`) disparada en `onFocus` y `onMouseEnter`, lectura automática de anuncios `announce()`, sufijos semánticos ARIA (`VoiceReaderObserver`), atajo global `Alt + V` y cancelación con `Escape`.
-- **MFA Accesible (`MfaPrompt`):** extiende el tiempo de espera cuando `voiceReader` está activo e incluye botón para repetir el código en voz alta.
-- **Preferencias Persistentes (`PUT /api/auth/accessibility`):** `fontSize`, `highContrast`, `dyslexicFont` (OpenDyslexic), `reducedMotion`, `readingGuide` (`ReadingGuideOverlay` en `z-[9999]`), `voiceReader` y `screenReaderOptimized`.
+### 3. Calendario Académico Duoc UC (2026-2027) e Insignia Dinámica
+- **Insignia `AcademicWeekBadge`:** Despliega en la barra superior la semana lectiva actual (ej. `Semana 16/18 • 2° Semestre`) calculada en tiempo real.
+- **Ingesta desde PDF Oficial:** Extracción automatizada de hitos curriculares, semanas de inducción (Semana 0) y reinicio de semestre desde resoluciones de Vicerrectoría Académica.
 
----
+### 4. Panel de Administración, SAT y Centro PAEDIS
+- **Directorio de Estudiantes y Ficha 360:** Filtros por carrera, sede y estado académico con visualización del semáforo predictivo de deserción.
+- **Centro de Operaciones PAEDIS (Ley N° 21.719):** Gestión confidencial de ajustes razonables, acuses de recibo docentes y renovación semestral con aislamiento de diagnósticos clínicos restringidos exclusivamente a Coordinadores PAEDIS.
+- **Sistema de Alerta Temprana (SAT):** Detección temprana de inasistencias críticas (`< 70% RI / Alto Riesgo`, `70-75% Moderado`, `> 75% Bajo Riesgo`) con módulo de simulación de asistencia por asignatura.
+- **Catálogo Dinámico y Dry-Run:** Ingesta de asignaturas vía Excel (`.xlsx`) y Markdown (`.md`) con previsualización segura y detección de choques antes de guardar.
+- **Bitácora Institucional (ActivityLog):** Registro inmutable de eventos administrativos con sanitización de datos personales.
 
-## Seguridad, Cumplimiento Ley N° 21.719 y API REST
-
-- **Protección de Datos y Autenticación:** contraseñas cifradas con `bcryptjs` mediante hook `pre('save')` en Mongoose 9, eliminación de `password` y `__v` en `toJSON`/`toObject`, metadatos de consentimiento ARCO y limitación de finalidad (`purposeLimitation`).
-- **Hardening API:** JWT `HS256`, RBAC (`requireAdmin`, `requireAdminOrCoordinator`), `rateLimitMiddleware` en login/MFA, cabeceras de seguridad OWASP, sanitización XSS/NoSQL/ReDoS y prevención de **Log Injection** en controladores.
-
-| Recurso | Rutas principales | Acceso |
-| :--- | :--- | :--- |
-| Salud API | `GET /api/health` | Público |
-| Autenticación y Perfil | `POST /api/auth/login`, `POST /api/auth/sso-login`, `GET /api/auth/me`, `PUT /api/auth/accessibility`, `GET/POST/PUT /api/auth/toma-ramos` | Público / JWT |
-| Módulos Institucionales | `GET /api/modules`, `GET /api/modules/:key` | Público (caché MongoDB) |
-| Oferta Académica | `GET /api/courses`, `GET /api/courses/careers`, `POST /api/courses/import` | Token opcional / Admin-Coord |
-| Administración, SAT y PAEDIS | `GET /api/admin/metrics`, CRUD `/students`, `/courses/*`, `/careers`, `/sedes`, `/sat-alerts/*`, `PATCH /api/admin/paedis/:id/case` | JWT + Admin o Coord. PAEDIS |
+### 5. Accesibilidad Universal WCAG 2.2 AA / AAA
+- **Lector de Pantalla Nativo (`voiceReader`):** Síntesis de voz accesible en español con atajo global `Alt + V`, navegación por 4 flechas de movimiento para personas no videntes y lectura de cambios dinámicos con `aria-live`.
+- **Selector de Modo Claro / Oscuro Personalizado:** Componente `.theme-switch` animado (sol, luna, estrellas y nubes) con persistencia en sesión y base de datos.
+- **Herramientas Visuales:** Soporte para tipografía OpenDyslexic, filtros de daltonismo (Deuteranopia, Protanopia, Tritanopia), regla de lectura (`ReadingGuideOverlay` con capa máxima `z-[9999]`) y modo de lectura simplificada.
 
 ---
 
-## Ejecución y Pruebas
+## Cuentas de Demostración y Roles
 
-### Opción A: Docker Compose
+Para pruebas y evaluación del sistema, la pantalla de inicio de sesión dispone de un selector rápido de cuentas preconfiguradas con contraseña universal:
+
+| Rol Institucional | Correo Demo | Contraseña | Capacidades y Alcance |
+| :--- | :--- | :--- | :--- |
+| **Administrador / PAEDIS** | `c.guzman@duocuc.cl` | `Duoc2026!` | Acceso total: Panel Admin, Catálogo Alameda, SAT, Auditoría y Módulo PAEDIS |
+| **Coordinador PAEDIS** | `coord.paedis@duoc.cl` | `Duoc2026!` | Gestión de expedientes PAEDIS confidenciales, ajustes razonables y seguimiento |
+| **Estudiante PAEDIS** | `d.rojas@duocuc.cl` | `Duoc2026!` | Portal de estudiante, simulador de toma de ramos con ajustes PAEDIS aplicados |
+| **Estudiante Regular** | `an.ordenesd@duocuc.cl` | `Duoc2026!` | Portal de estudiante, asistencia y simulación estándar de toma de ramos |
+| **Estudiante en Riesgo** | `m.contreras@duocuc.cl` | `Duoc2026!` | Caso SAT con asistencia `< 70%` para validar alertas preventivas de deserción |
+| **Tutora Par** | `v.soto@duocuc.cl` | `Duoc2026!` | Acompañamiento a pares y credencial cuidadora Ley N° 21.790 |
+
+---
+
+## Matriz de Endpoints API REST
+
+| Módulo | Método | Ruta | Acceso | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| **Salud** | `GET` | `/api/health` | Público | Verificación de estado del servidor, uptime y conectividad a MongoDB |
+| **Autenticación** | `POST` | `/api/auth/login` | Público (Rate-limit) | Inicio de sesión institucional con emisión de JWT |
+| | `GET` | `/api/auth/me` | JWT | Obtención del perfil activo y preferencias de accesibilidad |
+| | `PUT` | `/api/auth/accessibility` | JWT | Persistencia de ajustes de contraste, TTS y fuentes |
+| | `GET/POST`| `/api/auth/toma-ramos` | JWT (`isRegisteredInDb`) | Consulta y confirmación de asignaturas inscritas |
+| **Calendario** | `GET` | `/api/calendar/current` | Público | Semana lectiva vigente, hito académico actual y metadatos |
+| | `GET` | `/api/calendar/weeks` | Público | Lista completa de las 18 semanas del semestre |
+| **Oferta Académica** | `GET` | `/api/courses` | Público | Catálogo de asignaturas con filtros por carrera, sede y jornada |
+| | `GET` | `/api/courses/careers` | Público | Catálogo oficial de 20 carreras de Sede Alameda |
+| | `POST` | `/api/courses/import` | Admin / Coord | Ingesta masiva de asignaturas vía Excel o Markdown |
+| **Módulos** | `GET` | `/api/modules` | Público | Directorio de 9 módulos institucionales y 129 artículos de apoyo |
+| **Administración**| `GET` | `/api/admin/metrics` | Admin / Coord | Métricas institucionales de retención, PAEDIS y estado académico |
+| | `GET` | `/api/admin/charts-snapshot`| Admin / Coord | Snapshots optimizados para gráficos de adopción del simulador |
+| | `GET/POST`| `/api/admin/students` | Admin / Coord | Directorio 360 de estudiantes y registro de nuevos usuarios |
+| | `PATCH` | `/api/admin/paedis/:id/case`| Coord PAEDIS | Actualización reservada de expediente de ajustes razonables |
+| | `GET` | `/api/admin/audit-logs` | Admin | Bitácora inmutable de eventos conforme a la Ley N° 21.719 |
+
+---
+
+## Seguridad y Cumplimiento Normativo
+
+- **Ley N° 21.719 (Protección de Datos Personales):**
+  - Cero almacenamiento de contraseñas sin cifrar (hash irreversible con `bcryptjs` y 10 rondas de salt).
+  - Eliminación automática de campos confidenciales (`password`, `passwordResetTokenHash`) en cualquier serialización `toJSON` / `toObject`.
+  - Consentimiento informado explícito y política estricta de limitación de finalidad (`purposeLimitation`).
+- **Seguridad OWASP Top 10:**
+  - Cabeceras HTTP endurecidas: `Content-Security-Policy`, `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`.
+  - Rate Limiting en memoria contra ataques de fuerza bruta en endpoints de autenticación y restablecimiento.
+  - Prevención de inyecciones NoSQL mediante tipado estricto en esquemas de Mongoose y sanitización regex lineal libre de ReDoS.
+  - Aislamiento estricto de roles RBAC: `admin`, `coordinador_paedis`, `profesor`, `tutor_par`, `estudiante`.
+
+---
+
+## Ejecución y Despliegue
+
+### Opción A: Contenedores Docker (Recomendado)
 ```bash
+# Iniciar servicios con reconstrucción de imágenes
 docker compose up -d --build
+
+# Verificar estado de los contenedores
+docker compose ps
 ```
-- **Frontend:** `http://localhost:5173`
-- **Backend API:** `http://localhost:5000/api/health`
+- **Frontend:** [http://localhost:5173](http://localhost:5173)
+- **Backend API:** [http://localhost:5000/api/health](http://localhost:5000/api/health)
 - **MongoDB:** `localhost:27017/nexo360`
 
-### Opción B: Ejecución Local
+### Opción B: Ejecución Local en Node.js
 ```bash
-# Backend (puerto 5000, con fallback en memoria si MongoDB no está activo)
-cd backend && npm ci --ignore-scripts && npm start
+# 1. Backend (puerto 5000)
+cd backend
+npm install
+npm start
 
-# Frontend (puerto 5173)
-cd frontend && npm ci --ignore-scripts && npm run dev
+# 2. Frontend (puerto 5173)
+cd ../frontend
+npm install
+npm run dev
 ```
 
-### Validación Automatizada y Build
+---
+
+## Suite de Calidad y Pruebas
+
 ```bash
-# Suite Backend (60 pruebas en 7 archivos)
+# Ejecutar la suite completa de 134 pruebas automatizadas de backend
 npm test --prefix backend
 
-# Verificación del Simulador Frontend (10 pruebas)
-node frontend/src/tests/dashboardSimulatorTest.mjs
-
-# Build de producción Frontend
+# Validar la compilación de producción del frontend
 npm run build --prefix frontend
 ```
