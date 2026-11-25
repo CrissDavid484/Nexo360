@@ -348,6 +348,9 @@ export const TomaRamosSimulator = ({ onExit }) => {
 
   useEffect(() => {
     isMountedRef.current = true;
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
     return () => {
       isMountedRef.current = false;
       if (sapConfirmTimerRef.current) clearTimeout(sapConfirmTimerRef.current);
@@ -362,15 +365,6 @@ export const TomaRamosSimulator = ({ onExit }) => {
     },
     containerRef: infoModalRef,
     initialFocusRef: infoAcceptBtnRef,
-  });
-
-  useAccessibleModal({
-    isOpen: isPreFlowActive && !isUnregisteredUser,
-    onClose: () => {
-      if (onExit) onExit();
-    },
-    containerRef: preFlowModalRef,
-    restoreFocus: false,
   });
 
   const clearPersistedTomaRamos = useCallback(async () => {
@@ -975,6 +969,7 @@ export const TomaRamosSimulator = ({ onExit }) => {
     const top = Math.max(0, rect.top + window.scrollY - headerHeight - topOffset);
 
     window.scrollTo({ top, behavior: 'smooth' });
+    target.focus?.({ preventScroll: true });
   };
 
   if (isUnregisteredUser) {
@@ -2737,13 +2732,13 @@ export const TomaRamosSimulator = ({ onExit }) => {
         {/* MODAL DE PRE-FLUJO CONTENIDO DENTRO DEL SIMULADOR */}
         {isPreFlowActive && (
           <div
-            role="dialog"
-            aria-modal="true"
+            role="region"
             aria-labelledby="preflow-title"
             className="absolute inset-0 z-40 flex items-start sm:items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xs overflow-y-auto"
           >
             <div
               ref={preFlowModalRef}
+              tabIndex={-1}
               className="bg-white rounded-3xl max-w-5xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 space-y-5 my-4 max-h-[94%] overflow-y-auto focus:outline-none"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">

@@ -126,8 +126,11 @@ export const DashboardPage = () => {
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [faqExpanded, setFaqExpanded] = useState(null);
 
-  // Registrar uso del simulador para las métricas del panel de administración
+  // Registrar uso del simulador para las métricas del panel de administración y restablecer scroll
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
     if (activeTab === 'toma-ramos') {
       api.logSimulatorUsage().catch((err) => {
         console.warn('[DashboardPage] No se pudo registrar el uso del simulador:', err);
