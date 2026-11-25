@@ -50,8 +50,8 @@ export const DISABILITY_PROFILES = [
   },
   {
     id: 'ceguera_total',
-    label: 'Ceguera total / Persona no vidente',
-    barrera: 'Visual / Persona No Vidente',
+    label: 'Ceguera total',
+    barrera: 'Visual / Ceguera Total',
     summary:
       'Optimizado para lectores de pantalla, navegación por teclado y lectura por voz automática.',
     autoAdaptationHint:

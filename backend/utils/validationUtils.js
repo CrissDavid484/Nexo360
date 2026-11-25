@@ -42,7 +42,7 @@ const DEFAULT_ACCESSIBILITY_PREFERENCES = Object.freeze({
 
 const DISABILITY_BARRIER_MAP = Object.freeze({
   ninguna: '',
-  ceguera_total: 'Visual / Persona No Vidente',
+  ceguera_total: 'Visual / Ceguera Total',
   baja_vision: 'Visual / Baja Visión',
   daltonismo: 'Visual / Daltonismo',
   tea: 'Neurodivergencia / TEA',
