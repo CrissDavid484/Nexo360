@@ -5,10 +5,13 @@ import { useAccessibility } from '../../context/AccessibilityContext';
 import {
   CHILE_REGIONS,
   CHILE_REGIONS_CITIES,
+  CHILE_CITIES_BY_REGION,
   getCitiesForRegion,
   DUOC_SCHOOLS,
   getSchoolForCareer,
 } from '../../utils/studentUtils';
+
+export { CHILE_CITIES_BY_REGION };
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2';
@@ -184,7 +187,7 @@ const SedeForm = ({ canManage, onAdd, getVoiceProps }) => {
         </div>
         <div className="sm:col-span-1">
           <label htmlFor="entity-sede-city" className="block text-xs font-bold text-slate-800 mb-1">
-            Ciudad / Localidad
+            Ciudad / Comuna
           </label>
           <select
             id="entity-sede-city"
@@ -192,11 +195,11 @@ const SedeForm = ({ canManage, onAdd, getVoiceProps }) => {
             disabled={!region}
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            {...getVoiceProps('Seleccionar ciudad o localidad')}
+            {...getVoiceProps('Seleccionar ciudad o comuna')}
             className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed ${FOCUS_RING}`}
           >
             <option value="">
-              {region ? 'Selecciona una ciudad / localidad...' : 'Primero selecciona una región...'}
+              {region ? 'Selecciona una ciudad / comuna...' : 'Primero selecciona una región...'}
             </option>
             {availableCities.map((c) => (
               <option key={c} value={c}>

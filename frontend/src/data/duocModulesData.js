@@ -2575,3 +2575,49 @@ export const DUOC_CATEGORIES = [
     ]
   }
 ];
+
+/**
+ * Artículos Promovidos Oficiales destacados en la portada de centroayuda.duoc.cl/hc/es-419
+ */
+export const PROMOTED_ARTICLES = [
+  {
+    id: 33719813119245,
+    title: 'Calendario académico 2026',
+    badge: 'Fechas Clave 2026',
+    url: 'https://centroayuda.duoc.cl/hc/es-419/articles/33719813119245-Calendario-acad%C3%A9mico-2026',
+    sectionUrl: 'https://centroayuda.duoc.cl/hc/es-419/sections/33718683091469-Calendario-acad%C3%A9mico-y-reglamentos',
+    categoryId: 'vida-academica',
+    submoduleId: 'calendario-academico-2026',
+    summary: 'Inicio y término de clases, períodos de evaluación, semanas de exámenes, vacaciones y feriados oficiales.',
+  },
+  {
+    id: 44621145254669,
+    title: 'Ley N° 21.790: Apoyo para estudiantes cuidadores',
+    badge: 'Ley N° 21.790',
+    url: 'https://centroayuda.duoc.cl/hc/es-419/articles/44621145254669-Ley-N-21-790-Apoyo-para-estudiantes-cuidadores',
+    sectionUrl: 'https://centroayuda.duoc.cl/hc/es-419/sections/44620612844813-Apoyo-para-estudiantes-cuidadores-Ley-N-21-790',
+    categoryId: 'beneficios-estudiantiles',
+    submoduleId: 'apoyo-estudiantes-cuidadores',
+    summary: 'Medidas de flexibilidad académica, justificación de inasistencias y prioridad de inscripción para cuidadores/as.',
+  },
+  {
+    id: 35999617868813,
+    title: 'MFA: Verificación en dos pasos',
+    badge: 'Seguridad Digital',
+    url: 'https://centroayuda.duoc.cl/hc/es-419/articles/35999617868813-MFA-Verificaci%C3%B3n-en-dos-pasos',
+    sectionUrl: 'https://centroayuda.duoc.cl/hc/es-419/sections/30528243681421-Seguridad-y-autenticaci%C3%B3n',
+    categoryId: 'servicios-digitales',
+    submoduleId: 'seguridad-autenticacion-mfa-clave',
+    summary: 'Configuración de Microsoft Authenticator, códigos SMS y recuperación de accesos a tus plataformas Duoc UC.',
+  },
+];
+
+/**
+ * Enlace directo oficial al Centro de Ayuda para estudiantes Online de Duoc UC
+ */
+export const DUOC_ONLINE_HELP_CENTER = {
+  title: 'Centro de Ayuda para estudiantes Online',
+  description: 'Canal de soporte y trámites oficiales para carreras en modalidad 100% online y Campus Virtual Duoc UC.',
+  url: 'https://centrodeayudaonline.duoc.cl',
+};
+

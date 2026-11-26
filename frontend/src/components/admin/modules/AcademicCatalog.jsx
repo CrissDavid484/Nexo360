@@ -208,7 +208,7 @@ function CatalogCrudCard({
                 </div>
                 <div>
                   <label htmlFor="academic-sede-city-select" className="sr-only">
-                    Ciudad / Localidad de la sede
+                    Ciudad / Comuna de la sede
                   </label>
                   <select
                     id="academic-sede-city-select"
@@ -216,12 +216,12 @@ function CatalogCrudCard({
                     disabled={!extraState?.region}
                     value={extraState?.city || ''}
                     onChange={(e) => onExtraStateChange({ city: e.target.value })}
-                    aria-label="Ciudad o localidad de la sede"
-                    {...getVoiceProps('Seleccionar ciudad o localidad de la sede')}
+                    aria-label="Ciudad o comuna de la sede"
+                    {...getVoiceProps('Seleccionar ciudad o comuna de la sede')}
                     className={`w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold`}
                   >
                     <option value="">
-                      {extraState?.region ? 'Selecciona una ciudad / localidad...' : 'Primero selecciona una región...'}
+                      {extraState?.region ? 'Selecciona una ciudad / comuna...' : 'Primero selecciona una región...'}
                     </option>
                     {getCitiesForRegion(extraState?.region).map((cit) => (
                       <option key={cit} value={cit}>

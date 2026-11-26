@@ -3,7 +3,12 @@ import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
-import { DUOC_CATEGORIES, INTENT_SHORTCUTS } from '../data/duocModulesData';
+import {
+  DUOC_CATEGORIES,
+  INTENT_SHORTCUTS,
+  PROMOTED_ARTICLES,
+  DUOC_ONLINE_HELP_CENTER,
+} from '../data/duocModulesData';
 import { DEFAULT_CAMPUS, getStudentDisplayName } from '../utils/studentUtils';
 import { PURPOSE_GROUPS, analyzeDashboardSearch } from '../utils/dashboardSearchUtils';
 import { lazyLoad } from '../utils/lazyLoad';
@@ -32,6 +37,7 @@ import {
   Layers,
   Package,
   GraduationCap,
+  Globe,
 } from 'lucide-react';
 
 // Vistas complementarias con Code-Splitting (React.lazy)
@@ -104,6 +110,14 @@ const OFFICIAL_DUOC_FAQS = [
     submoduleId: 'continuidad-estudios-contrato',
     articleUrl:
       'https://centroayuda.duoc.cl/hc/es-419/articles/30497397424141--D%C3%B3nde-puedo-firmar-mi-Contrato-de-Continuidad',
+  },
+  {
+    q: '¿Dónde consulto el Calendario Académico 2026 oficial (fechas de clases, exámenes y feriados)?',
+    a: 'El Calendario Académico 2026 de Duoc UC establece las fechas de matrícula ordinaria y extraordinaria, inicio y término de semestres, períodos de inscripción y modificación de asignaturas, evaluaciones parciales, semanas de exámenes y feriados institucionales.',
+    categoryId: 'vida-academica',
+    submoduleId: 'calendario-academico-2026',
+    articleUrl:
+      'https://centroayuda.duoc.cl/hc/es-419/articles/33719813119245-Calendario-acad%C3%A9mico-2026',
   },
   {
     q: '¿Cómo activo MFA (Verificación en dos pasos), cambio mi clave o accedo a AVA y WiFi?',
@@ -252,6 +266,19 @@ export const DashboardPage = () => {
     setSelectedCategory(cat);
     setSelectedSubmodule(sub);
     setSelectedArticle(null);
+  };
+
+  const handleOpenPromotedArticle = (promoted) => {
+    const cat = DUOC_CATEGORIES.find((c) => c.id === promoted.categoryId);
+    const sub = cat?.submodules.find((s) => s.id === promoted.submoduleId);
+    const art = sub?.articles.find((a) => a.id === promoted.id || a.url === promoted.url);
+    if (cat && sub && art) {
+      handleOpenArticleDirectly(cat, sub, art);
+    } else if (cat && sub) {
+      handleOpenSubmodule(cat, sub);
+    } else {
+      window.open(promoted.url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const searchAnalysis = useMemo(
@@ -594,6 +621,89 @@ export const DashboardPage = () => {
 
 
 
+            {/* ARTÍCULOS PROMOVIDOS OFICIALES (centroayuda.duoc.cl) */}
+            <section aria-labelledby="promoted-articles-heading" className="space-y-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2
+                    id="promoted-articles-heading"
+                    {...getVoiceProps('Artículos promovidos oficiales de Duoc UC. Información prioritaria del semestre.')}
+                    className="text-lg sm:text-xl font-bold text-neutral-900 tracking-tight"
+                  >
+                    Artículos promovidos
+                  </h2>
+                  <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
+                    Información prioritaria verificada directamente con el Centro de Ayuda institucional.
+                  </p>
+                </div>
+                <a
+                  href="https://centroayuda.duoc.cl/hc/es-419"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  {...getVoiceProps('Ver portal de ayuda oficial')}
+                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline"
+                >
+                  <span>centroayuda.duoc.cl</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-neutral-400" aria-hidden="true" />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {PROMOTED_ARTICLES.map((promoted) => (
+                  <div
+                    key={promoted.id}
+                    className="p-5 rounded-2xl bg-white border border-neutral-200/90 hover:border-slate-300 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3 group"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold bg-amber-100/70 text-slate-900 px-2.5 py-0.5 rounded-full border border-amber-200">
+                          {promoted.badge}
+                        </span>
+                        <a
+                          href={promoted.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abrir artículo en centroayuda.duoc.cl"
+                          {...getVoiceProps(`Abrir ${promoted.title} en centroayuda.duoc.cl`)}
+                          className="text-neutral-400 hover:text-brand-navy p-1 rounded-md"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                        </a>
+                      </div>
+                      <h3 className="text-sm font-bold text-neutral-900 group-hover:text-brand-navy transition-colors leading-snug">
+                        {promoted.title}
+                      </h3>
+                      <p className="text-xs text-neutral-600 leading-relaxed font-normal">
+                        {promoted.summary}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPromotedArticle(promoted)}
+                        {...getVoiceProps(`Leer guía de ${promoted.title}`)}
+                        className="min-h-[38px] px-3.5 py-1.5 bg-brand-navy hover:bg-brand-navyDark text-white text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-brand-gold" aria-hidden="true" />
+                        <span>Leer guía en Nexo360</span>
+                      </button>
+                      <a
+                        href={promoted.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...getVoiceProps(`Ir al artículo oficial: ${promoted.title}`)}
+                        className="text-xs font-semibold text-neutral-600 hover:text-brand-navy inline-flex items-center gap-1"
+                      >
+                        <span>Oficial</span>
+                        <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             {/* CONSULTAS FRECUENTES (accesos directos limpios) */}
             <section aria-labelledby="intent-shortcuts-heading" className="space-y-4">
               <div>
@@ -739,6 +849,39 @@ export const DashboardPage = () => {
                   ))}
                 </div>
               )}
+            </section>
+
+            {/* ACCESO DIRECTO DISCRETO: CENTRO DE AYUDA PARA ESTUDIANTES ONLINE */}
+            <section
+              aria-label="Centro de Ayuda para estudiantes Online"
+              className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs"
+            >
+              <div className="flex items-center gap-3.5">
+                <div
+                  className="w-10 h-10 rounded-2xl bg-[#002B49] text-[#FFB81C] flex items-center justify-center shrink-0 shadow-xs"
+                  aria-hidden="true"
+                >
+                  <Globe className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    ¿Estudias en modalidad 100% online o Campus Virtual?
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {DUOC_ONLINE_HELP_CENTER.description}
+                  </p>
+                </div>
+              </div>
+              <a
+                href={DUOC_ONLINE_HELP_CENTER.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                {...getVoiceProps('Ir al Centro de Ayuda para estudiantes Online')}
+                className="min-h-[44px] px-4 py-2 bg-white hover:bg-slate-100 text-[#002B49] border border-slate-300 text-xs font-bold rounded-xl inline-flex items-center gap-2 transition-colors shrink-0 shadow-xs"
+              >
+                <span>{DUOC_ONLINE_HELP_CENTER.title}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+              </a>
             </section>
 
             {/* PREGUNTAS FRECUENTES */}
@@ -968,6 +1111,19 @@ export const DashboardPage = () => {
               Plataforma de inducción y orientación accesible para la comunidad estudiantil de Sede Alameda.
               Gestión institucional conforme a la normativa de protección de datos (Ley N° 21.719).
             </p>
+            <div className="pt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-neutral-500">¿Estudias en modalidad 100% online?</span>
+              <a
+                href={DUOC_ONLINE_HELP_CENTER.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                {...getVoiceProps('Ir al Centro de Ayuda para estudiantes Online')}
+                className="font-semibold text-brand-navy hover:underline inline-flex items-center gap-1"
+              >
+                <span>{DUOC_ONLINE_HELP_CENTER.title}</span>
+                <ExternalLink className="w-3 h-3 text-neutral-400" aria-hidden="true" />
+              </a>
+            </div>
           </div>
           <div className="text-left md:text-right shrink-0 space-y-1">
             <p className="font-medium text-neutral-700">

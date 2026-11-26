@@ -49,6 +49,8 @@ export const CHILE_REGIONS_CITIES = {
   'Región de Magallanes y de la Antártica Chilena': ['Punta Arenas', 'Puerto Natales', 'Porvenir', 'Puerto Williams', 'Cabo de Hornos', 'Primavera', 'Timaukel', 'San Gregorio', 'Río Verde', 'Laguna Blanca', 'Antártica'],
 };
 
+export const CHILE_CITIES_BY_REGION = CHILE_REGIONS_CITIES;
+
 /**
  * Obtiene la lista de ciudades/localidades para una región determinada.
  */
