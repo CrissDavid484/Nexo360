@@ -12,22 +12,24 @@ import {
   Search,
   FileText,
   ChevronRight,
-  RotateCcw,
   FileSignature,
-  Sliders,
 } from 'lucide-react';
 import { api } from '@services/api';
 import { useAccessibility } from '@context/AccessibilityContext';
+import { useAuth } from '@context/AuthContext';
+import { StudentDetailModal } from '@components/admin/StudentDetailModal';
 import {
   evaluateAttendanceStatus,
   getSatRiskBadgeMeta,
   extractCourseAttendanceRate,
+  calculateBidirectionalSimulation,
 } from '@utils/satUtils';
 import { DEFAULT_CAMPUS, matchesRutQuery } from '@utils/studentUtils';
 import { ADMIN_THEME } from '@components/admin/adminTheme';
 import { Card } from '@components/ui/Card';
 import { Button } from '@components/ui/Button';
 import { Modal } from '@components/ui/Modal';
+import { SatAttendanceSimulator } from '@components/admin/SatAttendanceSimulator';
 
 const SAT_RISK_BADGE_MAP = {
   LEVEL_2_CRITICAL: 'critico',
@@ -223,14 +225,19 @@ const FILTER_LEVEL_TABS = [
   { id: 'NONE', label: 'Sin Riesgo' },
 ];
 
-export function SatMonitoring({ announce: announceProp } = {}) {
+export function SatMonitoring({ announce: announceProp, isCoordinator: propCoordinator, isAdmin: propAdmin } = {}) {
   const { announce: contextAnnounce, getVoiceProps } = useAccessibility();
   const announce = announceProp || contextAnnounce;
+  const { user } = useAuth();
+  const userRole = (user?.role || '').toLowerCase();
+  const isCoordinator = propCoordinator ?? (userRole === 'coordinador_paedis');
+  const isAdmin = propAdmin ?? (userRole === 'admin' || userRole === 'administrador');
 
   const [loading, setLoading] = useState(true);
   const [satData, setSatData] = useState({ metrics: {}, students: [] });
   const [filterLevel, setFilterLevel] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStudentForDetail, setSelectedStudentForDetail] = useState(null);
   const [selectedStudentForIntervention, setSelectedStudentForIntervention] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [statusFeedback, setStatusFeedback] = useState(null);
@@ -325,42 +332,7 @@ export function SatMonitoring({ announce: announceProp } = {}) {
 
   const simMetrics = useMemo(() => {
     if (!selectedSimCourse) return null;
-    const totalSessions = Math.max(1, Number(selectedSimCourse.totalSessions || 20));
-    const attendedSessions = Math.max(
-      0,
-      Math.min(totalSessions, Number(selectedSimCourse.attendedSessions ?? totalSessions))
-    );
-    const currentAbsences = Math.max(0, totalSessions - attendedSessions);
-    const currentPct = Math.round(extractCourseAttendanceRate(selectedSimCourse) * 10) / 10;
-    const consecutiveAbsences = Number(selectedSimCourse.consecutiveAbsences || 0);
-    const isJustified = Boolean(selectedSimCourse.paedisJustified);
-    const minRequiredSessions = Math.ceil(totalSessions * 0.75);
-    const maxAllowedAbsences = Math.max(0, totalSessions - minRequiredSessions);
-    const remainingAllowedAbsences = Math.max(0, maxAllowedAbsences - currentAbsences);
-    const exceededAbsences = Math.max(0, currentAbsences - maxAllowedAbsences);
-
-    const nextAttended = Math.max(0, attendedSessions - 1);
-    const nextPct = Math.round((nextAttended / totalSessions) * 1000) / 10;
-    const nextRemaining = Math.max(0, maxAllowedAbsences - (currentAbsences + 1));
-    const nextTriggersRi = !isJustified && (nextPct < 75 || consecutiveAbsences + 1 >= 3);
-    const evalStatus = evaluateAttendanceStatus(currentPct, { isJustified, mode: 'sat75' });
-
-    return {
-      totalSessions,
-      attendedSessions,
-      currentAbsences,
-      currentPct,
-      consecutiveAbsences,
-      isJustified,
-      maxAllowedAbsences,
-      remainingAllowedAbsences,
-      exceededAbsences,
-      nextPct,
-      nextRemaining,
-      nextTriggersRi,
-      status: evalStatus.status,
-      statusLabel: evalStatus.label,
-    };
+    return calculateBidirectionalSimulation(selectedSimCourse);
   }, [selectedSimCourse]);
 
   const handleRunSimulation = useCallback(async (actionType) => {
@@ -378,21 +350,31 @@ export function SatMonitoring({ announce: announceProp } = {}) {
           setStatusFeedback({ type: 'success', text: 'Asistencia de ' + simulationTarget.courseCode + ' restablecida a valores base de origen.' });
           announce('Asistencia de ' + simulationTarget.courseCode + ' restablecida exitosamente.', 'polite');
         } else {
+          const actionLabels = {
+            add_attendance: '+1 Asistencia',
+            remove_absence: '1 Falta Menos',
+            recover_to_75: 'Recuperar ≥75%',
+            future_perfect: 'Asistencia Perfecta Futura',
+            add_absence: '+1 Falta (Inasistencia)',
+            drop_below_75: 'Baja <75% (RI)',
+            paedis_justify: 'Licencia / Justificativo',
+          };
+          const label = actionLabels[actionType] || actionType;
           setActiveSimulationInfo({
             courseCode: simulationTarget.courseCode,
-            action: actionType,
+            action: label,
             studentName: currentSimStudent?.fullName || currentSimStudent?.nombre || 'Estudiante',
           });
-          setStatusFeedback({ type: 'success', text: 'Proyección SAP ejecutada (' + actionType + ') para ' + simulationTarget.courseCode + '.' });
-          announce('Proyección SAP ejecutada para ' + simulationTarget.courseCode, 'polite');
+          setStatusFeedback({ type: 'success', text: 'Simulador Interactivo de Asistencia SAT: ' + label + ' aplicada a ' + simulationTarget.courseCode + '.' });
+          announce('Simulación SAT ejecutada para ' + simulationTarget.courseCode, 'polite');
         }
         await loadSatAlerts();
       } else {
-        setStatusFeedback({ type: 'error', text: res?.message || 'Error al ejecutar simulación SAP.' });
+        setStatusFeedback({ type: 'error', text: res?.message || 'Error al ejecutar simulación en el SAT.' });
       }
     } catch (err) {
       console.error('[EarlyWarningSAT] Error en simulación:', err);
-      if (isMountedRef.current) setStatusFeedback({ type: 'error', text: 'Error de conexión al simular corte semanal.' });
+      if (isMountedRef.current) setStatusFeedback({ type: 'error', text: 'Error de conexión al ejecutar la simulación SAT.' });
     } finally {
       if (isMountedRef.current) setIsSimulating(false);
     }
@@ -534,242 +516,25 @@ export function SatMonitoring({ announce: announceProp } = {}) {
         </div>
       </section>
 
-      <section aria-labelledby="sat-simulator-title" className={`${ADMIN_THEME.cardSurface} space-y-5`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
-              <Sliders className="w-3.5 h-3.5 text-neutral-500" aria-hidden="true" />
-              <span>Modo Simulación / Proyección (No Oficial)</span>
-            </div>
-            <h3 id="sat-simulator-title" className={`${ADMIN_THEME.sectionTitle} mt-1`}>
-              Simulador Interactivo de Asistencia SAT
-            </h3>
-            <p className={`${ADMIN_THEME.moduleSubtitle} max-w-3xl`}>
-              Evalúa en vivo el margen de <strong>faltas permitidas</strong> (umbral mínimo 75% RI) y compara el impacto de una <strong>inasistencia</strong> frente a una <strong>licencia o justificativo médico</strong>. No altera el libro de clases oficial.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              handleRunSimulation('reset').catch((err) => {
-                console.error('[EarlyWarningSAT] Error restableciendo simulación:', err);
-              });
-            }}
-            disabled={isSimulating || !selectedSimCourse}
-            {...getVoiceProps('Restablecer asistencia de la asignatura seleccionada a valores base')}
-            className="self-start md:self-auto shrink-0 min-h-[42px] px-4 py-2 bg-white hover:bg-neutral-100 text-neutral-800 text-xs font-semibold rounded-xl border border-neutral-300 shadow-2xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-neutral-600" aria-hidden="true" />
-            <span>Restablecer</span>
-          </button>
-        </div>
-
-        {/* Selectores de Estudiante y Asignatura */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label htmlFor="sat-sim-student-select" className={`${ADMIN_THEME.cardLabel} block`}>
-              1. Estudiante
-            </label>
-            <select
-              id="sat-sim-student-select"
-              value={simulationTarget.userId}
-              onChange={(e) => {
-                const uid = e.target.value;
-                const stu = (satData.students || []).find((s) => String(s.id || s._id) === String(uid));
-                const firstCourse = stu?.courseAttendance?.[0]?.courseCode || '';
-                setSimulationTarget({ userId: uid, courseCode: firstCourse });
-              }}
-              {...getVoiceProps('Seleccionar estudiante para simular asistencia SAT')}
-              className={`w-full ${ADMIN_THEME.controlInput}`}
-            >
-              {(satData.students || []).map((stu) => (
-                <option key={stu.id || stu._id} value={stu.id || stu._id}>
-                  {stu.fullName || stu.nombre} ({stu.career})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="sat-sim-course-select" className={`${ADMIN_THEME.cardLabel} block`}>
-              2. Asignatura
-            </label>
-            <select
-              id="sat-sim-course-select"
-              value={simulationTarget.courseCode}
-              onChange={(e) => setSimulationTarget({ ...simulationTarget, courseCode: e.target.value })}
-              disabled={!currentSimStudent || !currentSimStudent.courseAttendance?.length}
-              {...getVoiceProps('Seleccionar asignatura a evaluar en el simulador SAT')}
-              className={`w-full ${ADMIN_THEME.controlInput}`}
-            >
-              {currentSimStudent?.courseAttendance?.map((c) => (
-                <option key={c.courseCode} value={c.courseCode}>
-                  {c.courseCode} - {c.courseName} ({c.attendancePercentage}%)
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Estado en vivo de la asignatura seleccionada */}
-        {simMetrics && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Asistencia Actual
-                </span>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-2xl font-black ${simMetrics.isJustified ? 'text-purple-800' : simMetrics.status === 'ri' ? 'text-rose-700' : simMetrics.status === 'preventive' ? 'text-amber-700' : 'text-emerald-700'}`}>
-                    {simMetrics.currentPct}%
-                  </span>
-                  <span className="text-xs font-semibold text-slate-600">
-                    ({simMetrics.attendedSessions}/{simMetrics.totalSessions} clases)
-                  </span>
-                </div>
-                <span className="text-[11px] font-semibold text-slate-500 block">
-                  {simMetrics.statusLabel}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Faltas Permitidas (Umbral 75%)
-                </span>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-2xl font-black ${simMetrics.remainingAllowedAbsences === 0 ? 'text-rose-700' : simMetrics.remainingAllowedAbsences === 1 ? 'text-amber-700' : 'text-slate-900'}`}>
-                    {simMetrics.remainingAllowedAbsences}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-600">
-                    restantes de {simMetrics.maxAllowedAbsences} máx.
-                  </span>
-                </div>
-                <span className="text-[11px] font-medium text-slate-500 block">
-                  {simMetrics.currentAbsences} falta(s) acumulada(s) • {simMetrics.consecutiveAbsences} consecutiva(s)
-                  {simMetrics.exceededAbsences > 0 ? ` (excedido en ${simMetrics.exceededAbsences})` : ''}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Licencia / Excepción Médica
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-black ${simMetrics.isJustified ? 'text-purple-800' : 'text-slate-800'}`}>
-                    {simMetrics.isJustified ? 'Excepción Activa' : 'Sin Excepción'}
-                  </span>
-                </div>
-                <span className="text-[11px] font-medium text-slate-500 block">
-                  {simMetrics.isJustified
-                    ? 'Inasistencias amparadas por justificativo médico o PAEDIS (no aplica RI).'
-                    : 'Aplica regla reglamentaria estándar de 75% mínimo.'}
-                </span>
-              </div>
-            </div>
-
-            {activeSimulationInfo && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-slate-800 font-semibold"
-              >
-                <div className="flex items-center gap-2">
-                  <Play className="w-3.5 h-3.5 text-brand-navy shrink-0" aria-hidden="true" />
-                  <span>
-                    Proyección activa en <strong>{activeSimulationInfo.courseCode}</strong> ({activeSimulationInfo.studentName}) — acción aplicada: <strong>{activeSimulationInfo.action}</strong>.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleRunSimulation('reset').catch((err) => {
-                      console.error('[EarlyWarningSAT] Error restableciendo simulación:', err);
-                    });
-                  }}
-                  disabled={isSimulating}
-                  className="text-xs font-bold text-brand-navy hover:underline cursor-pointer"
-                >
-                  Restablecer valores base
-                </button>
-              </div>
-            )}
-
-            {/* Comparativa Interactiva: Falta vs Licencia / Justificativo Médico */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true" />
-                    <h4 className="text-xs sm:text-sm font-black text-neutral-900">
-                      Falta (Inasistencia)
-                    </h4>
-                  </div>
-                  <p className="text-xs text-neutral-600 leading-relaxed">
-                    Descuenta 1 clase asistida y suma 1 inasistencia consecutiva. Con +1 falta, la asistencia bajaría a{' '}
-                    <strong>{simMetrics.nextPct}%</strong> ({simMetrics.nextRemaining} faltas permitidas restantes)
-                    {simMetrics.nextTriggersRi ? ' — activaría Alerta Crítica (RI).' : '.'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleRunSimulation('add_absence').catch((err) => {
-                        console.error('[EarlyWarningSAT] Error ejecutando simulación:', err);
-                      });
-                    }}
-                    disabled={isSimulating}
-                    {...getVoiceProps('Simular más una falta por inasistencia')}
-                    className="min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-200 transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
-                  >
-                    +1 Falta (Inasistencia)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleRunSimulation('drop_below_75').catch((err) => {
-                        console.error('[EarlyWarningSAT] Error ejecutando simulación:', err);
-                      });
-                    }}
-                    disabled={isSimulating}
-                    {...getVoiceProps('Simular caída bajo 75 por ciento, causal de reprobación por inasistencia')}
-                    className="min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-neutral-100 text-neutral-700 border border-neutral-300 transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
-                  >
-                    Simular Baja &lt;75% (RI)
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <HeartHandshake className="w-4 h-4 text-purple-700 shrink-0" aria-hidden="true" />
-                    <h4 className="text-xs sm:text-sm font-black text-neutral-900">
-                      Licencia / Justificativo Médico (Excepción)
-                    </h4>
-                  </div>
-                  <p className="text-xs text-neutral-600 leading-relaxed">
-                    Ampara las inasistencias mediante licencia médica o ajuste PAEDIS vigente. Mantiene la trazabilidad de asistencia pero suspende la causal de Reprobación por Inasistencia (RI).
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleRunSimulation('paedis_justify').catch((err) => {
-                        console.error('[EarlyWarningSAT] Error ejecutando simulación:', err);
-                      });
-                    }}
-                    disabled={isSimulating}
-                    {...getVoiceProps(simMetrics.isJustified ? 'Quitar licencia o justificativo médico' : 'Aplicar licencia o justificativo médico')}
-                    className="min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
-                  >
-                    {simMetrics.isJustified ? 'Quitar Licencia / Excepción' : 'Aplicar Licencia / Justificativo'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      <section id="sat-simulator-section" aria-labelledby="sat-simulator-title" className={`${ADMIN_THEME.cardSurface} space-y-5`}>
+        <SatAttendanceSimulator
+          student={currentSimStudent}
+          course={selectedSimCourse}
+          students={satData.students || []}
+          selectedUserId={simulationTarget.userId}
+          selectedCourseCode={simulationTarget.courseCode}
+          onSelectStudent={(userId) => {
+            const stu = (satData.students || []).find((s) => String(s.id || s._id) === String(userId));
+            const firstCourse = stu?.courseAttendance?.[0]?.courseCode || '';
+            setSimulationTarget({ userId, courseCode: firstCourse });
+          }}
+          onSelectCourse={(courseCode) => {
+            setSimulationTarget((prev) => ({ ...prev, courseCode }));
+          }}
+          onRunSimulation={handleRunSimulation}
+          isSimulating={isSimulating}
+          activeSimulationInfo={activeSimulationInfo}
+        />
       </section>
 
       <section aria-labelledby="sat-directory-title" className={`${ADMIN_THEME.cardSurface} space-y-5`}>
@@ -847,7 +612,14 @@ export function SatMonitoring({ announce: announceProp } = {}) {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-black text-neutral-900 text-sm sm:text-base">{studentName}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentForDetail(student)}
+                          className="font-black text-neutral-900 text-sm sm:text-base hover:text-brand-navy hover:underline text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold rounded"
+                          {...getVoiceProps('Ver ficha integral de ' + studentName)}
+                        >
+                          {studentName}
+                        </button>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${badgeClass}`}>
                           {sat.riskLabel || 'Sin Riesgo'}
                         </span>
@@ -869,8 +641,8 @@ export function SatMonitoring({ announce: announceProp } = {}) {
 
                     <button
                       type="button"
-                      onClick={() => handleOpenInterventionModal(student)}
-                      {...getVoiceProps('Abrir Ficha 360 de intervención para ' + studentName)}
+                      onClick={() => setSelectedStudentForDetail(student)}
+                      {...getVoiceProps('Abrir Ficha 360 integral de ' + studentName)}
                       className="min-h-[38px] inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-brand-navy hover:bg-brand-navyDark text-white font-bold text-xs rounded-xl transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold self-start sm:self-auto shrink-0"
                     >
                       <FileText className="w-3.5 h-3.5 text-brand-gold" aria-hidden="true" />
@@ -1001,6 +773,22 @@ export function SatMonitoring({ announce: announceProp } = {}) {
           </form>
         )}
       </Modal>
+
+      {/* Modal Ficha Integral Unificada */}
+      {selectedStudentForDetail && (
+        <StudentDetailModal
+          isOpen={Boolean(selectedStudentForDetail)}
+          onClose={() => setSelectedStudentForDetail(null)}
+          student={selectedStudentForDetail}
+          isAdmin={isAdmin}
+          isCoordinator={isCoordinator}
+          getVoiceProps={getVoiceProps}
+          announce={announce}
+          onOpenIntervention={(stu) => {
+            handleOpenInterventionModal(stu);
+          }}
+        />
+      )}
     </div>
   );
 }

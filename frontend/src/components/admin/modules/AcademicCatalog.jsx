@@ -3,7 +3,13 @@ import { Building2, MapPin, FileSpreadsheet, Plus, Trash2, Search, X, RefreshCw,
 import { api } from '@services/api';
 import { useAccessibility } from '@context/AccessibilityContext';
 import { useAuth } from '@context/AuthContext';
-import { DEFAULT_CAMPUS } from '@utils/studentUtils';
+import {
+  DEFAULT_CAMPUS,
+  CHILE_REGIONS,
+  DUOC_SCHOOLS,
+  SEDES_DUOC_ITEMS,
+  getSchoolForCareer,
+} from '@utils/studentUtils';
 import { ADMIN_THEME } from '@components/admin/adminTheme';
 import { Card } from '@components/ui/Card';
 import { Badge } from '@components/ui/Badge';
@@ -12,22 +18,23 @@ import { Input } from '@components/ui/Input';
 import { Modal } from '@components/ui/Modal';
 
 const INITIAL_CAREERS_CATALOG = [
-  { id: 'career-0', name: 'Ingeniería en Informática', school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` },
-  { id: 'career-1', name: 'Técnico en Programación', school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` },
-  { id: 'career-2', name: 'Analista Programador', school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` },
+  { id: 'career-0', name: 'Ingeniería en Informática', school: 'Escuela de Informática y Telecomunicaciones' },
+  { id: 'career-1', name: 'Técnico en Programación', school: 'Escuela de Informática y Telecomunicaciones' },
+  { id: 'career-2', name: 'Analista Programador', school: 'Escuela de Informática y Telecomunicaciones' },
 ];
 
-const INITIAL_SEDES_CATALOG = [
-  { id: 'sede-0', name: 'Sede Alameda', city: 'Santiago' },
-  { id: 'sede-1', name: 'Sede Antonio Varas', city: 'Santiago' },
-  { id: 'sede-2', name: 'Sede Plaza Norte', city: 'Santiago' },
-];
+const INITIAL_SEDES_CATALOG = SEDES_DUOC_ITEMS.map((s, idx) => ({
+  id: `sede-${idx}`,
+  name: s.name,
+  region: s.region,
+  city: s.city,
+}));
 
 const CATALOG_CONFIG = {
   careers: {
     idPrefix: 'career',
-    title: `Carreras Duoc UC - ${DEFAULT_CAMPUS}`,
-    subtitleFallback: `Escuela Duoc UC - ${DEFAULT_CAMPUS}`,
+    title: 'Carreras Duoc UC Oficiales',
+    subtitleFallback: 'Escuela Oficial Duoc UC',
     addPlaceholder: 'Nombre de la nueva carrera...',
     searchPlaceholder: 'Filtrar carreras...',
     emptyText: 'No se encontraron carreras.',
@@ -37,31 +44,73 @@ const CATALOG_CONFIG = {
     addAnnounce: (name) => `Carrera ${name} agregada.`,
     deleteFeedback: (name) => `Carrera "${name}" eliminada exitosamente.`,
     deleteAnnounce: (name) => `Carrera ${name} eliminada.`,
-    buildLocalItem: (name) => ({ id: `career-${Date.now()}`, name, school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` }),
-    createApi: (name) => api.createAdminCareer({ name, school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` }),
+    buildLocalItem: (name, extra = {}) => ({
+      id: `career-${Date.now()}`,
+      name,
+      school: extra.school || getSchoolForCareer(name),
+    }),
+    createApi: (name, extra = {}) =>
+      api.createAdminCareer({
+        name,
+        school: extra.school || getSchoolForCareer(name),
+      }),
     deleteApi: (key) => api.deleteAdminCareer(key),
   },
   sedes: {
     idPrefix: 'sede',
-    title: `Sedes Duoc UC - ${DEFAULT_CAMPUS}`,
-    subtitleFallback: `Campus Duoc UC - ${DEFAULT_CAMPUS}`,
-    addPlaceholder: `Nombre de sede institucional (ej. Sede Antonio Varas)...`,
+    title: 'Sedes Duoc UC a Nivel Nacional',
+    subtitleFallback: 'Región Metropolitana · Santiago',
+    addPlaceholder: 'Nombre de sede institucional (ej. Campus Villarrica)...',
     searchPlaceholder: 'Filtrar sedes...',
     emptyText: 'No se encontraron sedes.',
     deleteLabelPrefix: 'Eliminar sede',
     confirmDelete: (item) => `¿Eliminar la sede "${item.name}"?`,
-    addFeedback: (name) => `Sede "${name}" agregada exitosamente a Duoc UC.`,
+    addFeedback: (name) => `Sede "${name}" agregada exitosamente a Duoc UC a nivel nacional.`,
     addAnnounce: (name) => `Sede ${name} agregada.`,
     deleteFeedback: (name) => `Sede "${name}" eliminada exitosamente.`,
     deleteAnnounce: (name) => `Sede ${name} eliminada.`,
-    buildLocalItem: (name) => ({ id: `sede-${Date.now()}`, name, city: 'Región Metropolitana' }),
-    createApi: (name) => api.createAdminSede({ name, city: 'Región Metropolitana' }),
+    buildLocalItem: (name, extra = {}) => ({
+      id: `sede-${Date.now()}`,
+      name,
+      region: extra.region || 'Región Metropolitana',
+      city: extra.city || 'Santiago',
+    }),
+    createApi: (name, extra = {}) =>
+      api.createAdminSede({
+        name,
+        region: extra.region || 'Región Metropolitana',
+        city: extra.city || 'Santiago',
+      }),
     deleteApi: (key) => api.deleteAdminSede(key),
   },
 };
 
-function CatalogCrudCard({ kind, items, totalCount, newInput, searchValue, canEdit = true, onNewInputChange, onSearchChange, onAddSubmit, onDeleteItem, getVoiceProps }) {
+function CatalogCrudCard({
+  kind,
+  items,
+  totalCount,
+  newInput,
+  searchValue,
+  extraState,
+  canEdit = true,
+  onNewInputChange,
+  onExtraStateChange,
+  onSearchChange,
+  onAddSubmit,
+  onDeleteItem,
+  getVoiceProps,
+}) {
   const cfg = CATALOG_CONFIG[kind];
+
+  const getItemSubtitle = (item) => {
+    if (kind === 'careers') {
+      return item.school || getSchoolForCareer(item.name);
+    }
+    const region = item.region || 'Región Metropolitana';
+    const city = item.city || 'Santiago';
+    return `${region} · ${city}`;
+  };
+
   return (
     <div className={`${ADMIN_THEME.cardSurface} space-y-4`}>
       <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
@@ -73,14 +122,105 @@ function CatalogCrudCard({ kind, items, totalCount, newInput, searchValue, canEd
       </div>
 
       {canEdit ? (
-        <form onSubmit={onAddSubmit} className="space-y-2.5">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input type="text" required value={newInput} onChange={(e) => onNewInputChange(e.target.value)} placeholder={cfg.addPlaceholder} aria-label={cfg.addPlaceholder} {...getVoiceProps(cfg.addPlaceholder)} className={`flex-1 ${ADMIN_THEME.controlInput}`} />
-            <Button type="submit" variant="primary" size="sm" {...getVoiceProps(`Agregar ${kind === 'careers' ? 'carrera' : 'sede'}`)} className="min-h-[42px] px-4 py-2 inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold">
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              <span>Agregar</span>
-            </Button>
-          </div>
+        <form onSubmit={onAddSubmit} className="space-y-2.5 bg-neutral-50/80 p-3 rounded-2xl border border-neutral-200">
+          {kind === 'careers' ? (
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  type="text"
+                  required
+                  value={newInput}
+                  onChange={(e) => onNewInputChange(e.target.value)}
+                  placeholder={cfg.addPlaceholder}
+                  aria-label={cfg.addPlaceholder}
+                  {...getVoiceProps(cfg.addPlaceholder)}
+                  className={`flex-1 ${ADMIN_THEME.controlInput}`}
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  {...getVoiceProps('Agregar carrera oficial')}
+                  className="min-h-[42px] px-4 py-2 inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
+                >
+                  <Plus className="w-4 h-4" aria-hidden="true" />
+                  <span>Agregar</span>
+                </Button>
+              </div>
+              <div>
+                <label htmlFor="academic-career-school-select" className="sr-only">
+                  Escuela oficial Duoc UC
+                </label>
+                <select
+                  id="academic-career-school-select"
+                  value={extraState?.school || DUOC_SCHOOLS[0]}
+                  onChange={(e) => onExtraStateChange({ school: e.target.value })}
+                  {...getVoiceProps('Seleccionar escuela oficial para la carrera')}
+                  aria-label="Escuela oficial Duoc UC"
+                  className={`w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold`}
+                >
+                  {DUOC_SCHOOLS.map((sch) => (
+                    <option key={sch} value={sch}>
+                      {sch}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                type="text"
+                required
+                value={newInput}
+                onChange={(e) => onNewInputChange(e.target.value)}
+                placeholder={cfg.addPlaceholder}
+                aria-label={cfg.addPlaceholder}
+                {...getVoiceProps(cfg.addPlaceholder)}
+                className={`w-full ${ADMIN_THEME.controlInput}`}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label htmlFor="academic-sede-region-select" className="sr-only">
+                    Región de Chile (16 regiones)
+                  </label>
+                  <select
+                    id="academic-sede-region-select"
+                    value={extraState?.region || 'Región Metropolitana'}
+                    onChange={(e) => onExtraStateChange({ region: e.target.value })}
+                    {...getVoiceProps('Seleccionar región de Chile')}
+                    aria-label="Región de Chile (16 regiones)"
+                    className={`w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold`}
+                  >
+                    {CHILE_REGIONS.map((reg) => (
+                      <option key={reg} value={reg}>
+                        {reg}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Input
+                  type="text"
+                  value={extraState?.city || ''}
+                  onChange={(e) => onExtraStateChange({ city: e.target.value })}
+                  placeholder="Ciudad / Ubicación específica..."
+                  aria-label="Ciudad o ubicación específica de la sede"
+                  {...getVoiceProps('Ciudad o comuna de la sede')}
+                  className={`w-full ${ADMIN_THEME.controlInput}`}
+                />
+              </div>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                {...getVoiceProps('Agregar sede oficial')}
+                className="w-full sm:w-auto min-h-[42px] px-4 py-2 inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                <span>Agregar Sede</span>
+              </Button>
+            </div>
+          )}
         </form>
       ) : (
         <div className="p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-600 font-medium">
@@ -90,7 +230,15 @@ function CatalogCrudCard({ kind, items, totalCount, newInput, searchValue, canEd
 
       <div className="relative">
         <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
-        <Input type="search" value={searchValue} onChange={(e) => onSearchChange(e.target.value)} placeholder={cfg.searchPlaceholder} aria-label={cfg.searchPlaceholder} {...getVoiceProps(cfg.searchPlaceholder)} className={`w-full pl-10 pr-3 ${ADMIN_THEME.controlInput}`} />
+        <Input
+          type="search"
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={cfg.searchPlaceholder}
+          aria-label={cfg.searchPlaceholder}
+          {...getVoiceProps(cfg.searchPlaceholder)}
+          className={`w-full pl-10 pr-3 ${ADMIN_THEME.controlInput}`}
+        />
       </div>
 
       <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1 divide-y divide-neutral-100">
@@ -99,12 +247,20 @@ function CatalogCrudCard({ kind, items, totalCount, newInput, searchValue, canEd
         ) : (
           items.map((item) => (
             <div key={item._id || item.id || item.name} className="pt-2 flex items-center justify-between gap-2 hover:bg-neutral-50 p-2 rounded-xl transition-colors">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className={`${ADMIN_THEME.bodyText} font-semibold block truncate`}>{item.name}</span>
-                <span className={`${ADMIN_THEME.metaText} block truncate`}>{item.school || item.city || cfg.subtitleFallback}</span>
+                <span className={`${ADMIN_THEME.metaText} block truncate`}>{getItemSubtitle(item)}</span>
               </div>
               {canEdit && (
-                <Button variant="ghost" size="sm" onClick={() => onDeleteItem(item)} {...getVoiceProps(`${cfg.deleteLabelPrefix} ${item.name}`)} className="text-neutral-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold" aria-label={`${cfg.deleteLabelPrefix} ${item.name}`} title={`${cfg.deleteLabelPrefix} ${item.name}`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDeleteItem(item)}
+                  {...getVoiceProps(`${cfg.deleteLabelPrefix} ${item.name}`)}
+                  className="text-neutral-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
+                  aria-label={`${cfg.deleteLabelPrefix} ${item.name}`}
+                  title={`${cfg.deleteLabelPrefix} ${item.name}`}
+                >
                   <Trash2 className="w-4 h-4" aria-hidden="true" />
                 </Button>
               )}
@@ -123,8 +279,18 @@ export const AcademicCatalog = ({
   announce,
 }) => {
   const [catalogState, setCatalogState] = useState({
-    careers: { items: INITIAL_CAREERS_CATALOG, newInput: '', search: '' },
-    sedes: { items: INITIAL_SEDES_CATALOG, newInput: '', search: '' },
+    careers: {
+      items: INITIAL_CAREERS_CATALOG,
+      newInput: '',
+      search: '',
+      extra: { school: DUOC_SCHOOLS[0] },
+    },
+    sedes: {
+      items: INITIAL_SEDES_CATALOG,
+      newInput: '',
+      search: '',
+      extra: { region: 'Región Metropolitana', city: '' },
+    },
   });
   const [isLoading, setIsLoading] = useState(true);
   const [statusFeedback, setStatusFeedback] = useState(null);
@@ -170,12 +336,34 @@ export const AcademicCatalog = ({
     const cfg = CATALOG_CONFIG[kind];
     const clean = catalogState[kind].newInput.trim();
     if (!clean) return;
-    const newObj = cfg.buildLocalItem(clean);
-    setCatalogState((prev) => ({ ...prev, [kind]: { ...prev[kind], items: [newObj, ...prev[kind].items], newInput: '' } }));
+
+    const extra = catalogState[kind].extra || {};
+    const newObj = cfg.buildLocalItem(clean, extra);
+
+    setCatalogState((prev) => ({
+      ...prev,
+      [kind]: {
+        ...prev[kind],
+        items: [newObj, ...prev[kind].items],
+        newInput: '',
+        extra:
+          kind === 'careers'
+            ? { school: DUOC_SCHOOLS[0] }
+            : { region: 'Región Metropolitana', city: '' },
+      },
+    }));
+
     setStatusFeedback({ type: 'success', text: cfg.addFeedback(clean) });
     announce(cfg.addAnnounce(clean), 'polite');
-    try { const res = await cfg.createApi(clean); if (res && res.success === false) console.warn(`[AcademicCatalog] Sincronización de ${kind}:`, res.message); }
-    catch (err) { console.warn(`[AcademicCatalog] Sincronización de ${kind} con backend:`, err); }
+
+    try {
+      const res = await cfg.createApi(clean, extra);
+      if (res && res.success === false) {
+        console.warn(`[AcademicCatalog] Sincronización de ${kind}:`, res.message);
+      }
+    } catch (err) {
+      console.warn(`[AcademicCatalog] Sincronización de ${kind} con backend:`, err);
+    }
   };
 
   const handleCatalogDelete = async (kind, item) => {
@@ -194,10 +382,10 @@ export const AcademicCatalog = ({
       <Card variant="outlined" padding="lg" className="rounded-2xl p-5 sm:p-6 space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-brand-navy bg-blue-100 border border-blue-200">
           <Building2 className="w-3.5 h-3.5 text-blue-700" aria-hidden="true" />
-          <span>Gestión Dinámica • Duoc UC - Sede Alameda</span>
+          <span>Gestión Dinámica de Sedes y Carreras Duoc UC</span>
         </div>
-        <h2 id="academic-catalog-title" className={ADMIN_THEME.moduleTitle}>Administración de Carreras y Sedes</h2>
-        <p className={ADMIN_THEME.moduleSubtitle}>Agrega y elimina carreras y sedes dinámicamente para Duoc UC - Sede Alameda. Los cambios se sincronizan en tiempo real con el formulario de registro y la oferta académica.</p>
+        <h2 id="academic-catalog-title" className={ADMIN_THEME.moduleTitle}>Administración de Carreras y Sedes Oficiales Duoc UC</h2>
+        <p className={ADMIN_THEME.moduleSubtitle}>Agrega y gestiona carreras y sedes oficiales de Duoc UC a nivel nacional. Los cambios se sincronizan en tiempo real con el formulario de registro y la oferta académica.</p>
       </Card>
 
       {statusFeedback && (
@@ -220,7 +408,13 @@ export const AcademicCatalog = ({
             totalCount={totalCount}
             newInput={catalogState[kind].newInput}
             searchValue={catalogState[kind].search}
+            extraState={catalogState[kind].extra}
             onNewInputChange={(val) => updateCatalogField(kind, { newInput: val })}
+            onExtraStateChange={(patch) =>
+              updateCatalogField(kind, {
+                extra: { ...(catalogState[kind].extra || {}), ...patch },
+              })
+            }
             onSearchChange={(val) => updateCatalogField(kind, { search: val })}
             onAddSubmit={(e) => handleCatalogAdd(kind, e).catch((err) => { console.error(`[AcademicCatalog] Error agregando ${label}:`, err); })}
             onDeleteItem={(item) => handleCatalogDelete(kind, item).catch((err) => { console.error(`[AcademicCatalog] Error eliminando ${label}:`, err); })}

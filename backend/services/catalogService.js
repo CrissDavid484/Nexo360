@@ -3,6 +3,169 @@ const Career = require('../models/Career');
 const Sede = require('../models/Sede');
 const { DEFAULT_SEDE, escapeRegex, sanitizeString } = require('../utils/validationUtils');
 
+const DUOC_SCHOOLS = [
+  'Escuela de Informática y Telecomunicaciones',
+  'Escuela de Administración y Negocios',
+  'Escuela de Diseño',
+  'Escuela de Comunicación',
+  'Escuela de Construcción',
+  'Escuela de Ingeniería y Recursos Naturales',
+  'Escuela de Salud',
+  'Escuela de Turismo y Hotelería',
+  'Escuela de Gastronomía',
+];
+
+const CHILE_REGIONS = [
+  'Región de Arica y Parinacota',
+  'Región de Tarapacá',
+  'Región de Antofagasta',
+  'Región de Atacama',
+  'Región de Coquimbo',
+  'Región de Valparaíso',
+  'Región Metropolitana',
+  "Región del Libertador General Bernardo O'Higgins",
+  'Región del Maule',
+  'Región de Ñuble',
+  'Región del Biobío',
+  'Región de La Araucanía',
+  'Región de Los Ríos',
+  'Región de Los Lagos',
+  'Región de Aysén del General Carlos Ibáñez del Campo',
+  'Región de Magallanes y de la Antártica Chilena',
+];
+
+/**
+ * Mapea deterministamente una carrera a su Escuela Oficial Duoc UC
+ */
+function getSchoolForCareer(careerName = '') {
+  const c = String(careerName || '').toLowerCase();
+
+  // Informática y Telecomunicaciones
+  if (
+    c.includes('programador') ||
+    c.includes('software') ||
+    c.includes('ciberseguridad') ||
+    c.includes('ciencia de datos') ||
+    c.includes('informática') ||
+    c.includes('biomédica') ||
+    c.includes('web') ||
+    c.includes('conectividad') ||
+    c.includes('redes') ||
+    c.includes('telecomunicaciones') ||
+    c.includes('infraestructura tecnológica')
+  ) {
+    return 'Escuela de Informática y Telecomunicaciones';
+  }
+
+  // Administración y Negocios (excluye turismo)
+  if (
+    c.includes('administración') ||
+    c.includes('auditoría') ||
+    c.includes('comercio exterior') ||
+    c.includes('control de gestión') ||
+    c.includes('gestión de personas') ||
+    c.includes('gestión logística') ||
+    c.includes('operaciones logísticas') ||
+    c.includes('marketing')
+  ) {
+    if (c.includes('turística') || c.includes('turismo')) {
+      return 'Escuela de Turismo y Hotelería';
+    }
+    return 'Escuela de Administración y Negocios';
+  }
+
+  // Diseño
+  if (
+    c.includes('diseño') ||
+    c.includes('ilustración') ||
+    c.includes('ambientes') ||
+    c.includes('vestuario') ||
+    c.includes('restauración')
+  ) {
+    return 'Escuela de Diseño';
+  }
+
+  // Comunicación
+  if (
+    c.includes('actuación') ||
+    c.includes('animación digital') ||
+    c.includes('audiovisual') ||
+    c.includes('periodismo') ||
+    c.includes('publicidad') ||
+    c.includes('relaciones públicas') ||
+    c.includes('sonido') ||
+    c.includes('iluminación')
+  ) {
+    return 'Escuela de Comunicación';
+  }
+
+  // Construcción
+  if (
+    c.includes('construcción') ||
+    c.includes('arquitectónico') ||
+    c.includes('estructural') ||
+    c.includes('topografía') ||
+    c.includes('modelador proyectista')
+  ) {
+    return 'Escuela de Construcción';
+  }
+
+  // Gastronomía
+  if (c.includes('culinarias') || c.includes('gastronomía')) {
+    return 'Escuela de Gastronomía';
+  }
+
+  // Turismo y Hotelería
+  if (
+    c.includes('turismo') ||
+    c.includes('turística') ||
+    c.includes('ecoturismo') ||
+    c.includes('hotelería')
+  ) {
+    return 'Escuela de Turismo y Hotelería';
+  }
+
+  // Salud
+  if (
+    c.includes('enfermería') ||
+    c.includes('fisioterapia') ||
+    c.includes('kinesiología') ||
+    c.includes('odontología') ||
+    c.includes('farmacia') ||
+    c.includes('laboratorio clínico') ||
+    c.includes('radiodiagnóstico') ||
+    c.includes('físico') ||
+    c.includes('calidad de alimentos')
+  ) {
+    return 'Escuela de Salud';
+  }
+
+  // Ingeniería y Recursos Naturales
+  if (
+    c.includes('agrícola') ||
+    c.includes('automatización') ||
+    c.includes('electricidad') ||
+    c.includes('mantenimiento') ||
+    c.includes('maquinaria') ||
+    c.includes('mecánica') ||
+    c.includes('medio ambiente') ||
+    c.includes('minas') ||
+    c.includes('mineros') ||
+    c.includes('prevención de riesgos') ||
+    c.includes('recursos naturales') ||
+    c.includes('geología') ||
+    c.includes('industrial') ||
+    c.includes('electromecánico') ||
+    c.includes('desabolladura') ||
+    c.includes('veterinario') ||
+    c.includes('energías renovables')
+  ) {
+    return 'Escuela de Ingeniería y Recursos Naturales';
+  }
+
+  return 'Escuela de Informática y Telecomunicaciones';
+}
+
 const INITIAL_CAREERS = [
   'Actuación',
   'Administración de Empresas',
@@ -90,8 +253,52 @@ const INITIAL_CAREERS = [
   'Telecomunicaciones y Conectividad',
 ].sort((a, b) => a.localeCompare(b, 'es'));
 
-// Sede oficial inicial: Duoc UC - Sede Alameda (CRUD dinámico permite extender sedes en tiempo de ejecución)
-const INITIAL_SEDES = [DEFAULT_SEDE];
+// 20 Sedes Oficiales de Duoc UC a Nivel Nacional
+const INITIAL_SEDES = [
+  { name: 'Sede Alameda', region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Antonio Varas', region: 'Región Metropolitana', city: 'Providencia' },
+  { name: 'Sede Brasil', region: 'Región de Valparaíso', city: 'Valparaíso' },
+  { name: 'Campus Arauco', region: 'Región del Biobío', city: 'Arauco' },
+  { name: 'Campus Nacimiento', region: 'Región del Biobío', city: 'Nacimiento' },
+  { name: 'Campus Villarrica', region: 'Región de La Araucanía', city: 'Villarrica' },
+  { name: 'Sede Educación Continua', region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Melipilla', region: 'Región Metropolitana', city: 'Melipilla' },
+  { name: 'Sede Maipú', region: 'Región Metropolitana', city: 'Maipú' },
+  { name: 'Sede Padre Alonso de Ovalle', region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Plaza Norte', region: 'Región Metropolitana', city: 'Huechuraba' },
+  { name: 'Sede Plaza Oeste', region: 'Región Metropolitana', city: 'Cerrillos' },
+  { name: 'Sede Plaza Vespucio', region: 'Región Metropolitana', city: 'La Florida' },
+  { name: 'Sede Puente Alto', region: 'Región Metropolitana', city: 'Puente Alto' },
+  { name: 'Campus Puerto Montt', region: 'Región de Los Lagos', city: 'Puerto Montt' },
+  { name: 'Sede San Bernardo', region: 'Región Metropolitana', city: 'San Bernardo' },
+  { name: 'Sede San Carlos de Apoquindo', region: 'Región Metropolitana', city: 'Las Condes' },
+  { name: 'Sede San Joaquín', region: 'Región Metropolitana', city: 'San Joaquín' },
+  { name: 'Sede Valparaíso', region: 'Región de Valparaíso', city: 'Valparaíso' },
+  { name: 'Sede Viña del Mar', region: 'Región de Valparaíso', city: 'Viña del Mar' },
+];
+
+const OFFICIAL_SEDES_SPECS = [
+  { name: 'Sede Alameda', match: /^(Sede\s+)?Alameda$/i, region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Antonio Varas', match: /^(Sede\s+)?Antonio Varas$/i, region: 'Región Metropolitana', city: 'Providencia' },
+  { name: 'Sede Brasil', match: /^(Sede\s+)?Brasil$/i, region: 'Región de Valparaíso', city: 'Valparaíso' },
+  { name: 'Campus Arauco', match: /^(Campus\s+|Sede\s+)?Arauco$/i, region: 'Región del Biobío', city: 'Arauco' },
+  { name: 'Campus Nacimiento', match: /^(Campus\s+|Sede\s+)?Nacimiento$/i, region: 'Región del Biobío', city: 'Nacimiento' },
+  { name: 'Campus Villarrica', match: /^(Campus\s+|Sede\s+)?Villarrica$/i, region: 'Región de La Araucanía', city: 'Villarrica' },
+  { name: 'Sede Educación Continua', match: /^(Sede\s+)?Educaci[oó]n Continua$/i, region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Melipilla', match: /^(Sede\s+)?Melipilla$/i, region: 'Región Metropolitana', city: 'Melipilla' },
+  { name: 'Sede Maipú', match: /^(Sede\s+)?Maip[uú]$/i, region: 'Región Metropolitana', city: 'Maipú' },
+  { name: 'Sede Padre Alonso de Ovalle', match: /^(Sede\s+)?Padre Alonso de Ovalle$/i, region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Plaza Norte', match: /^(Sede\s+)?Plaza Norte$/i, region: 'Región Metropolitana', city: 'Huechuraba' },
+  { name: 'Sede Plaza Oeste', match: /^(Sede\s+)?Plaza Oeste$/i, region: 'Región Metropolitana', city: 'Cerrillos' },
+  { name: 'Sede Plaza Vespucio', match: /^(Sede\s+)?Plaza Vespucio$/i, region: 'Región Metropolitana', city: 'La Florida' },
+  { name: 'Sede Puente Alto', match: /^(Sede\s+)?Puente Alto$/i, region: 'Región Metropolitana', city: 'Puente Alto' },
+  { name: 'Campus Puerto Montt', match: /^(Campus\s+|Sede\s+)?Puerto Montt$/i, region: 'Región de Los Lagos', city: 'Puerto Montt' },
+  { name: 'Sede San Bernardo', match: /^(Sede\s+)?San Bernardo$/i, region: 'Región Metropolitana', city: 'San Bernardo' },
+  { name: 'Sede San Carlos de Apoquindo', match: /^(Sede\s+)?San Carlos de Apoquindo$/i, region: 'Región Metropolitana', city: 'Las Condes' },
+  { name: 'Sede San Joaquín', match: /^(Sede\s+)?San Joaqu[ií]n$/i, region: 'Región Metropolitana', city: 'San Joaquín' },
+  { name: 'Sede Valparaíso', match: /^(Sede\s+)?Valpara[ií]so$/i, region: 'Región de Valparaíso', city: 'Valparaíso' },
+  { name: 'Sede Viña del Mar', match: /^(Sede\s+)?Viña del Mar$/i, region: 'Región de Valparaíso', city: 'Viña del Mar' },
+];
 
 /**
  * Verifica si un error de MongoDB corresponde exclusivamente a colisión benigna por clave duplicada (E11000).
@@ -114,6 +321,8 @@ function createHttpError(statusCode, message) {
   return err;
 }
 
+let catalogMigrationDone = false;
+
 /**
  * Factoría DRY para gestionar catálogos dinámicos (Carreras y Sedes) con respaldo en memoria.
  */
@@ -126,11 +335,14 @@ function createCatalogManager({
   mapSeedDoc,
   buildCreatePayload,
 }) {
-  let inMemoryItems = initialItems.map((item, idx) => ({
-    _id: `${idPrefix}_${idx + 1}`,
-    id: `${idPrefix}_${idx + 1}`,
-    ...mapSeedDoc(item, idx),
-  }));
+  let inMemoryItems = initialItems.map((item, idx) => {
+    const rawName = typeof item === 'object' && item !== null ? item.name : item;
+    return {
+      _id: `${idPrefix}_${idx + 1}`,
+      id: `${idPrefix}_${idx + 1}`,
+      ...mapSeedDoc(item, idx),
+    };
+  });
 
   async function seedIfEmptyInDb() {
     let dbItems = await Model.find({}).sort({ name: 1 }).lean();
@@ -138,7 +350,7 @@ function createCatalogManager({
       return dbItems;
     }
 
-    const docs = inMemoryItems.map((entry, idx) => mapSeedDoc(entry.name, idx, entry));
+    const docs = inMemoryItems.map((entry, idx) => mapSeedDoc(entry, idx, entry));
     try {
       await Model.insertMany(docs, { ordered: false });
     } catch (insertErr) {
@@ -155,6 +367,9 @@ function createCatalogManager({
     let items = [];
     if (mongoose.connection.readyState === 1) {
       try {
+        if (!catalogMigrationDone) {
+          await migrateCatalogDuocData();
+        }
         const dbItems = await seedIfEmptyInDb();
         if (dbItems && dbItems.length > 0) {
           items = dbItems;
@@ -255,15 +470,18 @@ const careerCatalog = createCatalogManager({
   idPrefix: 'career',
   singularLabel: 'carrera',
   pluralLabel: 'carreras',
-  mapSeedDoc: (name, idx, existing) => ({
-    name,
-    code: existing?.code || `CARR-${idx + 1}`,
-    school: existing?.school || 'Escuela Duoc UC',
-  }),
+  mapSeedDoc: (item, idx, existing) => {
+    const name = typeof item === 'object' && item !== null ? item.name : item;
+    return {
+      name,
+      code: existing?.code || `CARR-${idx + 1}`,
+      school: existing?.school || getSchoolForCareer(name),
+    };
+  },
   buildCreatePayload: (cleanName, rawBody) => ({
     name: cleanName,
     code: sanitizeString(rawBody.code, 20) || '',
-    school: sanitizeString(rawBody.school, 120) || 'Escuela Duoc UC',
+    school: sanitizeString(rawBody.school, 120) || getSchoolForCareer(cleanName),
   }),
 });
 
@@ -273,19 +491,142 @@ const sedeCatalog = createCatalogManager({
   idPrefix: 'sede',
   singularLabel: 'sede',
   pluralLabel: 'sedes',
-  mapSeedDoc: (name, _idx, existing) => ({
-    name,
-    city: existing?.city || 'Región Metropolitana',
-  }),
-  buildCreatePayload: (cleanName, rawBody) => ({
-    name: cleanName,
-    city: sanitizeString(rawBody.city, 80) || 'Región Metropolitana',
-  }),
+  mapSeedDoc: (item, _idx, existing) => {
+    const isObj = typeof item === 'object' && item !== null;
+    const name = isObj ? item.name : item;
+    const region = isObj ? item.region : (existing?.region || 'Región Metropolitana');
+    const city = isObj ? item.city : (existing?.city || 'Santiago');
+    return {
+      name,
+      region,
+      city,
+    };
+  },
+  buildCreatePayload: (cleanName, rawBody) => {
+    const region = sanitizeString(rawBody.region, 100) || 'Región Metropolitana';
+    const city = sanitizeString(rawBody.city, 80) || (region === 'Región Metropolitana' ? 'Santiago' : '');
+    return {
+      name: cleanName,
+      region,
+      city,
+    };
+  },
 });
 
+/**
+ * Migración y normalización automática del catálogo institucional Duoc UC en MongoDB:
+ * 1. Reemplaza "Escuela Duoc UC" (o escuelas genéricas/vacías/no oficiales) por la Escuela Oficial Duoc UC en todas las carreras.
+ * 2. Upsert de las 20 sedes oficiales Duoc UC con su Región y Ciudad reales a nivel nacional.
+ * 3. Depuración de sedes obsoletas (ej. Sede San Andrés de Concepción).
+ */
+async function migrateCatalogDuocData() {
+  if (mongoose.connection.readyState !== 1) {
+    return { success: false, message: 'Database not connected' };
+  }
+
+  const results = {
+    careersUpdated: 0,
+    sedesUpserted: 0,
+  };
+
+  try {
+    // 1. Sembrar carreras iniciales si la colección está vacía
+    const existingCareersCount = await Career.countDocuments();
+    if (existingCareersCount === 0) {
+      const docs = INITIAL_CAREERS.map((name, idx) => ({
+        name,
+        code: `CARR-${idx + 1}`,
+        school: getSchoolForCareer(name),
+      }));
+      await Career.insertMany(docs, { ordered: false }).catch((err) => {
+        if (!isDuplicateKeyBulkError(err)) {
+          console.warn('[CatalogService] Warning sembrando carreras:', err.message);
+        }
+      });
+    }
+
+    // 2. Actualizar todas las carreras existentes con bulkWrite
+    const careersToMigrate = await Career.find({
+      $or: [
+        { school: { $regex: /escuela duoc uc/i } },
+        { school: { $in: ['', null] } },
+        { school: { $exists: false } },
+        { school: { $nin: DUOC_SCHOOLS } },
+      ],
+    }).lean();
+
+    if (careersToMigrate.length > 0) {
+      const careerOps = careersToMigrate.map((car) => ({
+        updateOne: {
+          filter: { _id: car._id },
+          update: { $set: { school: getSchoolForCareer(car.name) } },
+        },
+      }));
+      await Career.bulkWrite(careerOps, { ordered: false });
+      results.careersUpdated = careerOps.length;
+    }
+
+    // 3. Limpiar sedes obsoletas que ya no pertenecen al catálogo de 20 sedes oficiales
+    await Sede.deleteMany({
+      name: { $regex: /san andr[eé]s de concepci[oó]n/i },
+    });
+
+    // 4. Upsert de las 20 sedes oficiales de Duoc UC con bulkWrite eficiente
+    const existingSedes = await Sede.find({}).lean();
+    const sedeOps = [];
+
+    for (const spec of OFFICIAL_SEDES_SPECS) {
+      const existing = existingSedes.find((s) => spec.match.test(s.name));
+      if (existing) {
+        const needsUpdate =
+          existing.region !== spec.region ||
+          existing.city !== spec.city ||
+          (existing.name !== spec.name && spec.name.includes(existing.name));
+        if (needsUpdate) {
+          sedeOps.push({
+            updateOne: {
+              filter: { _id: existing._id },
+              update: { $set: { name: spec.name, region: spec.region, city: spec.city } },
+            },
+          });
+        }
+      } else {
+        sedeOps.push({
+          insertOne: {
+            document: {
+              name: spec.name,
+              region: spec.region,
+              city: spec.city,
+            },
+          },
+        });
+      }
+    }
+
+    if (sedeOps.length > 0) {
+      await Sede.bulkWrite(sedeOps, { ordered: false });
+    }
+    results.sedesUpserted = OFFICIAL_SEDES_SPECS.length;
+
+    catalogMigrationDone = true;
+    return { success: true, ...results };
+  } catch (err) {
+    console.error('[CatalogService] Error en migrateCatalogDuocData:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+const ensureOfficialDuocCatalog = migrateCatalogDuocData;
+
 module.exports = {
+  DUOC_SCHOOLS,
+  CHILE_REGIONS,
   INITIAL_CAREERS,
   INITIAL_SEDES,
+  OFFICIAL_SEDES_SPECS,
   careerCatalog,
   sedeCatalog,
+  getSchoolForCareer,
+  migrateCatalogDuocData,
+  ensureOfficialDuocCatalog,
 };

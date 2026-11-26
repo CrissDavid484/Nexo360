@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { lazyLoad } from './utils/lazyLoad';
 import { SkipLink } from './components/common/SkipLink';
@@ -12,22 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 
 // Code-Splitting para optimización extrema de carga y rendimiento de red
 const DashboardPage = lazyLoad(() => import('./pages/DashboardPage'), 'DashboardPage');
-
 const NotFoundPage = lazyLoad(() => import('./pages/NotFoundPage'), 'NotFoundPage');
-
-const TomaRamosSimulator = lazyLoad(
-  () => import('./components/simulation/TomaRamosSimulator'),
-  'TomaRamosSimulator'
-);
-
-const TomaRamosRoute = () => {
-  const navigate = useNavigate();
-  return (
-    <ProtectedRoute>
-      <TomaRamosSimulator onExit={() => navigate('/dashboard')} />
-    </ProtectedRoute>
-  );
-};
 
 // Componente para proteger las rutas privadas institucionales
 const ProtectedRoute = ({ children }) => {
@@ -51,7 +36,36 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Ruta raíz inteligente: redirige al dashboard si ya está autenticado o al login si no
+// Componente para proteger las rutas exclusivas de administración y coordinación PAEDIS (RBAC)
+const AdminProtectedRoute = ({ children }) => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-12" role="status" aria-live="polite">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-amber-400 border-t-[#002B49] rounded-full animate-spin mx-auto mb-3" aria-hidden="true"></div>
+          <p className="text-slate-600 font-semibold text-sm">Verificando autorizaciones de seguridad Duoc UC...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const role = (user?.role || '').toLowerCase();
+  const isAuthorized = role === 'admin' || role === 'administrador' || role === 'coordinador_paedis';
+
+  if (!isAuthorized) {
+    return <Navigate to="/centro-de-ayuda" replace />;
+  }
+
+  return children;
+};
+
+// Ruta raíz inteligente: redirige al centro de ayuda si ya está autenticado o al login si no
 const RootRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -66,7 +80,7 @@ const RootRoute = () => {
     );
   }
 
-  return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
+  return <Navigate to={isAuthenticated ? "/centro-de-ayuda" : "/login"} replace />;
 };
 
 export const App = () => {
@@ -152,18 +166,85 @@ export const App = () => {
             <Route path="/" element={<RootRoute />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<LoginPage initialMode="reset" />} />
+
+            {/* Rutas Principales Institucionales con Enrutamiento Real y Persistencia F5 */}
             <Route
-              path="/dashboard"
+              path="/centro-de-ayuda"
               element={
                 <ProtectedRoute>
                   <DashboardPage />
                 </ProtectedRoute>
               }
             />
-            <Route path="/toma-ramos" element={<TomaRamosRoute />} />
+            <Route
+              path="/toma-ramos"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/biblioteca"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vivo-duoc"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/soporte"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/perfil"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Rutas de Administración Protegidas por RBAC (Admin y Coordinador PAEDIS) */}
+            <Route
+              path="/panel-admin"
+              element={
+                <AdminProtectedRoute>
+                  <DashboardPage />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="/panel-admin/:subTab"
+              element={
+                <AdminProtectedRoute>
+                  <DashboardPage />
+                </AdminProtectedRoute>
+              }
+            />
+
+            {/* Redirecciones de Compatibilidad, Alias y Rutas Rápidas */}
+            <Route path="/dashboard" element={<Navigate to="/centro-de-ayuda" replace />} />
             <Route path="/simulador" element={<Navigate to="/toma-ramos" replace />} />
             <Route path="/simulador-toma-ramos" element={<Navigate to="/toma-ramos" replace />} />
-            
+            <Route path="/tickets" element={<Navigate to="/soporte" replace />} />
+            <Route path="/admin-panel" element={<Navigate to="/panel-admin" replace />} />
+            <Route path="/admin-panel/*" element={<Navigate to="/panel-admin" replace />} />
+            <Route path="/admin" element={<Navigate to="/panel-admin" replace />} />
+            <Route path="/admin/*" element={<Navigate to="/panel-admin" replace />} />
+
             {/* 4. Ruta 404 Institucional: Página no encontrada */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

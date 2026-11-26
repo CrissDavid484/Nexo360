@@ -10,6 +10,7 @@ const courseRoutes = require('./routes/courseRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const simulatorSnapshotService = require('./services/simulatorSnapshotService');
 const academicCalendarService = require('./services/academicCalendarService');
+const catalogService = require('./services/catalogService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -154,6 +155,7 @@ async function startServer() {
   try {
     await connectDB();
     await academicCalendarService.ensureSeedCalendars();
+    await catalogService.migrateCatalogDuocData();
     simulatorSnapshotService.startSnapshotScheduler();
   } catch (err) {
     console.error('[MongoDB Error] Fallo al conectar en inicio:', err.message);

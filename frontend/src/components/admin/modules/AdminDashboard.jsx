@@ -246,7 +246,8 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
   const minLeft = halfWidth + 8;
   const maxLeft = mousePos ? Math.max(minLeft, mousePos.containerWidth - halfWidth - 8) : minLeft;
   const left = mousePos ? Math.min(Math.max(mousePos.x, minLeft), maxLeft) : 0;
-  const isBelow = mousePos ? mousePos.y < 130 : false;
+  // El tooltip se despliega SIEMPRE hacia arriba con separación de 26px sobre el cursor para no tapar la barra
+  const isBelow = false;
   const caretOffset = mousePos
     ? Math.min(Math.max(mousePos.x - left, -halfWidth + 24), halfWidth - 24)
     : 0;
@@ -254,8 +255,8 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
   const tooltipStyle = mousePos
     ? {
         left: `${left}px`,
-        top: isBelow ? `${mousePos.y + 16}px` : `${mousePos.y - 12}px`,
-        transform: isBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+        top: `${mousePos.y - 26}px`,
+        transform: 'translate(-50%, -100%)',
         width: `${tooltipWidth}px`,
       }
     : {
@@ -306,11 +307,7 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
           {/* Flecha/indicador visual apuntando hacia el cursor */}
           {mousePos && (
             <div
-              className={`absolute w-3 h-3 bg-[#002B49] dark:bg-slate-900 rotate-45 ${
-                isBelow
-                  ? '-top-1.5 border-l border-t border-sky-400/40 dark:border-sky-500/40'
-                  : '-bottom-1.5 border-r border-b border-sky-400/40 dark:border-sky-500/40'
-              }`}
+              className="absolute -bottom-1.5 w-3 h-3 bg-[#002B49] dark:bg-slate-900 rotate-45 border-r border-b border-sky-400/40 dark:border-sky-500/40"
               style={{ left: `calc(50% + ${caretOffset}px - 6px)` }}
               aria-hidden="true"
             />

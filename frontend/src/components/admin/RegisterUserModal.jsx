@@ -10,6 +10,10 @@ import {
   KeyRound,
   Mail,
   Sparkles,
+  Tag,
+  Plus,
+  ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useAccessibleModal } from '../../hooks/useAccessibleModal';
@@ -32,7 +36,82 @@ const INPUT_CLASS =
 
 const COLOR_BLIND_FILTER_OPTIONS = COLOR_BLIND_MODES.filter((mode) => mode.id !== 'none');
 
+export const STAFF_ROLE_META = {
+  coordinador_paedis: {
+    label: 'Coordinador PAEDIS',
+    color: 'purple',
+    permissions: ['paedis_read', 'paedis_write', 'manage_students', 'sat_monitoring'],
+    badges: ['PAEDIS', 'Inclusión', 'UAP'],
+  },
+  profesor: {
+    label: 'Docente Duoc UC',
+    color: 'blue',
+    permissions: ['paedis_read_students', 'class_management'],
+    badges: ['Docencia', 'Aula'],
+  },
+  director: {
+    label: 'Directivo Institucional',
+    color: 'emerald',
+    permissions: ['institutional_overview', 'continuity_exceptions', 'titration_equity'],
+    badges: ['Directivo', 'Gestión'],
+  },
+  subdirector: {
+    label: 'Subdirectivo Institucional',
+    color: 'emerald',
+    permissions: ['institutional_overview', 'continuity_exceptions'],
+    badges: ['Subdirección', 'Gestión'],
+  },
+  administrativo: {
+    label: 'Personal Administrativo',
+    color: 'slate',
+    permissions: ['operational_support', 'benefits_management'],
+    badges: ['Operaciones', 'Atención'],
+  },
+  admin: {
+    label: 'Administrador Nexo360',
+    color: 'amber',
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config', 'paedis_read', 'paedis_write'],
+    badges: ['TI', 'SuperAdmin', 'Seguridad'],
+  },
+};
+
+export const ALL_SYSTEM_PERMISSIONS = [
+  { id: 'full_access', label: 'Acceso completo', description: 'Acceso irrestricto a todas las funciones y configuraciones' },
+  { id: 'manage_users', label: 'Gestionar usuarios', description: 'Creación, edición y administración de roles y perfiles' },
+  { id: 'manage_catalogs', label: 'Gestionar catálogos', description: 'Administración de sedes, carreras y asignaturas' },
+  { id: 'audit_logs', label: 'Ver auditoría', description: 'Acceso a registros y bitácora de seguridad' },
+  { id: 'system_config', label: 'Configuración sistema', description: 'Parámetros institucionales y plataforma' },
+  { id: 'paedis_read', label: 'Leer PAEDIS', description: 'Consulta de expedientes y ajustes razonables' },
+  { id: 'paedis_write', label: 'Escribir PAEDIS', description: 'Aprobación, edición y emisión de fichas PAEDIS' },
+  { id: 'manage_students', label: 'Gestionar estudiantes', description: 'Gestión directa de fichas y datos estudiantiles' },
+  { id: 'sat_monitoring', label: 'Monitoreo SAT', description: 'Seguimiento de Alerta Temprana e intervenciones' },
+  { id: 'paedis_read_students', label: 'Leer estudiantes PAEDIS', description: 'Consulta de fichas docentes y adaptaciones' },
+  { id: 'class_management', label: 'Gestión de clases', description: 'Administración de asistencia y secciones en aula' },
+  { id: 'institutional_overview', label: 'Vista institucional', description: 'Supervisión de métricas de sede e institucionales' },
+  { id: 'continuity_exceptions', label: 'Excepciones continuidad', description: 'Aprobación de excepciones de continuidad de estudios' },
+  { id: 'titration_equity', label: 'Equidad titulación', description: 'Supervisión de procesos de titulación equitativa' },
+  { id: 'operational_support', label: 'Soporte operacional', description: 'Atención a la comunidad y soporte operativo' },
+  { id: 'benefits_management', label: 'Gestión beneficios', description: 'Administración de beneficios institucionales y becas' },
+];
+
+export const SUGGESTED_BADGE_TAGS = [
+  'PAEDIS',
+  'Inclusión',
+  'UAP',
+  'Docencia',
+  'Aula',
+  'Directivo',
+  'Gestión',
+  'Subdirección',
+  'Operaciones',
+  'Atención',
+  'TI',
+  'SuperAdmin',
+  'Seguridad',
+];
+
 function createInitialFormState(defaultCampus) {
+  const defaultStaffRole = 'coordinador_paedis';
   return {
     firstName: '',
     paternalLastName: '',
@@ -44,10 +123,12 @@ function createInitialFormState(defaultCampus) {
     disabilityProfile: 'ninguna',
     colorBlindMode: 'deuteranopia',
     enableVoiceReaderByDefault: true,
-    staffRole: 'coordinador_paedis',
+    staffRole: defaultStaffRole,
     career: '',
     campus: defaultCampus || 'Sede Alameda',
     attendanceRate: '88.9',
+    permissions: STAFF_ROLE_META[defaultStaffRole]?.permissions ? [...STAFF_ROLE_META[defaultStaffRole].permissions] : [],
+    badges: STAFF_ROLE_META[defaultStaffRole]?.badges ? [...STAFF_ROLE_META[defaultStaffRole].badges] : [],
   };
 }
 
@@ -218,6 +299,11 @@ function buildRegistrationPayload({ form, careerQuery, customDomain = '', custom
       disabilityProfile: payload.disabilityProfile,
       colorBlindMode: payload.colorBlindMode || meta?.defaults?.colorBlindMode || 'none',
     };
+  }
+
+  if (!isStudent) {
+    payload.permissions = Array.isArray(form.permissions) ? form.permissions : [];
+    payload.badges = Array.isArray(form.badges) ? form.badges : [];
   }
 
   return payload;
@@ -475,35 +561,247 @@ function PaedisStudentSection({
   );
 }
 
-function StaffRoleSection({ staffRole, isAdmin, onStaffRoleChange, getVoiceProps }) {
+function StaffRoleSection({
+  staffRole,
+  permissions = [],
+  badges = [],
+  isAdmin,
+  onStaffRoleChange,
+  onPermissionsChange,
+  onBadgesChange,
+  getVoiceProps,
+}) {
+  const [badgeInput, setBadgeInput] = useState('');
+
+  const handleAddBadge = (tagToAdd) => {
+    const clean = (tagToAdd || badgeInput).trim();
+    if (!clean) return;
+    if (badges.some((b) => b.toLowerCase() === clean.toLowerCase())) {
+      setBadgeInput('');
+      return;
+    }
+    onBadgesChange?.([...badges, clean]);
+    setBadgeInput('');
+  };
+
+  const handleRemoveBadge = (tagToRemove) => {
+    onBadgesChange?.(badges.filter((b) => b !== tagToRemove));
+  };
+
+  const handleTogglePermission = (permId) => {
+    if (permissions.includes(permId)) {
+      onPermissionsChange?.(permissions.filter((p) => p !== permId));
+    } else {
+      onPermissionsChange?.([...permissions, permId]);
+    }
+  };
+
+  const handleResetToRoleDefaults = () => {
+    const meta = STAFF_ROLE_META[staffRole];
+    if (meta) {
+      onPermissionsChange?.([...meta.permissions]);
+      onBadgesChange?.([...meta.badges]);
+    }
+  };
+
+  const handleSelectAllPermissions = () => {
+    onPermissionsChange?.(ALL_SYSTEM_PERMISSIONS.map((p) => p.id));
+  };
+
+  const handleClearPermissions = () => {
+    onPermissionsChange?.([]);
+  };
+
   return (
-    <div className="space-y-1.5">
-      <label htmlFor="create-staff-role" className="text-xs font-semibold text-slate-700">
-        Rol Institucional <span className="text-red-600">*</span>
-      </label>
-      <select
-        id="create-staff-role"
-        required
-        value={staffRole}
-        onChange={(e) => onStaffRoleChange(e.target.value)}
-        {...getVoiceProps('Seleccionar rol institucional del funcionario')}
-        className={INPUT_CLASS}
-      >
-        <option value="coordinador_paedis">Coordinador PAEDIS</option>
-        {isAdmin ? (
-          <option value="admin">Administrador</option>
-        ) : (
-          <option value="admin" disabled>
-            Administrador (Restringido: Solo Administrador puede asignar este rol)
-          </option>
+    <div className="space-y-4 p-4 bg-slate-50/90 border border-slate-200 rounded-2xl">
+      <div className="space-y-1.5">
+        <label htmlFor="create-staff-role" className="text-xs font-semibold text-slate-700">
+          Rol Institucional <span className="text-red-600">*</span>
+        </label>
+        <select
+          id="create-staff-role"
+          required
+          value={staffRole}
+          onChange={(e) => onStaffRoleChange(e.target.value)}
+          {...getVoiceProps('Seleccionar rol institucional del funcionario')}
+          className={INPUT_CLASS}
+        >
+          <option value="coordinador_paedis">Coordinador PAEDIS</option>
+          <option value="profesor">Docente Duoc UC</option>
+          <option value="director">Directivo Institucional</option>
+          <option value="subdirector">Subdirectivo Institucional</option>
+          <option value="administrativo">Personal Administrativo</option>
+          {isAdmin ? (
+            <option value="admin">Administrador Nexo360</option>
+          ) : (
+            <option value="admin" disabled>
+              Administrador (Restringido: Solo Administrador puede asignar este rol)
+            </option>
+          )}
+        </select>
+        {!isAdmin && (
+          <span className="text-[11px] text-slate-500 font-medium block">
+            *Por política de seguridad institucional, solo un Administrador puede crear usuarios con
+            rol Administrador.
+          </span>
         )}
-      </select>
-      {!isAdmin && (
-        <span className="text-[11px] text-slate-500 font-medium block">
-          *Por política de seguridad institucional, solo un Administrador puede crear usuarios con
-          rol Administrador.
-        </span>
-      )}
+      </div>
+
+      {/* Badges / Tarjetas Tags */}
+      <div className="space-y-2 pt-2 border-t border-slate-200/80">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <label htmlFor="create-badge-input" className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+            <Tag className="w-3.5 h-3.5 text-brand-navy" aria-hidden="true" />
+            <span>Tarjetas y Badges de Rol ({badges.length})</span>
+          </label>
+          <span className="text-[11px] text-slate-500 font-medium">
+            Etiquetas visuales de rol y asignación
+          </span>
+        </div>
+
+        {/* Active badges list */}
+        <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 bg-white border border-slate-200 rounded-xl" aria-label="Tarjetas asignadas">
+          {badges.length === 0 ? (
+            <span className="text-xs text-slate-400 italic">Sin tarjetas asignadas. Agrega una abajo.</span>
+          ) : (
+            badges.map((badge) => (
+              <span
+                key={badge}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-900 border border-blue-200"
+              >
+                <span>{badge}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveBadge(badge)}
+                  {...getVoiceProps(`Eliminar tarjeta ${badge}`)}
+                  className="p-0.5 hover:bg-blue-200 text-blue-700 rounded-md cursor-pointer transition-colors"
+                  aria-label={`Eliminar tarjeta ${badge}`}
+                >
+                  <X className="w-3 h-3" aria-hidden="true" />
+                </button>
+              </span>
+            ))
+          )}
+        </div>
+
+        {/* Input to add badge + suggestions */}
+        <div className="flex gap-2">
+          <input
+            id="create-badge-input"
+            type="text"
+            value={badgeInput}
+            onChange={(e) => setBadgeInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddBadge();
+              }
+            }}
+            placeholder="Escribir tarjeta / badge..."
+            {...getVoiceProps('Escribir nueva tarjeta o badge')}
+            className={`${INPUT_CLASS} text-xs py-1.5`}
+          />
+          <button
+            type="button"
+            onClick={() => handleAddBadge()}
+            {...getVoiceProps('Agregar tarjeta')}
+            className="px-3.5 py-2 bg-[#002B49] hover:bg-[#001f35] text-white text-xs font-bold rounded-xl transition-all shrink-0 flex items-center gap-1 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Agregar</span>
+          </button>
+        </div>
+
+        {/* Suggested chips */}
+        <div className="flex items-center gap-1.5 flex-wrap pt-1">
+          <span className="text-[11px] font-semibold text-slate-500">Sugerencias:</span>
+          {SUGGESTED_BADGE_TAGS.map((tag) => {
+            const isAssigned = badges.includes(tag);
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => (isAssigned ? handleRemoveBadge(tag) : handleAddBadge(tag))}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer border ${
+                  isAssigned
+                    ? 'bg-blue-100 border-blue-300 text-blue-800'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+                aria-pressed={isAssigned}
+              >
+                {tag} {isAssigned ? '✓' : '+'}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Permissions Section */}
+      <div className="space-y-2 pt-2 border-t border-slate-200/80">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+            <span className="text-xs font-semibold text-slate-800">
+              Permisos Habilitados ({permissions.length} de {ALL_SYSTEM_PERMISSIONS.length})
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleResetToRoleDefaults}
+              {...getVoiceProps('Restablecer permisos por defecto del rol')}
+              className="text-[11px] font-semibold text-brand-navy hover:underline flex items-center gap-1 px-2 py-1 rounded cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" aria-hidden="true" />
+              <span>Por defecto</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSelectAllPermissions}
+              className="text-[11px] font-semibold text-blue-700 hover:underline px-2 py-1 cursor-pointer"
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={handleClearPermissions}
+              className="text-[11px] font-semibold text-red-600 hover:underline px-2 py-1 cursor-pointer"
+            >
+              Ninguno
+            </button>
+          </div>
+        </div>
+
+        {/* Permissions grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border border-slate-200 rounded-xl bg-white" role="group" aria-label="Permisos del funcionario">
+          {ALL_SYSTEM_PERMISSIONS.map((perm) => {
+            const isChecked = permissions.includes(perm.id);
+            return (
+              <label
+                key={perm.id}
+                className={`p-2 rounded-lg border text-left cursor-pointer transition-all flex items-start gap-2 ${
+                  isChecked
+                    ? 'bg-blue-50/70 border-blue-300 text-slate-900'
+                    : 'bg-white border-slate-150 hover:bg-slate-50 text-slate-600'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => handleTogglePermission(perm.id)}
+                  className="mt-0.5 w-4 h-4 rounded text-brand-navy focus:ring-brand-navy border-slate-300"
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-bold block truncate">{perm.label}</span>
+                  <span className="text-[10px] text-slate-500 leading-tight block truncate">
+                    {perm.description}
+                  </span>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -972,8 +1270,19 @@ export const RegisterUserModal = ({
             ) : (
               <StaffRoleSection
                 staffRole={form.staffRole}
+                permissions={form.permissions}
+                badges={form.badges}
                 isAdmin={isAdmin}
-                onStaffRoleChange={(staffRole) => setForm((prev) => ({ ...prev, staffRole }))}
+                onStaffRoleChange={(staffRole) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    staffRole,
+                    permissions: STAFF_ROLE_META[staffRole]?.permissions ? [...STAFF_ROLE_META[staffRole].permissions] : prev.permissions,
+                    badges: STAFF_ROLE_META[staffRole]?.badges ? [...STAFF_ROLE_META[staffRole].badges] : prev.badges,
+                  }));
+                }}
+                onPermissionsChange={(permissions) => setForm((prev) => ({ ...prev, permissions }))}
+                onBadgesChange={(badges) => setForm((prev) => ({ ...prev, badges }))}
                 getVoiceProps={getVoiceProps}
               />
             )}

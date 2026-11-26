@@ -689,4 +689,128 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(afterSummary.status, 200);
     assert.equal(afterSummary.body?.summary?.totalSecciones, countBefore);
   });
+
+  test('13. Gestión de Permisos y Badges de Equipo: Persistencia en registro, actualización vía PATCH /api/admin/users/:id/permissions y RBAC', async () => {
+    // 1. Registrar funcionario con permisos y badges personalizados
+    const staffEmail = `prof.test.${Date.now()}@profesor.duoc.cl`;
+    const createStaffRes = await request('/api/admin/students', {
+      method: 'POST',
+      headers: adminHeaders,
+      body: {
+        firstName: 'Profesor',
+        paternalLastName: 'Prueba',
+        email: staffEmail,
+        rut: '15.987.654-3',
+        role: 'profesor',
+        campus: 'Sede Alameda',
+        permissions: ['paedis_read_students', 'class_management'],
+        badges: ['Docencia', 'Aula', 'Ingeniería'],
+        consentimientoLey21719: { aceptado: true },
+      },
+    });
+    assert.equal(createStaffRes.status, 201);
+    const createdUser = createStaffRes.body?.user;
+    assert.ok(createdUser);
+    assert.deepEqual(createdUser.permissions, ['paedis_read_students', 'class_management']);
+    assert.deepEqual(createdUser.badges, ['Docencia', 'Aula', 'Ingeniería']);
+
+    // 2. Coordinador no puede actualizar permisos (403)
+    const coordUpdateRes = await request(`/api/admin/users/${createdUser.id}/permissions`, {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: { permissions: ['full_access'] },
+    });
+    assert.equal(coordUpdateRes.status, 403);
+
+    // 3. Admin actualiza permisos y badges directamente
+    const adminUpdateRes = await request(`/api/admin/users/${createdUser.id}/permissions`, {
+      method: 'PATCH',
+      headers: adminHeaders,
+      body: {
+        role: 'profesor',
+        permissions: ['paedis_read_students', 'class_management', 'operational_support'],
+        badges: ['Docencia', 'Coordinador Sede'],
+      },
+    });
+    assert.equal(adminUpdateRes.status, 200);
+    assert.equal(adminUpdateRes.body?.success, true);
+    assert.deepEqual(adminUpdateRes.body?.user?.permissions, [
+      'paedis_read_students',
+      'class_management',
+      'operational_support',
+    ]);
+    assert.deepEqual(adminUpdateRes.body?.user?.badges, ['Docencia', 'Coordinador Sede']);
+
+    // 4. Admin intentando modificar sus propios permisos recibe 400
+    const selfUpdateRes = await request(`/api/admin/users/c.guzman@duocuc.cl/permissions`, {
+      method: 'PATCH',
+      headers: adminHeaders,
+      body: { permissions: [] },
+    });
+    assert.equal(selfUpdateRes.status, 400);
+    assert.match(selfUpdateRes.body?.message, /No puede modificar sus propios permisos/);
+  });
+
+  test('14. Catálogo Duoc UC: migrateCatalogDuocData migra carreras a Escuelas Oficiales y upsert de 20 Sedes', async () => {
+    const mongoose = require('mongoose');
+    const catalogService = require('../services/catalogService');
+    const Career = require('../models/Career');
+    const Sede = require('../models/Sede');
+
+    // 1. Simular carrera legacy con "Escuela Duoc UC"
+    const legacyCareerName = `Test Legacy Carrera ${Date.now()}`;
+    if (mongoose.connection.readyState === 1) {
+      await Career.create({
+        name: legacyCareerName,
+        code: 'LEGACY-01',
+        school: 'Escuela Duoc UC',
+      });
+    }
+
+    // 2. Ejecutar migración de catálogo
+    const migrationResult = await catalogService.migrateCatalogDuocData();
+    assert.ok(migrationResult);
+
+    // 3. Verificar que las carreras ya no tienen "Escuela Duoc UC"
+    if (mongoose.connection.readyState === 1) {
+      const remainingLegacy = await Career.countDocuments({
+        school: { $regex: /escuela duoc uc/i },
+      });
+      assert.equal(remainingLegacy, 0, 'No deben quedar carreras con "Escuela Duoc UC"');
+
+      // Verificar que la carrera de prueba fue migrada
+      const migrated = await Career.findOne({ name: legacyCareerName });
+      assert.ok(migrated);
+      assert.ok(catalogService.DUOC_SCHOOLS.includes(migrated.school));
+
+      // Limpiar carrera de prueba
+      await Career.deleteOne({ _id: migrated._id });
+    }
+
+    // 4. Verificar sedes vía endpoint /api/admin/sedes
+    const sedesRes = await request('/api/admin/sedes', { headers: adminHeaders });
+    assert.equal(sedesRes.status, 200);
+    const sedes = sedesRes.body?.sedes || [];
+    assert.ok(sedes.length >= 20, 'Debe haber al menos 20 sedes oficiales registradas');
+
+    // Comprobar Sedes específicas con Región y Ciudad oficiales
+    const alameda = sedes.find((s) => s.name === 'Sede Alameda');
+    assert.ok(alameda, 'Sede Alameda debe existir');
+    assert.equal(alameda.region, 'Región Metropolitana');
+    assert.equal(alameda.city, 'Santiago');
+
+    const brasil = sedes.find((s) => s.name.includes('Brasil'));
+    assert.ok(brasil, 'Sede Brasil debe existir');
+    assert.equal(brasil.region, 'Región de Valparaíso');
+    assert.equal(brasil.city, 'Valparaíso');
+
+    const educacionContinua = sedes.find((s) => s.name.includes('Educación Continua'));
+    assert.ok(educacionContinua, 'Sede Educación Continua debe existir');
+    assert.equal(educacionContinua.region, 'Región Metropolitana');
+    assert.equal(educacionContinua.city, 'Santiago');
+
+    // Verificar que San Andrés de Concepción no esté presente
+    const sanAndres = sedes.find((s) => s.name.includes('San Andrés de Concepción'));
+    assert.equal(sanAndres, undefined, 'Sede obsoleta San Andrés de Concepción debe haber sido depurada');
+  });
 });

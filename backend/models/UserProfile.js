@@ -434,6 +434,14 @@ const UserProfileSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    permissions: {
+      type: [String],
+      default: undefined,
+    },
+    badges: {
+      type: [String],
+      default: undefined,
+    },
     purposeLimitation: {
       type: [String],
       default: [

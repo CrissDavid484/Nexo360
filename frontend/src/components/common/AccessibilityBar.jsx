@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useOnClickOutside } from '../../hooks/useOnClickOutside';
@@ -127,6 +127,43 @@ export const AccessibilityBar = () => {
   const [showAdvancedVisualForBlind, setShowAdvancedVisualForBlind] = useState(false);
   const containerRef = useRef(null);
   const fabRef = useRef(null);
+  const lastToggleTimeRef = useRef(0);
+  const isTouchRef = useRef(false);
+
+  const closePanel = useCallback(() => {
+    lastToggleTimeRef.current = Date.now();
+    setIsOpen(false);
+  }, []);
+
+  const handleToggle = useCallback((e) => {
+    e?.stopPropagation?.();
+    const now = Date.now();
+    // Prevenir rebotes por clics rápidos y condiciones de carrera con eventos táctiles y backdrop
+    if (now - lastToggleTimeRef.current < 350) {
+      return;
+    }
+    lastToggleTimeRef.current = now;
+    setIsOpen((prev) => !prev);
+  }, []);
+
+  const handleButtonTouchEnd = useCallback((e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    isTouchRef.current = true;
+    handleToggle(e);
+    setTimeout(() => {
+      isTouchRef.current = false;
+    }, 450);
+  }, [handleToggle]);
+
+  const handleButtonClick = useCallback((e) => {
+    if (isTouchRef.current) {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      return;
+    }
+    handleToggle(e);
+  }, [handleToggle]);
 
   const activeCount =
     (fontSize !== 'normal' ? 1 : 0) +
@@ -145,9 +182,9 @@ export const AccessibilityBar = () => {
   const fontPercentage = fontSizePercentages[fontSize] || '130%';
   const activeColorBlindMeta = getColorBlindModeMeta(colorBlindMode);
 
-  useOnClickOutside(containerRef, () => setIsOpen(false), {
+  useOnClickOutside(containerRef, closePanel, {
     enabled: isOpen,
-    ignoreSelector: '#accessibility-panel, #accessibility-panel *, .theme-switch, .theme-switch *',
+    ignoreSelector: '#accessibility-panel, #accessibility-panel *, .a11y-fab-btn, .a11y-fab-btn *, .theme-switch, .theme-switch *',
   });
 
   // Cerrar con tecla Escape
@@ -156,7 +193,7 @@ export const AccessibilityBar = () => {
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        setIsOpen(false);
+        closePanel();
         fabRef.current?.focus();
       }
     };
@@ -165,7 +202,7 @@ export const AccessibilityBar = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, closePanel]);
 
   const voiceToggleOption = {
     optionKey: 'voiceReader',
@@ -227,8 +264,20 @@ export const AccessibilityBar = () => {
         <div
           className="fixed inset-0 bg-slate-950/20 backdrop-blur-[1px] z-[9998] sm:hidden animate-fade-in"
           aria-hidden="true"
-          onClick={() => setIsOpen(false)}
-          onTouchStart={() => setIsOpen(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              closePanel();
+            }
+          }}
+          onTouchEnd={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              closePanel();
+            }
+          }}
         />
       )}
       <aside
@@ -276,7 +325,7 @@ export const AccessibilityBar = () => {
 
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={closePanel}
                 aria-label="Cerrar panel de ajustes"
                 {...getVoiceProps('Cerrar panel de ajustes')}
                 className="min-h-[38px] min-w-[38px] rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
@@ -540,12 +589,13 @@ export const AccessibilityBar = () => {
       <button
         ref={fabRef}
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={handleButtonClick}
+        onTouchEnd={handleButtonTouchEnd}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label="Ajustes de accesibilidad"
         {...getVoiceProps('Ajustes de accesibilidad')}
-        className={`a11y-fab-btn group max-w-full min-h-[46px] py-2.5 rounded-l-full border border-r-0 shadow-lg flex items-center text-xs sm:text-sm font-bold transition-all duration-300 ease-in-out cursor-pointer bg-[#002B49] text-white hover:bg-[#001D33] ${
+        className={`a11y-fab-btn group max-w-full min-h-[46px] py-2.5 rounded-l-full border border-r-0 shadow-lg flex items-center text-xs sm:text-sm font-bold transition-all duration-300 ease-in-out cursor-pointer touch-manipulation select-none bg-[#002B49] text-white hover:bg-[#001D33] ${
           isOpen
             ? 'pl-3 pr-4 border-[#FFB81C]'
             : 'pl-3 pr-2.5 hover:pl-3 hover:pr-4 focus-visible:pl-3 focus-visible:pr-4 border-[#FFB81C]/60'

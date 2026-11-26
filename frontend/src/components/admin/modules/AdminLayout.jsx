@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ShieldAlert,
   Users,
@@ -30,10 +31,12 @@ import { useAuth } from '@context/AuthContext';
 import { useAccessibleModal } from '@hooks/useAccessibleModal';
 import {
   SEDES_DUOC,
+  SEDES_DUOC_ITEMS,
   CARRERAS_DUOC_LIST,
   DEFAULT_CAMPUS,
   matchesRutQuery,
   normalizeStudentProfile,
+  getSchoolForCareer,
 } from '@utils/studentUtils';
 import { ExplainabilityPanel } from './ExplainabilityPanel';
 import { AdminDashboard } from './AdminDashboard';
@@ -93,13 +96,23 @@ const ADMIN_SUB_TABS = [
 export const AdminLayout = ({ onExit }) => {
   const { announce, getVoiceProps } = useAccessibility();
   const { user } = useAuth();
+  const { subTab } = useParams();
+  const navigate = useNavigate();
 
   const userRole = (user?.role || '').toLowerCase();
   const isAdmin = userRole === 'admin' || userRole === 'administrador';
   const isCoordinator = userRole === 'coordinador_paedis';
   const canManageAdmin = isAdmin || isCoordinator;
 
-  const [adminSubTab, setAdminSubTab] = useState(() => isCoordinator ? 'paedis' : 'dashboard');
+  const defaultSubTab = isCoordinator ? 'paedis' : 'dashboard';
+  const isValidSubTab = subTab && ADMIN_SUB_TABS.some((tab) => tab.id === subTab);
+  const [adminSubTab, setAdminSubTab] = useState(() => (isValidSubTab ? subTab : defaultSubTab));
+
+  useEffect(() => {
+    if (subTab && ADMIN_SUB_TABS.some((tab) => tab.id === subTab)) {
+      setAdminSubTab(subTab);
+    }
+  }, [subTab]);
   const [metrics, setMetrics] = useState(null);
   const [students, setStudents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -192,6 +205,7 @@ export const AdminLayout = ({ onExit }) => {
               size="sm"
               onClick={() => {
                 setAdminSubTab(tab.id);
+                navigate(`/panel-admin/${tab.id}`);
                 announce(tab.announceMsg, 'polite');
               }}
               {...getVoiceProps(tab.label)}
@@ -220,7 +234,7 @@ export const AdminLayout = ({ onExit }) => {
       {adminSubTab === 'audit' && isAdmin && <AuditLog isAdmin={isAdmin} getVoiceProps={getVoiceProps} announce={announce} />}
 
       {/* Modals */}
-      <RegisterUserModal isOpen={isCreateModalOpen} onClose={() => { setIsCreateModalOpen(false); setModalError(''); }} closeBtnRef={createCloseBtnRef} sortedCareers={CARRERAS_DUOC_LIST.map((name, idx) => ({ id: `career-${idx}`, name, school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` }))} sortedSedes={SEDES_DUOC.map((name, idx) => ({ id: `sede-${idx}`, name, city: 'Región Metropolitana' }))} isAdmin={isAdmin} isCoordinator={!isAdmin} defaultCampus={DEFAULT_CAMPUS} isSubmitting={isSubmitting} serverError={modalError} onSubmitUser={handleCreateUser} />
+      <RegisterUserModal isOpen={isCreateModalOpen} onClose={() => { setIsCreateModalOpen(false); setModalError(''); }} closeBtnRef={createCloseBtnRef} sortedCareers={CARRERAS_DUOC_LIST.map((name, idx) => ({ id: `career-${idx}`, name, school: getSchoolForCareer(name) }))} sortedSedes={SEDES_DUOC_ITEMS.map((s, idx) => ({ id: `sede-${idx}`, name: s.name, region: s.region, city: s.city }))} isAdmin={isAdmin} isCoordinator={!isAdmin} defaultCampus={DEFAULT_CAMPUS} isSubmitting={isSubmitting} serverError={modalError} onSubmitUser={handleCreateUser} />
     </div>
   );
 };

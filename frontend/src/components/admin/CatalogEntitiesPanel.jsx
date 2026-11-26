@@ -2,47 +2,219 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, GraduationCap, MapPin, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
-import { DEFAULT_CAMPUS } from '../../utils/studentUtils';
+import {
+  CHILE_REGIONS,
+  DUOC_SCHOOLS,
+  getSchoolForCareer,
+} from '../../utils/studentUtils';
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:ring-offset-2';
 
 const ENTITY_KINDS = {
   careers: {
-    title: 'Carreras',
+    title: 'Carreras Duoc UC',
     singular: 'carrera',
     icon: GraduationCap,
     listKey: 'careers',
     fetch: () => api.getAdminCareers(),
-    create: (name) => api.createAdminCareer({ name, school: `Escuela Duoc UC - ${DEFAULT_CAMPUS}` }),
+    create: (payload) =>
+      api.createAdminCareer(
+        typeof payload === 'string'
+          ? { name: payload, school: getSchoolForCareer(payload) }
+          : payload
+      ),
     remove: (key) => api.deleteAdminCareer(key),
   },
   sedes: {
-    title: 'Sedes',
+    title: 'Sedes Duoc UC',
     singular: 'sede',
     icon: MapPin,
     listKey: 'sedes',
     fetch: () => api.getAdminSedes(),
-    create: (name) => api.createAdminSede({ name, city: 'Región Metropolitana' }),
+    create: (payload) =>
+      api.createAdminSede(
+        typeof payload === 'string'
+          ? { name: payload, region: 'Región Metropolitana', city: 'Santiago' }
+          : payload
+      ),
     remove: (key) => api.deleteAdminSede(key),
   },
 };
 
 const itemKey = (item) => item._id || item.id || item.name;
 
-const EntityList = ({ kind, items, canManage, onAdd, onDelete }) => {
-  const { getVoiceProps } = useAccessibility();
-  const cfg = ENTITY_KINDS[kind];
+const CareerForm = ({ canManage, onAdd, getVoiceProps }) => {
   const [name, setName] = useState('');
-  const Icon = cfg.icon;
+  const [school, setSchool] = useState(DUOC_SCHOOLS[0]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const clean = name.trim();
-    if (!clean) return;
-    onAdd(kind, clean)
-      .then((ok) => ok && setName(''))
-      .catch((err) => console.error('[CatalogEntitiesPanel] Error agregando:', err));
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    onAdd('careers', { name: cleanName, school })
+      .then((ok) => {
+        if (ok) {
+          setName('');
+          setSchool(DUOC_SCHOOLS[0]);
+        }
+      })
+      .catch((err) => console.error('[CatalogEntitiesPanel] Error agregando carrera:', err));
+  };
+
+  if (!canManage) return null;
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div>
+          <label htmlFor="entity-career-name" className="block text-xs font-bold text-slate-800 mb-1">
+            Nombre de la carrera
+          </label>
+          <input
+            id="entity-career-name"
+            type="text"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej. Ingeniería en Inteligencia Artificial"
+            {...getVoiceProps('Escribir nombre de la nueva carrera')}
+            className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white ${FOCUS_RING}`}
+          />
+        </div>
+        <div>
+          <label htmlFor="entity-career-school" className="block text-xs font-bold text-slate-800 mb-1">
+            Escuela oficial Duoc UC
+          </label>
+          <select
+            id="entity-career-school"
+            value={school}
+            onChange={(e) => setSchool(e.target.value)}
+            {...getVoiceProps('Seleccionar escuela oficial para la carrera')}
+            className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white ${FOCUS_RING}`}
+          >
+            {DUOC_SCHOOLS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button
+        type="submit"
+        {...getVoiceProps('Agregar carrera oficial')}
+        className={`w-full sm:w-auto min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold bg-[#002B49] text-white inline-flex items-center justify-center gap-2 cursor-pointer shadow-xs ${FOCUS_RING}`}
+      >
+        <Plus className="w-4 h-4" aria-hidden="true" />
+        <span>Agregar Carrera</span>
+      </button>
+    </form>
+  );
+};
+
+const SedeForm = ({ canManage, onAdd, getVoiceProps }) => {
+  const [name, setName] = useState('');
+  const [region, setRegion] = useState('Región Metropolitana');
+  const [city, setCity] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    const cleanCity =
+      city.trim() ||
+      (region === 'Región Metropolitana'
+        ? 'Santiago'
+        : region.replace(/^Región (de|del) /, ''));
+    onAdd('sedes', { name: cleanName, region, city: cleanCity })
+      .then((ok) => {
+        if (ok) {
+          setName('');
+          setRegion('Región Metropolitana');
+          setCity('');
+        }
+      })
+      .catch((err) => console.error('[CatalogEntitiesPanel] Error agregando sede:', err));
+  };
+
+  if (!canManage) return null;
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="sm:col-span-1">
+          <label htmlFor="entity-sede-name" className="block text-xs font-bold text-slate-800 mb-1">
+            Nombre de la sede
+          </label>
+          <input
+            id="entity-sede-name"
+            type="text"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej. Campus Villarrica"
+            {...getVoiceProps('Escribir nombre de la nueva sede')}
+            className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white ${FOCUS_RING}`}
+          />
+        </div>
+        <div className="sm:col-span-1">
+          <label htmlFor="entity-sede-region" className="block text-xs font-bold text-slate-800 mb-1">
+            Región (16 de Chile)
+          </label>
+          <select
+            id="entity-sede-region"
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            {...getVoiceProps('Seleccionar región de Chile')}
+            className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white ${FOCUS_RING}`}
+          >
+            {CHILE_REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="sm:col-span-1">
+          <label htmlFor="entity-sede-city" className="block text-xs font-bold text-slate-800 mb-1">
+            Ciudad / Ubicación
+          </label>
+          <input
+            id="entity-sede-city"
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Ej. Villarrica, Santiago..."
+            {...getVoiceProps('Escribir ciudad o comuna')}
+            className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white ${FOCUS_RING}`}
+          />
+        </div>
+      </div>
+      <button
+        type="submit"
+        {...getVoiceProps('Agregar sede oficial')}
+        className={`w-full sm:w-auto min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold bg-[#002B49] text-white inline-flex items-center justify-center gap-2 cursor-pointer shadow-xs ${FOCUS_RING}`}
+      >
+        <Plus className="w-4 h-4" aria-hidden="true" />
+        <span>Agregar Sede</span>
+      </button>
+    </form>
+  );
+};
+
+const EntityList = ({ kind, items, canManage, onAdd, onDelete }) => {
+  const { getVoiceProps } = useAccessibility();
+  const cfg = ENTITY_KINDS[kind];
+  const Icon = cfg.icon;
+
+  const getItemSubtitle = (item) => {
+    if (kind === 'careers') {
+      return item.school || getSchoolForCareer(item.name);
+    }
+    const region = item.region || 'Región Metropolitana';
+    const city = item.city || 'Santiago';
+    return `${region} · ${city}`;
   };
 
   return (
@@ -52,29 +224,10 @@ const EntityList = ({ kind, items, canManage, onAdd, onDelete }) => {
         {cfg.title} ({items.length})
       </h3>
 
-      {canManage && (
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
-          <label htmlFor={`entity-${kind}-input`} className="sr-only">
-            Nombre de la nueva {cfg.singular}
-          </label>
-          <input
-            id={`entity-${kind}-input`}
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={`Nombre de la nueva ${cfg.singular}`}
-            {...getVoiceProps(`Escribir nombre de la nueva ${cfg.singular}`)}
-            className={`flex-1 min-w-0 min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 ${FOCUS_RING}`}
-          />
-          <button
-            type="submit"
-            {...getVoiceProps(`Agregar ${cfg.singular}`)}
-            className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-bold bg-[#002B49] text-white inline-flex items-center justify-center gap-2 cursor-pointer ${FOCUS_RING}`}
-          >
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            <span>Agregar</span>
-          </button>
-        </form>
+      {kind === 'careers' ? (
+        <CareerForm canManage={canManage} onAdd={onAdd} getVoiceProps={getVoiceProps} />
+      ) : (
+        <SedeForm canManage={canManage} onAdd={onAdd} getVoiceProps={getVoiceProps} />
       )}
 
       {items.length === 0 ? (
@@ -82,8 +235,11 @@ const EntityList = ({ kind, items, canManage, onAdd, onDelete }) => {
       ) : (
         <ul className="divide-y divide-slate-200 rounded-xl border border-slate-300 bg-white max-h-64 overflow-y-auto">
           {items.map((item) => (
-            <li key={itemKey(item)} className="flex items-center justify-between gap-2 p-2.5">
-              <span className="text-sm font-semibold text-slate-900 break-words min-w-0">{item.name}</span>
+            <li key={itemKey(item)} className="flex items-center justify-between gap-2 p-2.5 hover:bg-slate-50">
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-semibold text-slate-900 break-words block">{item.name}</span>
+                <span className="text-xs text-slate-600 block truncate">{getItemSubtitle(item)}</span>
+              </div>
               {canManage && (
                 <button
                   type="button"
@@ -104,7 +260,7 @@ const EntityList = ({ kind, items, canManage, onAdd, onDelete }) => {
 };
 
 /**
- * Sección secundaria (colapsada por defecto) para gestionar Carreras y Sedes.
+ * Sección secundaria (colapsada por defecto) para gestionar Carreras y Sedes oficiales Duoc UC a nivel nacional.
  * Eliminar exige confirmación mediante `requestConfirm` (diálogo en la sección padre).
  */
 export const CatalogEntitiesPanel = ({ canManage, requestConfirm, notify }) => {
@@ -168,12 +324,13 @@ export const CatalogEntitiesPanel = ({ canManage, requestConfirm, notify }) => {
     [loadKind, notify]
   );
 
-  const handleAdd = (kind, name) => {
+  const handleAdd = (kind, payload) => {
     const cfg = ENTITY_KINDS[kind];
+    const itemName = typeof payload === 'object' && payload !== null ? payload.name : payload;
     return runMutation(
       kind,
-      () => cfg.create(name),
-      `Se agregó la ${cfg.singular} "${name}".`,
+      () => cfg.create(payload),
+      `Se agregó la ${cfg.singular} "${itemName}".`,
       `No se pudo agregar la ${cfg.singular}.`
     );
   };
@@ -182,7 +339,7 @@ export const CatalogEntitiesPanel = ({ canManage, requestConfirm, notify }) => {
     const cfg = ENTITY_KINDS[kind];
     requestConfirm({
       title: `¿Eliminar la ${cfg.singular} "${item.name}"?`,
-      message: `Se quitará "${item.name}" del registro institucional. Esta acción no se puede deshacer.`,
+      message: `Se quitará "${item.name}" del registro institucional oficial. Esta acción no se puede deshacer.`,
       confirmLabel: `Sí, eliminar ${cfg.singular}`,
       run: () =>
         runMutation(
@@ -203,14 +360,14 @@ export const CatalogEntitiesPanel = ({ canManage, requestConfirm, notify }) => {
           aria-expanded={isOpen}
           aria-controls="catalog-entities-body"
           {...getVoiceProps(
-            `Administrar carreras y sedes, opciones avanzadas. ${isOpen ? 'Expandido' : 'Contraído'}`
+            `Administrar catálogo oficial de carreras y sedes Duoc UC a nivel nacional. ${isOpen ? 'Expandido' : 'Contraído'}`
           )}
           className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left rounded-xl cursor-pointer ${FOCUS_RING}`}
         >
           <span>
-            Administrar carreras y sedes
+            Administrar Carreras y Sedes Oficiales Duoc UC
             <span className="block text-xs font-normal text-slate-700">
-              Opciones avanzadas. Normalmente no necesitas cambiarlas.
+              Catálogo oficial a nivel nacional (20 sedes y 9 escuelas). Opciones avanzadas.
             </span>
           </span>
           <ChevronDown
@@ -225,7 +382,7 @@ export const CatalogEntitiesPanel = ({ canManage, requestConfirm, notify }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {isLoading && (
               <p role="status" className="text-xs text-slate-700 lg:col-span-2">
-                Cargando carreras y sedes…
+                Cargando catálogo oficial de carreras y sedes…
               </p>
             )}
             {Object.keys(ENTITY_KINDS).map((kind) => (
@@ -244,3 +401,5 @@ export const CatalogEntitiesPanel = ({ canManage, requestConfirm, notify }) => {
     </section>
   );
 };
+
+export default CatalogEntitiesPanel;

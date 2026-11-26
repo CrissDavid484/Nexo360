@@ -9,11 +9,17 @@ const SedeSchema = new mongoose.Schema(
       trim: true,
       maxlength: 120,
     },
+    region: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: 'Región Metropolitana',
+    },
     city: {
       type: String,
       trim: true,
       maxlength: 80,
-      default: 'Región Metropolitana',
+      default: 'Santiago',
     },
   },
   {

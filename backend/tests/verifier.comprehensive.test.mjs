@@ -235,7 +235,10 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
 
   await t.test('8. [STUDENT DIRECTORY & DETAIL MODAL] Nombre y Sede únicamente en listado, modal con asistencias y semáforo', () => {
     const studentDirPath = path.resolve(projectRootDir, 'frontend/src/components/admin/modules/StudentDirectory.jsx');
-    const studentDirCode = fs.readFileSync(studentDirPath, 'utf8');
+    const modalPath = path.resolve(projectRootDir, 'frontend/src/components/admin/StudentDetailModal.jsx');
+    const studentDirCode =
+      fs.readFileSync(studentDirPath, 'utf8') +
+      (fs.existsSync(modalPath) ? fs.readFileSync(modalPath, 'utf8') : '');
 
     // Comprobar que la tarjeta del directorio contiene únicamente Nombre y Sede
     assert.ok(studentDirCode.includes('student.fullName'), 'Debe mostrar el nombre completo');

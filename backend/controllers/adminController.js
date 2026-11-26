@@ -43,6 +43,67 @@ const ALLOWED_ROLES = Object.freeze([
   'coordinador_paedis',
   'admin',
   'administrador',
+  'profesor',
+  'director',
+  'subdirector',
+  'administrativo',
+]);
+
+const STAFF_ROLE_META = Object.freeze({
+  admin: {
+    label: 'Administrador Nexo360',
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config', 'paedis_read', 'paedis_write'],
+    badges: ['TI', 'SuperAdmin', 'Seguridad'],
+  },
+  administrador: {
+    label: 'Administrador Nexo360',
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config', 'paedis_read', 'paedis_write'],
+    badges: ['TI', 'SuperAdmin', 'Seguridad'],
+  },
+  coordinador_paedis: {
+    label: 'Coordinador PAEDIS',
+    permissions: ['paedis_read', 'paedis_write', 'manage_students', 'sat_monitoring'],
+    badges: ['PAEDIS', 'Inclusión', 'UAP'],
+  },
+  profesor: {
+    label: 'Docente Duoc UC',
+    permissions: ['paedis_read_students', 'class_management'],
+    badges: ['Docencia', 'Aula'],
+  },
+  director: {
+    label: 'Directivo Institucional',
+    permissions: ['institutional_overview', 'continuity_exceptions', 'titration_equity'],
+    badges: ['Directivo', 'Gestión'],
+  },
+  subdirector: {
+    label: 'Subdirectivo',
+    permissions: ['institutional_overview', 'continuity_exceptions'],
+    badges: ['Subdirección', 'Gestión'],
+  },
+  administrativo: {
+    label: 'Personal Administrativo',
+    permissions: ['operational_support', 'benefits_management'],
+    badges: ['Operaciones', 'Atención'],
+  },
+});
+
+const ALL_SYSTEM_PERMISSIONS = Object.freeze([
+  'full_access',
+  'manage_users',
+  'manage_catalogs',
+  'audit_logs',
+  'system_config',
+  'paedis_read',
+  'paedis_write',
+  'manage_students',
+  'sat_monitoring',
+  'paedis_read_students',
+  'class_management',
+  'institutional_overview',
+  'continuity_exceptions',
+  'titration_equity',
+  'operational_support',
+  'benefits_management',
 ]);
 
 /**
@@ -458,10 +519,17 @@ function resolveIdentityFields(body) {
 
 function validateDomainForRole(email, role) {
   const domain = email.split('@')[1] || '';
-  const isStaffRole = role === 'admin' || role === 'coordinador_paedis';
+  const isStaffRole =
+    role === 'admin' ||
+    role === 'administrador' ||
+    role === 'coordinador_paedis' ||
+    role === 'profesor' ||
+    role === 'director' ||
+    role === 'subdirector' ||
+    role === 'administrativo';
 
   if (isStaffRole && !STAFF_DOMAINS.includes(domain)) {
-    return 'Los roles de Administrador y Coordinador PAEDIS requieren un correo institucional de colaborador (@profesor.duoc.cl o @duoc.cl).';
+    return 'Los roles de colaboradores y personal institucional requieren un correo de colaborador (@profesor.duoc.cl o @duoc.cl).';
   }
   if (!isStaffRole && !STUDENT_DOMAINS.includes(domain)) {
     return 'Los roles de Estudiante y Estudiante PAEDIS requieren un correo institucional estudiantil (@duocuc.cl).';
@@ -530,7 +598,7 @@ function validateCreateStudentRequest(body, reqUser) {
     return {
       errorStatus: 400,
       errorMessage:
-        'Rol no válido. Los roles institucionales permitidos son: Estudiante, Estudiante PAEDIS, Coordinador PAEDIS y Administrador.',
+        'Rol no válido. Los roles institucionales permitidos son: Estudiante, Estudiante PAEDIS, Coordinador PAEDIS, Docente, Directivo, Subdirectivo, Administrativo y Administrador.',
     };
   }
 
@@ -558,7 +626,13 @@ function validateCreateStudentRequest(body, reqUser) {
   }
 
   const role = requestedRole === 'administrador' ? 'admin' : requestedRole;
-  const isStaffRole = role === 'admin' || role === 'coordinador_paedis';
+  const isStaffRole =
+    role === 'admin' ||
+    role === 'coordinador_paedis' ||
+    role === 'profesor' ||
+    role === 'director' ||
+    role === 'subdirector' ||
+    role === 'administrativo';
 
   // Regla RBAC: Coordinador PAEDIS solo puede registrar estudiantes (@duocuc.cl / rol estudiante)
   if (actorRole === 'coordinador_paedis') {
@@ -761,6 +835,12 @@ function buildNewUserDocument({
     accessibilityPreferences: profileSetup.accessibilityPreferences,
     enrolledCourses: initialCourses,
     courseAttendance: initialCourseAttendance,
+    permissions: Array.isArray(body.permissions)
+      ? body.permissions.map((p) => sanitizeString(p, 50)).filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p))
+      : (STAFF_ROLE_META[role]?.permissions || []),
+    badges: Array.isArray(body.badges)
+      ? body.badges.map((b) => sanitizeString(b, 40)).filter(Boolean).slice(0, 10)
+      : (STAFF_ROLE_META[role]?.badges || []),
     consentimientoLey21719: {
       aceptado: true,
       fechaAceptacion: body.consentimientoLey21719?.fechaAceptacion || new Date(),
@@ -1038,27 +1118,41 @@ exports.updateUserRole = async (req, res) => {
     const isPaedis = rawRole === 'estudiante_paedis';
     let updatedUser = null;
 
+    const updateFields = {
+      role: rawRole,
+      roleLabel,
+      isPaedis,
+    };
+
+    if (Array.isArray(req.body?.permissions)) {
+      updateFields.permissions = req.body.permissions
+        .map((p) => sanitizeString(p, 50))
+        .filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p));
+    }
+    if (Array.isArray(req.body?.badges)) {
+      updateFields.badges = req.body.badges
+        .map((b) => sanitizeString(b, 40))
+        .filter(Boolean)
+        .slice(0, 10);
+    }
+
     if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(targetDocId))) {
       updatedUser = await UserProfile.findByIdAndUpdate(
         targetDocId,
         {
-          $set: {
-            role: rawRole,
-            roleLabel,
-            isPaedis,
-          },
+          $set: updateFields,
         },
         { returnDocument: 'after', runValidators: true }
       );
     } else {
-      authService.updateUserFieldsInMemory(targetUser.email, { role: rawRole, roleLabel, isPaedis });
-      updatedUser = { ...targetUser, role: rawRole, roleLabel, isPaedis };
+      authService.updateUserFieldsInMemory(targetUser.email, updateFields);
+      updatedUser = { ...targetUser, ...updateFields };
     }
 
     await logAdminAction(req.user, {
       action: 'student_updated_by_admin',
       details: `Rol de ${targetUser.fullName || targetUser.email} actualizado a "${roleLabel}".`,
-      metadata: { targetEmail: targetUser.email, role: rawRole },
+      metadata: { targetEmail: targetUser.email, role: rawRole, ...updateFields },
     });
 
     return res.status(200).json({
@@ -1071,6 +1165,104 @@ exports.updateUserRole = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error al actualizar el rol del usuario.',
+    });
+  }
+};
+
+/**
+ * PATCH /api/admin/users/:id/permissions
+ */
+exports.updateUserPermissions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const targetUser = await findUserByIdOrEmail(id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado para actualización de permisos.',
+      });
+    }
+
+    const actorId = String(req.user?._id || req.user?.id || '');
+    const targetDocId = targetUser._id || targetUser.id || id;
+    if (
+      (actorId && String(targetDocId) === actorId) ||
+      (req.user?.email && targetUser.email && req.user.email.toLowerCase() === targetUser.email.toLowerCase())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'No puede modificar sus propios permisos o rol mientras está en sesión.',
+      });
+    }
+
+    const updateFields = {};
+    const validRoles = UserProfile.schema.path('role').enumValues || [
+      'admin',
+      'administrador',
+      'estudiante_paedis',
+      'estudiante',
+      'tutor_par',
+      'profesor',
+      'director',
+      'subdirector',
+      'coordinador_paedis',
+      'administrativo',
+    ];
+
+    if (req.body?.role) {
+      const rawRole = sanitizeString(req.body.role, 40)?.toLowerCase() || '';
+      if (!validRoles.includes(rawRole)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rol institucional no válido.',
+        });
+      }
+      updateFields.role = rawRole;
+      updateFields.roleLabel = ROLE_LABELS[rawRole] || 'Personal Administrativo';
+      updateFields.isPaedis = rawRole === 'estudiante_paedis';
+    }
+
+    if (Array.isArray(req.body?.permissions)) {
+      updateFields.permissions = req.body.permissions
+        .map((p) => sanitizeString(p, 50))
+        .filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p));
+    }
+
+    if (Array.isArray(req.body?.badges)) {
+      updateFields.badges = req.body.badges
+        .map((b) => sanitizeString(b, 40))
+        .filter(Boolean)
+        .slice(0, 10);
+    }
+
+    let updatedUser = null;
+    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(targetDocId))) {
+      updatedUser = await UserProfile.findByIdAndUpdate(
+        targetDocId,
+        { $set: updateFields },
+        { returnDocument: 'after', runValidators: true }
+      );
+    } else {
+      authService.updateUserFieldsInMemory(targetUser.email, updateFields);
+      updatedUser = { ...targetUser, ...updateFields };
+    }
+
+    await logAdminAction(req.user, {
+      action: 'staff_permissions_updated',
+      details: `Permisos y badges de ${targetUser.fullName || targetUser.email} actualizados (${updateFields.permissions?.length ?? 0} permisos, ${updateFields.badges?.length ?? 0} badges).`,
+      metadata: { targetEmail: targetUser.email, ...updateFields },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Permisos y badges de ${targetUser.fullName || targetUser.email} actualizados correctamente.`,
+      user: updatedUser ? authService.formatUserResponse(updatedUser) : null,
+    });
+  } catch (error) {
+    console.error('[AdminController] Error al actualizar permisos de usuario:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al actualizar permisos y badges en la base de datos.',
     });
   }
 };

@@ -19,7 +19,7 @@ const CareerSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 120,
-      default: 'Escuela Duoc UC',
+      default: 'Escuela de Informática y Telecomunicaciones',
     },
   },
   {

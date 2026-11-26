@@ -193,6 +193,27 @@ function applySimulatedCourseUpdate(courseAttendance = [], simulationOptions = {
     if (action === 'add_absence') {
       consecutiveAbs += 1;
       attended = Math.max(0, attended - 1);
+    } else if (action === 'add_attendance' || action === 'add_presence' || action === 'positive_attendance') {
+      attended = Math.min(total, attended + 1);
+      consecutiveAbs = Math.max(0, consecutiveAbs - 1);
+      if (attended / total >= 0.75 && consecutiveAbs < 3) {
+        missedKey = false;
+      }
+    } else if (action === 'remove_absence' || action === 'reduce_absence') {
+      attended = Math.min(total, attended + 1);
+      consecutiveAbs = Math.max(0, consecutiveAbs - 1);
+      if (attended / total >= 0.75 && consecutiveAbs < 3) {
+        missedKey = false;
+      }
+    } else if (action === 'recover_to_75' || action === 'reach_75') {
+      const minReq = Math.ceil(total * 0.75);
+      attended = Math.min(total, Math.max(attended, minReq));
+      consecutiveAbs = 0;
+      missedKey = false;
+    } else if (action === 'future_perfect' || action === 'project_perfect' || action === 'attend_all_remaining') {
+      attended = total;
+      consecutiveAbs = 0;
+      missedKey = false;
     } else if (action === 'drop_below_75') {
       attended = Math.max(0, Math.floor(total * 0.68));
       consecutiveAbs = Math.max(3, consecutiveAbs + 1);
@@ -207,6 +228,16 @@ function applySimulatedCourseUpdate(courseAttendance = [], simulationOptions = {
       justified = false;
     } else {
       // Campos directos personalizados si se enviaron
+      if (typeof simulationOptions.deltaAttendance === 'number') {
+        const delta = Math.trunc(simulationOptions.deltaAttendance);
+        attended = Math.max(0, Math.min(total, attended + delta));
+        if (delta > 0) {
+          consecutiveAbs = Math.max(0, consecutiveAbs - delta);
+          if (attended / total >= 0.75 && consecutiveAbs < 3) missedKey = false;
+        } else if (delta < 0) {
+          consecutiveAbs = Math.max(0, consecutiveAbs - delta);
+        }
+      }
       if (typeof simulationOptions.attendedSessions === 'number') {
         attended = Math.max(0, Math.min(total, Math.trunc(simulationOptions.attendedSessions)));
       }

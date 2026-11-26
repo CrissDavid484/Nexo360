@@ -43,7 +43,7 @@ export const LoginPage = ({ initialMode = 'login' }) => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate('/centro-de-ayuda', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -79,7 +79,7 @@ export const LoginPage = ({ initialMode = 'login' }) => {
 
   const handleApproved = (token, user) => {
     setAuthData(token, user);
-    navigate('/dashboard');
+    navigate('/centro-de-ayuda');
   };
 
   const handleCancelMfa = () => {

@@ -22,6 +22,7 @@ router.get('/students', requireAdminOrCoordinator, adminController.getStudents);
 router.post('/students', requireAdminOrCoordinator, adminController.createStudent);
 router.put('/students/:id/status', requireAdminOrCoordinator, adminController.updateStudentStatus);
 router.patch('/users/:id/role', requireAdmin, adminController.updateUserRole);
+router.patch('/users/:id/permissions', requireAdmin, adminController.updateUserPermissions);
 router.delete('/students/:id', requireAdmin, adminController.deleteStudent);
 
 // Gestión y carga de asignaturas/oferta académica para Toma de Ramos (Excel/MD/DB)

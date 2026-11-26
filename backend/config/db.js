@@ -22,6 +22,13 @@ const connectDB = async () => {
     } catch (courseErr) {
       console.warn(`[MongoDB] No se pudo sembrar cursos automáticamente: ${courseErr.message}`);
     }
+
+    try {
+      const catalogService = require('../services/catalogService');
+      await catalogService.migrateCatalogDuocData();
+    } catch (catErr) {
+      console.warn(`[MongoDB] No se pudo migrar catálogo Duoc UC automáticamente: ${catErr.message}`);
+    }
   } catch (error) {
     console.warn(
       `[MongoDB Advertencia] No se pudo conectar a MongoDB en (${mongoURI}): ${error.message}`

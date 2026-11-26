@@ -204,6 +204,16 @@ export const api = {
   },
 
   /**
+   * Actualizar permisos y badges de un miembro del equipo (solo Administrador)
+   */
+  async updateUserPermissions(id, { permissions, badges, role } = {}) {
+    return request(`/admin/users/${encodeURIComponent(id)}/permissions`, {
+      method: 'PATCH',
+      body: { permissions, badges, role },
+    });
+  },
+
+  /**
    * Obtener lista de Carreras Duoc UC
    */
   async getAdminCareers() {

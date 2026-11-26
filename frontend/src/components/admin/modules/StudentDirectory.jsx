@@ -1,40 +1,27 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
-  Users,
   GraduationCap,
-  AlertTriangle,
-  CheckCircle2,
   Search,
-  ChevronRight,
   ShieldCheck,
   X,
-  Building2,
-  Calendar,
   Eye,
   Brain,
 } from 'lucide-react';
 import { api } from '@services/api';
-import { useAccessibility } from '@context/AccessibilityContext';
 import { useAuth } from '@context/AuthContext';
-import { useAccessibleModal } from '@hooks/useAccessibleModal';
-import {
-  evaluateAttendanceStatus,
-  getAttendanceColorClasses,
-  getSatRiskBadgeMeta,
-  extractCourseAttendanceRate,
-} from '@utils/satUtils';
 import {
   DEFAULT_CAMPUS,
   matchesRutQuery,
-  normalizeStudentProfile,
 } from '@utils/studentUtils';
 import { explainPredictiveRisk } from '@utils/satUtils';
 import { ExplainabilityPanel } from './ExplainabilityPanel';
+import { StudentDetailModal } from '@components/admin/StudentDetailModal';
+
+export { StudentDetailModal };
 import { ADMIN_THEME } from '@components/admin/adminTheme';
 import { Card } from '@components/ui/Card';
 import { Badge } from '@components/ui/Badge';
 import { Button } from '@components/ui/Button';
-import { Table } from '@components/ui/Table';
 import { Modal } from '@components/ui/Modal';
 
 const STUDENT_STATUS_FILTERS = [
@@ -239,294 +226,6 @@ function StudentCard({ student, isSelected, onClick, onExplain, getVoiceProps })
   );
 }
 
-function StudentDetailModal({
-  isOpen,
-  onClose,
-  student,
-  onExplain,
-  onStatusChange,
-  onDelete,
-  isAdmin,
-  isCoordinator,
-  isSavingStatus,
-  getVoiceProps,
-  announce,
-}) {
-  const initialFocusRef = useRef(null);
-  const contentRef = useRef(null);
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
-  const [nextStatus, setNextStatus] = useState(student?.academicStatus || 'activo');
-
-  useEffect(() => {
-    setNextStatus(student?.academicStatus || 'activo');
-    setIsEditingStatus(false);
-  }, [student]);
-
-  useAccessibleModal({
-    isOpen: Boolean(isOpen && student),
-    onClose,
-    containerRef: contentRef,
-    initialFocusRef,
-  });
-
-  if (!isOpen || !student) return null;
-
-  const isStaff = isStaffOrAdministrativeRole(student.role);
-  const studentSede = student.campus || student.sede || DEFAULT_CAMPUS;
-
-  const pred = student.prediction || explainPredictiveRisk(student);
-  const fallbackTraffic = explainPredictiveRisk(student);
-  const effectiveTraffic = pred.trafficLight || fallbackTraffic.trafficLight || 'green';
-  const effectiveKey =
-    effectiveTraffic === 'red' ? 'rojo' : effectiveTraffic === 'yellow' ? 'amarillo' : 'verde';
-  const satBadgeMeta = getSatRiskBadgeMeta(effectiveKey);
-  const trafficColor = TRAFFIC_LIGHT_COLOR_MAP[effectiveKey] || 'green';
-
-  const detailCourses = student.enrolledCourses || student.courseAttendance || [];
-  // selectedStudentForDetail?.enrolledCourses - patrón para optional chaining en modal
-
-  return (
-    <Modal
-      ref={initialFocusRef}
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Ficha Integral: ${student.fullName || student.nombre}`}
-      size="xl"
-      initialFocusRef={initialFocusRef}
-      voiceLabel={`Ficha integral de ${student.fullName || student.nombre}`}
-    >
-      <div ref={contentRef} className="space-y-5 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3">
-          <div>
-            <h3 className="text-lg sm:text-xl font-black text-neutral-900">{student.fullName || student.nombre}</h3>
-            <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-neutral-500">
-              <span className="font-semibold">{studentSede}</span>
-              <span>•</span>
-              <span>{isStaff ? (student.roleLabel || student.role) : (student.career || 'Ingeniería en Informática')}</span>
-              <span>•</span>
-              <span>{student.email}</span>
-              <span>•</span>
-              <span>RUT: {student.rut || 'Sin RUT'}</span>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <Badge
-              variant={student.academicStatus === 'desercion' ? 'error' : student.academicStatus === 'titulado' ? 'warning' : 'success'}
-              size="sm"
-            >
-              {student.academicStatus || 'activo'}
-            </Badge>
-            {!isStaff && student.isPaedis && <Badge variant="warning" size="sm">♿ PAEDIS</Badge>}
-            {!isStaff && (
-              <span className={`min-h-[28px] px-2.5 py-1 rounded-full text-[10px] font-black border ${
-                trafficColor === 'red' ? 'bg-rose-50 text-rose-800 border-rose-200' :
-                trafficColor === 'yellow' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                'bg-emerald-50 text-emerald-800 border-emerald-200'
-              }`}>
-                {effectiveTraffic === 'red' ? 'Alto Riesgo' : effectiveTraffic === 'yellow' ? 'Riesgo Moderado' : 'Bajo Riesgo'}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {isStaff ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3 bg-white rounded-xl border border-neutral-200">
-              <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Rol Institucional</span>
-              <span className="text-sm font-black text-neutral-900 block mt-1">{student.roleLabel || student.role}</span>
-            </div>
-            <div className="p-3 bg-white rounded-xl border border-neutral-200">
-              <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Sede Asignada</span>
-              <span className="text-sm font-black text-neutral-900 block mt-1">{studentSede}</span>
-            </div>
-            <div className="p-3 bg-white rounded-xl border border-neutral-200">
-              <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Teléfono de Contacto</span>
-              <span className="text-sm font-black text-neutral-900 block mt-1">{student.phone || 'Por actualizar'}</span>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 bg-white rounded-xl border border-neutral-200">
-                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Asistencia Global</span>
-                <span className="text-2xl font-black text-neutral-900 block">{student.attendanceRate ?? 88.9}%</span>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-neutral-200">
-                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Score Predictivo</span>
-                <span className="text-2xl font-black text-neutral-900 block">{pred.score ?? 15}%</span>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-neutral-200">
-                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Prob. Titulación</span>
-                <span className="text-2xl font-black text-neutral-900 block">{pred.graduationProbability ?? 90}%</span>
-              </div>
-              <div className="p-3 bg-white rounded-xl border border-neutral-200">
-                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Nivel SAT</span>
-                <span className="text-2xl font-black text-neutral-900 block">{pred.riskLevel || 'BAJO'}</span>
-              </div>
-            </div>
-
-            {/* Attendance Detail Table */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <GraduationCap className="w-5 h-5 text-brand-navy" aria-hidden="true" />
-                  <h4 className="text-sm sm:text-base font-black text-neutral-900">Asistencia Detallada por Asignatura Cursada</h4>
-                </div>
-                <span className="text-xs font-bold text-neutral-500">{detailCourses.length} asignaturas</span>
-              </div>
-
-              {detailCourses.length > 0 ? (
-                <div className="overflow-x-auto rounded-2xl border border-neutral-200">
-                  <Table
-                    columns={[
-                      { field: 'nombre', header: 'Asignatura', render: (v, row) => (row.nombre || row.curso || row.sigla) + ' (' + row.sigla + ')' },
-                      { field: 'seccion', header: 'Sección / Sala', render: (v, row) => 'Sec. ' + (row.seccion || '001D') + ' • ' + (row.sala || DEFAULT_CAMPUS) },
-                      { field: 'asistencias', header: 'Clases Asistidas', render: (v, row) => row.clasesRegistradas ? (v ?? 0) + ' de ' + row.clasesRegistradas + ' clases' : 'Registrado' },
-                      { field: 'attendancePercentage', header: '% Asistencia', render: (v, row) => {
-                        const pct = row.attendancePercentage ?? row.porcentajeAsistencia ?? row.attendanceRate ?? 0;
-                        return typeof pct === 'number' ? pct + '%' : String(pct) + '%';
-                      } },
-                      { field: 'status', header: 'Estado Normativo', render: (v, row) => {
-                        const rate = extractCourseAttendanceRate(row);
-                        const evalResult = evaluateAttendanceStatus(rate, { mode: 'ri70' });
-                        return ATTENDANCE_STATUS_TEXT[evalResult.status] || 'Cumple Asistencia';
-                      }},
-                    ]}
-                    data={detailCourses}
-                    striped
-                    hoverable
-                    compact
-                    emptyMessage="Sin asignaturas registradas"
-                  />
-                </div>
-              ) : (
-                <Card variant="filled" padding="md" className="text-xs text-neutral-600 space-y-1">
-                  <p className="font-bold text-neutral-900">Asistencia General Estimada: {student.attendanceRate ?? 88.9}%</p>
-                  <p>Las asignaturas específicas y su porcentaje de asistencia se extraen y sincronizan automáticamente en segundo plano al iniciar sesión mediante el portal Vivo Duoc.</p>
-                </Card>
-              )}
-
-              {/* Predictive Traffic Light */}
-              <Card variant="filled" padding="md" className="border-neutral-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-4 h-4 text-amber-600" aria-hidden="true">🧠</span>
-                    <span className="text-xs font-black uppercase tracking-wider text-neutral-900">Semáforo Predictivo de Retención vs. Deserción</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-neutral-100 p-1.5 rounded-full border border-neutral-200">
-                    <span title="Verde: Bajo Riesgo (> 75%)" className={`w-3.5 h-3.5 rounded-full transition-all ${trafficColor === 'green' ? 'bg-emerald-500 shadow-md ring-2 ring-emerald-300 animate-pulse' : 'bg-emerald-200 opacity-40'}`} />
-                    <span title="Amarillo: Riesgo Moderado (70% - 75%)" className={`w-3.5 h-3.5 rounded-full transition-all ${trafficColor === 'yellow' ? 'bg-amber-400 shadow-md ring-2 ring-amber-200 animate-pulse' : 'bg-amber-200 opacity-40'}`} />
-                    <span title="Rojo: Alto Riesgo / RI (< 70%)" className={`w-3.5 h-3.5 rounded-full transition-all ${trafficColor === 'red' ? 'bg-rose-500 shadow-md ring-2 ring-rose-300 animate-pulse' : 'bg-rose-200 opacity-40'}`} />
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-neutral-200/60 pt-2.5">
-                  <div>
-                    <span className="text-sm font-black text-neutral-900 block">{effectiveTraffic === 'red' ? 'Alto Riesgo' : effectiveTraffic === 'yellow' ? 'Riesgo Moderado' : 'Bajo Riesgo'}</span>
-                    <span className="text-xs text-neutral-600 font-semibold block">Nivel: <strong>{pred.riskLevel || 'BAJO'}</strong> • Prob. Titulación: <strong>{pred.graduationProbability ?? 90}%</strong></span>
-                  </div>
-                  <span className={`text-xs font-black px-3 py-1 rounded-xl self-start sm:self-auto border ${satBadgeMeta.badgeClass}`}>Score: {pred.score ?? 15}%</span>
-                </div>
-
-                {Array.isArray(pred.factors) && pred.factors.length > 0 && (
-                  <ul className="space-y-1 text-xs text-neutral-600 pt-1 border-t border-neutral-200/50">
-                    {pred.factors.map((f) => (
-                      <li key={f} className="flex items-start gap-1.5">
-                        <span className="text-neutral-400 font-bold">•</span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  fullWidth
-                  onClick={() => onExplain(student)}
-                  {...getVoiceProps('Abrir panel de explicabilidad completa para ' + (student.fullName || student.nombre))}
-                  className="mt-2"
-                >
-                  <Eye className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Ver Explicabilidad Completa (Breakdown, Factores, NBA)</span>
-                </Button>
-              </Card>
-            </div>
-          </>
-        )}
-
-        {/* Inline status editor */}
-        {isEditingStatus && !isStaff && (
-          <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-2xl flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <label htmlFor="detail-academic-status" className="text-xs font-bold text-neutral-800">
-                Nuevo estado académico:
-              </label>
-              <select
-                id="detail-academic-status"
-                value={nextStatus}
-                onChange={(e) => setNextStatus(e.target.value)}
-                className="min-h-[38px] px-3 py-1.5 text-xs font-semibold bg-white border border-neutral-300 rounded-xl"
-              >
-                <option value="activo">Activo</option>
-                <option value="desercion">Deserción</option>
-                <option value="titulado">Titulado</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setIsEditingStatus(false)}>
-                Cancelar
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                loading={isSavingStatus}
-                onClick={async () => {
-                  await onStatusChange(student, nextStatus);
-                  setIsEditingStatus(false);
-                }}
-              >
-                Guardar Estado
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-neutral-100">
-          <div className="flex flex-wrap items-center gap-2">
-            {!isStaff && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsEditingStatus((prev) => !prev)}
-                disabled={!isAdmin && !isCoordinator}
-                {...getVoiceProps('Cambiar estado académico de ' + (student.fullName || student.nombre))}
-              >
-                Cambiar Estado Académico
-              </Button>
-            )}
-            {isAdmin && (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => onDelete(student)}
-                {...getVoiceProps('Eliminar usuario ' + (student.fullName || student.nombre))}
-              >
-                {isStaff ? 'Eliminar Funcionario' : 'Eliminar Estudiante'}
-              </Button>
-            )}
-          </div>
-          <Button variant="secondary" size="sm" onClick={onClose} {...getVoiceProps('Contraer ficha del usuario')}>
-            <X className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Cerrar Ficha</span>
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 
 export const StudentDirectory = ({
@@ -550,6 +249,7 @@ export const StudentDirectory = ({
   const [filterYear, setFilterYear] = useState('all');
   const [filterCareer, setFilterCareer] = useState('all');
   const [selectedStudentKey, setSelectedStudentKey] = useState(null);
+  const [modalInitialView, setModalInitialView] = useState('ficha');
   const [statusFeedback, setStatusFeedback] = useState(null);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
 
@@ -672,11 +372,10 @@ export const StudentDirectory = ({
   }, [announce, onRefresh]);
 
   const handleOpenExplainability = useCallback((student) => {
-    const pred = student.prediction || explainPredictiveRisk(student);
-    setExplainabilityStudent(student);
-    setExplainabilityPrediction(pred);
-    setIsExplainabilityOpen(true);
-    announce('Abriendo panel de explicabilidad para ' + (student.fullName || student.nombre), 'polite');
+    const key = student._id || student.id || student.email;
+    setSelectedStudentKey(key);
+    setModalInitialView('explicabilidad');
+    announce('Abriendo explicabilidad predictiva para ' + (student.fullName || student.nombre), 'polite');
   }, [announce]);
 
   const handleExecuteAction = useCallback((nba, student) => {
@@ -851,7 +550,10 @@ export const StudentDirectory = ({
                   key={key}
                   student={student}
                   isSelected={isSelected}
-                  onClick={() => setSelectedStudentKey(key)}
+                  onClick={() => {
+                    setSelectedStudentKey(key);
+                    setModalInitialView('ficha');
+                  }}
                   onExplain={handleOpenExplainability}
                   getVoiceProps={getVoiceProps}
                 />
@@ -874,6 +576,8 @@ export const StudentDirectory = ({
             isSavingStatus={isSavingStatus}
             getVoiceProps={getVoiceProps}
             announce={announce}
+            onExecuteAction={handleExecuteAction}
+            initialViewMode={modalInitialView}
           />
         )}
 

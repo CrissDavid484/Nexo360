@@ -18,6 +18,37 @@ const {
 const SENSITIVE_LOG_KEY_REGEX = /pass|token|jwt|secret|diagnostico|notas|ajuste/i;
 const IN_MEMORY_LOG_CAP = 200;
 
+const STAFF_ROLE_DEFAULTS = Object.freeze({
+  admin: {
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config', 'paedis_read', 'paedis_write'],
+    badges: ['TI', 'SuperAdmin', 'Seguridad'],
+  },
+  administrador: {
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config', 'paedis_read', 'paedis_write'],
+    badges: ['TI', 'SuperAdmin', 'Seguridad'],
+  },
+  coordinador_paedis: {
+    permissions: ['paedis_read', 'paedis_write', 'manage_students', 'sat_monitoring'],
+    badges: ['PAEDIS', 'Inclusión', 'UAP'],
+  },
+  profesor: {
+    permissions: ['paedis_read_students', 'class_management'],
+    badges: ['Docencia', 'Aula'],
+  },
+  director: {
+    permissions: ['institutional_overview', 'continuity_exceptions', 'titration_equity'],
+    badges: ['Directivo', 'Gestión'],
+  },
+  subdirector: {
+    permissions: ['institutional_overview', 'continuity_exceptions'],
+    badges: ['Subdirección', 'Gestión'],
+  },
+  administrativo: {
+    permissions: ['operational_support', 'benefits_management'],
+    badges: ['Operaciones', 'Atención'],
+  },
+});
+
 /**
  * Elimina recursivamente de metadata cualquier clave que coincida con credenciales o datos clínicos (Ley N° 21.719).
  */
@@ -943,6 +974,12 @@ class AuthService {
           'Conservación durante el periodo académico activo conforme al Art. 12 de la Ley N° 21.719',
         arcoRightsNotice: 'Derechos ARCO garantizados por Duoc UC',
       },
+      permissions: Array.isArray(raw.permissions)
+        ? raw.permissions
+        : (STAFF_ROLE_DEFAULTS[role]?.permissions || []),
+      badges: Array.isArray(raw.badges)
+        ? raw.badges
+        : (STAFF_ROLE_DEFAULTS[role]?.badges || []),
     };
   }
 

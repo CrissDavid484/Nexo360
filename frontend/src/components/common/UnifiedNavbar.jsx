@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { useOnClickOutside } from '../../hooks/useOnClickOutside';
@@ -22,6 +23,43 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+export const TAB_ROUTE_MAP = {
+  'centro-ayuda': '/centro-de-ayuda',
+  'toma-ramos': '/toma-ramos',
+  'biblioteca': '/biblioteca',
+  'vivo-duoc': '/vivo-duoc',
+  'tickets': '/soporte',
+  'soporte': '/soporte',
+  'perfil': '/perfil',
+  'admin-panel': '/panel-admin',
+  'panel-admin': '/panel-admin',
+};
+
+export const resolveTabFromPath = (pathname = '') => {
+  if (pathname.startsWith('/panel-admin') || pathname.startsWith('/admin-panel') || pathname.startsWith('/admin')) {
+    return 'admin-panel';
+  }
+  if (pathname.startsWith('/toma-ramos') || pathname.startsWith('/simulador')) {
+    return 'toma-ramos';
+  }
+  if (pathname.startsWith('/biblioteca')) {
+    return 'biblioteca';
+  }
+  if (pathname.startsWith('/vivo-duoc')) {
+    return 'vivo-duoc';
+  }
+  if (pathname.startsWith('/soporte') || pathname.startsWith('/tickets')) {
+    return 'tickets';
+  }
+  if (pathname.startsWith('/perfil')) {
+    return 'perfil';
+  }
+  if (pathname.startsWith('/centro-de-ayuda')) {
+    return 'centro-ayuda';
+  }
+  return null;
+};
+
 /**
  * Navegación Principal Unificada Nexo360 (Duoc UC - Sede Alameda)
  * - Modo Escritorio (>= 1024px / lg): Barra superior clásica y estilizada con logo prominente, navegación central, menú de usuario y botón salir.
@@ -29,9 +67,24 @@ import {
  * - Accesibilidad WCAG 2.2 AA/AAA: Cierre con Escape, clic fuera, soporte de voz (getVoiceProps) y áreas táctiles >= 44px.
  * - Cero colisiones con el panel de accesibilidad (AccessibilityBar en bottom-5 right-0).
  */
-export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
+export const UnifiedNavbar = ({ activeTab: propActiveTab, onTabChange }) => {
   const { user, logout } = useAuth();
   const { getVoiceProps } = useAccessibility();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Sincronización bidireccional y robusta con la URL activa para persistencia F5
+  const activeTab = propActiveTab || resolveTabFromPath(location.pathname) || 'centro-ayuda';
+
+  const handleTabNavigation = (tabId) => {
+    const targetPath = TAB_ROUTE_MAP[tabId] || `/${tabId}`;
+    if (onTabChange) {
+      onTabChange(tabId);
+    }
+    if (location.pathname !== targetPath && !location.pathname.startsWith(`${targetPath}/`)) {
+      navigate(targetPath);
+    }
+  };
 
   // Estados para menús en modo escritorio
   const [isSimMenuOpen, setIsSimMenuOpen] = useState(false);
@@ -112,7 +165,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
   const activeSimItem = simulationItems.find((item) => item.id === activeTab);
 
   const handleMobileNavigation = (tabId) => {
-    onTabChange(tabId);
+    handleTabNavigation(tabId);
     setIsMobileMenuOpen(false);
     mobileTriggerRef.current?.focus();
   };
@@ -171,7 +224,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
           <div className="flex items-center justify-self-start shrink-0">
             <button
               type="button"
-              onClick={() => onTabChange('centro-ayuda')}
+              onClick={() => handleTabNavigation('centro-ayuda')}
               {...getVoiceProps(`Ir al inicio de Nexo360 Duoc UC ${DEFAULT_CAMPUS}`)}
               className="h-14 flex items-center group text-left rounded-2xl px-1.5 transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#002B49] focus-visible:ring-offset-2 cursor-pointer"
               aria-label={`Ir al inicio de Nexo360 Centro de Ayuda ${DEFAULT_CAMPUS}`}
@@ -199,7 +252,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 {/* Opción 1: Centro de Ayuda */}
                 <button
                   type="button"
-                  onClick={() => onTabChange('centro-ayuda')}
+                  onClick={() => handleTabNavigation('centro-ayuda')}
                   aria-current={activeTab === 'centro-ayuda' ? 'page' : undefined}
                   {...getVoiceProps('Centro de Ayuda')}
                   className={`min-h-[38px] flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
@@ -278,7 +331,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                             type="button"
                             role="menuitem"
                             onClick={() => {
-                              onTabChange(item.id);
+                              handleTabNavigation(item.id);
                               setIsSimMenuOpen(false);
                             }}
                             {...getVoiceProps(`${item.label}. ${item.subtitle}`)}
@@ -328,7 +381,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                 {/* Opción 3: Soporte TI */}
                 <button
                   type="button"
-                  onClick={() => onTabChange('tickets')}
+                  onClick={() => handleTabNavigation('tickets')}
                   aria-current={activeTab === 'tickets' ? 'page' : undefined}
                   {...getVoiceProps('Soporte TI')}
                   className={`min-h-[38px] flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-150 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
@@ -455,7 +508,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                             type="button"
                             role="menuitem"
                             onClick={() => {
-                              onTabChange('centro-ayuda');
+                              handleTabNavigation('centro-ayuda');
                               setIsUserMenuOpen(false);
                             }}
                             className="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-amber-50 hover:bg-amber-100/80 text-amber-950 border border-amber-200/80 transition-colors cursor-pointer"
@@ -477,7 +530,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                             type="button"
                             role="menuitem"
                             onClick={() => {
-                              onTabChange('admin-panel');
+                              handleTabNavigation('admin-panel');
                               setIsUserMenuOpen(false);
                             }}
                             className="w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-xl text-left bg-[#002B49] hover:bg-[#003B66] text-white transition-colors shadow-xs cursor-pointer"
@@ -504,7 +557,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
                       type="button"
                       role="menuitem"
                       onClick={() => {
-                        onTabChange('perfil');
+                        handleTabNavigation('perfil');
                         setIsUserMenuOpen(false);
                       }}
                       className={`w-full min-h-[44px] flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
@@ -559,7 +612,7 @@ export const UnifiedNavbar = ({ activeTab, onTabChange }) => {
             <button
               type="button"
               onClick={() => {
-                onTabChange('centro-ayuda');
+                handleTabNavigation('centro-ayuda');
                 setIsMobileMenuOpen(false);
               }}
               {...getVoiceProps(`Ir al inicio de Nexo360 Duoc UC ${DEFAULT_CAMPUS}`)}

@@ -9,6 +9,7 @@ export const Modal = React.forwardRef(
     onClose,
     title,
     children,
+    footer,
     size = 'md',
     showClose = true,
     closeOnOverlay = true,
@@ -68,7 +69,7 @@ export const Modal = React.forwardRef(
 
     const modalContent = (
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-sm animate-fade-in"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-sm animate-fade-in overscroll-contain"
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
@@ -82,7 +83,7 @@ export const Modal = React.forwardRef(
         <div
           ref={setCombinedRef}
           tabIndex={-1}
-          className={`relative z-10 w-full ${sizeStyles[size]} max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-neutral-200 animate-scale-in overflow-hidden ${className}`}
+          className={`relative z-10 w-full ${sizeStyles[size]} max-h-[90vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-neutral-200 animate-scale-in overflow-hidden overscroll-contain ${className}`}
           {...props}
         >
           {(title || showClose) && (
@@ -104,9 +105,14 @@ export const Modal = React.forwardRef(
               )}
             </header>
           )}
-          <div className="p-6 flex-1 overflow-y-auto">
+          <div className="p-6 flex-1 overflow-y-auto overscroll-contain">
             {children}
           </div>
+          {footer && (
+            <footer className="px-6 py-4 border-t border-neutral-100 bg-white/95 backdrop-blur-xs flex items-center justify-between gap-3 shrink-0 rounded-b-3xl">
+              {footer}
+            </footer>
+          )}
         </div>
       </div>
     );

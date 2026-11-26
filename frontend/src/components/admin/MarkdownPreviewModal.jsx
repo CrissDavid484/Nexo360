@@ -37,13 +37,13 @@ export const MarkdownPreviewModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in overscroll-contain">
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="md-modal-title"
-        className="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden"
+        className="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden overscroll-contain"
       >
         <header className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50">
           <div className="flex items-center gap-2.5 min-w-0">

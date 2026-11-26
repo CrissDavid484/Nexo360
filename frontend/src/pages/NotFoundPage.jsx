@@ -25,7 +25,7 @@ export const NotFoundPage = () => {
 
   const handleReturnToPortal = () => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate('/centro-de-ayuda', { replace: true });
     } else {
       navigate('/login', { replace: true });
     }

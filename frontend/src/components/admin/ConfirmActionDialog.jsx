@@ -34,14 +34,14 @@ export const ConfirmActionDialog = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4 animate-fade-in overscroll-contain">
       <div
         ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-action-title"
         aria-describedby="confirm-action-message"
-        className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-red-300 space-y-4"
+        className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto overscroll-contain p-6 shadow-2xl border border-red-300 space-y-4"
       >
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-100 text-red-800 flex items-center justify-center shrink-0">

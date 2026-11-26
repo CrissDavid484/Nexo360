@@ -262,3 +262,168 @@ export function explainPredictiveRisk(student) {
     key,
   };
 }
+
+/**
+ * Determina el nivel de riesgo institucional SAT (Alto, Moderado, Bajo / Normal, o Excepción PAEDIS).
+ */
+export function calculateAttendanceRiskLevel(percentage, options = {}) {
+  const { isJustified = false, consecutiveAbsences = 0, missedKeySession = false } = options;
+
+  if (isJustified) {
+    return {
+      level: 'PAEDIS_JUSTIFIED',
+      riskTier: 'Excepción',
+      label: 'Excepción PAEDIS (Justificada)',
+      badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
+      textClass: 'text-purple-800',
+      dotClass: 'bg-purple-500',
+      color: 'purple',
+    };
+  }
+
+  const pct = Number(percentage);
+  const numConsecutive = Number(consecutiveAbsences || 0);
+
+  if (pct < 75 || numConsecutive >= 3 || missedKeySession) {
+    return {
+      level: 'LEVEL_2_CRITICAL',
+      riskTier: 'Alto',
+      label: 'Alto (Crítico RI <75%)',
+      badgeClass: 'bg-rose-100 text-rose-900 border-rose-300',
+      textClass: 'text-rose-700',
+      dotClass: 'bg-rose-500',
+      color: 'rose',
+    };
+  }
+
+  if (pct <= 79.9 || numConsecutive === 2) {
+    return {
+      level: 'LEVEL_1_PREVENTIVE',
+      riskTier: 'Moderado',
+      label: 'Moderado (Preventivo 75%-79%)',
+      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+      textClass: 'text-amber-700',
+      dotClass: 'bg-amber-500',
+      color: 'amber',
+    };
+  }
+
+  return {
+    level: 'NONE',
+    riskTier: 'Normal',
+    label: 'Normal / Bajo (≥80% Regular)',
+    badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+    textClass: 'text-emerald-700',
+    dotClass: 'bg-emerald-500',
+    color: 'emerald',
+  };
+}
+
+/**
+ * Calcula proyecciones bidireccionales en tiempo real para una asignatura SAT.
+ * Permite simular tanto asistencias positivas (+1 asistencia, 1 falta menos, etc.) como inasistencias.
+ */
+export function calculateBidirectionalSimulation(course) {
+  if (!course) return null;
+
+  const totalSessions = Math.max(1, Number(course.totalSessions || 20));
+  const attendedSessions = Math.max(
+    0,
+    Math.min(totalSessions, Number(course.attendedSessions ?? totalSessions))
+  );
+  const currentAbsences = Math.max(0, totalSessions - attendedSessions);
+  const rawPct =
+    course.attendancePercentage ??
+    course.attendanceRate ??
+    course.asistencia ??
+    course.attendance ??
+    Math.round((attendedSessions / totalSessions) * 1000) / 10;
+  const currentPct = Math.round(Number(rawPct) * 10) / 10;
+  const consecutiveAbsences = Number(course.consecutiveAbsences || 0);
+  const isJustified = Boolean(course.paedisJustified);
+  const minRequiredSessions = Math.ceil(totalSessions * 0.75);
+  const maxAllowedAbsences = Math.max(0, totalSessions - minRequiredSessions);
+  const remainingAllowedAbsences = Math.max(0, maxAllowedAbsences - currentAbsences);
+  const exceededAbsences = Math.max(0, currentAbsences - maxAllowedAbsences);
+
+  const currentRisk = calculateAttendanceRiskLevel(currentPct, {
+    isJustified,
+    consecutiveAbsences,
+    missedKeySession: Boolean(course.missedKeySession),
+  });
+
+  // Proyección Positiva (+1 Asistencia / 1 falta menos)
+  const posAttended = Math.min(totalSessions, attendedSessions + 1);
+  const posAbsences = Math.max(0, totalSessions - posAttended);
+  const posConsecutive = Math.max(0, consecutiveAbsences - 1);
+  const posPct = Math.round((posAttended / totalSessions) * 1000) / 10;
+  const posRemaining = Math.max(0, maxAllowedAbsences - posAbsences);
+  const posRisk = calculateAttendanceRiskLevel(posPct, {
+    isJustified,
+    consecutiveAbsences: posConsecutive,
+    missedKeySession: false,
+  });
+
+  // Proyección Negativa (+1 Inasistencia)
+  const negAttended = Math.max(0, attendedSessions - 1);
+  const negAbsences = totalSessions - negAttended;
+  const negConsecutive = consecutiveAbsences + 1;
+  const negPct = Math.round((negAttended / totalSessions) * 1000) / 10;
+  const negRemaining = Math.max(0, maxAllowedAbsences - negAbsences);
+  const negRisk = calculateAttendanceRiskLevel(negPct, {
+    isJustified,
+    consecutiveAbsences: negConsecutive,
+    missedKeySession: Boolean(course.missedKeySession),
+  });
+  const negTriggersRi = !isJustified && (negPct < 75 || negConsecutive >= 3);
+
+  // Metas de recuperación
+  const neededFor75 = Math.max(0, minRequiredSessions - attendedSessions);
+  const minSessionsFor80 = Math.ceil(totalSessions * 0.8);
+  const neededFor80 = Math.max(0, minSessionsFor80 - attendedSessions);
+
+  return {
+    totalSessions,
+    attendedSessions,
+    currentAbsences,
+    currentPct,
+    consecutiveAbsences,
+    isJustified,
+    maxAllowedAbsences,
+    remainingAllowedAbsences,
+    exceededAbsences,
+    currentRisk,
+    positive: {
+      attended: posAttended,
+      absences: posAbsences,
+      consecutiveAbsences: posConsecutive,
+      pct: posPct,
+      remainingAllowed: posRemaining,
+      risk: posRisk,
+      deltaPct: Math.round((posPct - currentPct) * 10) / 10,
+    },
+    negative: {
+      attended: negAttended,
+      absences: negAbsences,
+      consecutiveAbsences: negConsecutive,
+      pct: negPct,
+      remainingAllowed: negRemaining,
+      risk: negRisk,
+      triggersRi: negTriggersRi,
+      deltaPct: Math.round((negPct - currentPct) * 10) / 10,
+    },
+    recovery: {
+      minRequiredSessions,
+      neededFor75,
+      neededFor80,
+      canReach75: totalSessions - currentAbsences >= minRequiredSessions,
+      canReach80: totalSessions - currentAbsences >= minSessionsFor80,
+    },
+    // Compatibilidad retroactiva
+    status: currentRisk.level === 'LEVEL_2_CRITICAL' ? 'ri' : currentRisk.level === 'LEVEL_1_PREVENTIVE' ? 'preventive' : 'normal',
+    statusLabel: currentRisk.label,
+    nextPct: negPct,
+    nextRemaining: negRemaining,
+    nextTriggersRi: negTriggersRi,
+  };
+}

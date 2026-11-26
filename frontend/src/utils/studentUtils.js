@@ -8,7 +8,193 @@
 
 export const DEFAULT_CAMPUS = 'Sede Alameda';
 
-export const SEDES_DUOC = [DEFAULT_CAMPUS];
+export const CHILE_REGIONS = [
+  'Región de Arica y Parinacota',
+  'Región de Tarapacá',
+  'Región de Antofagasta',
+  'Región de Atacama',
+  'Región de Coquimbo',
+  'Región de Valparaíso',
+  'Región Metropolitana',
+  "Región del Libertador General Bernardo O'Higgins",
+  'Región del Maule',
+  'Región de Ñuble',
+  'Región del Biobío',
+  'Región de La Araucanía',
+  'Región de Los Ríos',
+  'Región de Los Lagos',
+  'Región de Aysén del General Carlos Ibáñez del Campo',
+  'Región de Magallanes y de la Antártica Chilena',
+];
+
+export const DUOC_SCHOOLS = [
+  'Escuela de Informática y Telecomunicaciones',
+  'Escuela de Administración y Negocios',
+  'Escuela de Diseño',
+  'Escuela de Comunicación',
+  'Escuela de Construcción',
+  'Escuela de Ingeniería y Recursos Naturales',
+  'Escuela de Salud',
+  'Escuela de Turismo y Hotelería',
+  'Escuela de Gastronomía',
+];
+
+export const SEDES_DUOC_ITEMS = [
+  { name: 'Sede Alameda', region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Antonio Varas', region: 'Región Metropolitana', city: 'Providencia' },
+  { name: 'Sede Brasil', region: 'Región de Valparaíso', city: 'Valparaíso' },
+  { name: 'Campus Arauco', region: 'Región del Biobío', city: 'Arauco' },
+  { name: 'Campus Nacimiento', region: 'Región del Biobío', city: 'Nacimiento' },
+  { name: 'Campus Villarrica', region: 'Región de La Araucanía', city: 'Villarrica' },
+  { name: 'Sede Educación Continua', region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Melipilla', region: 'Región Metropolitana', city: 'Melipilla' },
+  { name: 'Sede Maipú', region: 'Región Metropolitana', city: 'Maipú' },
+  { name: 'Sede Padre Alonso de Ovalle', region: 'Región Metropolitana', city: 'Santiago' },
+  { name: 'Sede Plaza Norte', region: 'Región Metropolitana', city: 'Huechuraba' },
+  { name: 'Sede Plaza Oeste', region: 'Región Metropolitana', city: 'Cerrillos' },
+  { name: 'Sede Plaza Vespucio', region: 'Región Metropolitana', city: 'La Florida' },
+  { name: 'Sede Puente Alto', region: 'Región Metropolitana', city: 'Puente Alto' },
+  { name: 'Campus Puerto Montt', region: 'Región de Los Lagos', city: 'Puerto Montt' },
+  { name: 'Sede San Bernardo', region: 'Región Metropolitana', city: 'San Bernardo' },
+  { name: 'Sede San Carlos de Apoquindo', region: 'Región Metropolitana', city: 'Las Condes' },
+  { name: 'Sede San Joaquín', region: 'Región Metropolitana', city: 'San Joaquín' },
+  { name: 'Sede Valparaíso', region: 'Región de Valparaíso', city: 'Valparaíso' },
+  { name: 'Sede Viña del Mar', region: 'Región de Valparaíso', city: 'Viña del Mar' },
+];
+
+export const SEDES_DUOC = SEDES_DUOC_ITEMS.map((s) => s.name);
+
+/**
+ * Mapea deterministamente una carrera a su Escuela Oficial Duoc UC
+ */
+export function getSchoolForCareer(careerName = '') {
+  const c = String(careerName || '').toLowerCase();
+
+  // Informática y Telecomunicaciones
+  if (
+    c.includes('programador') ||
+    c.includes('software') ||
+    c.includes('ciberseguridad') ||
+    c.includes('ciencia de datos') ||
+    c.includes('informática') ||
+    c.includes('biomédica') ||
+    c.includes('web') ||
+    c.includes('conectividad') ||
+    c.includes('redes') ||
+    c.includes('telecomunicaciones') ||
+    c.includes('infraestructura tecnológica')
+  ) {
+    return 'Escuela de Informática y Telecomunicaciones';
+  }
+
+  // Administración y Negocios
+  if (
+    c.includes('administración') ||
+    c.includes('auditoría') ||
+    c.includes('comercio exterior') ||
+    c.includes('control de gestión') ||
+    c.includes('gestión de personas') ||
+    c.includes('gestión logística') ||
+    c.includes('operaciones logísticas') ||
+    c.includes('marketing')
+  ) {
+    if (c.includes('turística') || c.includes('turismo')) {
+      return 'Escuela de Turismo y Hotelería';
+    }
+    return 'Escuela de Administración y Negocios';
+  }
+
+  // Diseño
+  if (
+    c.includes('diseño') ||
+    c.includes('ilustración') ||
+    c.includes('ambientes') ||
+    c.includes('vestuario') ||
+    c.includes('restauración')
+  ) {
+    return 'Escuela de Diseño';
+  }
+
+  // Comunicación
+  if (
+    c.includes('actuación') ||
+    c.includes('animación digital') ||
+    c.includes('audiovisual') ||
+    c.includes('periodismo') ||
+    c.includes('publicidad') ||
+    c.includes('relaciones públicas') ||
+    c.includes('sonido') ||
+    c.includes('iluminación')
+  ) {
+    return 'Escuela de Comunicación';
+  }
+
+  // Construcción
+  if (
+    c.includes('construcción') ||
+    c.includes('arquitectónico') ||
+    c.includes('estructural') ||
+    c.includes('topografía') ||
+    c.includes('modelador proyectista')
+  ) {
+    return 'Escuela de Construcción';
+  }
+
+  // Gastronomía
+  if (c.includes('culinarias') || c.includes('gastronomía')) {
+    return 'Escuela de Gastronomía';
+  }
+
+  // Turismo y Hotelería
+  if (
+    c.includes('turismo') ||
+    c.includes('turística') ||
+    c.includes('ecoturismo') ||
+    c.includes('hotelería')
+  ) {
+    return 'Escuela de Turismo y Hotelería';
+  }
+
+  // Salud
+  if (
+    c.includes('enfermería') ||
+    c.includes('fisioterapia') ||
+    c.includes('kinesiología') ||
+    c.includes('odontología') ||
+    c.includes('farmacia') ||
+    c.includes('laboratorio clínico') ||
+    c.includes('radiodiagnóstico') ||
+    c.includes('físico') ||
+    c.includes('calidad de alimentos')
+  ) {
+    return 'Escuela de Salud';
+  }
+
+  // Ingeniería y Recursos Naturales
+  if (
+    c.includes('agrícola') ||
+    c.includes('automatización') ||
+    c.includes('electricidad') ||
+    c.includes('mantenimiento') ||
+    c.includes('maquinaria') ||
+    c.includes('mecánica') ||
+    c.includes('medio ambiente') ||
+    c.includes('minas') ||
+    c.includes('mineros') ||
+    c.includes('prevención de riesgos') ||
+    c.includes('recursos naturales') ||
+    c.includes('geología') ||
+    c.includes('industrial') ||
+    c.includes('electromecánico') ||
+    c.includes('desabolladura') ||
+    c.includes('veterinario') ||
+    c.includes('energías renovables')
+  ) {
+    return 'Escuela de Ingeniería y Recursos Naturales';
+  }
+
+  return 'Escuela de Informática y Telecomunicaciones';
+}
 
 export const INSTITUTIONAL_DOMAINS = ['duocuc.cl', 'profesor.duoc.cl', 'duoc.cl'];
 export const STUDENT_DOMAINS = ['duocuc.cl'];

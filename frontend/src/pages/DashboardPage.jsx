@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
@@ -114,10 +115,80 @@ const OFFICIAL_DUOC_FAQS = [
   },
 ];
 
+export const PATH_TO_TAB = {
+  '/centro-de-ayuda': 'centro-ayuda',
+  '/toma-ramos': 'toma-ramos',
+  '/simulador': 'toma-ramos',
+  '/simulador-toma-ramos': 'toma-ramos',
+  '/biblioteca': 'biblioteca',
+  '/vivo-duoc': 'vivo-duoc',
+  '/soporte': 'tickets',
+  '/tickets': 'tickets',
+  '/perfil': 'perfil',
+  '/panel-admin': 'admin-panel',
+  '/admin-panel': 'admin-panel',
+  '/admin': 'admin-panel',
+};
+
+export const TAB_TO_PATH = {
+  'centro-ayuda': '/centro-de-ayuda',
+  'toma-ramos': '/toma-ramos',
+  'biblioteca': '/biblioteca',
+  'vivo-duoc': '/vivo-duoc',
+  'tickets': '/soporte',
+  'soporte': '/soporte',
+  'perfil': '/perfil',
+  'admin-panel': '/panel-admin',
+  'panel-admin': '/panel-admin',
+};
+
+export const resolveTabFromPathname = (pathname = '') => {
+  if (pathname.startsWith('/panel-admin') || pathname.startsWith('/admin-panel') || pathname.startsWith('/admin')) {
+    return 'admin-panel';
+  }
+  if (pathname.startsWith('/toma-ramos') || pathname.startsWith('/simulador')) {
+    return 'toma-ramos';
+  }
+  if (pathname.startsWith('/biblioteca')) {
+    return 'biblioteca';
+  }
+  if (pathname.startsWith('/vivo-duoc')) {
+    return 'vivo-duoc';
+  }
+  if (pathname.startsWith('/soporte') || pathname.startsWith('/tickets')) {
+    return 'tickets';
+  }
+  if (pathname.startsWith('/perfil')) {
+    return 'perfil';
+  }
+  return 'centro-ayuda';
+};
+
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { announce, getVoiceProps } = useAccessibility();
-  const [activeTab, setActiveTab] = useState('centro-ayuda');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const activeTab = resolveTabFromPathname(location.pathname);
+
+  const userRole = (user?.role || '').toLowerCase();
+  const isAdminOrCoordinator =
+    userRole === 'admin' || userRole === 'administrador' || userRole === 'coordinador_paedis';
+
+  const handleTabChange = (targetTab) => {
+    const nextPath = TAB_TO_PATH[targetTab] || `/${targetTab}`;
+    if (location.pathname !== nextPath && !location.pathname.startsWith(`${nextPath}/`)) {
+      navigate(nextPath);
+    }
+  };
+
+  // Protección de seguridad RBAC: Si un estudiante navega a /panel-admin, redirigir inmediatamente a /centro-de-ayuda
+  useEffect(() => {
+    if (activeTab === 'admin-panel' && !isAdminOrCoordinator) {
+      navigate('/centro-de-ayuda', { replace: true });
+    }
+  }, [activeTab, isAdminOrCoordinator, navigate]);
 
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedSubmodule, setSelectedSubmodule] = useState(null);
@@ -215,7 +286,7 @@ export const DashboardPage = () => {
       <AccessibilityBar />
 
       {/* 2. Navegación Principal Luminosa */}
-      <UnifiedNavbar activeTab={activeTab} onTabChange={setActiveTab} />
+      <UnifiedNavbar activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* 3. Contenido Principal */}
       <main
@@ -360,7 +431,7 @@ export const DashboardPage = () => {
                       </a>
                       <button
                         type="button"
-                        onClick={() => setActiveTab('toma-ramos')}
+                        onClick={() => handleTabChange('toma-ramos')}
                         {...getVoiceProps('Practicar en Simulador de Toma de Ramos')}
                         className="min-h-[44px] px-4 py-2.5 bg-brand-gold hover:bg-amber-400 text-slate-950 font-medium text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 shadow-xs transition-transform active:scale-95"
                       >
@@ -819,7 +890,7 @@ export const DashboardPage = () => {
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('centro-ayuda')}
+                    onClick={() => handleTabChange('centro-ayuda')}
                     {...getVoiceProps('Volver al Centro de Ayuda')}
                     className="min-h-[44px] px-6 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white font-bold text-sm rounded-xl transition-all shadow-xs cursor-pointer"
                   >
@@ -829,7 +900,7 @@ export const DashboardPage = () => {
               </div>
             ) : (
               <div className="animate-fade-in-up">
-                <TomaRamosSimulator onExit={() => setActiveTab('centro-ayuda')} />
+                <TomaRamosSimulator onExit={() => handleTabChange('centro-ayuda')} />
               </div>
             )
           )}
@@ -859,9 +930,13 @@ export const DashboardPage = () => {
           )}
 
           {activeTab === 'admin-panel' && (
-            <div className="w-full animate-fade-in">
-              <AdminLayout onExit={() => setActiveTab('centro-ayuda')} />
-            </div>
+            isAdminOrCoordinator ? (
+              <div className="w-full animate-fade-in">
+                <AdminLayout onExit={() => handleTabChange('centro-ayuda')} />
+              </div>
+            ) : (
+              <Navigate to="/centro-de-ayuda" replace />
+            )
           )}
         </Suspense>
       </main>
