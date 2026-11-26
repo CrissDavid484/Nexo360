@@ -6,6 +6,8 @@ import { useAuth } from '@context/AuthContext';
 import {
   DEFAULT_CAMPUS,
   CHILE_REGIONS,
+  CHILE_REGIONS_CITIES,
+  getCitiesForRegion,
   DUOC_SCHOOLS,
   SEDES_DUOC_ITEMS,
   getSchoolForCareer,
@@ -33,7 +35,7 @@ const INITIAL_SEDES_CATALOG = SEDES_DUOC_ITEMS.map((s, idx) => ({
 const CATALOG_CONFIG = {
   careers: {
     idPrefix: 'career',
-    title: 'Carreras Duoc UC Oficiales',
+    title: 'Carreras Duoc UC',
     subtitleFallback: 'Escuela Oficial Duoc UC',
     addPlaceholder: 'Nombre de la nueva carrera...',
     searchPlaceholder: 'Filtrar carreras...',
@@ -58,7 +60,7 @@ const CATALOG_CONFIG = {
   },
   sedes: {
     idPrefix: 'sede',
-    title: 'Sedes Duoc UC a Nivel Nacional',
+    title: 'Sedes Duoc UC',
     subtitleFallback: 'Región Metropolitana · Santiago',
     addPlaceholder: 'Nombre de sede institucional (ej. Campus Villarrica)...',
     searchPlaceholder: 'Filtrar sedes...',
@@ -186,12 +188,17 @@ function CatalogCrudCard({
                   </label>
                   <select
                     id="academic-sede-region-select"
-                    value={extraState?.region || 'Región Metropolitana'}
-                    onChange={(e) => onExtraStateChange({ region: e.target.value })}
+                    required
+                    value={extraState?.region || ''}
+                    onChange={(e) => {
+                      const newRegion = e.target.value;
+                      onExtraStateChange({ region: newRegion, city: '' });
+                    }}
                     {...getVoiceProps('Seleccionar región de Chile')}
                     aria-label="Región de Chile (16 regiones)"
                     className={`w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold`}
                   >
+                    <option value="">Selecciona una región...</option>
                     {CHILE_REGIONS.map((reg) => (
                       <option key={reg} value={reg}>
                         {reg}
@@ -199,15 +206,30 @@ function CatalogCrudCard({
                     ))}
                   </select>
                 </div>
-                <Input
-                  type="text"
-                  value={extraState?.city || ''}
-                  onChange={(e) => onExtraStateChange({ city: e.target.value })}
-                  placeholder="Ciudad / Ubicación específica..."
-                  aria-label="Ciudad o ubicación específica de la sede"
-                  {...getVoiceProps('Ciudad o comuna de la sede')}
-                  className={`w-full ${ADMIN_THEME.controlInput}`}
-                />
+                <div>
+                  <label htmlFor="academic-sede-city-select" className="sr-only">
+                    Ciudad / Localidad de la sede
+                  </label>
+                  <select
+                    id="academic-sede-city-select"
+                    required
+                    disabled={!extraState?.region}
+                    value={extraState?.city || ''}
+                    onChange={(e) => onExtraStateChange({ city: e.target.value })}
+                    aria-label="Ciudad o localidad de la sede"
+                    {...getVoiceProps('Seleccionar ciudad o localidad de la sede')}
+                    className={`w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold`}
+                  >
+                    <option value="">
+                      {extraState?.region ? 'Selecciona una ciudad / localidad...' : 'Primero selecciona una región...'}
+                    </option>
+                    {getCitiesForRegion(extraState?.region).map((cit) => (
+                      <option key={cit} value={cit}>
+                        {cit}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <Button
                 type="submit"
@@ -289,7 +311,7 @@ export const AcademicCatalog = ({
       items: INITIAL_SEDES_CATALOG,
       newInput: '',
       search: '',
-      extra: { region: 'Región Metropolitana', city: '' },
+      extra: { region: '', city: '' },
     },
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -338,6 +360,17 @@ export const AcademicCatalog = ({
     if (!clean) return;
 
     const extra = catalogState[kind].extra || {};
+    if (kind === 'sedes') {
+      if (!extra.region) {
+        setStatusFeedback({ type: 'error', text: 'Debes seleccionar una región para la nueva sede.' });
+        return;
+      }
+      if (!extra.city) {
+        setStatusFeedback({ type: 'error', text: 'Debes seleccionar una ciudad o localidad para la nueva sede.' });
+        return;
+      }
+    }
+
     const newObj = cfg.buildLocalItem(clean, extra);
 
     setCatalogState((prev) => ({
@@ -349,7 +382,7 @@ export const AcademicCatalog = ({
         extra:
           kind === 'careers'
             ? { school: DUOC_SCHOOLS[0] }
-            : { region: 'Región Metropolitana', city: '' },
+            : { region: '', city: '' },
       },
     }));
 

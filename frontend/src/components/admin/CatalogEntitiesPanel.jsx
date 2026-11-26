@@ -4,6 +4,8 @@ import { api } from '../../services/api';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import {
   CHILE_REGIONS,
+  CHILE_REGIONS_CITIES,
+  getCitiesForRegion,
   DUOC_SCHOOLS,
   getSchoolForCareer,
 } from '../../utils/studentUtils';
@@ -115,23 +117,21 @@ const CareerForm = ({ canManage, onAdd, getVoiceProps }) => {
 
 const SedeForm = ({ canManage, onAdd, getVoiceProps }) => {
   const [name, setName] = useState('');
-  const [region, setRegion] = useState('Región Metropolitana');
+  const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
+
+  const availableCities = getCitiesForRegion(region);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const cleanName = name.trim();
-    if (!cleanName) return;
-    const cleanCity =
-      city.trim() ||
-      (region === 'Región Metropolitana'
-        ? 'Santiago'
-        : region.replace(/^Región (de|del) /, ''));
-    onAdd('sedes', { name: cleanName, region, city: cleanCity })
+    if (!cleanName || !region || !city) return;
+
+    onAdd('sedes', { name: cleanName, region, city })
       .then((ok) => {
         if (ok) {
           setName('');
-          setRegion('Región Metropolitana');
+          setRegion('');
           setCity('');
         }
       })
@@ -164,11 +164,17 @@ const SedeForm = ({ canManage, onAdd, getVoiceProps }) => {
           </label>
           <select
             id="entity-sede-region"
+            required
             value={region}
-            onChange={(e) => setRegion(e.target.value)}
+            onChange={(e) => {
+              const newReg = e.target.value;
+              setRegion(newReg);
+              setCity('');
+            }}
             {...getVoiceProps('Seleccionar región de Chile')}
             className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white ${FOCUS_RING}`}
           >
+            <option value="">Selecciona una región...</option>
             {CHILE_REGIONS.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -178,17 +184,26 @@ const SedeForm = ({ canManage, onAdd, getVoiceProps }) => {
         </div>
         <div className="sm:col-span-1">
           <label htmlFor="entity-sede-city" className="block text-xs font-bold text-slate-800 mb-1">
-            Ciudad / Ubicación
+            Ciudad / Localidad
           </label>
-          <input
+          <select
             id="entity-sede-city"
-            type="text"
+            required
+            disabled={!region}
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            placeholder="Ej. Villarrica, Santiago..."
-            {...getVoiceProps('Escribir ciudad o comuna')}
-            className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white ${FOCUS_RING}`}
-          />
+            {...getVoiceProps('Seleccionar ciudad o localidad')}
+            className={`w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-400 text-sm text-slate-900 bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed ${FOCUS_RING}`}
+          >
+            <option value="">
+              {region ? 'Selecciona una ciudad / localidad...' : 'Primero selecciona una región...'}
+            </option>
+            {availableCities.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <button

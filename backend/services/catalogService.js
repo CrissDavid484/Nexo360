@@ -367,10 +367,19 @@ function createCatalogManager({
     let items = [];
     if (mongoose.connection.readyState === 1) {
       try {
-        if (!catalogMigrationDone) {
+        const needsSync =
+          !catalogMigrationDone ||
+          (await Sede.countDocuments()) < 20 ||
+          (await Sede.exists({
+            $or: [{ city: { $in: [null, '', 'Región Metropolitana'] } }, { region: { $in: [null, ''] } }],
+          })) ||
+          (await Career.exists({ school: { $regex: /escuela duoc uc/i } }));
+
+        if (needsSync) {
           await migrateCatalogDuocData();
         }
-        const dbItems = await seedIfEmptyInDb();
+
+        const dbItems = await Model.find({}).sort({ name: 1 }).lean();
         if (dbItems && dbItems.length > 0) {
           items = dbItems;
         }
@@ -571,37 +580,31 @@ async function migrateCatalogDuocData() {
       name: { $regex: /san andr[eé]s de concepci[oó]n/i },
     });
 
-    // 4. Upsert de las 20 sedes oficiales de Duoc UC con bulkWrite eficiente
-    const existingSedes = await Sede.find({}).lean();
-    const sedeOps = [];
+    // 4. Corregir explícitamente cualquier Sede Alameda antigua con ciudad o región anómala
+    await Sede.updateMany(
+      { name: /alameda/i },
+      { $set: { name: 'Sede Alameda', region: 'Región Metropolitana', city: 'Santiago' } }
+    );
 
-    for (const spec of OFFICIAL_SEDES_SPECS) {
-      const existing = existingSedes.find((s) => spec.match.test(s.name));
-      if (existing) {
-        const needsUpdate =
-          existing.region !== spec.region ||
-          existing.city !== spec.city ||
-          (existing.name !== spec.name && spec.name.includes(existing.name));
-        if (needsUpdate) {
-          sedeOps.push({
-            updateOne: {
-              filter: { _id: existing._id },
-              update: { $set: { name: spec.name, region: spec.region, city: spec.city } },
-            },
-          });
-        }
-      } else {
-        sedeOps.push({
-          insertOne: {
-            document: {
-              name: spec.name,
-              region: spec.region,
-              city: spec.city,
-            },
+    // 5. Upsert forzado de las 20 sedes oficiales de Duoc UC con bulkWrite
+    const sedeOps = OFFICIAL_SEDES_SPECS.map((spec) => ({
+      updateOne: {
+        filter: {
+          $or: [
+            { name: spec.name },
+            { name: { $regex: spec.match } },
+          ],
+        },
+        update: {
+          $set: {
+            name: spec.name,
+            region: spec.region,
+            city: spec.city,
           },
-        });
-      }
-    }
+        },
+        upsert: true,
+      },
+    }));
 
     if (sedeOps.length > 0) {
       await Sede.bulkWrite(sedeOps, { ordered: false });

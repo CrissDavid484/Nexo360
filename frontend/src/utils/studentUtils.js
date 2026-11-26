@@ -27,6 +27,36 @@ export const CHILE_REGIONS = [
   'Región de Magallanes y de la Antártica Chilena',
 ];
 
+/**
+ * Mapa exhaustivo de las 16 regiones de Chile con sus respectivas comunas, ciudades y localidades oficiales.
+ */
+export const CHILE_REGIONS_CITIES = {
+  'Región de Arica y Parinacota': ['Arica', 'Camarones', 'Putre', 'General Lagos'],
+  'Región de Tarapacá': ['Iquique', 'Alto Hospicio', 'Pozo Almonte', 'Pica', 'Huara', 'Camiña', 'Colchane'],
+  'Región de Antofagasta': ['Antofagasta', 'Calama', 'Tocopilla', 'Mejillones', 'Taltal', 'San Pedro de Atacama', 'Sierra Gorda', 'María Elena', 'Ollagüe'],
+  'Región de Atacama': ['Copiapó', 'Vallenar', 'Caldera', 'Chañaral', 'Diego de Almagro', 'Huasco', 'Tierra Amarilla', 'Freirina', 'Alto del Carmen'],
+  'Región de Coquimbo': ['La Serena', 'Coquimbo', 'Ovalle', 'Illapel', 'Salamanca', 'Vicuña', 'Los Vilos', 'Monte Patria', 'Combarbalá', 'Andacollo', 'Canela', 'Punitaqui', 'Paihuano', 'Río Hurtado', 'La Higuera'],
+  'Región de Valparaíso': ['Valparaíso', 'Viña del Mar', 'Quilpué', 'Villa Alemana', 'Concón', 'Quillota', 'San Antonio', 'Los Andes', 'San Felipe', 'La Calera', 'Limache', 'Casablanca', 'Quintero', 'Puchuncaví', 'La Ligua', 'Cabildo', 'Papudo', 'Zapallar', 'Santo Domingo', 'Cartagena', 'El Quisco', 'El Tabo', 'Algarrobo', 'Llaillay', 'Putaendo', 'Santa María', 'Catemu', 'Panquehue', 'San Esteban', 'Calle Larga', 'Rinconada', 'Nogales', 'Hijuelas', 'Olmué', 'Isla de Pascua', 'Juan Fernández'],
+  'Región Metropolitana': ['Santiago', 'Providencia', 'Las Condes', 'Maipú', 'Puente Alto', 'San Bernardo', 'Melipilla', 'Huechuraba', 'Cerrillos', 'La Florida', 'San Joaquín', 'Ñuñoa', 'Vitacura', 'Lo Barnechea', 'Peñalolén', 'La Reina', 'Macul', 'Estación Central', 'Quinta Normal', 'Independencia', 'Recoleta', 'Conchalí', 'Renca', 'Quilicura', 'Pudahuel', 'Cerro Navia', 'Lo Prado', 'San Miguel', 'San Ramón', 'La Granja', 'La Pintana', 'El Bosque', 'Pedro Aguirre Cerda', 'Lo Espejo', 'Talagante', 'Peñaflor', 'Isla de Maipo', 'El Monte', 'Padre Hurtado', 'Buin', 'Paine', 'Colina', 'Lampa', 'Tiltil', 'Pirque', 'San José de Maipo', 'Curacaví', 'María Pinto', 'San Pedro', 'Alhué'],
+  "Región del Libertador General Bernardo O'Higgins": ['Rancagua', 'Machalí', 'Rengo', 'San Fernando', 'Pichilemu', 'Graneros', 'San Vicente', 'Santa Cruz', 'Mostazal', 'Chimbarongo', 'Doñihue', 'Coltauco', 'Requínoa', 'Malloa', 'Peumo', 'Pichidegua', 'Las Cabras', 'Codegua', 'Coinco', 'Olivar', 'Quinta de Tilcoco', 'Nancagua', 'Placilla', 'Chépica', 'Lolol', 'Pumanque', 'Palmilla', 'Peralillo', 'Navidad', 'Litueche', 'La Estrella', 'Marchigüe', 'Paredones'],
+  'Región del Maule': ['Talca', 'Curicó', 'Linares', 'Constitución', 'Molina', 'San Javier', 'Parral', 'Cauquenes', 'San Clemente', 'Teno', 'Longaví', 'Colbún', 'Retiro', 'Yerbas Buenas', 'Villa Alegre', 'Maule', 'Pelarco', 'Pencahue', 'Río Claro', 'San Rafael', 'Curepto', 'Hualañé', 'Licantén', 'Rauco', 'Romeral', 'Sagrada Familia', 'Vichuquén', 'Chanco', 'Pelluhue', 'Empedrado'],
+  'Región de Ñuble': ['Chillán', 'Chillán Viejo', 'San Carlos', 'Bulnes', 'Yungay', 'Coihueco', 'Pinto', 'Quirihue', 'San Nicolás', 'Coelemu', 'Ninhue', 'Portezuelo', 'Ránquil', 'Trehuaco', 'Cobquecura', 'Quillón', 'San Ignacio', 'El Carmen', 'Pemuco', 'San Fabián', 'Treguaco'],
+  'Región del Biobío': ['Concepción', 'Talcahuano', 'San Pedro de la Paz', 'Hualpén', 'Chiguayante', 'Coronel', 'Lota', 'Penco', 'Tomé', 'Arauco', 'Nacimiento', 'Los Ángeles', 'Cabrero', 'Mulchén', 'Laja', 'Yumbel', 'Santa Bárbara', 'Huépil', 'Tucapel', 'Negrete', 'San Rosendo', 'Antuco', 'Quilleco', 'Alto Biobío', 'Lebu', 'Curanilahue', 'Cañete', 'Los Álamos', 'Contulmo', 'Tirúa', 'Florida', 'Hualqui', 'Santa Juana'],
+  'Región de La Araucanía': ['Temuco', 'Padre Las Casas', 'Villarrica', 'Pucón', 'Angol', 'Victoria', 'Lautaro', 'Nueva Imperial', 'Carahue', 'Pitrufquén', 'Collipulli', 'Traiguén', 'Curacautín', 'Loncoche', 'Gorbea', 'Toltén', 'Teodoro Schmidt', 'Saavedra', 'Cholchol', 'Galvarino', 'Perquenco', 'Vilcún', 'Cunco', 'Melipeuco', 'Curarrehue', 'Freire', 'Renaico', 'Ercilla', 'Los Sauces', 'Purén', 'Lumaco', 'Lonquimay'],
+  'Región de Los Ríos': ['Valdivia', 'La Unión', 'Río Bueno', 'Panguipulli', 'Paillaco', 'Los Lagos', 'Mariquina', 'Lanco', 'Futrono', 'Corral', 'Máfil', 'Lago Ranco'],
+  'Región de Los Lagos': ['Puerto Montt', 'Osorno', 'Castro', 'Ancud', 'Puerto Varas', 'Frutillar', 'Llanquihue', 'Calbuco', 'Quellón', 'Dalcahue', 'Chonchi', 'Fresia', 'Los Muermos', 'Maullín', 'Cochamó', 'Purranque', 'Puyehue', 'Río Negro', 'San Pablo', 'San Juan de la Costa', 'Puerto Octay', 'Curaco de Vélez', 'Puqueldón', 'Queilén', 'Quemchi', 'Chaitén', 'Futaleufú', 'Hualaihué', 'Palena'],
+  'Región de Aysén del General Carlos Ibáñez del Campo': ['Coyhaique', 'Puerto Aysén', 'Chile Chico', 'Cochrane', 'Puerto Cisnes', 'Melinka', 'Lago Verde', 'Río Ibáñez', 'Tortel', "O'Higgins"],
+  'Región de Magallanes y de la Antártica Chilena': ['Punta Arenas', 'Puerto Natales', 'Porvenir', 'Puerto Williams', 'Cabo de Hornos', 'Primavera', 'Timaukel', 'San Gregorio', 'Río Verde', 'Laguna Blanca', 'Antártica'],
+};
+
+/**
+ * Obtiene la lista de ciudades/localidades para una región determinada.
+ */
+export function getCitiesForRegion(region) {
+  if (!region) return [];
+  return CHILE_REGIONS_CITIES[region] || [];
+}
+
 export const DUOC_SCHOOLS = [
   'Escuela de Informática y Telecomunicaciones',
   'Escuela de Administración y Negocios',
