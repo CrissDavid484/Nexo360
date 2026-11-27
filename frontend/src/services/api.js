@@ -623,4 +623,13 @@ export const api = {
   async getAdminSimulatorSnapshots(limit = 20) {
     return request(`/admin/simulator-snapshots?limit=${encodeURIComponent(limit)}`);
   },
+
+  /**
+   * Obtener dashboard completo de Vivo Duoc UC (proxy backend servidor-a-servidor)
+   * Endpoint: GET /api/vivo-duoc/dashboard
+   * Protegido por JWT Nexo360, deriva identidad desde usuario autenticado (prevención IDOR)
+   */
+  async getVivoDuocDashboard() {
+    return request('/vivo-duoc/dashboard');
+  },
 };

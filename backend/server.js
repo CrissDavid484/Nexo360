@@ -9,6 +9,7 @@ const moduleRoutes = require('./routes/moduleRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
+const vivoDuocRoutes = require('./routes/vivoDuocRoutes');
 const simulatorSnapshotService = require('./services/simulatorSnapshotService');
 const academicCalendarService = require('./services/academicCalendarService');
 const catalogService = require('./services/catalogService');
@@ -237,6 +238,7 @@ app.use('/api/modules', moduleRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/vivo-duoc', vivoDuocRoutes);
 
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {

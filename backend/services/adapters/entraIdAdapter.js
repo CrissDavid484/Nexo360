@@ -432,6 +432,25 @@ class MicrosoftEntraIdAdapter {
   }
 
   /**
+   * Obtiene un access token válido para la API de Duoc UC.
+   * En producción, esto usaría el refresh token almacenado en la sesión del usuario
+   * para obtener un nuevo access token via On-Behalf-Of o flujo de refresh token.
+   * @param {string} userId - ID del usuario en Nexo360
+   * @returns {Promise<{accessToken: string, expiresIn: number}|null>}
+   */
+  async getAccessTokenForDuocApi(userId) {
+    if (!this.isConfigured()) {
+      return null;
+    }
+    // Placeholder: en implementación real, recuperar refresh token de BD/sesión
+    // y hacer token refresh contra Microsoft Entra ID
+    // const refreshToken = await sessionStore.getRefreshToken(userId);
+    // const tokens = await this.refreshAccessToken(refreshToken);
+    // return { accessToken: tokens.access_token, expiresIn: tokens.expires_in };
+    return null;
+  }
+
+  /**
    * Intercambia un authorization code por tokens OIDC reales en Microsoft Entra ID.
    */
   async exchangeCodeForTokens(code, { codeVerifier } = {}) {
