@@ -341,9 +341,10 @@ async function dispatchEmail({ to, subject, text, html, resetToken, resetUrl, se
   });
 
   const isProd = process.env.NODE_ENV === 'production';
+  const delivered = deliveryMode === 'smtp' || (!isProd && deliveryMode === 'fallback');
   return {
-    delivered: true,
-    deliveryMode,
+    delivered,
+    deliveryMode: deliveryMode === 'fallback' && isProd ? 'unconfigured_smtp' : deliveryMode,
     devPreview:
       !isProd && deliveryMode === 'fallback'
         ? {
@@ -357,25 +358,23 @@ async function dispatchEmail({ to, subject, text, html, resetToken, resetUrl, se
 }
 
 /**
- * Envía el correo de bienvenida institucional con contraseña inicial y enlace de cambio seguro.
+ * Envía el correo de bienvenida institucional con enlace de activación seguro (sin contraseñas predecibles).
  */
-async function sendWelcomeEmail({ to, fullName, initialPassword, resetToken, roleLabel }) {
-  const resetUrl = buildResetUrl(to, resetToken);
+async function sendWelcomeEmail({ to, fullName, activationUrl, activationToken, resetToken, roleLabel, initialPassword }) {
+  const targetUrl = activationUrl || (resetToken ? buildResetUrl(to, resetToken) : '');
   const safeName = escapeHtml(fullName || 'Usuario Duoc UC');
   const safeRole = escapeHtml(roleLabel || 'Miembro Institucional');
-  const safePassword = escapeHtml(initialPassword || '');
-  const safeUrl = escapeHtml(resetUrl);
-  const subject = 'Bienvenido/a a Nexo360 Duoc UC — Credenciales de acceso';
+  const safeUrl = escapeHtml(targetUrl);
+  const subject = 'Bienvenido/a a Nexo360 Duoc UC — Activación de cuenta';
 
   const text = [
     `Hola ${fullName || 'Usuario Duoc UC'},`,
     '',
     `Tu cuenta institucional en Nexo360 ha sido creada con el perfil: ${roleLabel || 'Miembro Institucional'}.`,
     `Correo de acceso: ${to}`,
-    `Contraseña inicial temporal: ${initialPassword}`,
     '',
-    'Por seguridad y cumplimiento de la Ley N° 21.719, te recomendamos cambiar tu contraseña inicial desde tu perfil o mediante el siguiente enlace (válido por 30 minutos):',
-    resetUrl,
+    'Para completar el registro y activar tu acceso conforme a la Ley N° 21.719, por favor define tu contraseña personal mediante el siguiente enlace seguro (vigente por 48 horas):',
+    targetUrl,
   ].join('\n');
 
   const html = `
@@ -385,10 +384,9 @@ async function sendWelcomeEmail({ to, fullName, initialPassword, resetToken, rol
       <p>Tu cuenta institucional ha sido registrada con el rol: <strong>${safeRole}</strong>.</p>
       <ul>
         <li><strong>Correo institucional:</strong> ${escapeHtml(to)}</li>
-        <li><strong>Contraseña inicial temporal:</strong> <code>${safePassword}</code></li>
       </ul>
-      <p>Puedes cambiar tu contraseña inicial directamente usando el siguiente enlace seguro (vigente por 30 minutos):</p>
-      <p><a href="${safeUrl}" style="color: #0055a5; font-weight: bold;">Establecer nueva contraseña en Nexo360</a></p>
+      <p>Por seguridad y para proteger tus datos personales, debes activar tu cuenta y definir tu propia contraseña institucional en el siguiente enlace seguro (vigente por 48 horas):</p>
+      <p><a href="${safeUrl}" style="color: #0055a5; font-weight: bold;">Activar mi cuenta y definir contraseña en Nexo360</a></p>
       <p style="font-size: 12px; color: #64748b;">Tratamiento de datos protegido conforme a la Ley N° 21.719 de Protección de Datos Personales.</p>
     </div>
   `.trim();
@@ -398,9 +396,9 @@ async function sendWelcomeEmail({ to, fullName, initialPassword, resetToken, rol
     subject,
     text,
     html,
-    resetToken,
-    resetUrl,
-    secretToMask: initialPassword,
+    resetToken: activationToken || resetToken,
+    resetUrl: targetUrl,
+    secretToMask: initialPassword || '',
   });
 }
 

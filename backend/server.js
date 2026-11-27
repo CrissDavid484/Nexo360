@@ -70,18 +70,28 @@ app.use(
 
       const normalizedOrigin = stripTrailingSlashes(origin);
 
-      let isPagesDev = false;
+      let isAllowedCloudflareOrDuoc = false;
       try {
         const { hostname } = new URL(normalizedOrigin);
-        isPagesDev = hostname.endsWith('.pages.dev');
+        isAllowedCloudflareOrDuoc =
+          hostname === 'nexo360.pages.dev' ||
+          hostname.endsWith('.nexo360.pages.dev') ||
+          hostname === 'nexo360.duoc.cl' ||
+          hostname.endsWith('.duoc.cl') ||
+          (process.env.ALLOWED_CORS_HOSTS || '')
+            .split(',')
+            .map((h) => h.trim().toLowerCase())
+            .filter(Boolean)
+            .includes(hostname.toLowerCase());
       } catch {
-        isPagesDev = false;
+        isAllowedCloudflareOrDuoc = false;
       }
 
       if (
         allowedOrigins.includes(normalizedOrigin) ||
-        isPagesDev ||
-        (process.env.NODE_ENV !== 'production' && normalizedOrigin.endsWith(':5173'))
+        isAllowedCloudflareOrDuoc ||
+        (process.env.NODE_ENV !== 'production' &&
+          (normalizedOrigin.includes('localhost') || normalizedOrigin.includes('127.0.0.1')))
       ) {
         return callback(null, true);
       }

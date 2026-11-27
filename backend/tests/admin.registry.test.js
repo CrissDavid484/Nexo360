@@ -439,17 +439,28 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     const latestMail = currentOutbox[currentOutbox.length - 1];
     assert.ok(latestMail.subject.includes('Bienvenido/a a Nexo360'));
 
-    // 3. Login con contraseña inicial autogenerada: 20654321ks (RUT limpio + 's' de Salazar)
+    // 3. Activación criptográfica con token seguro y login con contraseña definida
+    const activationToken = studentRes.body?.activation?.token;
+    assert.ok(activationToken, 'Debe generar token criptográfico de activación de un solo uso');
+    const activateRes = await request('/api/auth/activate-account', {
+      method: 'POST',
+      body: {
+        token: activationToken,
+        password: 'PasswordSegura2026!',
+      },
+    });
+    assert.equal(activateRes.status, 200);
+
     const loginRes = await request('/api/auth/login', {
       method: 'POST',
       body: {
         email: 'v.salazar@duocuc.cl',
-        password: '20654321ks',
+        password: 'PasswordSegura2026!',
       },
     });
     assert.equal(loginRes.status, 200);
     assert.equal(loginRes.body?.user?.email, 'v.salazar@duocuc.cl');
-    assert.equal(loginRes.body?.user?.mustChangePassword, true);
+    assert.equal(loginRes.body?.user?.mustChangePassword, false);
 
     // 4. Registro de funcionario (@profesor.duoc.cl) sin carrera obligatoria
     const staffRes = await request('/api/admin/students', {

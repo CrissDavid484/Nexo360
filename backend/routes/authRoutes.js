@@ -36,6 +36,8 @@ router.get(
 router.get('/ley21719', authController.getLey21719Info);
 router.post('/sso-login', loginLimiter, authController.ssoLogin);
 router.post('/login', loginLimiter, authController.login);
+router.get('/verify-activation-token', authController.verifyActivationToken);
+router.post('/activate-account', loginLimiter, authController.activateAccount);
 router.post('/forgot-password', passwordRecoveryLimiter, authController.forgotPassword);
 router.post('/reset-password', passwordRecoveryLimiter, authController.resetPassword);
 router.get('/mfa-status/:sessionId', mfaPollingLimiter, authController.getMfaStatus);

@@ -130,7 +130,7 @@ function buildDefaultStudentProfile(cleanEmail, overrides = {}) {
     isPaedis: false,
     academicStatus: 'activo',
     statusReason: 'Estudiante regular activo',
-    attendanceRate: 88.9,
+    attendanceRate: null,
     hasUsedSimulator: false,
     simulatorUsageCount: 0,
     career: 'Ingeniería en Informática',
@@ -594,6 +594,13 @@ class AuthService {
       );
     }
 
+    if (userDoc.isActivated === false) {
+      throw createAuthError(
+        403,
+        'Cuenta pendiente de activación: Por favor revisa tu correo electrónico para definir tu contraseña institucional mediante el enlace de activación seguro.'
+      );
+    }
+
     const isPasswordValid = await this.verifyUserPassword(userDoc, password);
     if (!isPasswordValid) {
       throw createAuthError(
@@ -648,6 +655,126 @@ class AuthService {
       return false;
     }
     return bcrypt.compare(password, stored);
+  }
+
+  /**
+   * Valida un token de activación de cuenta (de un solo uso, con vencimiento).
+   */
+  async verifyActivationToken(token) {
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      throw createAuthError(400, 'Token de activación no proporcionado o inválido.');
+    }
+    const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+    let userDoc;
+    if (mongoose.connection.readyState === 1) {
+      userDoc = await UserProfile.findOne({
+        activationTokenHash: tokenHash,
+        activationTokenExpiresAt: { $gt: new Date() },
+      });
+    } else {
+      userDoc = Array.from(inMemoryUsers.values()).find(
+        (u) =>
+          u.activationTokenHash === tokenHash &&
+          u.activationTokenExpiresAt &&
+          new Date(u.activationTokenExpiresAt) > new Date()
+      );
+    }
+
+    if (!userDoc) {
+      throw createAuthError(400, 'Token de activación inválido, expirado o ya utilizado.');
+    }
+
+    if (isUserBlockedOrInactive(userDoc)) {
+      throw createAuthError(403, 'Acceso denegado: Esta cuenta institucional se encuentra deshabilitada o suspendida.');
+    }
+
+    return {
+      success: true,
+      email: userDoc.email,
+      fullName: userDoc.fullName || userDoc.nombre,
+      role: userDoc.role,
+      roleLabel: userDoc.roleLabel,
+    };
+  }
+
+  /**
+   * Activa una cuenta institucional permitiendo al titular definir su propia contraseña.
+   */
+  async activateAccountWithToken(token, newPassword) {
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      throw createAuthError(400, 'Token de activación no proporcionado o inválido.');
+    }
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+      throw createAuthError(400, 'La nueva contraseña debe tener al menos 8 caracteres.');
+    }
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasDigit = /[0-9]/.test(newPassword);
+    if (!hasUpper || !hasLower || !hasDigit) {
+      throw createAuthError(
+        400,
+        'La contraseña debe contener al menos una letra mayúscula, una minúscula y un número.'
+      );
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+    let userDoc;
+    if (mongoose.connection.readyState === 1) {
+      userDoc = await UserProfile.findOne({
+        activationTokenHash: tokenHash,
+        activationTokenExpiresAt: { $gt: new Date() },
+      }).select('+password +activationTokenHash');
+    } else {
+      userDoc = Array.from(inMemoryUsers.values()).find(
+        (u) =>
+          u.activationTokenHash === tokenHash &&
+          u.activationTokenExpiresAt &&
+          new Date(u.activationTokenExpiresAt) > new Date()
+      );
+    }
+
+    if (!userDoc) {
+      throw createAuthError(400, 'Token de activación inválido, expirado o ya utilizado.');
+    }
+
+    if (isUserBlockedOrInactive(userDoc)) {
+      throw createAuthError(403, 'Acceso denegado: Esta cuenta institucional se encuentra deshabilitada o suspendida.');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    if (mongoose.connection.readyState === 1 && typeof userDoc.save === 'function') {
+      userDoc.password = hashedPassword;
+      userDoc.activationTokenHash = null;
+      userDoc.activationTokenExpiresAt = null;
+      userDoc.isActivated = true;
+      userDoc.mustChangePassword = false;
+      userDoc.statusUpdatedAt = new Date();
+      await userDoc.save();
+    } else {
+      userDoc.password = hashedPassword;
+      userDoc.activationTokenHash = null;
+      userDoc.activationTokenExpiresAt = null;
+      userDoc.isActivated = true;
+      userDoc.mustChangePassword = false;
+      userDoc.statusUpdatedAt = new Date();
+      inMemoryUsers.set(userDoc.email.toLowerCase(), userDoc);
+    }
+
+    await this.logActivity({
+      userId: userDoc._id || userDoc.id,
+      userEmail: userDoc.email,
+      userName: userDoc.fullName || userDoc.nombre,
+      userRole: userDoc.role,
+      action: 'account_activated',
+      details: 'Cuenta institucional activada exitosamente por el titular con contraseña propia. Trazabilidad Ley N° 21.719.',
+    });
+
+    return {
+      success: true,
+      message: 'Cuenta activada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña institucional.',
+    };
   }
 
   /**
@@ -960,7 +1087,11 @@ class AuthService {
       sede: campus,
       academicStatus: raw.academicStatus || 'activo',
       statusReason: raw.statusReason || 'Estudiante regular activo',
-      attendanceRate: Number(raw.attendanceRate ?? 88.9),
+      attendanceRate:
+        raw.attendanceRate !== undefined && raw.attendanceRate !== null && !isNaN(raw.attendanceRate)
+          ? Number(raw.attendanceRate)
+          : null,
+      isActivated: raw.isActivated !== false,
       hasUsedSimulator: Boolean(raw.hasUsedSimulator),
       simulatorUsageCount: Number(raw.simulatorUsageCount || 0),
       lastSimulatorUsage: raw.lastSimulatorUsage || null,

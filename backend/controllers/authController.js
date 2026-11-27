@@ -279,15 +279,23 @@ exports.ssoLogin = async (req, res) => {
         });
       }
 
+      if (typeof body.state !== 'string' || !body.state.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'El inicio de sesión institucional OIDC requiere un parámetro state de correlación previo y válido.',
+        });
+      }
+
+      const authState = entraIdAdapter.consumeAuthorizationState(body.state.trim());
+      if (!authState) {
+        return res.status(401).json({
+          success: false,
+          message: 'Estado de correlación OIDC inválido, expirado o ya utilizado.',
+        });
+      }
+
       let verifiedProfile;
       if (hasCode) {
-        if (typeof body.state !== 'string' || !body.state.trim()) {
-          return res.status(400).json({
-            success: false,
-            message: 'El flujo de código OIDC requiere el parámetro state.',
-          });
-        }
-        const authState = entraIdAdapter.consumeAuthorizationState(body.state.trim());
         const tokenResponse = await entraIdAdapter.exchangeCodeForTokens(body.code.trim(), {
           codeVerifier: authState.codeVerifier,
         });
@@ -302,13 +310,8 @@ exports.ssoLogin = async (req, res) => {
           expectedNonce: authState.nonce,
         });
       } else {
-        let expectedNonce;
-        if (typeof body.state === 'string' && body.state.trim()) {
-          const authState = entraIdAdapter.consumeAuthorizationState(body.state.trim());
-          expectedNonce = authState.nonce;
-        }
         verifiedProfile = await entraIdAdapter.validateIdToken(body.idToken.trim(), {
-          expectedNonce,
+          expectedNonce: authState.nonce,
         });
       }
 
@@ -886,3 +889,37 @@ exports.getLey21719Info = (req, res) =>
       },
     },
   });
+
+/**
+ * GET /api/auth/verify-activation-token?token=...
+ * Valida si un token de activación es auténtico y está vigente.
+ */
+exports.verifyActivationToken = async (req, res) => {
+  try {
+    const token = typeof req.query?.token === 'string' ? req.query.token : '';
+    const result = await authService.verifyActivationToken(token);
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message || 'Token de activación inválido o expirado.',
+    });
+  }
+};
+
+/**
+ * POST /api/auth/activate-account
+ * Activa la cuenta institucional definiendo la contraseña personal del titular.
+ */
+exports.activateAccount = async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+    const result = await authService.activateAccountWithToken(token, password);
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message || 'No fue posible activar la cuenta.',
+    });
+  }
+};

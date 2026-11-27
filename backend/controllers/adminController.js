@@ -731,14 +731,6 @@ function validateCreateStudentRequest(body, reqUser) {
     return { errorStatus: 400, errorMessage: domainError };
   }
 
-  if (body.consentimientoLey21719?.aceptado === false) {
-    return {
-      errorStatus: 400,
-      errorMessage:
-        'El tratamiento de datos bajo la Ley N° 21.719 es obligatorio para registrar cuentas institucionales.',
-    };
-  }
-
   const identity = resolveIdentityFields(body);
   if (!identity.fullName) {
     return { errorStatus: 400, errorMessage: 'El nombre completo es obligatorio.' };
@@ -856,6 +848,9 @@ function buildNewUserDocument({
   cleanRut,
   hashedPassword,
   mustChangePassword,
+  isActivated,
+  activationTokenHash,
+  activationTokenExpiresAt,
 }) {
   const selectedCareer = resolveCareerForRole(body, isStaffRole);
   const selectedCampus = sanitizeString(body.campus || body.sede, 80) || DEFAULT_SEDE;
@@ -863,6 +858,8 @@ function buildNewUserDocument({
     sanitizeString(body.roleLabel, 120) || ROLE_LABELS[role] || 'Estudiante Duoc UC';
 
   const isStudentRole = role === 'estudiante' || role === 'estudiante_paedis';
+  const isDemoAccount = Boolean(body.isDemoAccount || body.source === 'DEMO');
+
   let initialCourses = Array.isArray(body.enrolledCourses) && body.enrolledCourses.length > 0
     ? body.enrolledCourses
     : [];
@@ -871,19 +868,27 @@ function buildNewUserDocument({
     : [];
   let calculatedAttendance = typeof body.attendanceRate === 'number'
     ? body.attendanceRate
-    : (Number.parseFloat(body.attendanceRate) || 88.9);
+    : (body.attendanceRate !== undefined && body.attendanceRate !== null && !isNaN(body.attendanceRate)
+        ? Number.parseFloat(body.attendanceRate)
+        : null);
 
-  if (isStudentRole && initialCourses.length === 0) {
-    const generated = generateSimulatedStudentCourses(selectedCareer, calculatedAttendance);
+  // Generar cursos simulados ÚNICAMENTE si es explícitamente una cuenta demo aislada (P0)
+  if (isStudentRole && isDemoAccount && initialCourses.length === 0) {
+    const generated = generateSimulatedStudentCourses(selectedCareer, calculatedAttendance || 88.9);
     initialCourses = generated.enrolledCourses;
     initialCourseAttendance = generated.courseAttendance;
     calculatedAttendance = generated.attendanceRate;
   }
 
+  const isConsentGiven = body.consentimientoLey21719?.aceptado === true;
+
   return {
     email,
     password: hashedPassword,
     mustChangePassword,
+    isActivated: body.isActivated !== undefined ? Boolean(body.isActivated) : isActivated,
+    activationTokenHash: activationTokenHash || null,
+    activationTokenExpiresAt: activationTokenExpiresAt || null,
     firstName: identity.firstName,
     paternalLastName: identity.paternalLastName,
     maternalLastName: identity.maternalLastName,
@@ -903,11 +908,11 @@ function buildNewUserDocument({
     carrera: selectedCareer,
     campus: selectedCampus,
     sede: selectedCampus,
-    address: sanitizeString(body.address, 200) || 'Por actualizar',
+    address: sanitizeString(body.address, 200) || '',
     personalEmail: sanitizeString(body.personalEmail, 120)?.toLowerCase() || email,
-    phone: sanitizeString(body.phone, 30) || '+56 9 0000 0000',
-    emergencyContact: sanitizeString(body.emergencyContact, 120) || 'Contacto Familiar',
-    emergencyPhone: sanitizeString(body.emergencyPhone, 30) || '+56 9 0000 0000',
+    phone: sanitizeString(body.phone, 30) || '',
+    emergencyContact: sanitizeString(body.emergencyContact, 120) || '',
+    emergencyPhone: sanitizeString(body.emergencyPhone, 30) || '',
     tutorParAsignado: isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado',
     ajustesAprobados: Array.isArray(body.ajustesAprobados) ? body.ajustesAprobados : [],
     accessibilityPreferences: profileSetup.accessibilityPreferences,
@@ -920,11 +925,19 @@ function buildNewUserDocument({
       ? body.badges.map((b) => sanitizeString(b, 40)).filter(Boolean).slice(0, 10)
       : (STAFF_ROLE_META[role]?.badges || []),
     consentimientoLey21719: {
-      aceptado: true,
-      fechaAceptacion: body.consentimientoLey21719?.fechaAceptacion || new Date(),
+      aceptado: isConsentGiven,
+      fechaAceptacion: isConsentGiven ? (body.consentimientoLey21719?.fechaAceptacion || new Date()) : null,
+      estado: isConsentGiven ? 'ACEPTADO' : 'PENDIENTE',
+      mecanismo: isConsentGiven ? 'DECLARADO' : 'CREACION_ADMINISTRATIVA',
       finalidadTratamiento:
         sanitizeString(body.consentimientoLey21719?.finalidadTratamiento, 300) ||
         'Gestión académica, registro curricular, acompañamiento PAEDIS y prevención de deserción estudiantil según Ley N° 21.719 de Chile',
+    },
+    consentMetadata: {
+      consentGiven: isConsentGiven,
+      consentDate: isConsentGiven ? new Date() : null,
+      consentVersion: '1.0 - Ley N° 21.719',
+      law: 'Ley N° 21.719 de Protección de Datos Personales de Chile',
     },
   };
 }
@@ -936,16 +949,16 @@ async function dispatchWelcomeAndLogs({
   fullName,
   role,
   roleLabel,
-  initialPassword,
+  activationToken,
+  activationUrl,
 }) {
   let emailResult = { delivered: false, deliveryMode: 'fallback', devPreview: null };
   try {
-    const resetToken = await authService.createPasswordResetToken(email);
     emailResult = await emailService.sendWelcomeEmail({
       to: email,
       fullName,
-      initialPassword,
-      resetToken,
+      activationUrl,
+      activationToken,
       roleLabel,
     });
   } catch {
@@ -954,7 +967,7 @@ async function dispatchWelcomeAndLogs({
 
   await logAdminAction(reqUser, {
     action: 'student_registered_by_admin',
-    details: `Usuario ${fullName} (${email}) registrado con rol ${roleLabel}. Cumplimiento Ley 21.719 verificado.`,
+    details: `Usuario ${fullName} (${email}) registrado con rol ${roleLabel}. Configuración de privacidad implementada; revisión jurídica institucional pendiente.`,
     metadata: { targetEmail: email, targetRole: role },
   });
 
@@ -965,7 +978,7 @@ async function dispatchWelcomeAndLogs({
       userName: fullName,
       userRole: role,
       action: 'welcome_email_sent',
-      details: `Correo de bienvenida enviado (${emailResult.deliveryMode}).`,
+      details: `Correo de activación enviado (${emailResult.deliveryMode}).`,
       metadata: { deliveryMode: emailResult.deliveryMode },
     });
   }
@@ -997,14 +1010,37 @@ exports.createStudent = async (req, res) => {
 
     const cleanRut = sanitizeString(body.rut, 20) || 'Sin RUT';
     const explicitPassword = sanitizeString(body.password, 256);
-    const password =
-      explicitPassword ||
-      generateInitialPassword(cleanRut, identity.paternalLastName, identity.fullName);
-    const mustChangePassword =
-      body.mustChangePassword !== undefined ? Boolean(body.mustChangePassword) : !explicitPassword;
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    let hashedPassword;
+    let mustChangePassword;
+    let isActivated;
+    let activationToken = null;
+    let activationTokenHash = null;
+    let activationTokenExpiresAt = null;
+
+    if (explicitPassword) {
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(explicitPassword, salt);
+      mustChangePassword =
+        body.mustChangePassword !== undefined ? Boolean(body.mustChangePassword) : true;
+      isActivated = true;
+    } else {
+      // Prioridad P0: Sustituir generateInitialPassword por token criptográfico de activación de un solo uso
+      // Se mantiene generateInitialPassword disponible para compatibilidad interna y verificación de contratos.
+      activationToken = crypto.randomBytes(32).toString('hex');
+      activationTokenHash = crypto.createHash('sha256').update(activationToken).digest('hex');
+      activationTokenExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 horas
+
+      const unusablePassword = crypto.randomBytes(32).toString('hex');
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(unusablePassword, salt);
+      mustChangePassword = true;
+      isActivated = false;
+    }
+
+    const activationUrl = activationToken
+      ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/activar-cuenta?token=${activationToken}`
+      : null;
 
     const newUserData = buildNewUserDocument({
       body,
@@ -1017,6 +1053,9 @@ exports.createStudent = async (req, res) => {
       cleanRut,
       hashedPassword,
       mustChangePassword,
+      isActivated,
+      activationTokenHash,
+      activationTokenExpiresAt,
     });
 
     let createdUser;
@@ -1069,7 +1108,8 @@ exports.createStudent = async (req, res) => {
       fullName: identity.fullName,
       role,
       roleLabel: newUserData.roleLabel,
-      initialPassword: password,
+      activationToken,
+      activationUrl,
     });
 
     return res.status(201).json({
@@ -1077,12 +1117,23 @@ exports.createStudent = async (req, res) => {
       message: `Usuario ${identity.fullName} registrado exitosamente en la base de datos de Nexo360.`,
       user: authService.formatUserResponse(createdUser),
       emailSent: Boolean(emailResult.delivered),
+      ...(activationToken
+        ? {
+            activation: {
+              token: activationToken,
+              activationUrl,
+              expiresAt: activationTokenExpiresAt,
+              message:
+                'Cuenta creada pendiente de activación. El titular debe definir su contraseña mediante el enlace de activación.',
+            },
+          }
+        : {}),
       ...(process.env.NODE_ENV !== 'production' && emailResult.devPreview
         ? { emailPreview: emailResult.devPreview }
         : {}),
     });
-  } catch {
-    console.error('[AdminController] Error al crear usuario.');
+  } catch (err) {
+    console.error('[AdminController] Error al crear usuario:', err?.message || err);
     return res.status(500).json({
       success: false,
       message: 'Error al registrar usuario en la base de datos.',
@@ -2266,17 +2317,34 @@ exports.updatePaedisCase = async (req, res) => {
       body.medioEntrega !== undefined ||
       body.evidencia !== undefined;
 
+    const isNotified = NOTIFIED_SHEET_STATES.includes(nextSheetState);
+    const deliveryChannel =
+      sanitizeString(body.medioEntrega, 80) ||
+      existingRecord?.medioEntrega ||
+      (isNotified ? 'Notificación Electrónica Institucional' : '');
+
     if (shouldAppendHistory) {
       nextHistorial.unshift({
         estado: nextSheetState,
         fecha: new Date(),
         actorEmail: (req.user?.email || 'coordinacion.paedis@duoc.cl').toLowerCase(),
-        medioEntrega: sanitizeString(body.medioEntrega, 80) || '',
-        evidencia: sanitizeString(body.evidencia, 500) || '',
+        medioEntrega: deliveryChannel,
+        evidencia: sanitizeString(body.evidencia, 500) || (isNotified ? 'Registro en plataforma' : ''),
       });
     }
 
-    const isNotified = NOTIFIED_SHEET_STATES.includes(nextSheetState);
+    // Validación de integridad para estados de entrega/acuse de Ficha Docente (P0/P1)
+    const isTransitioningState =
+      clinicalUpdates.fichaDocenteEstado !== undefined &&
+      clinicalUpdates.fichaDocenteEstado !== existingRecord?.fichaDocenteEstado;
+    if (isTransitioningState && ['ENVIADA', 'ENTREGADA', 'ACUSADA'].includes(nextSheetState)) {
+      if (!deliveryChannel && body.strictDeliveryValidation) {
+        return res.status(400).json({
+          success: false,
+          message: `La transición al estado "${nextSheetState}" de la Ficha Docente requiere medio de entrega o evidencia válida.`,
+        });
+      }
+    }
     const canonicalRecordPayload = {
       ...(validUserId ? { userId: validUserId, studentId: validUserId } : {}),
       userEmail: cleanEmail,
@@ -2348,7 +2416,7 @@ exports.updatePaedisCase = async (req, res) => {
       });
     }
 
-    // Sincronizar SOLO campos operativos no-clínicos en UserProfile (nunca diagnosticoDeclarado ni notasConfidencialesPaedis)
+    // Sincronizar SOLO campos operativos no-clínicos en UserProfile con compensación atómica si falla
     const userSafeUpdates = { ...operationalUpdates };
     delete userSafeUpdates.diagnosticoDeclarado;
     delete userSafeUpdates.notasConfidencialesPaedis;
@@ -2356,8 +2424,21 @@ exports.updatePaedisCase = async (req, res) => {
 
     let updatedUser = user;
     if (Object.keys(userSafeUpdates).length > 0) {
-      const syncResult = await authService.updateProfileFields(cleanEmail, userSafeUpdates);
-      updatedUser = syncResult.user || { ...user, ...userSafeUpdates };
+      try {
+        const syncResult = await authService.updateProfileFields(cleanEmail, userSafeUpdates);
+        updatedUser = syncResult.user || { ...user, ...userSafeUpdates };
+      } catch (syncErr) {
+        // Compensación atómica: revertir PaedisRecord al estado previo para evitar inconsistencia
+        if (mongoose.connection?.readyState === 1 && existingRecord) {
+          await PaedisRecord.findOneAndUpdate(
+            { $or: [{ studentEmail: cleanEmail }, { userEmail: cleanEmail }] },
+            { $set: existingRecord }
+          ).catch(() => {});
+        } else if (existingRecord) {
+          inMemoryPaedisRecords.set(cleanEmail, existingRecord);
+        }
+        throw syncErr;
+      }
     }
 
     const isNotifyAction = isNotified;
@@ -2892,8 +2973,14 @@ exports.exportActivityLogs = async (req, res) => {
     }
 
     if (String(req.query?.format || '').toLowerCase() === 'csv') {
-      const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const header = ['id', 'createdAt', 'action', 'userEmail', 'userName', 'userRole', 'details'].join(',');
+      const csvEscape = (v) => {
+        let s = String(v ?? '');
+        if (/^[=+\-@\t\r]/.test(s)) {
+          s = `'${s}`;
+        }
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      const header = ['id', 'createdAt', 'action', 'userEmail', 'userName', 'userRole', 'details'].map(csvEscape).join(',');
       const rows = logs.map((l) =>
         [l.id, l.createdAt, l.action, l.userEmail, l.userName, l.userRole, l.details]
           .map(csvEscape)

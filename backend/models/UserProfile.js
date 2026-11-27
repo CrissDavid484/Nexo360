@@ -145,6 +145,19 @@ const UserProfileSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isActivated: {
+      type: Boolean,
+      default: true,
+    },
+    activationTokenHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    activationTokenExpiresAt: {
+      type: Date,
+      default: null,
+    },
     passwordResetTokenHash: {
       type: String,
       default: '',
@@ -235,7 +248,7 @@ const UserProfileSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       max: 100,
-      default: 88.9,
+      default: null,
     },
     hasUsedSimulator: {
       type: Boolean,

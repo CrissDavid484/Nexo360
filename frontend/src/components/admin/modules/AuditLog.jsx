@@ -102,12 +102,19 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
   const loadLogs = useCallback(async () => {
     try {
       setLoading(true);
-      const qTerm = (filters.search || filters.actor || '').trim();
       const queryParams = {
         page,
         limit: pageSize,
       };
-      if (qTerm) queryParams.q = qTerm;
+      if (filters.action && filters.action !== 'all') {
+        const cat = ACTION_CATEGORIES.find((c) => c.id === filters.action);
+        if (cat) queryParams.category = cat.id;
+        else queryParams.action = filters.action;
+      }
+      if (filters.actor?.trim()) queryParams.actor = filters.actor.trim();
+      if (filters.dateFrom) queryParams.from = filters.dateFrom;
+      if (filters.dateTo) queryParams.to = filters.dateTo;
+      if (filters.search?.trim()) queryParams.q = filters.search.trim();
 
       const res = await api.getAdminActivityLogs(queryParams);
       if (res?.success) {
@@ -122,35 +129,9 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, filters.search, filters.actor]);
+  }, [page, pageSize, filters.action, filters.actor, filters.dateFrom, filters.dateTo, filters.search]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
-
-  const filteredLogs = useMemo(() => {
-    const selectedCategory = ACTION_CATEGORIES.find((c) => c.id === filters.action);
-    const allowedActions = selectedCategory?.actions || null;
-    const actorFilter = filters.actor.trim().toLowerCase();
-    const fromTime = filters.dateFrom ? new Date(`${filters.dateFrom}T00:00:00`).getTime() : null;
-    const toTime = filters.dateTo ? new Date(`${filters.dateTo}T23:59:59`).getTime() : null;
-
-    return logs.filter((entry) => {
-      if (allowedActions && !allowedActions.includes(entry.action)) {
-        return false;
-      }
-      if (actorFilter) {
-        const actorStr = `${entry.userEmail || ''} ${entry.userName || ''}`.toLowerCase();
-        if (!actorStr.includes(actorFilter)) return false;
-      }
-      if (fromTime || toTime) {
-        const t = entry.createdAt ? new Date(entry.createdAt).getTime() : Number.NaN;
-        if (Number.isFinite(t)) {
-          if (fromTime && t < fromTime) return false;
-          if (toTime && t > toTime) return false;
-        }
-      }
-      return true;
-    });
-  }, [logs, filters.action, filters.actor, filters.dateFrom, filters.dateTo]);
 
   const columns = [
     { field: 'createdAt', header: 'Fecha y Hora', render: (v) => formatDate(v) },
@@ -160,30 +141,49 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
     { field: 'details', header: 'Detalles' },
   ];
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
-      const escapeCsv = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
-      const header = ['Fecha y Hora', 'Acción', 'Actor', 'Correo Actor', 'Detalles'];
-      const rows = filteredLogs.map((l) => [
-        formatDate(l.createdAt),
-        ACTION_LABELS[l.action] || l.action || '',
-        l.userName || '',
-        l.userEmail || '',
-        l.details || '',
-      ]);
-      const csvContent = '\uFEFF' + [header, ...rows].map((r) => r.map(escapeCsv).join(',')).join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      setLoading(true);
+      const queryParams = { format: 'csv' };
+      if (filters.action && filters.action !== 'all') {
+        const cat = ACTION_CATEGORIES.find((c) => c.id === filters.action);
+        if (cat) queryParams.category = cat.id;
+        else queryParams.action = filters.action;
+      }
+      if (filters.actor?.trim()) queryParams.actor = filters.actor.trim();
+      if (filters.dateFrom) queryParams.from = filters.dateFrom;
+      if (filters.dateTo) queryParams.to = filters.dateTo;
+      if (filters.search?.trim()) queryParams.q = filters.search.trim();
+
+      const res = await api.exportActivityLogs(queryParams);
+      let csvContent = '';
+      if (typeof res === 'string') {
+        csvContent = res;
+      } else if (res?.logs && Array.isArray(res.logs)) {
+        const escapeCsv = (val) => {
+          let s = String(val ?? '');
+          if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+          return `"${s.replace(/"/g, '""')}"`;
+        };
+        const header = ['id', 'createdAt', 'action', 'userEmail', 'userName', 'userRole', 'details'];
+        const rows = res.logs.map((l) => [l.id, l.createdAt, l.action, l.userEmail, l.userName, l.userRole, l.details]);
+        csvContent = [header, ...rows].map((r) => r.map(escapeCsv).join(',')).join('\n');
+      }
+
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `auditoria_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `auditoria_completa_${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      setStatusFeedback({ type: 'success', text: `Bitácora exportada (${filteredLogs.length} registros).` });
+      setStatusFeedback({ type: 'success', text: 'Bitácora completa exportada desde el servidor en CSV.' });
       announce('Bitácora de auditoría exportada en CSV.', 'polite');
     } catch (err) {
       console.error('[AuditLog] Error exportando:', err);
-      setStatusFeedback({ type: 'error', text: 'Error al exportar la bitácora.' });
+      setStatusFeedback({ type: 'error', text: 'Error al exportar la bitácora desde el servidor.' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -197,7 +197,7 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
           <p className={ADMIN_THEME.moduleSubtitle}>Trazabilidad completa de acciones administrativas (Ley N° 21.719)</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Button variant="secondary" size="sm" onClick={handleExport} disabled={filteredLogs.length === 0} {...getVoiceProps('Exportar bitácora a CSV')} className="min-h-[42px] px-4 py-2">
+          <Button variant="secondary" size="sm" onClick={handleExport} disabled={total === 0} {...getVoiceProps('Exportar bitácora a CSV')} className="min-h-[42px] px-4 py-2">
             <Download className="w-4 h-4" aria-hidden="true" />
             <span>Exportar CSV</span>
           </Button>
@@ -282,13 +282,13 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
 
       {loading ? (
         <div className="p-12 text-center text-neutral-400 font-bold space-y-2"><span className="animate-spin inline-block w-6 h-6 border-2 border-brand-navy border-t-transparent rounded-full" aria-hidden="true" /><span>Cargando bitácora de auditoría...</span></div>
-      ) : filteredLogs.length === 0 ? (
+      ) : logs.length === 0 ? (
         <Card variant="filled" padding="lg" className="text-center">No se encontraron registros de auditoría con los filtros seleccionados.</Card>
       ) : (
         <div className="space-y-4">
-          <Table columns={columns} data={filteredLogs} striped hoverable compact emptyMessage="Sin registros" />
+          <Table columns={columns} data={logs} striped hoverable compact emptyMessage="Sin registros" />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-neutral-500">Mostrando {filteredLogs.length} de {total} registros</span>
+            <span className="text-xs text-neutral-500">Mostrando {logs.length} de {total} registros</span>
             <div className="flex items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} {...getVoiceProps('Página anterior')}>Anterior</Button>
               <span className="text-xs font-bold text-neutral-700">Página {page} de {totalPages}</span>

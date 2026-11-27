@@ -17,6 +17,7 @@ import { useAccessibleModal } from '../../hooks/useAccessibleModal';
 import { useOnClickOutside } from '../../hooks/useOnClickOutside';
 import { lazyLoad } from '../../utils/lazyLoad';
 import { simplifyText, simplifyArticleHtml } from '../../utils/clearReadingUtils';
+import DOMPurify from 'dompurify';
 
 const TomaRamosSimulator = lazyLoad(
   () => import('../simulation/TomaRamosSimulator'),
@@ -35,35 +36,55 @@ function escapeHtml(text) {
 
 function sanitizeArticleHtml(html) {
   if (typeof html !== 'string' || !html) return '';
-  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
-    return html;
-  }
   try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const scripts = doc.querySelectorAll('script');
-    scripts.forEach((s) => s.remove());
-    const all = doc.querySelectorAll('*');
-    for (const el of all) {
-      for (const attr of Array.from(el.attributes)) {
-        const attrName = attr.name.toLowerCase();
-        if (attrName.startsWith('on')) {
-          el.removeAttribute(attr.name);
-        } else if (['href', 'src', 'action', 'formaction', 'xlink:href'].includes(attrName)) {
-          const val = (attr.value || '').trim().toLowerCase();
-          if (
-            val.startsWith('javascript:') ||
-            val.startsWith('vbscript:') ||
-            val.startsWith('data:text/html')
-          ) {
-            el.setAttribute(attr.name, '#');
-          }
+    const clean = DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: [
+        'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'span', 'ul', 'ol', 'li',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'table', 'thead',
+        'tbody', 'tr', 'th', 'td', 'a', 'div', 'hr', 'code', 'pre', 'iframe',
+      ],
+      ALLOWED_ATTR: [
+        'href', 'title', 'target', 'rel', 'class', 'className', 'style',
+        'src', 'width', 'height', 'frameborder', 'allow', 'allowfullscreen',
+        'aria-label', 'aria-hidden', 'role',
+      ],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+      ADD_ATTR: ['target', 'rel'],
+      FORBID_TAGS: ['script', 'style', 'object', 'embed', 'form', 'input', 'textarea', 'button'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'srcdoc'],
+    });
+
+    if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(clean, 'text/html');
+
+      // Endurecer enlaces externos
+      const links = doc.querySelectorAll('a[href]');
+      links.forEach((a) => {
+        const href = a.getAttribute('href') || '';
+        if (/^https?:\/\//i.test(href)) {
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener noreferrer');
         }
-      }
+      });
+
+      // Restringir iframes estrictamente a proveedores educativos autorizados
+      const iframes = doc.querySelectorAll('iframe');
+      iframes.forEach((iframe) => {
+        const src = iframe.getAttribute('src') || '';
+        const isAllowedHost = /^(?:https?:)?\/\/(?:www\.)?(?:youtube\.com|youtube-nocookie\.com|player\.vimeo\.com)\//i.test(src);
+        if (!isAllowedHost) {
+          iframe.remove();
+        }
+      });
+
+      return doc.body.innerHTML;
     }
-    return doc.body.innerHTML;
+
+    return clean;
   } catch {
-    return html;
+    // Si ocurre un error durante la sanitización, devolver texto plano escapado, nunca HTML raw
+    return escapeHtml(html);
   }
 }
 

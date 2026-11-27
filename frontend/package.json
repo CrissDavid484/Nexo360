@@ -7,9 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node src/tests/satSimulatorBidirectionalTest.mjs"
+    "test": "node src/tests/satSimulatorBidirectionalTest.mjs && node src/tests/dashboardSimulatorTest.mjs && node src/tests/courseImportPreviewTest.mjs && node src/tests/domPurifySanitizerTest.mjs"
   },
   "dependencies": {
+    "dompurify": "^3.5.0",
     "lucide-react": "^0.475.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

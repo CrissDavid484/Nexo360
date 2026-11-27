@@ -426,25 +426,85 @@ function stripTagsAndClean(raw) {
     .trim();
 }
 
+function findXmlTagBlocks(xml, targetTagName) {
+  const blocks = [];
+  if (!xml || typeof xml !== 'string') return blocks;
+  const targetLower = targetTagName.toLowerCase();
+  let i = 0;
+  const len = xml.length;
+
+  while (i < len) {
+    const openIdx = xml.indexOf('<', i);
+    if (openIdx === -1) break;
+
+    const tagCloseIdx = xml.indexOf('>', openIdx);
+    if (tagCloseIdx === -1) break;
+
+    const fullTag = xml.slice(openIdx + 1, tagCloseIdx).trim();
+    if (fullTag.startsWith('/') || fullTag.startsWith('?') || fullTag.startsWith('!')) {
+      i = tagCloseIdx + 1;
+      continue;
+    }
+
+    const spaceIdx = fullTag.search(/\s/);
+    const tagNameWithNs = (spaceIdx === -1 ? fullTag : fullTag.slice(0, spaceIdx)).replace(/\/$/, '');
+    const colonIdx = tagNameWithNs.indexOf(':');
+    const localName = (colonIdx === -1 ? tagNameWithNs : tagNameWithNs.slice(colonIdx + 1)).toLowerCase();
+
+    if (localName !== targetLower) {
+      i = openIdx + 1;
+      continue;
+    }
+
+    const attrs = spaceIdx === -1 ? '' : fullTag.slice(spaceIdx).replace(/\/$/, '').trim();
+
+    if (fullTag.endsWith('/')) {
+      blocks.push({ attrs, inner: '' });
+      i = tagCloseIdx + 1;
+      continue;
+    }
+
+    const closingTag = `</${tagNameWithNs}>`.toLowerCase();
+    const fallbackClosing = `</${localName}>`.toLowerCase();
+    const lowerSub = xml.toLowerCase();
+    let closeIdx = lowerSub.indexOf(closingTag, tagCloseIdx);
+    let closeLen = closingTag.length;
+    if (closeIdx === -1) {
+      closeIdx = lowerSub.indexOf(fallbackClosing, tagCloseIdx);
+      closeLen = fallbackClosing.length;
+    }
+
+    if (closeIdx === -1) {
+      i = tagCloseIdx + 1;
+      continue;
+    }
+
+    const inner = xml.slice(tagCloseIdx + 1, closeIdx);
+    blocks.push({ attrs, inner });
+    i = closeIdx + closeLen;
+  }
+
+  return blocks;
+}
+
 function parseSpreadsheetMlRows(xml) {
-  const rowMatches = xml.match(/<(?:\w+:)?Row\b[^>]*>[\s\S]*?<\/(?:\w+:)?Row>/gi);
-  if (!rowMatches || rowMatches.length === 0) return null;
+  const rowBlocks = findXmlTagBlocks(xml, 'Row');
+  if (!rowBlocks || rowBlocks.length === 0) return null;
 
   const matrix = [];
-  for (const rowXml of rowMatches) {
+  for (const rowBlock of rowBlocks) {
     const row = [];
-    const cellRegex = /<(?:\w+:)?Cell\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?Cell>/gi;
-    let cellMatch;
-    while ((cellMatch = cellRegex.exec(rowXml)) !== null) {
-      const attrs = cellMatch[1] || '';
-      const idxAttr = attrs.match(/\b(?:[a-zA-Z0-9_]+:)?Index\s*=\s*(?:"(\d+)"|'(\d+)')/i);
+    const cellBlocks = findXmlTagBlocks(rowBlock.inner, 'Cell');
+    for (const cellBlock of cellBlocks) {
+      const idxAttr = cellBlock.attrs.match(/Index\s*=\s*(?:"(\d+)"|'(\d+)')/i);
       if (idxAttr) {
         const rawIdx = idxAttr[1] || idxAttr[2];
         const targetIdx = Math.max(0, Number.parseInt(rawIdx, 10) - 1);
         while (row.length < targetIdx) row.push('');
       }
-      const dataMatch = cellMatch[2].match(/<(?:\w+:)?Data\b[^>]*>([\s\S]*?)<\/(?:\w+:)?Data>/i);
-      row.push(stripTagsAndClean(dataMatch ? dataMatch[1] : cellMatch[2]));
+      const dataBlocks = findXmlTagBlocks(cellBlock.inner, 'Data');
+      const text = dataBlocks.length > 0 ? dataBlocks[0].inner : cellBlock.inner;
+      row.push(stripTagsAndClean(text));
     }
     if (row.some((v) => v !== '')) matrix.push(row);
   }
@@ -512,22 +572,80 @@ function stripXmlCommentsAndProlog(xml) {
   return s.trim();
 }
 
+function parseGenericXmlElements(xml) {
+  const elements = [];
+  if (!xml || typeof xml !== 'string') return elements;
+  let i = 0;
+  const len = xml.length;
+
+  while (i < len) {
+    const openIdx = xml.indexOf('<', i);
+    if (openIdx === -1) break;
+
+    const tagCloseIdx = xml.indexOf('>', openIdx);
+    if (tagCloseIdx === -1) break;
+
+    const fullTag = xml.slice(openIdx + 1, tagCloseIdx).trim();
+    if (fullTag.startsWith('/') || fullTag.startsWith('?') || fullTag.startsWith('!')) {
+      i = tagCloseIdx + 1;
+      continue;
+    }
+
+    const spaceIdx = fullTag.search(/\s/);
+    const tagNameWithNs = (spaceIdx === -1 ? fullTag : fullTag.slice(0, spaceIdx)).replace(/\/$/, '');
+    const colonIdx = tagNameWithNs.indexOf(':');
+    const localName = colonIdx === -1 ? tagNameWithNs : tagNameWithNs.slice(colonIdx + 1);
+
+    const attrs = spaceIdx === -1 ? '' : fullTag.slice(spaceIdx).replace(/\/$/, '').trim();
+
+    if (fullTag.endsWith('/')) {
+      elements.push({ tag: localName, fullTag: tagNameWithNs, attrs, inner: '' });
+      i = tagCloseIdx + 1;
+      continue;
+    }
+
+    const closingTag = `</${tagNameWithNs}>`.toLowerCase();
+    const fallbackClosing = `</${localName}>`.toLowerCase();
+    const lowerSub = xml.toLowerCase();
+    let closeIdx = lowerSub.indexOf(closingTag, tagCloseIdx);
+    let closeLen = closingTag.length;
+    if (closeIdx === -1) {
+      closeIdx = lowerSub.indexOf(fallbackClosing, tagCloseIdx);
+      closeLen = fallbackClosing.length;
+    }
+
+    if (closeIdx === -1) {
+      i = tagCloseIdx + 1;
+      continue;
+    }
+
+    const inner = xml.slice(tagCloseIdx + 1, closeIdx);
+    elements.push({ tag: localName, fullTag: tagNameWithNs, attrs, inner });
+    i = closeIdx + closeLen;
+  }
+
+  return elements;
+}
+
 function parseGenericXmlRecords(xml) {
   const cleaned = stripXmlCommentsAndProlog(xml);
-  const rootMatch = cleaned.match(/^<([a-zA-Z_][\w:.-]*)\b[^>]*>([\s\S]*)<\/\1\s*>$/);
-  const body = rootMatch ? rootMatch[2] : cleaned;
+  let body = cleaned;
+  if (cleaned.startsWith('<') && cleaned.endsWith('>')) {
+    const firstClose = cleaned.indexOf('>');
+    const lastOpen = cleaned.lastIndexOf('</');
+    if (firstClose !== -1 && lastOpen > firstClose) {
+      body = cleaned.slice(firstClose + 1, lastOpen);
+    }
+  }
 
   const preferredNames = ['curso', 'asignatura', 'oferta', 'offering', 'course', 'section', 'seccion', 'row', 'record', 'registro', 'item'];
-  const tagCounts = new Map();
-  const directChildRegex = /<([a-zA-Z_][\w:.-]*)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/g;
-  const children = [];
-  let m;
-  while ((m = directChildRegex.exec(body)) !== null) {
-    const tag = m[1];
-    children.push({ tag, attrs: m[2] || '', inner: m[3] || '' });
-    tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-  }
+  const children = parseGenericXmlElements(body);
   if (children.length === 0) return [];
+
+  const tagCounts = new Map();
+  for (const c of children) {
+    tagCounts.set(c.tag, (tagCounts.get(c.tag) || 0) + 1);
+  }
 
   let recordTag = children.find((c) => preferredNames.includes(c.tag.toLowerCase()))?.tag;
   if (!recordTag) {
@@ -544,7 +662,8 @@ function parseGenericXmlRecords(xml) {
   const hasNestedContainer =
     recordNodes.length === 1 &&
     !preferredNames.includes(recordTag.toLowerCase()) &&
-    /<[a-zA-Z_][\w:.-]*\b[^>]*>[\s\S]*?<[a-zA-Z_]/.test(recordNodes[0].inner);
+    recordNodes[0].inner.includes('<');
+
   if (hasNestedContainer) {
     const nested = parseGenericXmlRecords(`<${recordNodes[0].tag}>${recordNodes[0].inner}</${recordNodes[0].tag}>`);
     if (nested.length > 0) return nested;
@@ -552,13 +671,11 @@ function parseGenericXmlRecords(xml) {
 
   return recordNodes.map((node) => {
     const obj = { ...extractXmlAttributes(node.attrs) };
-    const fieldRegex = /<([a-zA-Z_][\w:.-]*)\b[^>]*?(?:\/>|>([\s\S]*?)<\/\1>)/g;
-    let fm;
-    while ((fm = fieldRegex.exec(node.inner)) !== null) {
-      const rawKey = fm[1].includes(':') ? fm[1].split(':').pop() : fm[1];
-      const val = stripTagsAndClean(fm[2] || '');
-      if (val !== '' || !(rawKey in obj)) {
-        obj[rawKey] = val;
+    const fields = parseGenericXmlElements(node.inner);
+    for (const field of fields) {
+      const val = stripTagsAndClean(field.inner);
+      if (val !== '' || !(field.tag in obj)) {
+        obj[field.tag] = val;
       }
     }
     return obj;
