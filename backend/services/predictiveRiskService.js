@@ -657,10 +657,10 @@ function calculatePredictiveRisk(user = {}) {
   }
 
   const attendance = computeAttendanceScore(effectiveAttendance, coursesInRI, coursesInAlert, config);
-  const paedis = computePaedisScore(user, config);
-  const simulator = computeSimulatorScore(user, config);
-  const trend = computeTrendScore(user, config);
-  const load = computeLoadScore(user, config);
+  const paedis = computePaedisScore(user);
+  const simulator = computeSimulatorScore(user);
+  const trend = computeTrendScore(user);
+  const load = computeLoadScore(user);
 
   const subScores = { attendance, paedis, simulator, trend, load };
   const allFactors = [

@@ -188,7 +188,7 @@ const PaedisRecordSchema = new mongoose.Schema(
   }
 );
 
-PaedisRecordSchema.pre('validate', function (next) {
+PaedisRecordSchema.pre('validate', function () {
   if (this.userId && !this.studentId) {
     this.studentId = this.userId;
   } else if (this.studentId && !this.userId) {
@@ -216,8 +216,6 @@ PaedisRecordSchema.pre('validate', function (next) {
   } else {
     this.fichaDocenteNotificada = false;
   }
-
-  next();
 });
 
 module.exports = mongoose.model('PaedisRecord', PaedisRecordSchema);

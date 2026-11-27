@@ -339,7 +339,7 @@ export const StudentDirectory = ({
         if (mounted) setIsLoadingInterventions(false);
       }
     };
-    loadInterventions();
+    void loadInterventions();
     return () => {
       mounted = false;
     };

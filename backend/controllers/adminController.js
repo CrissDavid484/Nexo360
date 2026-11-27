@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const UserProfile = require('../models/UserProfile');
@@ -2475,7 +2476,7 @@ exports.createStudentIntervention = async (req, res) => {
       savedIntervention = await StudentIntervention.create(docPayload);
     } else if (process.env.NODE_ENV === 'test') {
       savedIntervention = {
-        _id: `int_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        _id: `int_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
         ...docPayload,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

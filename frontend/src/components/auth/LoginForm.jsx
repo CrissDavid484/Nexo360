@@ -60,7 +60,7 @@ export const LoginForm = ({ onDirectSuccess, onForgotPassword }) => {
       }
     };
 
-    finishOidc();
+    void finishOidc();
     return () => {
       active = false;
     };

@@ -74,7 +74,7 @@ export const DemoAccountsSelector = ({ onSelectAccount, selectedEmail = '' }) =>
       }
     };
 
-    loadDemoAccounts();
+    void loadDemoAccounts();
     return () => {
       isMounted = false;
     };
