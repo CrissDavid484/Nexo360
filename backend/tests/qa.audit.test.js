@@ -2,8 +2,10 @@ const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const app = require('../server');
 const UserProfile = require('../models/UserProfile');
+const authService = require('../services/authService');
 const { getJwtSecret } = require('../middleware/authMiddleware');
 const { request, setBaseUrl } = require('./testHelper');
 
@@ -13,7 +15,8 @@ let baseUrl;
 describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () => {
   before(async () => {
     await new Promise((resolve) => {
-      server = app.listen(0, '127.0.0.1', () => {
+      server = http.createServer(app);
+      server.listen(0, '127.0.0.1', () => {
         const { port } = server.address();
         baseUrl = `http://127.0.0.1:${port}`;
         setBaseUrl(baseUrl);
@@ -89,15 +92,13 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
   });
 
   test('5. [SEC-01] Token JWT legítimo HS256 permite acceso autenticado y rechaza firmas alteradas', async () => {
-    const validToken = jwt.sign(
-      {
-        email: 'c.guzman@duocuc.cl',
-        fullName: 'Cristian Guzmán',
-        rut: '19.276.735-0',
-      },
-      getJwtSecret(),
-      { algorithm: 'HS256', expiresIn: '10m' }
-    );
+    const validToken = authService.generateJwt({
+      id: 'seed_admin_c_guzman',
+      email: 'c.guzman@duocuc.cl',
+      fullName: 'Cristian Guzmán',
+      role: 'admin',
+      tokenVersion: 0,
+    });
 
     const validRes = await request('/api/auth/me', {
       headers: { Authorization: `Bearer ${validToken}` },
@@ -109,7 +110,7 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     const forgedToken = jwt.sign(
       { email: 'c.guzman@duocuc.cl' },
       'wrong_secret_key',
-      { algorithm: 'HS256' }
+      { algorithm: 'HS256', issuer: 'nexo360-api', audience: 'nexo360-client' }
     );
     const invalidRes = await request('/api/auth/me', {
       headers: { Authorization: `Bearer ${forgedToken}` },
@@ -118,7 +119,6 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
   });
 
   test('6. [SEC-03 & SEC-07] Prevención de NoSQL Injection, validación de dominio @duocuc.cl y cabeceras Rate-Limit', async () => {
-    // Intento de NoSQL Injection enviando objetos en email/password
     const nosqlRes = await request('/api/auth/login', {
       method: 'POST',
       body: { email: { $ne: null }, password: { $ne: null } },
@@ -126,7 +126,6 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(nosqlRes.status, 400);
     assert.ok(nosqlRes.headers['x-ratelimit-limit'], 'Debe incluir cabecera X-RateLimit-Limit');
 
-    // Intento con dominio externo no institucional
     const externalEmailRes = await request('/api/auth/login', {
       method: 'POST',
       body: { email: 'usuario@gmail.com', password: 'Password123!' },
@@ -134,7 +133,6 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(externalEmailRes.status, 400);
     assert.match(externalEmailRes.body?.message || '', /dominio institucional/i);
 
-    // Validación estricta de UUID v4 en /mfa-status/:sessionId
     const badSessionRes = await request('/api/auth/mfa-status/not-a-valid-uuid');
     assert.equal(badSessionRes.status, 400);
   });
@@ -155,7 +153,6 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
       ],
     });
 
-    // Simular intento accidental de asignar password al documento
     doc.set('password', 'secreto123', { strict: false });
     const err = doc.validateSync();
     assert.equal(err, undefined);
@@ -172,14 +169,15 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
   });
 
   test('9. [QA-01 & SEC-03] Sanitización y persistencia de Perfil, Accesibilidad y Toma de Ramos', async () => {
-    const validToken = jwt.sign(
-      { email: 'c.guzman@duocuc.cl', fullName: 'Cristian Guzmán' },
-      getJwtSecret(),
-      { algorithm: 'HS256', expiresIn: '10m' }
-    );
+    const validToken = authService.generateJwt({
+      id: 'seed_admin_c_guzman',
+      email: 'c.guzman@duocuc.cl',
+      fullName: 'Cristian Guzmán',
+      role: 'admin',
+      tokenVersion: 0,
+    });
     const authHeaders = { Authorization: `Bearer ${validToken}` };
 
-    // Actualizar perfil (incluyendo direccion y emailPersonal que antes se perdían)
     const profileRes = await request('/api/auth/profile', {
       method: 'PUT',
       headers: authHeaders,
@@ -187,7 +185,7 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
         direccion: 'Av. España 8, Santiago',
         telefonoPersonal: '+56 9 9988 7766',
         emailPersonal: 'cristian.nuevo@gmail.com',
-        role: 'SUPERADMIN_INJECTION', // Debe ser ignorado por whitelist
+        role: 'SUPERADMIN_INJECTION',
       },
     });
     assert.equal(profileRes.status, 200);
@@ -196,7 +194,6 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(profileRes.body?.user?.emailPersonal, 'cristian.nuevo@gmail.com');
     assert.notEqual(profileRes.body?.user?.role, 'SUPERADMIN_INJECTION');
 
-    // Actualizar preferencias de accesibilidad con sanitización de fontSize inválido
     const a11yRes = await request('/api/auth/accessibility', {
       method: 'PUT',
       headers: authHeaders,
@@ -212,7 +209,6 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(a11yRes.body?.accessibilityPreferences?.fontSize, 'normal');
     assert.equal(a11yRes.body?.accessibilityPreferences?.highContrast, true);
 
-    // Guardar toma de ramos sanitizando estructura
     const tomaRes = await request('/api/auth/toma-ramos', {
       method: 'POST',
       headers: authHeaders,
@@ -233,13 +229,22 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.equal(tomaRes.body?.enrolledCourses[0].sigla, 'ASY4131');
   });
 
-  test('10. [SSO Microsoft & BD 10 Roles] Catálogo de 10 usuarios institucionales y captura de correo como nombre para nuevos correos', async () => {
-    // 1. Verificar que GET /api/auth/users retorna los 10 perfiles institucionales y la URL oficial de Microsoft
-    const usersRes = await request('/api/auth/users');
+  test('10. [SSO & RBAC] GET /api/auth/users protegido y SSO demo restringido sin correos arbitrarios', async () => {
+    const anonUsersRes = await request('/api/auth/users');
+    assert.equal(anonUsersRes.status, 401);
+
+    const adminToken = authService.generateJwt({
+      id: 'seed_admin_c_guzman',
+      email: 'c.guzman@duocuc.cl',
+      role: 'admin',
+      tokenVersion: 0,
+    });
+    const usersRes = await request('/api/auth/users', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
     assert.equal(usersRes.status, 200);
     assert.equal(usersRes.body?.success, true);
     assert.ok(usersRes.body?.totalUsers >= 10);
-    assert.ok(usersRes.body?.officialLoginUrl?.includes('login.microsoftonline.com'));
 
     const rolesPresent = new Set(usersRes.body.users.map((u) => u.rol));
     assert.ok(rolesPresent.has('admin'));
@@ -249,74 +254,91 @@ describe('Auditoría QA, Ciberseguridad (OWASP) y Optimización - Nexo360', () =
     assert.ok(rolesPresent.has('director'));
     assert.ok(rolesPresent.has('subdirector'));
 
-    // 2. Login SSO con un usuario de la BD (ej. Directora de Carrera)
-    const dirLogin = await request('/api/auth/sso-login', {
-      method: 'POST',
-      body: { email: 'p.valenzuela@duoc.cl' },
-    });
-    assert.equal(dirLogin.status, 200);
-    assert.equal(dirLogin.body?.success, true);
-    assert.equal(dirLogin.body?.user?.nombre, 'Patricia Valenzuela');
-    assert.equal(dirLogin.body?.user?.rol, 'director');
+    const prevDemo = process.env.ENABLE_DEMO_ACCOUNTS;
+    process.env.ENABLE_DEMO_ACCOUNTS = 'true';
+    try {
+      const dirLogin = await request('/api/auth/sso-login', {
+        method: 'POST',
+        body: { email: 'p.valenzuela@duoc.cl' },
+      });
+      assert.equal(dirLogin.status, 200);
+      assert.equal(dirLogin.body?.success, true);
+      assert.equal(dirLogin.body?.user?.nombre, 'Patricia Valenzuela');
+      assert.equal(dirLogin.body?.user?.rol, 'director');
 
-    // 3. Login SSO con un correo institucional no registrado: deriva un nombre humano y no expone datos de Cristian
-    const customEmail = 'alumno.nuevo2026@duocuc.cl';
-    const customLogin = await request('/api/auth/sso-login', {
-      method: 'POST',
-      body: { email: customEmail },
-    });
-    assert.equal(customLogin.status, 200);
-    assert.equal(customLogin.body?.success, true);
-    assert.ok(customLogin.body?.user?.nombre);
-    assert.equal(customLogin.body?.user?.nombre, 'Alumno Nuevo2026');
-    assert.notEqual(customLogin.body?.user?.rut, '19.276.735-0');
+      // Correo institucional arbitrario no sembrado es rechazado (401 fail-closed)
+      const arbitraryLogin = await request('/api/auth/sso-login', {
+        method: 'POST',
+        body: { email: 'alumno.nuevo2026@duocuc.cl' },
+      });
+      assert.equal(arbitraryLogin.status, 401);
+    } finally {
+      if (prevDemo === undefined) delete process.env.ENABLE_DEMO_ACCOUNTS;
+      else process.env.ENABLE_DEMO_ACCOUNTS = prevDemo;
+    }
   });
 
-  test('11. [Admin Panel & Motor Predictivo] Control de acceso RBAC, Métricas KPI, Predicción de Deserción y CRUD de Estados', async () => {
-    // 1. Login con contraseña nativa de Cristian Guzmán (Admin)
-    const loginRes = await request('/api/auth/login', {
-      method: 'POST',
-      body: { email: 'c.guzman@duocuc.cl', password: 'Duoc2026!' },
+  test('11. [Admin Panel & Motor Predictivo] Control de acceso RBAC, Métricas KPI, Predicción y CRUD de Estados', async () => {
+    const qaAdminEmail = `qa.admin.${Date.now()}@duoc.cl`;
+    const qaPass = 'QaAdminSecure2026!';
+    const hashedPassword = await bcrypt.hash(qaPass, 10);
+    authService.registerUser({
+      _id: `qa_admin_${Date.now()}`,
+      email: qaAdminEmail,
+      fullName: 'QA Admin',
+      role: 'admin',
+      password: hashedPassword,
+      tokenVersion: 0,
+      isRegisteredInDb: true,
     });
-    assert.equal(loginRes.status, 200);
-    assert.equal(loginRes.body?.success, true);
-    assert.ok(loginRes.body?.token);
-    assert.equal(loginRes.body?.user?.role, 'admin');
 
-    const adminHeaders = { Authorization: `Bearer ${loginRes.body.token}` };
+    try {
+      const loginRes = await request('/api/auth/login', {
+        method: 'POST',
+        body: { email: qaAdminEmail, password: qaPass },
+      });
+      assert.equal(loginRes.status, 200);
+      assert.equal(loginRes.body?.success, true);
+      assert.ok(loginRes.body?.token);
+      assert.equal(loginRes.body?.user?.role, 'admin');
 
-    // 2. Token de estudiante normal debe ser bloqueado en /api/admin/* (403 Forbidden)
-    const studentToken = jwt.sign(
-      { email: 'm.contreras@duocuc.cl', role: 'estudiante' },
-      getJwtSecret(),
-      { algorithm: 'HS256' }
-    );
-    const forbiddenRes = await request('/api/admin/metrics', {
-      headers: { Authorization: `Bearer ${studentToken}` },
-    });
-    assert.equal(forbiddenRes.status, 403);
+      const adminHeaders = { Authorization: `Bearer ${loginRes.body.token}` };
 
-    // 3. Admin accede a /api/admin/metrics exitosamente
-    const metricsRes = await request('/api/admin/metrics', {
-      headers: adminHeaders,
-    });
-    assert.equal(metricsRes.status, 200);
-    assert.equal(metricsRes.body?.success, true);
-    assert.ok(metricsRes.body?.metrics?.totalUsers >= 10);
-    assert.ok(metricsRes.body?.metrics?.statusDistribution?.activo >= 1);
-    assert.ok(typeof metricsRes.body?.metrics?.simulatorUsagePercentage === 'number');
+      const studentToken = authService.generateJwt({
+        id: 'seed_est_m_contreras',
+        email: 'm.contreras@duocuc.cl',
+        role: 'estudiante',
+        tokenVersion: 0,
+      });
+      const forbiddenRes = await request('/api/admin/metrics', {
+        headers: { Authorization: `Bearer ${studentToken}` },
+      });
+      assert.equal(forbiddenRes.status, 403);
 
-    // 4. Admin accede a /api/admin/students y recibe predicción de deserción calculada
-    const studentsRes = await request('/api/admin/students', {
-      headers: adminHeaders,
-    });
-    assert.equal(studentsRes.status, 200);
-    assert.equal(studentsRes.body?.success, true);
-    assert.ok(studentsRes.body?.students?.length >= 10);
+      const metricsRes = await request('/api/admin/metrics', {
+        headers: adminHeaders,
+      });
+      assert.equal(metricsRes.status, 200);
+      assert.equal(metricsRes.body?.success, true);
+      assert.ok(metricsRes.body?.metrics?.totalUsers >= 10);
+      assert.ok(metricsRes.body?.metrics?.statusDistribution?.activo >= 1);
+      assert.ok(typeof metricsRes.body?.metrics?.simulatorUsagePercentage === 'number');
 
-    const firstStudent = studentsRes.body.students[0];
-    assert.ok(firstStudent.prediction);
-    assert.ok(typeof firstStudent.prediction.score === 'number');
-    assert.ok(['BAJO', 'MEDIO', 'ALTO', 'DESERTOR', 'TITULADO'].includes(firstStudent.prediction.riskLevel));
+      const studentsRes = await request('/api/admin/students', {
+        headers: adminHeaders,
+      });
+      assert.equal(studentsRes.status, 200);
+      assert.equal(studentsRes.body?.success, true);
+      assert.ok(studentsRes.body?.students?.length >= 10);
+
+      const withDataStudent = studentsRes.body.students.find((s) => s.email === 'm.contreras@duocuc.cl');
+      assert.ok(withDataStudent?.prediction);
+      assert.equal(withDataStudent.prediction.isHeuristic, true);
+      assert.equal(withDataStudent.prediction.graduationProbability, undefined);
+      assert.ok(typeof withDataStudent.prediction.score === 'number');
+      assert.ok(['BAJO', 'MEDIO', 'ALTO', 'DESERTOR', 'TITULADO', 'SIN_DATOS'].includes(withDataStudent.prediction.riskLevel));
+    } finally {
+      authService.removeUserFromMemory(qaAdminEmail);
+    }
   });
 });

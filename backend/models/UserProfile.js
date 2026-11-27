@@ -62,12 +62,18 @@ const CourseAttendanceSchema = new mongoose.Schema(
     courseCode: { type: String, required: true, trim: true, maxlength: 30 },
     courseName: { type: String, required: true, trim: true, maxlength: 120 },
     totalSessions: { type: Number, min: 0, default: 20 },
+    completedSessions: { type: Number, min: 0 },
+    scheduledSessions: { type: Number, min: 0 },
+    pendingSessions: { type: Number, min: 0 },
     attendedSessions: { type: Number, min: 0, default: 20 },
     attendancePercentage: { type: Number, min: 0, max: 100, default: 100 },
+    minAttendanceRequired: { type: Number, min: 0, max: 100, default: 70 },
+    activityType: { type: String, enum: ['TEORICA', 'PRACTICA'], default: 'TEORICA' },
     consecutiveAbsences: { type: Number, min: 0, default: 0 },
     lateCount: { type: Number, min: 0, default: 0 },
     missedKeySession: { type: Boolean, default: false },
     paedisJustified: { type: Boolean, default: false },
+    officialExceptionAuthorized: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -122,6 +128,18 @@ const UserProfileSchema = new mongoose.Schema(
       type: String,
       required: false, // Opcional al crear pero autogenerado si no se provee
       select: true,
+    },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
     mustChangePassword: {
       type: Boolean,
@@ -307,6 +325,7 @@ const UserProfileSchema = new mongoose.Schema(
       trim: true,
       maxlength: 160,
       default: '',
+      select: false,
     },
     ajustesAprobados: {
       type: [ReasonableAdjustmentSchema],
@@ -335,6 +354,7 @@ const UserProfileSchema = new mongoose.Schema(
       trim: true,
       maxlength: 1000,
       default: '',
+      select: false,
     },
     fichaDocenteNotificada: {
       type: Boolean,
@@ -444,10 +464,12 @@ const UserProfileSchema = new mongoose.Schema(
       ],
     },
     consentMetadata: {
-      consentGiven: { type: Boolean, default: true },
-      consentDate: { type: Date, default: Date.now },
+      consentGiven: { type: Boolean, default: false },
+      consentDate: { type: Date, default: null },
       consentVersion: { type: String, default: '1.0 - Ley N° 21.719' },
       law: { type: String, default: 'Ley N° 21.719 de Protección de Datos Personales de Chile' },
+      legalBasis: { type: String, default: 'PENDIENTE_REVISION_INSTITUCIONAL' },
+      informationDelivered: { type: Boolean, default: false },
       purpose: {
         type: [String],
         default: [
@@ -482,13 +504,13 @@ UserProfileSchema.pre('save', async function () {
   }
 });
 
-// Método para verificar contraseñas
+// Método para verificar contraseñas (solo bcrypt $2a$/$2b$, sin fallback en texto plano)
 UserProfileSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password || !candidatePassword) return false;
   if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
     return bcrypt.compare(candidatePassword, this.password);
   }
-  return this.password === candidatePassword;
+  return false;
 };
 
 // Métodos de transformación para cumplir con la Ley N° 21.719 (Cero almacenamiento o exposición de contraseñas y tokens)

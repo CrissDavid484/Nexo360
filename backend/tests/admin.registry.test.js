@@ -5,7 +5,7 @@ const path = require('node:path');
 const http = require('node:http');
 const jwt = require('jsonwebtoken');
 const app = require('../server');
-const { getJwtSecret } = require('../middleware/authMiddleware');
+const authService = require('../services/authService');
 const { request, setBaseUrl } = require('./testHelper');
 
 let server;
@@ -29,21 +29,27 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     }
   });
 
-  const adminToken = jwt.sign(
-    { id: 'seed_admin_c_guzman', email: 'c.guzman@duocuc.cl', role: 'admin', fullName: 'Cristian Guzmán' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
-  const coordinatorToken = jwt.sign(
-    { id: 'seed_coord_paedis', email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis', fullName: 'Coordinador PAEDIS' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
-  const studentToken = jwt.sign(
-    { id: 'seed_est_m_contreras', email: 'm.contreras@duocuc.cl', role: 'estudiante', fullName: 'Matías Contreras' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
+  const adminToken = authService.generateJwt({
+    id: 'seed_admin_c_guzman',
+    email: 'c.guzman@duocuc.cl',
+    role: 'admin',
+    fullName: 'Cristian Guzmán',
+    tokenVersion: 0,
+  });
+  const coordinatorToken = authService.generateJwt({
+    id: 'seed_coord_paedis',
+    email: 'coord.paedis@duoc.cl',
+    role: 'coordinador_paedis',
+    fullName: 'Coordinador PAEDIS',
+    tokenVersion: 0,
+  });
+  const studentToken = authService.generateJwt({
+    id: 'seed_est_m_contreras',
+    email: 'm.contreras@duocuc.cl',
+    role: 'estudiante',
+    fullName: 'Matías Contreras',
+    tokenVersion: 0,
+  });
 
   const adminHeaders = { Authorization: `Bearer ${adminToken}` };
   const coordinatorHeaders = { Authorization: `Bearer ${coordinatorToken}` };
@@ -826,5 +832,287 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     // Comprobar sincronización e idempotencia de migración
     const migrationRes = await authService.syncPaedisRecordsMigration();
     assert.ok(typeof migrationRes.migrated === 'number');
+  });
+
+  test('16. Intervenciones persistentes (POST/GET /api/admin/students/:id/interventions): 201, sin derivación externa falsa y RBAC', async () => {
+    const denied = await request('/api/admin/students/m.contreras@duocuc.cl/interventions', {
+      method: 'POST',
+      headers: studentHeaders,
+      body: { actionTitle: 'Intento no autorizado' },
+    });
+    assert.equal(denied.status, 403);
+
+    const badReq = await request('/api/admin/students/m.contreras@duocuc.cl/interventions', {
+      method: 'POST',
+      headers: coordinatorHeaders,
+      body: { notes: 'Sin título' },
+    });
+    assert.equal(badReq.status, 400);
+
+    const createRes = await request('/api/admin/students/m.contreras@duocuc.cl/interventions', {
+      method: 'POST',
+      headers: coordinatorHeaders,
+      body: {
+        actionTitle: 'Llamado preventivo SAT',
+        actionCategory: 'SEGUIMIENTO_SAT',
+        notes: 'Se coordina entrevista presencial.',
+      },
+    });
+    assert.equal(createRes.status, 201);
+    assert.equal(createRes.body?.success, true);
+    assert.equal(createRes.body?.externalDerivationPerformed, false);
+    assert.equal(createRes.body?.intervention?.status, 'REGISTRADA');
+    assert.equal(createRes.body?.intervention?.externalDerivationPerformed, false);
+
+    const listRes = await request('/api/admin/students/m.contreras@duocuc.cl/interventions', {
+      headers: coordinatorHeaders,
+    });
+    assert.equal(listRes.status, 200);
+    assert.ok(Array.isArray(listRes.body?.interventions));
+    assert.ok(listRes.body.interventions.some((i) => i.actionTitle === 'Llamado preventivo SAT'));
+  });
+
+  test('17. Auditoría ActivityLog: filtros category/actor/from/to antes de paginar y /activity-logs/export sanitizado', async () => {
+    const authService = require('../services/authService');
+    const marker = `EXPORT_AUDIT_${Date.now()}`;
+    await authService.logActivity({
+      userId: 'seed_admin_c_guzman',
+      userEmail: 'c.guzman@duocuc.cl',
+      userName: 'Cristian Guzmán',
+      userRole: 'admin',
+      action: 'sat_intervention_updated',
+      details: `Auditoría ${marker}`,
+      metadata: {
+        actorEmail: 'c.guzman@duocuc.cl',
+        diagnosticoSecreto: 'NO_EXPORTAR',
+        notaClinica: 'NO_EXPORTAR',
+        safeTag: marker,
+      },
+    });
+
+    const filtered = await request(
+      `/api/admin/activity-logs?category=sat&actor=c.guzman&q=${encodeURIComponent(marker)}&page=1&limit=5`,
+      { headers: adminHeaders }
+    );
+    assert.equal(filtered.status, 200);
+    assert.equal(filtered.body?.total, 1);
+    assert.equal(filtered.body?.logs?.[0]?.metadata?.safeTag, marker);
+    assert.equal(filtered.body?.logs?.[0]?.metadata?.diagnosticoSecreto, undefined);
+
+    const deniedExport = await request('/api/admin/activity-logs/export', {
+      headers: coordinatorHeaders,
+    });
+    assert.equal(deniedExport.status, 403);
+
+    const exportRes = await request(
+      `/api/admin/activity-logs/export?category=sat&q=${encodeURIComponent(marker)}`,
+      { headers: adminHeaders }
+    );
+    assert.equal(exportRes.status, 200);
+    assert.equal(exportRes.body?.success, true);
+    assert.equal(exportRes.body?.count, 1);
+    assert.equal(exportRes.body?.logs?.[0]?.metadata?.notaClinica, undefined);
+  });
+
+  test('18. PAEDIS Segregación y Fail-Loud: GET /paedis/:id/record, sin escritura clínica en UserProfile y 500 si falla MongoDB', async () => {
+    const mongoose = require('mongoose');
+    const PaedisRecord = require('../models/PaedisRecord');
+    const authService = require('../services/authService');
+
+    const adminDenied = await request('/api/admin/paedis/d.rojas@duocuc.cl/record', {
+      headers: adminHeaders,
+    });
+    assert.equal(adminDenied.status, 403);
+
+    // Transición explícita a PREPARADA NO marca fichaDocenteNotificada
+    const prepRes = await request('/api/admin/paedis/d.rojas@duocuc.cl/case', {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: {
+        estadoCaso: 'APROBADO',
+        fichaDocenteEstado: 'PREPARADA',
+        medioEntrega: 'DESCARGA_TXT',
+        evidencia: 'Archivo generado localmente',
+        diagnosticoDeclarado: 'Diagnóstico reservado test',
+        notasConfidenciales: 'Nota clínica reservada test',
+      },
+    });
+    assert.equal(prepRes.status, 200);
+    assert.equal(prepRes.body?.record?.fichaDocenteEstado, 'PREPARADA');
+    assert.equal(prepRes.body?.record?.fichaDocenteNotificada, false);
+    assert.ok(prepRes.body?.record?.fichaDocenteHistorial?.length >= 1);
+
+    // UserProfile NO debe recibir campos clínicos nuevos
+    const rawUser = await authService.findRegisteredUser('d.rojas@duocuc.cl');
+    assert.notEqual(rawUser.diagnosticoDeclarado, 'Diagnóstico reservado test');
+    assert.notEqual(rawUser.notasConfidencialesPaedis, 'Nota clínica reservada test');
+
+    const getRecRes = await request('/api/admin/paedis/d.rojas@duocuc.cl/record', {
+      headers: coordinatorHeaders,
+    });
+    assert.equal(getRecRes.status, 200);
+    assert.equal(getRecRes.body?.record?.diagnosticoDeclarado, 'Diagnóstico reservado test');
+    assert.equal(getRecRes.body?.record?.notasConfidenciales, 'Nota clínica reservada test');
+
+    // Fail-loud: si MongoDB está conectado y PaedisRecord.findOneAndUpdate falla, debe retornar 500 (nunca 200)
+    const adminController = require('../controllers/adminController');
+    const UserProfile = require('../models/UserProfile');
+    const connDesc = Object.getOwnPropertyDescriptor(mongoose.connection, 'readyState');
+    const origUserFindOne = UserProfile.findOne;
+    const origFindOne = PaedisRecord.findOne;
+    const origFindOneAndUpdate = PaedisRecord.findOneAndUpdate;
+    try {
+      Object.defineProperty(mongoose.connection, 'readyState', { configurable: true, get: () => 1 });
+      UserProfile.findOne = async () => rawUser;
+      PaedisRecord.findOne = () => ({ lean: async () => null });
+      PaedisRecord.findOneAndUpdate = () => ({
+        lean: async () => {
+          throw new Error('Simulated DB write failure');
+        },
+      });
+      let failStatus = null;
+      let failBody = null;
+      const mockRes = {
+        status(code) {
+          failStatus = code;
+          return this;
+        },
+        json(payload) {
+          failBody = payload;
+          return this;
+        },
+      };
+      await adminController.updatePaedisCase(
+        {
+          params: { id: 'd.rojas@duocuc.cl' },
+          user: { email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis', fullName: 'Coordinador PAEDIS' },
+          body: { fichaDocenteEstado: 'ENVIADA' },
+        },
+        mockRes
+      );
+      assert.equal(failStatus, 500);
+      assert.equal(failBody?.success, false);
+    } finally {
+      UserProfile.findOne = origUserFindOne;
+      PaedisRecord.findOne = origFindOne;
+      PaedisRecord.findOneAndUpdate = origFindOneAndUpdate;
+      if (connDesc) Object.defineProperty(mongoose.connection, 'readyState', connDesc);
+      else delete mongoose.connection.readyState;
+    }
+  });
+
+  test('19. Catálogo Carreras y Sedes: PUT updateCareer/updateSede y protección referencial 409 al eliminar', async () => {
+    // Sede Alameda tiene usuarios asociados -> 409 Conflict
+    const protectedDelete = await request(`/api/admin/sedes/${encodeURIComponent('Sede Alameda')}`, {
+      method: 'DELETE',
+      headers: adminHeaders,
+    });
+    assert.equal(protectedDelete.status, 409);
+
+    const tempSede = `Sede Temporal Edit ${Date.now()}`;
+    const createdSede = await request('/api/admin/sedes', {
+      method: 'POST',
+      headers: adminHeaders,
+      body: { name: tempSede, region: 'Región de Valparaíso', city: 'Viña del Mar' },
+    });
+    assert.equal(createdSede.status, 201);
+
+    const updatedName = `${tempSede} Renombrada`;
+    const updateRes = await request(`/api/admin/sedes/${encodeURIComponent(tempSede)}`, {
+      method: 'PUT',
+      headers: adminHeaders,
+      body: { name: updatedName, city: 'Quilpué' },
+    });
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.body?.sede?.name, updatedName);
+    assert.equal(updateRes.body?.sede?.city, 'Quilpué');
+
+    // Duplicado contra Sede Alameda -> 409
+    const dupRes = await request(`/api/admin/sedes/${encodeURIComponent(updatedName)}`, {
+      method: 'PUT',
+      headers: adminHeaders,
+      body: { name: 'Sede Alameda' },
+    });
+    assert.equal(dupRes.status, 409);
+
+    const delTemp = await request(`/api/admin/sedes/${encodeURIComponent(updatedName)}`, {
+      method: 'DELETE',
+      headers: adminHeaders,
+    });
+    assert.equal(delTemp.status, 200);
+  });
+
+  test('20. Escalación de privilegios bloqueada, tokenVersion revocado al cambiar rol/permisos e isPaedis preservado; SAT simulatePersisted', async () => {
+    const authService = require('../services/authService');
+    const targetEmail = `rbac.rev.${Date.now()}@duocuc.cl`;
+    authService.registerUser({
+      _id: `rbac_rev_${Date.now()}`,
+      email: targetEmail,
+      fullName: 'Usuario RBAC Test',
+      role: 'estudiante_paedis',
+      isPaedis: true,
+      tokenVersion: 0,
+    });
+
+    try {
+      const oldToken = authService.generateJwt({
+        id: `rbac_rev_${Date.now()}`,
+        email: targetEmail,
+        role: 'estudiante_paedis',
+        tokenVersion: 0,
+      });
+
+      // Admin cambia rol a tutor_par -> incrementa tokenVersion y NO borra isPaedis
+      const roleRes = await request(`/api/admin/users/${encodeURIComponent(targetEmail)}/role`, {
+        method: 'PATCH',
+        headers: adminHeaders,
+        body: { role: 'tutor_par' },
+      });
+      assert.equal(roleRes.status, 200);
+      assert.equal(roleRes.body?.user?.isPaedis, true);
+      assert.equal(roleRes.body?.user?.tokenVersion, 1);
+
+      // Token anterior con tokenVersion: 0 queda revocado (401)
+      const staleRes = await request('/api/auth/me', {
+        headers: { Authorization: `Bearer ${oldToken}` },
+      });
+      assert.equal(staleRes.status, 401);
+
+      // Admin sin full_access ni manage_users no puede escalar a admin/full_access
+      const restrictedAdminEmail = `restricted.admin.${Date.now()}@duoc.cl`;
+      authService.registerUser({
+        _id: `rest_adm_${Date.now()}`,
+        email: restrictedAdminEmail,
+        fullName: 'Admin Limitado',
+        role: 'admin',
+        permissions: ['manage_catalogs'],
+        tokenVersion: 0,
+      });
+      const restrictedToken = authService.generateJwt({
+        id: `rest_adm_${Date.now()}`,
+        email: restrictedAdminEmail,
+        role: 'admin',
+        tokenVersion: 0,
+      });
+      const escRes = await request(`/api/admin/users/${encodeURIComponent(targetEmail)}/role`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${restrictedToken}` },
+        body: { role: 'admin' },
+      });
+      assert.equal(escRes.status, 403);
+      authService.removeUserFromMemory(restrictedAdminEmail);
+    } finally {
+      authService.removeUserFromMemory(targetEmail);
+    }
+
+    // simulateSatCourse devuelve simulationPersisted y persistenceError explícitos
+    const simRes = await request('/api/admin/sat-alerts/m.contreras@duocuc.cl/simulate', {
+      method: 'PATCH',
+      headers: coordinatorHeaders,
+      body: { courseCode: 'PWY2101', action: 'future_class_attend' },
+    });
+    assert.equal(simRes.status, 200);
+    assert.equal(simRes.body?.simulationPersisted, false);
+    assert.equal(simRes.body?.persistenceError, null);
   });
 });

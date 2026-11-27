@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const UserProfile = require('../models/UserProfile');
 const PaedisRecord = require('../models/PaedisRecord');
+const StudentIntervention = require('../models/StudentIntervention');
+const AttendanceSimulation = require('../models/AttendanceSimulation');
 const ActivityLog = require('../models/ActivityLog');
 const authService = require('../services/authService');
 const emailService = require('../services/emailService');
@@ -11,12 +13,14 @@ const simulatorSnapshotService = require('../services/simulatorSnapshotService')
 const academicCalendarService = require('../services/academicCalendarService');
 const { calculatePredictiveRisk } = require('../services/predictiveRiskService');
 const { careerCatalog, sedeCatalog } = require('../services/catalogService');
+const { STAFF_ROLE_DEFAULTS } = require('../middleware/authMiddleware');
 const {
   EMAIL_REGEX,
   STUDENT_DOMAINS,
   STAFF_DOMAINS,
   VALID_DISABILITY_PROFILES,
   DEFAULT_SEDE,
+  escapeRegex,
   sanitizeString,
   normalizeRutSearch,
   sanitizeAccessibilityPreferences,
@@ -24,6 +28,18 @@ const {
   getBarrierForDisability,
   getDefaultAccessibilityForDisability,
 } = require('../utils/validationUtils');
+
+const {
+  PAEDIS_CASE_STATES,
+  TEACHER_SHEET_STATES,
+  NOTIFIED_SHEET_STATES,
+} = PaedisRecord;
+
+const { INTERVENTION_STATUSES } = StudentIntervention;
+
+// Almacenes en memoria exclusivos para tests/no-producción cuando MongoDB está desconectado
+const inMemoryPaedisRecords = new Map();
+const inMemoryInterventions = new Map();
 
 const ROLE_LABELS = Object.freeze({
   admin: 'Administrador de la Plataforma TI',
@@ -53,12 +69,12 @@ const ALLOWED_ROLES = Object.freeze([
 const STAFF_ROLE_META = Object.freeze({
   admin: {
     label: 'Administrador Nexo360',
-    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config', 'paedis_read', 'paedis_write'],
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config'],
     badges: ['TI', 'SuperAdmin', 'Seguridad'],
   },
   administrador: {
     label: 'Administrador Nexo360',
-    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config', 'paedis_read', 'paedis_write'],
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config'],
     badges: ['TI', 'SuperAdmin', 'Seguridad'],
   },
   coordinador_paedis: {
@@ -108,9 +124,6 @@ const ALL_SYSTEM_PERMISSIONS = Object.freeze([
 ]);
 
 /**
- * Crea handlers CRUD uniformes (DRY) para catálogos dinámicos (Carreras / Sedes).
- */
-/**
  * Registra una acción administrativa atribuida al usuario autenticado (actor).
  * Nunca incluir contraseñas, tokens ni datos clínicos en details/metadata (Ley N° 21.719).
  */
@@ -133,6 +146,7 @@ function createCatalogHandlers({
   entityPlural,
   entitySingular,
   createAction,
+  updateAction,
   removeAction,
 }) {
   return {
@@ -181,6 +195,34 @@ function createCatalogHandlers({
       }
     },
 
+    update: async (req, res) => {
+      try {
+        const updated = await manager.update(req.params.id, req.body || {});
+        await logAdminAction(req.user, {
+          action: updateAction,
+          details: `${entitySingular} "${updated.name}" actualizada.`,
+          metadata: { entity: itemKey, name: updated.name, targetId: String(req.params.id).slice(0, 100) },
+        });
+        return res.status(200).json({
+          success: true,
+          message: `${entitySingular} "${updated.name}" actualizada exitosamente.`,
+          [itemKey]: updated,
+        });
+      } catch (error) {
+        if (error.statusCode) {
+          return res.status(error.statusCode).json({
+            success: false,
+            message: error.message,
+          });
+        }
+        console.error(`[AdminController] Error interno al actualizar ${entitySingular.toLowerCase()}.`);
+        return res.status(500).json({
+          success: false,
+          message: `Error al actualizar la ${entitySingular.toLowerCase()}.`,
+        });
+      }
+    },
+
     remove: async (req, res) => {
       try {
         await manager.remove(req.params.id);
@@ -217,6 +259,7 @@ const careerHandlers = createCatalogHandlers({
   entityPlural: 'carreras',
   entitySingular: 'Carrera',
   createAction: 'career_created',
+  updateAction: 'career_created',
   removeAction: 'career_deleted',
 });
 
@@ -227,6 +270,7 @@ const sedeHandlers = createCatalogHandlers({
   entityPlural: 'sedes',
   entitySingular: 'Sede',
   createAction: 'sede_created',
+  updateAction: 'sede_created',
   removeAction: 'sede_deleted',
 });
 
@@ -268,19 +312,14 @@ exports.getMetrics = async (req, res) => {
       simulatorSnapshotService.getLatestSnapshot(),
     ]);
     const totalUsers = allUsers.length;
-    const students = allUsers.filter(
-      (u) =>
-        u.role.startsWith('estudiante') ||
-        u.role === 'tutor_par' ||
-        u.email === 'c.guzman@duocuc.cl'
-    );
-    const totalStudents = students.length || 1;
+    const students = allUsers.filter((u) => simulatorSnapshotService.isStudentUser(u));
+    const totalStudents = students.length;
 
     const paedisStudents = students.filter(
       (s) => s.isPaedis === true || s.role === 'estudiante_paedis'
     );
     const paedisCount = paedisStudents.length;
-    const paedisPercentage = Math.round((paedisCount / totalStudents) * 100);
+    const paedisPercentage = totalStudents > 0 ? Math.round((paedisCount / totalStudents) * 100) : 0;
 
     const statusDistribution = {
       activo: students.filter((s) => s.academicStatus === 'activo').length,
@@ -461,19 +500,41 @@ exports.getStudents = async (req, res) => {
     const actorRole = (req.user?.role || '').toLowerCase();
     const isCoordinator = actorRole === 'coordinador_paedis';
 
+    let paedisMap = new Map();
+    if (isCoordinator) {
+      if (mongoose.connection.readyState === 1) {
+        const records = await PaedisRecord.find({}).lean();
+        for (const rec of records) {
+          const emailKey = String(rec.studentEmail || rec.userEmail || '').toLowerCase();
+          if (emailKey) paedisMap.set(emailKey, rec);
+        }
+      } else {
+        paedisMap = inMemoryPaedisRecords;
+      }
+    }
+
     const enriched = users.map((u) => {
       const pred = calculatePredictiveRisk(u);
-      const studentData = { ...u, prediction: pred };
+      const emailKey = String(u.email || '').toLowerCase();
+      const paedisRecord = isCoordinator ? paedisMap.get(emailKey) || null : null;
+      const baseView = isCoordinator
+        ? authService.toPaedisRestricted(u, paedisRecord)
+        : authService.toAdminView(u);
+      const studentData = { ...baseView, prediction: pred };
 
-      // Ley N° 21.719: Si el solicitante no es Coordinador PAEDIS (ej. Admin TI),
-      // se omiten campos clínicos y confidenciales detallados del expediente
       if (!isCoordinator) {
-        delete studentData.diagnosticoDeclarado;
-        delete studentData.notasConfidencialesPaedis;
-        delete studentData.acreditacionPaedis;
+        delete studentData.notasConfidenciales;
         studentData.isPaedis = Boolean(u.isPaedis || u.role === 'estudiante_paedis');
         studentData.hasAdjustments =
           Array.isArray(u.ajustesAprobados) && u.ajustesAprobados.length > 0;
+      } else if (paedisRecord) {
+        studentData.estadoCaso = paedisRecord.estadoCaso;
+        studentData.fichaDocenteEstado = paedisRecord.fichaDocenteEstado;
+        studentData.fichaDocenteHistorial = paedisRecord.fichaDocenteHistorial || [];
+        studentData.fichaDocenteNotificada = Boolean(paedisRecord.fichaDocenteNotificada);
+        studentData.notasConfidenciales = paedisRecord.notasConfidenciales || '';
+        studentData.notasConfidencialesPaedis =
+          paedisRecord.notasConfidenciales || paedisRecord.notasConfidencialesPaedis || '';
       }
 
       return studentData;
@@ -847,7 +908,6 @@ function buildNewUserDocument({
     emergencyContact: sanitizeString(body.emergencyContact, 120) || 'Contacto Familiar',
     emergencyPhone: sanitizeString(body.emergencyPhone, 30) || '+56 9 0000 0000',
     tutorParAsignado: isPaedis ? 'Coordinación PAEDIS Duoc UC' : 'Sin tutor asignado',
-    diagnosticoDeclarado: sanitizeString(body.diagnosticoDeclarado, 160) || '',
     ajustesAprobados: Array.isArray(body.ajustesAprobados) ? body.ajustesAprobados : [],
     accessibilityPreferences: profileSetup.accessibilityPreferences,
     enrolledCourses: initialCourses,
@@ -964,6 +1024,41 @@ exports.createStudent = async (req, res) => {
     } else {
       createdUser = { _id: `local_${Date.now()}`, ...newUserData };
       authService.registerUser(createdUser);
+    }
+
+    const initialDiag = sanitizeString(body.diagnosticoDeclarado, 160) || '';
+    const initialNotes =
+      sanitizeString(body.notasConfidenciales ?? body.notasConfidencialesPaedis, 1000) || '';
+    if (isPaedis || initialDiag || initialNotes) {
+      const validUserId =
+        createdUser._id && mongoose.Types.ObjectId.isValid(String(createdUser._id))
+          ? new mongoose.Types.ObjectId(String(createdUser._id))
+          : undefined;
+      const paedisPayload = {
+        ...(validUserId ? { userId: validUserId, studentId: validUserId } : {}),
+        userEmail: email,
+        studentEmail: email,
+        studentName: identity.fullName,
+        estadoCaso: 'INGRESO',
+        diagnosticoDeclarado: initialDiag,
+        notasConfidenciales: initialNotes,
+        notasConfidencialesPaedis: initialNotes,
+        barreraPaedis: profileSetup.barreraPaedis || 'Visual / Sensorial',
+        disabilityProfile: profileSetup.disabilityProfile || 'ninguna',
+        ajustesAprobados: Array.isArray(newUserData.ajustesAprobados)
+          ? newUserData.ajustesAprobados
+          : [],
+        updatedBy: (req.user?.email || 'admin@duocuc.cl').toLowerCase(),
+      };
+      if (mongoose.connection.readyState === 1) {
+        await PaedisRecord.findOneAndUpdate(
+          { $or: [{ studentEmail: email }, { userEmail: email }] },
+          { $set: paedisPayload },
+          { upsert: true, returnDocument: 'after', runValidators: true }
+        );
+      } else if (process.env.NODE_ENV !== 'production') {
+        inMemoryPaedisRecords.set(email, paedisPayload);
+      }
     }
 
     const emailResult = await dispatchWelcomeAndLogs({
@@ -1125,6 +1220,48 @@ function parsePermissionsAndBadges(body = {}) {
   return fields;
 }
 
+function getEffectiveActorPermissions(reqUser) {
+  const actorRole = String(reqUser?.role || '').toLowerCase();
+  if (Array.isArray(reqUser?.permissions)) {
+    return reqUser.permissions;
+  }
+  return STAFF_ROLE_DEFAULTS[actorRole]?.permissions || [];
+}
+
+function canGrantPrivilegedAccess(reqUser) {
+  const actorRole = String(reqUser?.role || '').toLowerCase();
+  const isActorAdmin = actorRole === 'admin' || actorRole === 'administrador';
+  const effectivePerms = getEffectiveActorPermissions(reqUser);
+  return (
+    effectivePerms.includes('full_access') ||
+    (isActorAdmin && effectivePerms.includes('manage_users'))
+  );
+}
+
+function hasPrivilegeEscalation(reqUser, nextRole, nextPermissions) {
+  const isAdminRoleTarget = nextRole === 'admin' || nextRole === 'administrador';
+  const grantsFullAccess =
+    Array.isArray(nextPermissions) && nextPermissions.includes('full_access');
+  if (!isAdminRoleTarget && !grantsFullAccess) {
+    return false;
+  }
+  return !canGrantPrivilegedAccess(reqUser);
+}
+
+async function persistRoleOrPermissionUpdate(targetUser, targetDocId, updateFields) {
+  if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(targetDocId))) {
+    return UserProfile.findByIdAndUpdate(
+      targetDocId,
+      { $set: updateFields, $inc: { tokenVersion: 1 } },
+      { returnDocument: 'after', runValidators: true }
+    );
+  }
+  const nextTokenVersion = Number(targetUser.tokenVersion || 0) + 1;
+  const memFields = { ...updateFields, tokenVersion: nextTokenVersion };
+  authService.updateUserFieldsInMemory(targetUser.email, memFields);
+  return { ...targetUser, ...memFields };
+}
+
 exports.updateUserRole = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1152,33 +1289,33 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
+    const parsedPermsAndBadges = parsePermissionsAndBadges(req.body);
+    if (hasPrivilegeEscalation(req.user, rawRole, parsedPermsAndBadges.permissions)) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'Acceso restringido: No tiene privilegios suficientes para otorgar rol Administrador o permiso full_access.',
+      });
+    }
+
     const roleLabel = ROLE_LABELS[rawRole] || 'Personal Administrativo';
-    const isPaedis = rawRole === 'estudiante_paedis';
     const targetDocId = targetUser._id || targetUser.id || id;
 
     const updateFields = {
       role: rawRole,
       roleLabel,
-      isPaedis,
-      ...parsePermissionsAndBadges(req.body),
+      ...parsedPermsAndBadges,
     };
-
-    let updatedUser = null;
-    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(targetDocId))) {
-      updatedUser = await UserProfile.findByIdAndUpdate(
-        targetDocId,
-        { $set: updateFields },
-        { returnDocument: 'after', runValidators: true }
-      );
-    } else {
-      authService.updateUserFieldsInMemory(targetUser.email, updateFields);
-      updatedUser = { ...targetUser, ...updateFields };
+    if (rawRole === 'estudiante_paedis') {
+      updateFields.isPaedis = true;
     }
+
+    const updatedUser = await persistRoleOrPermissionUpdate(targetUser, targetDocId, updateFields);
 
     await logAdminAction(req.user, {
       action: 'student_updated_by_admin',
       details: `Rol de ${targetUser.fullName || targetUser.email} actualizado a "${roleLabel}".`,
-      metadata: { targetEmail: targetUser.email, role: rawRole, ...updateFields },
+      metadata: { targetEmail: targetUser.email, role: rawRole },
     });
 
     return res.status(200).json({
@@ -1218,6 +1355,7 @@ exports.updateUserPermissions = async (req, res) => {
 
     const targetDocId = targetUser._id || targetUser.id || id;
     const updateFields = { ...parsePermissionsAndBadges(req.body) };
+    let nextRole = null;
 
     if (req.body?.role) {
       const rawRole = sanitizeString(req.body.role, 40)?.toLowerCase() || '';
@@ -1227,27 +1365,32 @@ exports.updateUserPermissions = async (req, res) => {
           message: 'Rol institucional no válido.',
         });
       }
+      nextRole = rawRole;
       updateFields.role = rawRole;
       updateFields.roleLabel = ROLE_LABELS[rawRole] || 'Personal Administrativo';
-      updateFields.isPaedis = rawRole === 'estudiante_paedis';
+      if (rawRole === 'estudiante_paedis') {
+        updateFields.isPaedis = true;
+      }
     }
 
-    let updatedUser = null;
-    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(targetDocId))) {
-      updatedUser = await UserProfile.findByIdAndUpdate(
-        targetDocId,
-        { $set: updateFields },
-        { returnDocument: 'after', runValidators: true }
-      );
-    } else {
-      authService.updateUserFieldsInMemory(targetUser.email, updateFields);
-      updatedUser = { ...targetUser, ...updateFields };
+    if (hasPrivilegeEscalation(req.user, nextRole, updateFields.permissions)) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'Acceso restringido: No tiene privilegios suficientes para otorgar rol Administrador o permiso full_access.',
+      });
     }
+
+    const updatedUser = await persistRoleOrPermissionUpdate(targetUser, targetDocId, updateFields);
 
     await logAdminAction(req.user, {
       action: 'staff_permissions_updated',
       details: `Permisos y badges de ${targetUser.fullName || targetUser.email} actualizados (${updateFields.permissions?.length ?? 0} permisos, ${updateFields.badges?.length ?? 0} badges).`,
-      metadata: { targetEmail: targetUser.email, ...updateFields },
+      metadata: {
+        targetEmail: targetUser.email,
+        permissionsCount: updateFields.permissions?.length ?? 0,
+        badgesCount: updateFields.badges?.length ?? 0,
+      },
     });
 
     return res.status(200).json({
@@ -1470,10 +1613,12 @@ exports.clearCourses = async (req, res) => {
 // Gestión dinámica de Carreras y Sedes Duoc UC (CRUD DRY vía catalogService)
 exports.getCareers = careerHandlers.list;
 exports.createCareer = careerHandlers.create;
+exports.updateCareer = careerHandlers.update;
 exports.deleteCareer = careerHandlers.remove;
 
 exports.getSedes = sedeHandlers.list;
 exports.createSede = sedeHandlers.create;
+exports.updateSede = sedeHandlers.update;
 exports.deleteSede = sedeHandlers.remove;
 
 /**
@@ -1490,10 +1635,19 @@ exports.getSatAlerts = async (req, res) => {
         (Array.isArray(u.courseAttendance) && u.courseAttendance.length > 0)
     );
 
-    const evaluatedStudents = studentUsers.map((student) => ({
-      ...student,
-      satEvaluation: satAlertService.evaluateStudentSat(student),
-    }));
+    const actorRole = (req.user?.role || '').toLowerCase();
+    const isCoordinator = actorRole === 'coordinador_paedis';
+
+    const evaluatedStudents = studentUsers.map((student) => {
+      const safeStudent = isCoordinator ? student : authService.toAdminView(student);
+      if (!isCoordinator) {
+        delete safeStudent.notasConfidenciales;
+      }
+      return {
+        ...safeStudent,
+        satEvaluation: satAlertService.evaluateStudentSat(student),
+      };
+    });
 
     const riskPriority = {
       LEVEL_2_CRITICAL: 1,
@@ -1563,9 +1717,13 @@ exports.simulateSatCourse = async (req, res) => {
     }
 
     const currentAttendance = Array.isArray(user.courseAttendance) ? user.courseAttendance : [];
+    const origCourse = currentAttendance.find(
+      (c) => String(c.courseCode || '').trim().toUpperCase() === rawCourseCode.toUpperCase()
+    );
     const updatedCourses = satAlertService.applySimulatedCourseUpdate(currentAttendance, {
       courseCode: rawCourseCode,
       action: rawAction,
+      baselineCourse: origCourse || undefined,
       attendedSessions:
         typeof req.body.attendedSessions === 'number'
           ? Math.trunc(req.body.attendedSessions)
@@ -1586,34 +1744,64 @@ exports.simulateSatCourse = async (req, res) => {
       courseAttendance: updatedCourses,
     };
     const satEval = satAlertService.evaluateStudentSat(simulatedStudent);
+    const simCourse = updatedCourses.find(
+      (c) => String(c.courseCode || '').trim().toUpperCase() === rawCourseCode.toUpperCase()
+    );
+    const normalizedAction = satAlertService.normalizeSimulationAction(rawAction);
 
-    // Persistir escenario volátil en AttendanceSimulation con TTL de 7 días (si la BD está conectada)
+    let simulationPersisted = false;
+    let persistenceError = null;
+
     if (mongoose.connection.readyState === 1) {
+      const baseTotal = origCourse ? Number(origCourse.completedSessions ?? origCourse.totalSessions ?? 0) : 0;
+      const baseAttended = origCourse ? Number(origCourse.attendedSessions ?? 0) : 0;
+      const simTotal = simCourse ? Number(simCourse.completedSessions ?? simCourse.totalSessions ?? 0) : 0;
+      const simAttended = simCourse ? Number(simCourse.attendedSessions ?? 0) : 0;
+      const basePct = origCourse ? (origCourse.attendancePercentage ?? origCourse.asistencia ?? 0) : 0;
+      const simPct = simCourse ? (simCourse.attendancePercentage ?? simCourse.asistencia ?? 0) : 0;
+      const recoveryPossible = simCourse
+        ? Boolean(simCourse.recoveryPossible)
+        : false;
+      const minRequiredThreshold = simCourse
+        ? Number(simCourse.minAttendanceRequired ?? satAlertService.DEFAULT_MIN_ATTENDANCE)
+        : satAlertService.DEFAULT_MIN_ATTENDANCE;
+
+      const rawDocId = user._id || user.id;
+      const validObjectId =
+        rawDocId && mongoose.Types.ObjectId.isValid(rawDocId)
+          ? new mongoose.Types.ObjectId(rawDocId)
+          : undefined;
+
       try {
-        const AttendanceSimulation = require('../models/AttendanceSimulation');
-        const origCourse = currentAttendance.find((c) => c.courseCode === rawCourseCode);
-        const simCourse = updatedCourses.find((c) => c.courseCode === rawCourseCode);
-        const basePct = origCourse ? (origCourse.attendancePercentage ?? origCourse.asistencia ?? 0) : 0;
-        const simPct = simCourse ? (simCourse.attendancePercentage ?? simCourse.asistencia ?? 0) : 0;
-
-        const rawDocId = user._id || user.id;
-        const validObjectId =
-          rawDocId && mongoose.Types.ObjectId.isValid(rawDocId)
-            ? new mongoose.Types.ObjectId(rawDocId)
-            : undefined;
-
         await AttendanceSimulation.create({
           userId: validObjectId,
           userEmail: user.email,
           courseCode: rawCourseCode,
-          actionApplied: rawAction.toUpperCase().includes('PAEDIS')
-            ? 'CUSTOM_STEPPER'
-            : (rawAction.toUpperCase() || 'CUSTOM_STEPPER'),
-          baselinePercentage: basePct,
-          simulatedPercentage: simPct,
-          deltaPercentage: Math.round((simPct - basePct) * 10) / 10,
+          actionApplied: normalizedAction,
+          baselineAttended: baseAttended,
+          baselineTotal: baseTotal,
+          simulatedAttended: simAttended,
+          simulatedTotal: simTotal,
+          recoveryPossible,
+          minRequiredThreshold,
+          baselinePercentage: basePct === null ? 0 : basePct,
+          simulatedPercentage: simPct === null ? 0 : simPct,
+          deltaPercentage:
+            basePct !== null && simPct !== null
+              ? Math.round((simPct - basePct) * 10) / 10
+              : 0,
         });
+        simulationPersisted = true;
       } catch (simErr) {
+        persistenceError = simErr.message;
+        if (simErr.name === 'ValidationError') {
+          return res.status(400).json({
+            success: false,
+            simulationPersisted: false,
+            persistenceError: simErr.message,
+            message: `Error de validación al persistir simulación SAT: ${simErr.message}`,
+          });
+        }
         console.warn('[AdminController] Escenario de simulación no registrado en BD:', simErr.message);
       }
     }
@@ -1624,22 +1812,29 @@ exports.simulateSatCourse = async (req, res) => {
       userName: user.fullName || user.nombre,
       userRole: user.role,
       action: 'sat_weekly_cut_simulated',
-      details: `Simulación SAP aplicada a ramo ${rawCourseCode}: acción '${rawAction || 'personalizada'}'. Nuevo estado SAT: ${satEval.riskLevel}`,
+      details: `Simulación SAP aplicada a ramo ${rawCourseCode}: acción '${normalizedAction}'. Nuevo estado SAT: ${satEval.riskLevel}`,
       metadata: {
         actorEmail: req.user?.email || '',
         actorRole: req.user?.role || 'admin',
         targetEmail: user.email,
         courseCode: rawCourseCode,
-        simulatedAction: rawAction || 'personalizada',
+        simulatedAction: normalizedAction,
         riskLevel: satEval.riskLevel,
+        simulationPersisted,
       },
     });
 
-    const formatted = authService.formatUserResponse(simulatedStudent);
+    const actorRole = (req.user?.role || '').toLowerCase();
+    const formatted =
+      actorRole === 'coordinador_paedis'
+        ? authService.formatUserResponse(simulatedStudent)
+        : authService.toAdminView(simulatedStudent);
 
     return res.status(200).json({
       success: true,
       message: 'Simulación de corte semanal SAP aplicada exitosamente (no destructiva).',
+      simulationPersisted,
+      persistenceError,
       student: {
         ...formatted,
         satEvaluation: satEval,
@@ -1806,36 +2001,78 @@ function sanitizeTeacherAcknowledgments(rawList) {
     .filter(Boolean);
 }
 
-function buildPaedisCaseUpdates(body, existingUser = null) {
-  const updates = {};
-  const stringFields = [
-    ['diagnosticoDeclarado', 160],
+function buildPaedisCaseUpdates(body, existingUser = null, existingRecord = null) {
+  const operationalUpdates = {};
+  const clinicalUpdates = {};
+  const errors = [];
+
+  if (body.estadoCaso !== undefined || body.estadoCasoPaedis !== undefined) {
+    const rawState = String(body.estadoCaso ?? body.estadoCasoPaedis).trim().toUpperCase();
+    if (!PAEDIS_CASE_STATES.includes(rawState)) {
+      errors.push(`Estado de caso PAEDIS inválido: ${rawState}`);
+    } else {
+      clinicalUpdates.estadoCaso = rawState;
+    }
+  }
+
+  if (body.fichaDocenteEstado !== undefined) {
+    const rawSheetState = String(body.fichaDocenteEstado).trim().toUpperCase();
+    if (!TEACHER_SHEET_STATES.includes(rawSheetState)) {
+      errors.push(`Estado de Ficha Docente inválido: ${rawSheetState}`);
+    } else {
+      clinicalUpdates.fichaDocenteEstado = rawSheetState;
+    }
+  }
+
+  if (errors.length > 0) {
+    return { error: errors.join('; ') };
+  }
+
+  // Campos clínicos segregados exclusivamente en PaedisRecord (NO en UserProfile)
+  if (body.diagnosticoDeclarado !== undefined) {
+    clinicalUpdates.diagnosticoDeclarado = sanitizeString(body.diagnosticoDeclarado, 160) || '';
+  }
+  const rawNotas = body.notasConfidenciales ?? body.notasConfidencialesPaedis;
+  if (rawNotas !== undefined) {
+    clinicalUpdates.notasConfidenciales = sanitizeString(rawNotas, 1000) || '';
+  }
+
+  // Campos operativos/institucionales
+  const opStringFields = [
     ['barreraPaedis', 80],
     ['acreditacionPaedis', 100],
-    ['notasConfidencialesPaedis', 1000],
     ['tutorParAsignado', 120],
     ['vigenciaSemestrePaedis', 20],
   ];
-
-  for (const [key, maxLen] of stringFields) {
+  for (const [key, maxLen] of opStringFields) {
     if (body[key] !== undefined) {
-      updates[key] = sanitizeString(body[key], maxLen) || '';
+      operationalUpdates[key] = sanitizeString(body[key], maxLen) || '';
     }
   }
 
   if (body.tutorPaedisAsignado !== undefined) {
-    const isYes = body.tutorPaedisAsignado === 'Sí' || body.tutorPaedisAsignado === true || body.tutorPaedisAsignado === 'Si';
-    updates.tutorPaedisAsignado = isYes ? 'Sí' : 'No';
+    const isYes =
+      body.tutorPaedisAsignado === 'Sí' ||
+      body.tutorPaedisAsignado === true ||
+      body.tutorPaedisAsignado === 'Si';
+    operationalUpdates.tutorPaedisAsignado = isYes ? 'Sí' : 'No';
   }
 
   // Renovación semestral con un clic
   if (body.renewForSemester) {
     const nextSem = sanitizeString(body.renewForSemester, 20) || '2026-2';
-    updates.vigenciaSemestrePaedis = nextSem;
-    updates.fechaRenovacionSemestral = new Date();
-    updates.acusesDocentes = [];
-    if (!Array.isArray(body.ajustesAprobados) && existingUser && Array.isArray(existingUser.ajustesAprobados)) {
-      updates.ajustesAprobados = existingUser.ajustesAprobados.map((a) => {
+    operationalUpdates.vigenciaSemestrePaedis = nextSem;
+    operationalUpdates.fechaRenovacionSemestral = new Date();
+    operationalUpdates.acusesDocentes = [];
+    if (!clinicalUpdates.fichaDocenteEstado) {
+      clinicalUpdates.fichaDocenteEstado = 'BORRADOR';
+    }
+    if (!clinicalUpdates.estadoCaso) {
+      clinicalUpdates.estadoCaso = 'RENOVACION';
+    }
+    const baseAjustes = existingRecord?.ajustesAprobados || existingUser?.ajustesAprobados;
+    if (!Array.isArray(body.ajustesAprobados) && Array.isArray(baseAjustes)) {
+      operationalUpdates.ajustesAprobados = baseAjustes.map((a) => {
         const item = typeof a.toObject === 'function' ? a.toObject() : { ...a };
         item.semestreVigencia = nextSem;
         return item;
@@ -1843,34 +2080,124 @@ function buildPaedisCaseUpdates(body, existingUser = null) {
     }
   }
 
-  const effectiveSemester = updates.vigenciaSemestrePaedis || (existingUser?.vigenciaSemestrePaedis || '2026-1');
+  const effectiveSemester =
+    operationalUpdates.vigenciaSemestrePaedis ||
+    existingRecord?.vigenciaSemestrePaedis ||
+    existingUser?.vigenciaSemestrePaedis ||
+    '2026-1';
 
   if (Array.isArray(body.ajustesAprobados)) {
-    updates.ajustesAprobados = sanitizeReasonableAdjustments(body.ajustesAprobados, effectiveSemester);
+    operationalUpdates.ajustesAprobados = sanitizeReasonableAdjustments(
+      body.ajustesAprobados,
+      effectiveSemester
+    );
   }
 
   if (Array.isArray(body.acusesDocentes)) {
-    updates.acusesDocentes = sanitizeTeacherAcknowledgments(body.acusesDocentes);
+    operationalUpdates.acusesDocentes = sanitizeTeacherAcknowledgments(body.acusesDocentes);
   }
 
-  if (typeof body.fichaDocenteNotificada === 'boolean') {
-    updates.fichaDocenteNotificada = body.fichaDocenteNotificada;
-    updates.fechaNotificacionDocente = body.fichaDocenteNotificada
-      ? parseValidDate(body.fechaNotificacionDocente, new Date())
-      : null;
+  // Solo ENVIADA/ENTREGADA/ACUSADA pueden activar fichaDocenteNotificada=true
+  const nextSheetState =
+    clinicalUpdates.fichaDocenteEstado ||
+    existingRecord?.fichaDocenteEstado ||
+    (body.fichaDocenteNotificada === true ? 'ENVIADA' : 'BORRADOR');
+
+  if (clinicalUpdates.fichaDocenteEstado || typeof body.fichaDocenteNotificada === 'boolean') {
+    if (body.fichaDocenteEstado !== undefined) {
+      const isRealDelivery = NOTIFIED_SHEET_STATES.includes(nextSheetState);
+      operationalUpdates.fichaDocenteNotificada = isRealDelivery;
+      operationalUpdates.fechaNotificacionDocente = isRealDelivery
+        ? parseValidDate(body.fechaNotificacionDocente, existingRecord?.fechaNotificacionDocente || new Date())
+        : null;
+    } else if (body.fichaDocenteNotificada === true) {
+      clinicalUpdates.fichaDocenteEstado = 'ENVIADA';
+      operationalUpdates.fichaDocenteNotificada = true;
+      operationalUpdates.fechaNotificacionDocente = parseValidDate(
+        body.fechaNotificacionDocente,
+        new Date()
+      );
+    } else {
+      clinicalUpdates.fichaDocenteEstado = 'BORRADOR';
+      operationalUpdates.fichaDocenteNotificada = false;
+      operationalUpdates.fechaNotificacionDocente = null;
+    }
   }
 
   if (body.accessibilityPreferences && typeof body.accessibilityPreferences === 'object') {
-    updates.accessibilityPreferences = sanitizeAccessibilityPreferences(body.accessibilityPreferences);
-  } else if (/visual|ciego|no vidente|baja visi[oó]n/i.test(updates.barreraPaedis || '')) {
-    updates.accessibilityPreferences = sanitizeAccessibilityPreferences({
+    operationalUpdates.accessibilityPreferences = sanitizeAccessibilityPreferences(
+      body.accessibilityPreferences
+    );
+  } else if (/visual|ciego|no vidente|baja visi[oó]n/i.test(operationalUpdates.barreraPaedis || '')) {
+    operationalUpdates.accessibilityPreferences = sanitizeAccessibilityPreferences({
       voiceReader: true,
       screenReaderOptimized: true,
     });
   }
 
-  return updates;
+  return { operationalUpdates, clinicalUpdates };
 }
+
+/**
+ * GET /api/admin/paedis/:id/record
+ * Obtiene el expediente confidencial segregado PaedisRecord (solo Coordinador PAEDIS).
+ */
+exports.getPaedisRecord = async (req, res) => {
+  try {
+    const rawId = String(req.params.id || '').trim();
+    if (!rawId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de estudiante no proporcionado.',
+      });
+    }
+
+    const user = await findUserByIdOrEmail(rawId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Estudiante no encontrado para consulta de expediente PAEDIS.',
+      });
+    }
+
+    const cleanEmail = user.email.toLowerCase();
+    let record = null;
+    if (mongoose.connection?.readyState === 1) {
+      record = await PaedisRecord.findOne({
+        $or: [{ studentEmail: cleanEmail }, { userEmail: cleanEmail }],
+      }).lean();
+    } else if (process.env.NODE_ENV !== 'production') {
+      record = inMemoryPaedisRecords.get(cleanEmail) || null;
+    } else {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible en producción.',
+      });
+    }
+
+    await authService.logActivity({
+      userId: req.user?._id || req.user?.id,
+      userEmail: req.user?.email || 'coordinacion.paedis@duoc.cl',
+      userName: req.user?.fullName || 'Coordinación PAEDIS',
+      userRole: req.user?.role || 'coordinador_paedis',
+      action: 'paedis_records_consulted',
+      details: `Consulta de expediente PAEDIS segregado para ${user.fullName || cleanEmail}. Trazabilidad Ley N° 21.719.`,
+      metadata: { targetEmail: cleanEmail },
+    });
+
+    return res.status(200).json({
+      success: true,
+      record,
+      student: authService.toPaedisRestricted(user, record),
+    });
+  } catch {
+    console.error('[AdminController] Error al consultar expediente PAEDIS.');
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar el expediente PAEDIS.',
+    });
+  }
+};
 
 /**
  * PATCH /api/admin/paedis/:id/case
@@ -1895,47 +2222,144 @@ exports.updatePaedisCase = async (req, res) => {
       });
     }
 
+    const cleanEmail = user.email.toLowerCase();
+    let existingRecord = null;
+    if (mongoose.connection?.readyState === 1) {
+      existingRecord = await PaedisRecord.findOne({
+        $or: [{ studentEmail: cleanEmail }, { userEmail: cleanEmail }],
+      }).lean();
+    } else if (process.env.NODE_ENV !== 'production') {
+      existingRecord = inMemoryPaedisRecords.get(cleanEmail) || null;
+    }
+
     const body = req.body || {};
-    const updates = buildPaedisCaseUpdates(body, user);
-    if (Object.keys(updates).length === 0) {
+    const parsed = buildPaedisCaseUpdates(body, user, existingRecord);
+    if (parsed.error) {
+      return res.status(400).json({
+        success: false,
+        message: parsed.error,
+      });
+    }
+
+    const { operationalUpdates, clinicalUpdates } = parsed;
+    if (Object.keys(operationalUpdates).length === 0 && Object.keys(clinicalUpdates).length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Debe proporcionar al menos un campo de expediente PAEDIS para actualizar.',
       });
     }
 
-    const syncResult = await authService.updateProfileFields(user.email, updates);
-    const updatedUser = syncResult.user || { ...user, ...updates };
+    const rawDocId = user._id || user.id;
+    const validUserId =
+      rawDocId && mongoose.Types.ObjectId.isValid(String(rawDocId))
+        ? new mongoose.Types.ObjectId(String(rawDocId))
+        : undefined;
 
-    // Sincronización segregada del expediente confidencial en PaedisRecord (Ley N° 21.719)
-    try {
-      if (mongoose.connection?.readyState === 1) {
-        await PaedisRecord.findOneAndUpdate(
-          { studentEmail: user.email.toLowerCase() },
-          {
-            $set: {
-              studentId: user._id,
-              studentEmail: user.email.toLowerCase(),
-              studentName: user.fullName || user.email,
-              estadoCaso: updates.estadoCasoPaedis || user.estadoCasoPaedis || 'EVALUACION',
-              barreraPaedis: updates.barreraPaedis || user.barreraPaedis,
-              diagnosticoDeclarado: updates.diagnosticoDeclarado || user.diagnosticoDeclarado,
-              acreditacionPaedis: updates.acreditacionPaedis || user.acreditacionPaedis,
-              ajustesAprobados: updates.ajustesAprobados || user.ajustesAprobados || [],
-              notasConfidenciales: updates.notasConfidencialesPaedis || user.notasConfidencialesPaedis,
-              acusesDocentes: updates.acusesDocentes || user.acusesDocentes || [],
-              fichaDocenteNotificada: updates.fichaDocenteNotificada ?? user.fichaDocenteNotificada ?? false,
-              updatedBy: req.user?.email || 'coordinacion.paedis@duoc.cl',
-            },
-          },
-          { upsert: true, new: true }
-        );
-      }
-    } catch (errSync) {
-      console.warn('[AdminController] Advertencia al sincronizar PaedisRecord:', errSync?.message);
+    const nextSheetState =
+      clinicalUpdates.fichaDocenteEstado || existingRecord?.fichaDocenteEstado || 'BORRADOR';
+    const nextHistorial = Array.isArray(existingRecord?.fichaDocenteHistorial)
+      ? [...existingRecord.fichaDocenteHistorial]
+      : [];
+    const shouldAppendHistory =
+      clinicalUpdates.fichaDocenteEstado !== undefined ||
+      body.medioEntrega !== undefined ||
+      body.evidencia !== undefined;
+
+    if (shouldAppendHistory) {
+      nextHistorial.unshift({
+        estado: nextSheetState,
+        fecha: new Date(),
+        actorEmail: (req.user?.email || 'coordinacion.paedis@duoc.cl').toLowerCase(),
+        medioEntrega: sanitizeString(body.medioEntrega, 80) || '',
+        evidencia: sanitizeString(body.evidencia, 500) || '',
+      });
     }
 
-    const isNotifyAction = body.fichaDocenteNotificada === true;
+    const isNotified = NOTIFIED_SHEET_STATES.includes(nextSheetState);
+    const canonicalRecordPayload = {
+      ...(validUserId ? { userId: validUserId, studentId: validUserId } : {}),
+      userEmail: cleanEmail,
+      studentEmail: cleanEmail,
+      studentName: user.fullName || user.nombre || cleanEmail,
+      estadoCaso: clinicalUpdates.estadoCaso || existingRecord?.estadoCaso || 'EVALUACION',
+      diagnosticoDeclarado:
+        clinicalUpdates.diagnosticoDeclarado ?? existingRecord?.diagnosticoDeclarado ?? '',
+      barreraPaedis:
+        operationalUpdates.barreraPaedis ?? existingRecord?.barreraPaedis ?? user.barreraPaedis ?? 'Visual / Sensorial',
+      acreditacionPaedis:
+        operationalUpdates.acreditacionPaedis ??
+        existingRecord?.acreditacionPaedis ??
+        user.acreditacionPaedis ??
+        'Credencial RND SENADIS',
+      notasConfidenciales:
+        clinicalUpdates.notasConfidenciales ?? existingRecord?.notasConfidenciales ?? '',
+      notasConfidencialesPaedis:
+        clinicalUpdates.notasConfidenciales ?? existingRecord?.notasConfidenciales ?? '',
+      ajustesAprobados:
+        operationalUpdates.ajustesAprobados ??
+        existingRecord?.ajustesAprobados ??
+        user.ajustesAprobados ??
+        [],
+      tutorPaedisAsignado:
+        operationalUpdates.tutorPaedisAsignado ??
+        existingRecord?.tutorPaedisAsignado ??
+        user.tutorPaedisAsignado ??
+        'No',
+      acusesDocentes:
+        operationalUpdates.acusesDocentes ??
+        existingRecord?.acusesDocentes ??
+        user.acusesDocentes ??
+        [],
+      fichaDocenteEstado: nextSheetState,
+      fichaDocenteHistorial: nextHistorial.slice(0, 50),
+      fichaDocenteNotificada: isNotified,
+      fechaNotificacionDocente: isNotified
+        ? operationalUpdates.fechaNotificacionDocente || existingRecord?.fechaNotificacionDocente || new Date()
+        : null,
+      vigenciaSemestrePaedis:
+        operationalUpdates.vigenciaSemestrePaedis ||
+        existingRecord?.vigenciaSemestrePaedis ||
+        user.vigenciaSemestrePaedis ||
+        '2026-1',
+      fechaRenovacionSemestral:
+        operationalUpdates.fechaRenovacionSemestral ??
+        existingRecord?.fechaRenovacionSemestral ??
+        user.fechaRenovacionSemestral ??
+        null,
+      updatedBy: (req.user?.email || 'coordinacion.paedis@duoc.cl').toLowerCase(),
+    };
+
+    // Persistir expediente confidencial en PaedisRecord (fail-loud si MongoDB falla)
+    let savedRecord = null;
+    if (mongoose.connection?.readyState === 1) {
+      savedRecord = await PaedisRecord.findOneAndUpdate(
+        { $or: [{ studentEmail: cleanEmail }, { userEmail: cleanEmail }] },
+        { $set: canonicalRecordPayload },
+        { upsert: true, returnDocument: 'after', runValidators: true }
+      ).lean();
+    } else if (process.env.NODE_ENV !== 'production') {
+      savedRecord = { ...canonicalRecordPayload, updatedAt: new Date().toISOString() };
+      inMemoryPaedisRecords.set(cleanEmail, savedRecord);
+    } else {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible para guardar expediente PAEDIS.',
+      });
+    }
+
+    // Sincronizar SOLO campos operativos no-clínicos en UserProfile (nunca diagnosticoDeclarado ni notasConfidencialesPaedis)
+    const userSafeUpdates = { ...operationalUpdates };
+    delete userSafeUpdates.diagnosticoDeclarado;
+    delete userSafeUpdates.notasConfidencialesPaedis;
+    delete userSafeUpdates.notasConfidenciales;
+
+    let updatedUser = user;
+    if (Object.keys(userSafeUpdates).length > 0) {
+      const syncResult = await authService.updateProfileFields(cleanEmail, userSafeUpdates);
+      updatedUser = syncResult.user || { ...user, ...userSafeUpdates };
+    }
+
+    const isNotifyAction = isNotified;
 
     await authService.logActivity({
       userId: req.user?._id || req.user?.id,
@@ -1943,11 +2367,12 @@ exports.updatePaedisCase = async (req, res) => {
       userName: req.user?.fullName || 'Coordinación PAEDIS',
       userRole: req.user?.role || 'coordinador_paedis',
       action: isNotifyAction ? 'paedis_docente_notified' : 'paedis_case_updated',
-      details: `${isNotifyAction ? 'Ficha Docente Confidencial emitida' : 'Expediente PAEDIS actualizado'} para ${user.fullName || user.email} (${updates.ajustesAprobados?.length ?? user.ajustesAprobados?.length ?? 0} ajustes). Trazabilidad Ley N° 21.719.`,
+      details: `${isNotifyAction ? 'Ficha Docente Confidencial emitida' : 'Expediente PAEDIS actualizado'} para ${user.fullName || cleanEmail} (${savedRecord.ajustesAprobados?.length ?? 0} ajustes, estado ficha: ${nextSheetState}). Trazabilidad Ley N° 21.719.`,
       metadata: {
-        targetEmail: user.email,
-        adjustmentsCount: updates.ajustesAprobados?.length ?? user.ajustesAprobados?.length ?? 0,
-        fichaDocenteNotificada: updates.fichaDocenteNotificada ?? user.fichaDocenteNotificada,
+        targetEmail: cleanEmail,
+        adjustmentsCount: savedRecord.ajustesAprobados?.length ?? 0,
+        fichaDocenteEstado: nextSheetState,
+        fichaDocenteNotificada: isNotified,
       },
     });
 
@@ -1956,13 +2381,196 @@ exports.updatePaedisCase = async (req, res) => {
       message: isNotifyAction
         ? 'Ficha Docente Confidencial emitida y registrada conforme a la Ley N° 21.719.'
         : 'Expediente PAEDIS y ajustes razonables actualizados exitosamente.',
-      student: authService.formatUserResponse(updatedUser),
+      record: savedRecord,
+      student: authService.toPaedisRestricted(updatedUser, savedRecord),
     });
-  } catch {
-    console.error('[AdminController] Error al actualizar expediente PAEDIS.');
+  } catch (err) {
+    if (err?.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Datos inválidos en expediente PAEDIS.',
+      });
+    }
+    console.error('[AdminController] Error al actualizar expediente PAEDIS:', err?.message || err);
     return res.status(500).json({
       success: false,
       message: 'Error al guardar el expediente PAEDIS.',
+    });
+  }
+};
+
+/**
+ * POST /api/admin/students/:id/interventions
+ * Registra una intervención interna de seguimiento persistente en StudentIntervention.
+ */
+exports.createStudentIntervention = async (req, res) => {
+  try {
+    const rawId = String(req.params.id || '').trim();
+    if (!rawId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de estudiante no proporcionado.',
+      });
+    }
+
+    const user = await findUserByIdOrEmail(rawId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Estudiante no encontrado para registrar intervención.',
+      });
+    }
+
+    const body = req.body || {};
+    const actionTitle = sanitizeString(body.actionTitle, 200) || '';
+    if (!actionTitle) {
+      return res.status(400).json({
+        success: false,
+        message: 'El título de la intervención (actionTitle) es obligatorio.',
+      });
+    }
+
+    const rawStatus = String(body.status || 'REGISTRADA').trim().toUpperCase();
+    const status = INTERVENTION_STATUSES.includes(rawStatus) ? rawStatus : 'REGISTRADA';
+    const actionCategory = sanitizeString(body.actionCategory, 80) || 'SEGUIMIENTO_SAT';
+    const responsibleEmail =
+      sanitizeString(body.responsibleEmail, 120)?.toLowerCase() ||
+      String(req.user?.email || '').toLowerCase();
+    const responsibleName =
+      sanitizeString(body.responsibleName, 120) ||
+      String(req.user?.fullName || req.user?.nombre || 'Coordinación PAEDIS');
+    const evidence = sanitizeString(body.evidence, 1000) || '';
+    const notes = sanitizeString(body.notes, 1000) || '';
+    const cleanEmail = user.email.toLowerCase();
+    const rawDocId = user._id || user.id;
+    const validStudentId =
+      rawDocId && mongoose.Types.ObjectId.isValid(String(rawDocId))
+        ? new mongoose.Types.ObjectId(String(rawDocId))
+        : undefined;
+
+    const docPayload = {
+      ...(validStudentId ? { studentId: validStudentId } : {}),
+      studentEmail: cleanEmail,
+      studentName: user.fullName || user.nombre || cleanEmail,
+      actionTitle,
+      actionCategory,
+      responsibleEmail,
+      responsibleName,
+      status,
+      evidence,
+      notes,
+      externalDerivationPerformed: false,
+      history: [
+        {
+          status,
+          note: notes || 'Intervención registrada en bitácora interna de seguimiento.',
+          actorEmail: String(req.user?.email || '').toLowerCase(),
+          at: new Date(),
+        },
+      ],
+    };
+
+    let savedIntervention;
+    if (mongoose.connection.readyState === 1) {
+      savedIntervention = await StudentIntervention.create(docPayload);
+    } else if (process.env.NODE_ENV === 'test') {
+      savedIntervention = {
+        _id: `int_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        ...docPayload,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const existingList = inMemoryInterventions.get(cleanEmail) || [];
+      existingList.unshift(savedIntervention);
+      inMemoryInterventions.set(cleanEmail, existingList);
+    } else {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible para registrar intervenciones.',
+      });
+    }
+
+    await logAdminAction(req.user, {
+      action: 'sat_intervention_updated',
+      fallbackName: 'Coordinación PAEDIS',
+      details: `Intervención interna registrada para ${user.fullName || cleanEmail}: ${actionTitle} (${status}).`,
+      metadata: {
+        targetEmail: cleanEmail,
+        actionCategory,
+        status,
+        externalDerivationPerformed: false,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      externalDerivationPerformed: false,
+      message:
+        'Intervención registrada en bitácora interna de seguimiento (requiere gestión manual del responsable asignado).',
+      intervention: savedIntervention,
+    });
+  } catch (err) {
+    if (err?.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Datos inválidos para intervención estudiantil.',
+      });
+    }
+    console.error('[AdminController] Error al crear intervención:', err?.message || err);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al registrar la intervención de seguimiento.',
+    });
+  }
+};
+
+/**
+ * GET /api/admin/students/:id/interventions
+ * Lista intervenciones persistidas de un estudiante.
+ */
+exports.getStudentInterventions = async (req, res) => {
+  try {
+    const rawId = String(req.params.id || '').trim();
+    if (!rawId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Identificador de estudiante no proporcionado.',
+      });
+    }
+
+    const user = await findUserByIdOrEmail(rawId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Estudiante no encontrado.',
+      });
+    }
+
+    const cleanEmail = user.email.toLowerCase();
+    let interventions = [];
+    if (mongoose.connection.readyState === 1) {
+      interventions = await StudentIntervention.find({ studentEmail: cleanEmail })
+        .sort({ createdAt: -1 })
+        .lean();
+    } else if (process.env.NODE_ENV === 'test') {
+      interventions = [...(inMemoryInterventions.get(cleanEmail) || [])];
+    } else {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible para consultar intervenciones.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: interventions.length,
+      interventions,
+    });
+  } catch {
+    console.error('[AdminController] Error al consultar intervenciones.');
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar las intervenciones del estudiante.',
     });
   }
 };
@@ -2065,23 +2673,246 @@ exports.importAcademicCalendar = async (req, res) => {
   }
 };
 
+const AUDIT_SENSITIVE_KEY_RX = /pass|token|jwt|secret|diagnostico|nota|ajuste|clinic|acreditacion/i;
+
+const AUDIT_CATEGORY_ACTIONS = Object.freeze({
+  auth: ['login', 'password_reset_requested', 'password_reset_completed', 'password_changed', 'welcome_email_sent'],
+  seguridad: ['login', 'password_reset_requested', 'password_reset_completed', 'password_changed', 'welcome_email_sent'],
+  paedis: ['paedis_case_updated', 'paedis_docente_notified', 'paedis_records_consulted'],
+  sat: ['sat_weekly_cut_simulated', 'sat_intervention_updated'],
+  catalog: ['career_created', 'career_deleted', 'sede_created', 'sede_deleted', 'IMPORT', 'CLEAR', 'SEED', 'catalog_import', 'catalog_clear', 'catalog_seed', 'CURSOS_IMPORTADOS', 'CURSOS_RESTABLECIDOS', 'CURSOS_ELIMINADOS'],
+  academico: ['career_created', 'career_deleted', 'sede_created', 'sede_deleted', 'IMPORT', 'CLEAR', 'SEED', 'catalog_import', 'catalog_clear', 'catalog_seed', 'CURSOS_IMPORTADOS', 'CURSOS_RESTABLECIDOS', 'CURSOS_ELIMINADOS'],
+  users: ['status_changed_by_admin', 'student_registered_by_admin', 'student_updated_by_admin', 'student_deleted_by_admin', 'staff_permissions_updated'],
+  usuarios: ['status_changed_by_admin', 'student_registered_by_admin', 'student_updated_by_admin', 'student_deleted_by_admin', 'staff_permissions_updated'],
+  simulator: ['used_simulator_toma_ramos', 'saved_toma_ramos'],
+});
+
+function sanitizeAuditValue(value, depth = 0) {
+  if (depth > 5 || value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map((v) => sanitizeAuditValue(v, depth + 1));
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object') {
+    const clean = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (!AUDIT_SENSITIVE_KEY_RX.test(k)) {
+        clean[k] = sanitizeAuditValue(v, depth + 1);
+      }
+    }
+    return clean;
+  }
+  return value;
+}
+
+function sanitizeAuditLogEntry(doc = {}) {
+  const rawMeta =
+    doc.metadata && typeof doc.metadata === 'object' && !Array.isArray(doc.metadata)
+      ? sanitizeAuditValue(doc.metadata)
+      : {};
+  return {
+    id: String(doc._id || doc.id || ''),
+    action: String(doc.action || ''),
+    userEmail: String(doc.userEmail || ''),
+    userName: String(doc.userName || doc.userEmail || 'Usuario'),
+    userRole: String(doc.userRole || 'estudiante'),
+    details: String(doc.details || ''),
+    metadata: rawMeta,
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+  };
+}
+
+function parseAuditFilterParams(query = {}) {
+  const safeAction = typeof query.action === 'string' ? query.action.trim().slice(0, 80) : '';
+  const safeCategory = typeof query.category === 'string' ? query.category.trim().toLowerCase().slice(0, 40) : '';
+  const safeActor = typeof query.actor === 'string' ? query.actor.trim().slice(0, 120) : '';
+  const safeQ = typeof query.q === 'string' ? query.q.trim().slice(0, 100) : '';
+
+  let fromDate = null;
+  if (query.from) {
+    const parsedFrom = new Date(String(query.from));
+    if (!Number.isNaN(parsedFrom.getTime())) fromDate = parsedFrom;
+  }
+  let toDate = null;
+  if (query.to) {
+    const rawTo = String(query.to).trim();
+    const parsedTo = new Date(/^\d{4}-\d{2}-\d{2}$/.test(rawTo) ? `${rawTo}T23:59:59.999Z` : rawTo);
+    if (!Number.isNaN(parsedTo.getTime())) toDate = parsedTo;
+  }
+
+  return { safeAction, safeCategory, safeActor, safeQ, fromDate, toDate };
+}
+
+function buildAuditMongoFilter({ safeAction, safeCategory, safeActor, safeQ, fromDate, toDate }) {
+  const andClauses = [];
+
+  if (safeCategory && AUDIT_CATEGORY_ACTIONS[safeCategory]) {
+    andClauses.push({ action: { $in: AUDIT_CATEGORY_ACTIONS[safeCategory] } });
+  }
+  if (safeAction) {
+    andClauses.push({ action: { $eq: safeAction } });
+  }
+  if (safeActor) {
+    const escapedActor = escapeRegex(safeActor, 120);
+    const actorRx = { $regex: escapedActor, $options: 'i' };
+    andClauses.push({
+      $or: [{ userEmail: actorRx }, { userName: actorRx }, { 'metadata.actorEmail': actorRx }],
+    });
+  }
+  if (fromDate || toDate) {
+    const range = {};
+    if (fromDate) range.$gte = fromDate;
+    if (toDate) range.$lte = toDate;
+    andClauses.push({ createdAt: range });
+  }
+  if (safeQ) {
+    const escapedQ = escapeRegex(safeQ, 100);
+    const rx = { $regex: escapedQ, $options: 'i' };
+    andClauses.push({
+      $or: [{ action: rx }, { userEmail: rx }, { userName: rx }, { details: rx }],
+    });
+  }
+
+  if (andClauses.length === 0) return {};
+  if (andClauses.length === 1) return andClauses[0];
+  return { $and: andClauses };
+}
+
+function filterInMemoryAuditLogs(allLogs, filters) {
+  const { safeAction, safeCategory, safeActor, safeQ, fromDate, toDate } = filters;
+  const catActions = safeCategory && AUDIT_CATEGORY_ACTIONS[safeCategory]
+    ? new Set(AUDIT_CATEGORY_ACTIONS[safeCategory])
+    : null;
+  const actorRx = safeActor ? new RegExp(escapeRegex(safeActor, 120), 'i') : null;
+  const searchRx = safeQ ? new RegExp(escapeRegex(safeQ, 100), 'i') : null;
+
+  return allLogs.filter((entry) => {
+    if (catActions && !catActions.has(entry.action)) return false;
+    if (safeAction && entry.action !== safeAction) return false;
+    if (actorRx) {
+      const actorCandidates = [entry.userEmail, entry.userName, entry.metadata?.actorEmail];
+      if (!actorCandidates.some((f) => actorRx.test(String(f || '')))) return false;
+    }
+    if (fromDate || toDate) {
+      const ts = new Date(entry.createdAt || 0);
+      if (Number.isNaN(ts.getTime())) return false;
+      if (fromDate && ts < fromDate) return false;
+      if (toDate && ts > toDate) return false;
+    }
+    if (searchRx) {
+      const hay = [entry.action, entry.userEmail, entry.userName, entry.details];
+      if (!hay.some((f) => searchRx.test(String(f || '')))) return false;
+    }
+    return true;
+  });
+}
+
 /**
  * GET /api/admin/activity-logs
  * Consulta paginada y filtrada de auditoría ActivityLog (exclusivo para Administrador, Ley N° 21.719).
+ * Aplica todos los filtros en MongoDB ANTES de skip/limit.
  */
 exports.getActivityLogs = async (req, res) => {
   try {
-    const { action, q, page, limit } = req.query || {};
-    const result = await authService.queryActivityLogs({ action, q, page, limit });
+    const filters = parseAuditFilterParams(req.query || {});
+    const parsedPage = Number.parseInt(String(req.query?.page ?? 1), 10);
+    const safePage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const parsedLimit = Number.parseInt(String(req.query?.limit ?? 25), 10);
+    const safeLimit =
+      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 25;
+    const skip = (safePage - 1) * safeLimit;
+
+    if (mongoose.connection.readyState === 1) {
+      const mongoFilter = buildAuditMongoFilter(filters);
+      const [docs, total, distinctActions] = await Promise.all([
+        ActivityLog.find(mongoFilter).sort({ createdAt: -1 }).skip(skip).limit(safeLimit).lean(),
+        ActivityLog.countDocuments(mongoFilter),
+        ActivityLog.distinct('action'),
+      ]);
+      return res.status(200).json({
+        success: true,
+        logs: docs.map(sanitizeAuditLogEntry),
+        total,
+        page: safePage,
+        limit: safeLimit,
+        actions: distinctActions.filter(Boolean).sort((a, b) => a.localeCompare(b)),
+      });
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible para consultar auditoría.',
+      });
+    }
+
+    const allLogs = authService.getRecentLogs(200);
+    const actions = Array.from(new Set(allLogs.map((e) => e.action).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+    const filtered = filterInMemoryAuditLogs(allLogs, filters);
+
     return res.status(200).json({
       success: true,
-      ...result,
+      logs: filtered.slice(skip, skip + safeLimit).map(sanitizeAuditLogEntry),
+      total: filtered.length,
+      page: safePage,
+      limit: safeLimit,
+      actions,
     });
   } catch {
     console.error('[AdminController] Error al consultar registros de auditoría.');
     return res.status(500).json({
       success: false,
       message: 'Error al consultar la bitácora de auditoría.',
+    });
+  }
+};
+
+/**
+ * GET /api/admin/activity-logs/export
+ * Exporta todos los registros de auditoría que coinciden con los filtros (sin paginación y sanitizados).
+ */
+exports.exportActivityLogs = async (req, res) => {
+  try {
+    const filters = parseAuditFilterParams(req.query || {});
+    let logs = [];
+
+    if (mongoose.connection.readyState === 1) {
+      const mongoFilter = buildAuditMongoFilter(filters);
+      const docs = await ActivityLog.find(mongoFilter).sort({ createdAt: -1 }).lean();
+      logs = docs.map(sanitizeAuditLogEntry);
+    } else if (process.env.NODE_ENV !== 'production') {
+      const allLogs = authService.getRecentLogs(200);
+      logs = filterInMemoryAuditLogs(allLogs, filters).map(sanitizeAuditLogEntry);
+    } else {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible para exportar auditoría.',
+      });
+    }
+
+    if (String(req.query?.format || '').toLowerCase() === 'csv') {
+      const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const header = ['id', 'createdAt', 'action', 'userEmail', 'userName', 'userRole', 'details'].join(',');
+      const rows = logs.map((l) =>
+        [l.id, l.createdAt, l.action, l.userEmail, l.userName, l.userRole, l.details]
+          .map(csvEscape)
+          .join(',')
+      );
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      return res.status(200).send([header, ...rows].join('\n'));
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: logs.length,
+      exportedAt: new Date().toISOString(),
+      logs,
+    });
+  } catch {
+    console.error('[AdminController] Error al exportar registros de auditoría.');
+    return res.status(500).json({
+      success: false,
+      message: 'Error al exportar la bitácora de auditoría.',
     });
   }
 };

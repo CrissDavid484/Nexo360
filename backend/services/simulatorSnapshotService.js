@@ -36,7 +36,6 @@ const MONTH_LABELS_ES = Object.freeze([
 ]);
 
 const SEDE_ALAMEDA_CAREERS = Object.freeze([
-  // Escuela de Informática y Telecomunicaciones
   {
     name: 'Ingeniería en Informática',
     school: 'Escuela de Informática y Telecomunicaciones',
@@ -76,7 +75,6 @@ const SEDE_ALAMEDA_CAREERS = Object.freeze([
     school: 'Escuela de Informática y Telecomunicaciones',
     aliases: ['admin. de redes y telecomunicaciones', 'administracion de redes y telecomunicaciones'],
   },
-  // Escuela de Construcción
   {
     name: 'Ingeniería en Construcción',
     school: 'Escuela de Construcción',
@@ -126,7 +124,6 @@ const SEDE_ALAMEDA_CAREERS = Object.freeze([
       'tecnico en instalaciones y proyectos electricos',
     ],
   },
-  // Escuela de Administración y Negocios
   {
     name: 'Auditoría',
     school: 'Escuela de Administración y Negocios',
@@ -161,8 +158,15 @@ const SEDE_ALAMEDA_CAREERS = Object.freeze([
   },
 ]);
 
+const STUDENT_ROLES = new Set(['estudiante', 'estudiante_paedis', 'tutor_par']);
 const inMemorySnapshots = [];
 let schedulerTimer = null;
+
+function isStudentUser(user) {
+  if (!user || typeof user !== 'object') return false;
+  const role = String(user.role || '').trim().toLowerCase();
+  return role.startsWith('estudiante') || STUDENT_ROLES.has(role);
+}
 
 function normalizeText(value) {
   return String(value || '')
@@ -231,6 +235,7 @@ function buildCareerBreakdown(students) {
   }
 
   for (const student of students) {
+    if (!isStudentUser(student)) continue;
     const canonical = resolveAlamedaCareerName(student.career || student.carrera);
     if (!canonical || !byCareer.has(canonical)) continue;
     const bucket = byCareer.get(canonical);
@@ -253,7 +258,7 @@ function buildCareerBreakdown(students) {
 
 function resolveWeekBucketIndex(rawDate, nowMs) {
   const parsed = rawDate ? new Date(rawDate).getTime() : Number.NaN;
-  if (!Number.isFinite(parsed)) return 0;
+  if (!Number.isFinite(parsed)) return null;
   const diffDays = Math.max(0, Math.floor((nowMs - parsed) / 86400000));
   const weeksAgo = Math.floor(diffDays / 7);
   const currentWeekEst = 16;
@@ -263,29 +268,29 @@ function resolveWeekBucketIndex(rawDate, nowMs) {
   return targetWeek - 1;
 }
 
-function distributeRealistic18Weeks(totalCount) {
-  const buckets = Array(18).fill(0);
-  if (totalCount <= 0) return buckets;
-  // shortcut: distribucion sintetica en 18 semanas para datos sparse, migrar a agregacion directa cuando aumente el volumen
-  const weights = [0.5, 0.25, 0.15];
-  let remaining = totalCount;
-  for (let i = 0; i < weights.length && remaining > 0; i++) {
-    const chunk = Math.min(remaining, Math.max(1, Math.round(totalCount * weights[i])));
-    buckets[i] = chunk;
-    remaining -= chunk;
-  }
-  if (remaining > 0) buckets[7] = remaining; // Semana 8
-  return buckets;
-}
+/**
+ * Construye métricas de adopción del simulador basadas exclusivamente en logs reales con timestamp.
+ * Excluye roles administrativos y nunca genera distribuciones semanales sintéticas.
+ */
+function buildSimulatorAdoptionMetrics(students = [], simulatorLogs = [], now = new Date()) {
+  const validStudents = Array.isArray(students) ? students.filter(isStudentUser) : [];
+  const studentEmailSet = new Set(
+    validStudents.map((s) => String(s.email || '').toLowerCase().trim()).filter(Boolean)
+  );
 
-function buildSimulatorAdoptionMetrics(students, simulatorLogs, now = new Date()) {
   const startedMap = new Map();
   const savedMap = new Map();
 
-  for (const log of simulatorLogs) {
-    const email = String(log.userEmail || '').toLowerCase().trim();
+  for (const log of Array.isArray(simulatorLogs) ? simulatorLogs : []) {
+    const email = String(log?.userEmail || '').toLowerCase().trim();
     if (!email) continue;
-    const ts = log.createdAt ? new Date(log.createdAt) : now;
+    // Si existen estudiantes registrados, excluir correos no estudiantiles (e.g. admins)
+    if (studentEmailSet.size > 0 && !studentEmailSet.has(email)) continue;
+    const rawTs = log.createdAt || log.timestamp;
+    if (!rawTs) continue;
+    const ts = new Date(rawTs);
+    if (Number.isNaN(ts.getTime())) continue;
+
     if (log.action === 'used_simulator_toma_ramos') {
       const prev = startedMap.get(email);
       if (!prev || ts > prev) startedMap.set(email, ts);
@@ -301,92 +306,76 @@ function buildSimulatorAdoptionMetrics(students, simulatorLogs, now = new Date()
   let startedOnlyTotal = 0;
   let completedTotal = 0;
 
-  for (const student of students) {
-    const email = String(student.email || '').toLowerCase().trim();
-    const hasLogStart = startedMap.has(email);
-    const hasLogSave = savedMap.has(email);
-    const hasUsedFlag = Boolean(student.hasUsedSimulator || (student.simulatorUsageCount || 0) > 0);
-    const hasEnrolled = Array.isArray(student.enrolledCourses) && student.enrolledCourses.length > 0;
-
-    if (hasLogSave) {
+  for (const [email, savedTs] of savedMap.entries()) {
+    const bucketIdx = resolveWeekBucketIndex(savedTs, nowMs);
+    if (bucketIdx !== null) {
       completedTotal += 1;
-      completedBuckets[resolveWeekBucketIndex(savedMap.get(email), nowMs)] += 1;
-    } else if (hasLogStart) {
+      completedBuckets[bucketIdx] += 1;
+    }
+    startedMap.delete(email);
+  }
+
+  for (const [, startedTs] of startedMap.entries()) {
+    const bucketIdx = resolveWeekBucketIndex(startedTs, nowMs);
+    if (bucketIdx !== null) {
       startedOnlyTotal += 1;
-      startedOnlyBuckets[resolveWeekBucketIndex(startedMap.get(email), nowMs)] += 1;
-    } else if (hasUsedFlag) {
-      const ts = student.lastSimulatorUsage || student.updatedAt || student.createdAt || now;
-      if (hasEnrolled) {
-        completedTotal += 1;
-        completedBuckets[resolveWeekBucketIndex(ts, nowMs)] += 1;
-      } else {
-        startedOnlyTotal += 1;
-        startedOnlyBuckets[resolveWeekBucketIndex(ts, nowMs)] += 1;
-      }
+      startedOnlyBuckets[bucketIdx] += 1;
     }
   }
 
-  // Si los registros reales se agrupan en un solo punto por ser demo/inicial,
-  // aplicar distribución realista institucional en 18 semanas respetando el total exacto.
-  const finalCompletedBuckets = completedTotal > 0 && completedBuckets.filter(b => b > 0).length <= 1
-    ? distributeRealistic18Weeks(completedTotal)
-    : completedBuckets;
+  const hasRealLogs = startedOnlyTotal > 0 || completedTotal > 0;
+  const startedOnlyWeekly = hasRealLogs
+    ? startedOnlyBuckets.map((value, idx) => ({
+        label: `Sem ${idx + 1}`,
+        value: Math.trunc(value),
+      }))
+    : [];
+  const completedWeekly = hasRealLogs
+    ? completedBuckets.map((value, idx) => ({
+        label: `Sem ${idx + 1}`,
+        value: Math.trunc(value),
+      }))
+    : [];
 
-  const finalStartedBuckets = startedOnlyTotal > 0 && startedOnlyBuckets.filter(b => b > 0).length <= 1
-    ? distributeRealistic18Weeks(startedOnlyTotal)
-    : startedOnlyBuckets;
-
-  const s1StartedTotal = Math.max(1, Math.round(startedOnlyTotal * 0.9));
-  const s1CompletedTotal = Math.max(3, completedTotal);
+  const emptySemester = {
+    startedOnlyTotal: 0,
+    completedTotal: 0,
+    startedOnlyWeekly: [],
+    completedWeekly: [],
+  };
 
   const bySemester = {
-    semestre1: {
-      startedOnlyTotal: s1StartedTotal,
-      completedTotal: s1CompletedTotal,
-      startedOnlyWeekly: distributeRealistic18Weeks(s1StartedTotal).map((value, idx) => ({
-        label: `Sem ${idx + 1}`,
-        value: Math.trunc(value),
-      })),
-      completedWeekly: distributeRealistic18Weeks(s1CompletedTotal).map((value, idx) => ({
-        label: `Sem ${idx + 1}`,
-        value: Math.trunc(value),
-      })),
-    },
+    semestre1: emptySemester,
     semestre2: {
       startedOnlyTotal,
       completedTotal,
-      startedOnlyWeekly: finalStartedBuckets.map((value, idx) => ({
-        label: `Sem ${idx + 1}`,
-        value: Math.trunc(value),
-      })),
-      completedWeekly: finalCompletedBuckets.map((value, idx) => ({
-        label: `Sem ${idx + 1}`,
-        value: Math.trunc(value),
-      })),
+      startedOnlyWeekly,
+      completedWeekly,
     },
   };
 
   const totalCurrent = startedOnlyTotal + completedTotal;
-  const completedCurrent = completedTotal;
-  const rateCurrent = totalCurrent > 0 ? Number(((completedCurrent / totalCurrent) * 100).toFixed(1)) : 0;
+  const rateCurrent =
+    totalCurrent > 0 ? Number(((completedTotal / totalCurrent) * 100).toFixed(1)) : 0;
 
-  const historicalAdoption = totalCurrent > 0
-    ? [
-        { period: '2026-2', label: '2° Sem 2026 (Actual)', startedTotal: totalCurrent, completedTotal: completedCurrent, completionRate: rateCurrent },
-      ]
-    : [];
+  const historicalAdoption =
+    totalCurrent > 0
+      ? [
+          {
+            period: '2026-2',
+            label: '2° Sem 2026 (Actual)',
+            startedTotal: totalCurrent,
+            completedTotal,
+            completionRate: rateCurrent,
+          },
+        ]
+      : [];
 
   return {
     startedOnlyTotal,
     completedTotal,
-    startedOnlyWeekly: finalStartedBuckets.map((value, idx) => ({
-      label: `Sem ${idx + 1}`,
-      value: Math.trunc(value),
-    })),
-    completedWeekly: finalCompletedBuckets.map((value, idx) => ({
-      label: `Sem ${idx + 1}`,
-      value: Math.trunc(value),
-    })),
+    startedOnlyWeekly,
+    completedWeekly,
     bySemester,
     historicalAdoption,
   };
@@ -405,9 +394,9 @@ function buildPaedisMonthlyMetrics(paedisStudents, now = new Date()) {
       m <= currentMonth
         ? paedisStudents.filter((s) => {
             const rawDate = s.createdAt || s.consentimientoLey21719?.fechaAceptacion;
-            if (!rawDate) return true;
+            if (!rawDate) return false;
             const parsed = new Date(rawDate);
-            return Number.isNaN(parsed.getTime()) ? true : parsed <= monthEnd;
+            return !Number.isNaN(parsed.getTime()) && parsed <= monthEnd;
           }).length
         : 0;
 
@@ -428,6 +417,7 @@ function buildPaedisMonthlyMetrics(paedisStudents, now = new Date()) {
 function buildTopDemandedSections(students) {
   const sectionCounts = new Map();
   for (const s of students) {
+    if (!isStudentUser(s)) continue;
     const enrolled = Array.isArray(s.enrolledCourses) ? s.enrolledCourses : [];
     for (const c of enrolled) {
       const sigla = String(c?.sigla || c?.courseCode || '').trim();
@@ -487,20 +477,16 @@ function getNextScheduledCut(date = new Date()) {
 
 async function computeSnapshotPayload({ slot = 'bootstrap', now = new Date() } = {}) {
   const allUsers = await authService.getAllUsers();
-  const students = allUsers.filter(
-    (u) =>
-      (u.role && u.role.startsWith('estudiante')) ||
-      u.role === 'tutor_par' ||
-      u.email === 'c.guzman@duocuc.cl'
-  );
-  const totalStudents = students.length || 1;
+  const students = allUsers.filter(isStudentUser);
+  const totalStudents = students.length;
   const paedisStudents = students.filter(
     (s) => s.isPaedis === true || s.role === 'estudiante_paedis'
   );
 
   const simulatorUsersCount = students.filter((s) => s.hasUsedSimulator).length;
-  const simulatorUsagePercentage = Math.round((simulatorUsersCount / totalStudents) * 100);
-  const totalSimulatorInteractions = allUsers.reduce(
+  const simulatorUsagePercentage =
+    totalStudents > 0 ? Math.round((simulatorUsersCount / totalStudents) * 100) : 0;
+  const totalSimulatorInteractions = students.reduce(
     (acc, u) => acc + (u.simulatorUsageCount || 0),
     0
   );
@@ -508,7 +494,7 @@ async function computeSnapshotPayload({ slot = 'bootstrap', now = new Date() } =
   const simulatorWeeklyUsage = {};
   for (let i = 1; i <= 8; i++) {
     const weekKey = `week${i}`;
-    simulatorWeeklyUsage[weekKey] = allUsers.reduce(
+    simulatorWeeklyUsage[weekKey] = students.reduce(
       (acc, u) => acc + (u.simulatorWeeklyUsage?.[weekKey] || 0),
       0
     );
@@ -681,12 +667,14 @@ module.exports = {
   CHILE_TIMEZONE,
   SCHEDULED_SLOTS,
   SEDE_ALAMEDA_CAREERS,
+  isStudentUser,
   getChileTimeParts,
   getNextScheduledCut,
   buildCareerBreakdown,
   buildSimulatorAdoptionMetrics,
   buildPaedisMonthlyMetrics,
   buildTopDemandedSections,
+  computeSnapshotPayload,
   captureSnapshot,
   getLatestSnapshot,
   listSnapshots,

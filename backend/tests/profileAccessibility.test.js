@@ -142,11 +142,14 @@ test('Perfil y Accesibilidad: Foto, Cortina, Persistencia A11y, voiceReader y Ov
     '6. Endpoint PUT /api/auth/accessibility persiste voiceReader en esquema, sesión y GET /api/auth/me',
     async () => {
       const a11yUser = {
+        id: 'a11y_voicereader_test',
         email: 'a11y.voicereader.test@duocuc.cl',
         fullName: 'Estudiante A11y Voz',
         role: 'estudiante',
+        tokenVersion: 0,
       };
-      const a11yToken = jwt.sign(a11yUser, secret, { algorithm: 'HS256', expiresIn: '1h' });
+      authService.registerUser(a11yUser);
+      const a11yToken = authService.generateJwt(a11yUser);
       const headers = { Authorization: `Bearer ${a11yToken}` };
 
       // Validar esquema Mongoose para voiceReader

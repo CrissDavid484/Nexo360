@@ -114,9 +114,12 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     const objOutput = testDoc.toObject();
     assert.strictEqual(objOutput.password, undefined, 'toObject no debe incluir password');
 
-    // Verificar metadatos de consentimiento y limitación de finalidad
+    // Verificar metadatos de consentimiento (default false conforme a Ley 21.719) y limitación de finalidad
     assert.ok(testDoc.consentMetadata, 'Debe poseer estructura de metadatos de consentimiento');
-    assert.strictEqual(testDoc.consentMetadata.consentGiven, true);
+    assert.strictEqual(testDoc.consentMetadata.consentGiven, false);
+    assert.strictEqual(testDoc.consentMetadata.consentDate, null);
+    assert.strictEqual(testDoc.consentMetadata.legalBasis, 'PENDIENTE_REVISION_INSTITUCIONAL');
+    assert.strictEqual(testDoc.consentMetadata.informationDelivered, false);
     assert.ok(Array.isArray(testDoc.purposeLimitation), 'purposeLimitation debe ser un array');
     assert.ok(testDoc.purposeLimitation.includes('gestion_academica'), 'Debe incluir finalidad academica');
 
@@ -130,28 +133,22 @@ test('AUDITORÍA INTEGRAL VERIFIER: Nexo360 - Ingesta Alameda 2026, Backend, Fro
     );
   });
 
-  await t.test('6. [VIVO DUOC LOGIN & NATIVE DB USER PROFILE] URL oficial y estructura nativa de estudiante', async () => {
+  await t.test('6. [VIVO DUOC LOGIN & NATIVE DB USER PROFILE] OIDC fail-closed sin configuración y estructura nativa de estudiante', async () => {
     const authService = (await import('../services/authService.js')).default;
 
-    const loginUrl = authService.getOfficialLoginUrl();
-    assert.ok(
-      loginUrl.includes('client_id=674913e2-e170-4787-833f-e307f87db6e5'),
-      'Debe contener client_id oficial'
-    );
-    assert.ok(
-      loginUrl.includes('nonce=890304a71c3cc708b8d73d6a4f6ab56c') ||
-        loginUrl.includes('nonce=23077c7bfb49e35770b10965bcbb9df5'),
-      'Debe contener nonce oficial de Vivo Duoc'
-    );
-    assert.ok(
-      loginUrl.includes('state=e8044508aa7459a37f5439328c7d6f39') ||
-        loginUrl.includes('state=181261858bac94807f59900cdd53d715'),
-      'Debe contener state oficial de Vivo Duoc'
-    );
-    assert.ok(
-      loginUrl.includes('redirect_uri=https%3A%2F%2Fexperienciavivo.duoc.cl%2Fauth%2Fopenidc%2Fcallback'),
-      'Debe redirigir a callback oficial de experienciavivo'
-    );
+    // Sin variables OIDC/OFFICIAL_VIVO_DUOC_OAUTH_URL configuradas, getOfficialLoginUrl debe ser null (fail-closed)
+    const prevOauth = process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL;
+    delete process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL;
+    try {
+      assert.strictEqual(authService.getOfficialLoginUrl(), null);
+      process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL = 'https://login.microsoftonline.com/test-tenant/oauth2/v2.0/authorize?client_id=test-client';
+      const loginUrl = authService.getOfficialLoginUrl('c.guzman@duocuc.cl');
+      assert.ok(loginUrl.includes('login.microsoftonline.com'));
+      assert.ok(loginUrl.includes('login_hint=c.guzman%40duocuc.cl'));
+    } finally {
+      if (prevOauth === undefined) delete process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL;
+      else process.env.OFFICIAL_VIVO_DUOC_OAUTH_URL = prevOauth;
+    }
 
     // Verificar formato y perfil nativo en BD
     const sessionData = authService.formatUserResponse({

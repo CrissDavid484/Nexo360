@@ -1,5 +1,16 @@
 const mongoose = require('mongoose');
 
+const SIMULATION_ACTIONS = Object.freeze([
+  'POSITIVE_ATTENDANCE',
+  'NEGATIVE_ABSENCE',
+  'FUTURE_CLASS_ATTEND',
+  'FUTURE_CLASS_MISS',
+  'CORRECT_PAST_ATTENDANCE',
+  'HYPOTHETICAL_EXCEPTION',
+  'RESET_BASE',
+  'CUSTOM_STEPPER',
+]);
+
 /**
  * Esquema de Escenarios Simulados de Asistencia (SAT)
  * Aislado estrictamente de los registros de asistencia académica real.
@@ -26,8 +37,34 @@ const AttendanceSimulationSchema = new mongoose.Schema(
     },
     actionApplied: {
       type: String,
-      enum: ['POSITIVE_ATTENDANCE', 'NEGATIVE_ABSENCE', 'RESET_BASE', 'CUSTOM_STEPPER'],
+      enum: SIMULATION_ACTIONS,
       required: true,
+    },
+    baselineAttended: {
+      type: Number,
+      min: 0,
+    },
+    baselineTotal: {
+      type: Number,
+      min: 0,
+    },
+    simulatedAttended: {
+      type: Number,
+      min: 0,
+    },
+    simulatedTotal: {
+      type: Number,
+      min: 0,
+    },
+    recoveryPossible: {
+      type: Boolean,
+      default: true,
+    },
+    minRequiredThreshold: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 70,
     },
     baselinePercentage: {
       type: Number,
@@ -55,3 +92,4 @@ const AttendanceSimulationSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model('AttendanceSimulation', AttendanceSimulationSchema);
+module.exports.SIMULATION_ACTIONS = SIMULATION_ACTIONS;

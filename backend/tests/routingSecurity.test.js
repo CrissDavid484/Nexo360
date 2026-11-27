@@ -2,7 +2,7 @@ const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const app = require('../server');
-const { getJwtSecret } = require('../middleware/authMiddleware');
+const authService = require('../services/authService');
 const { request, setBaseUrl } = require('./testHelper');
 
 let server;
@@ -128,23 +128,26 @@ describe('Task 7: Enrutamiento Real, Persistencia al Recargar F5 y Seguridad por
   });
 
   test('4. Seguridad RBAC en Backend API: /api/admin/metrics y /api/admin/students bloquean estudiantes (403)', async () => {
-    const studentToken = jwt.sign(
-      { id: 'student_test_1', email: 'alumno.test@duocuc.cl', role: 'estudiante' },
-      getJwtSecret(),
-      { expiresIn: '1h' }
-    );
+    const studentToken = authService.generateJwt({
+      id: 'seed_est_m_contreras',
+      email: 'm.contreras@duocuc.cl',
+      role: 'estudiante',
+      tokenVersion: 0,
+    });
 
-    const adminToken = jwt.sign(
-      { id: 'admin_test_1', email: 'admin.test@duocuc.cl', role: 'admin' },
-      getJwtSecret(),
-      { expiresIn: '1h' }
-    );
+    const adminToken = authService.generateJwt({
+      id: 'seed_admin_c_guzman',
+      email: 'c.guzman@duocuc.cl',
+      role: 'admin',
+      tokenVersion: 0,
+    });
 
-    const coordToken = jwt.sign(
-      { id: 'coord_test_1', email: 'coord.test@duocuc.cl', role: 'coordinador_paedis' },
-      getJwtSecret(),
-      { expiresIn: '1h' }
-    );
+    const coordToken = authService.generateJwt({
+      id: 'seed_coord_paedis',
+      email: 'coord.paedis@duoc.cl',
+      role: 'coordinador_paedis',
+      tokenVersion: 0,
+    });
 
     // 1. Estudiante intentando acceder al panel de administración -> 403 Forbidden
     const resStudent = await request('/api/admin/metrics', {

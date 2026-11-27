@@ -200,11 +200,11 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     assert.ok(factors.some(f => f.includes('Acompañamiento PAEDIS activo')));
   });
 
-  test('computeSimulatorScore: Sin uso aumenta score', () => {
+  test('computeSimulatorScore: Sin uso mantiene score neutro 50 (sin penalización)', () => {
     const config = loadWeightsConfig();
     const { score, factors } = computeSimulatorScore({ hasUsedSimulator: false }, config);
-    assert.ok(score > 50);
-    assert.ok(factors.some(f => f.includes('No ha planificado')));
+    assert.equal(score, 50);
+    assert.ok(factors.some(f => f.includes('sin penalización')));
   });
 
   test('computeSimulatorScore: Con uso y quality score reduce score', () => {
@@ -437,20 +437,24 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
   // ============================================================
   // Tests de Predicción Completa (Estados Terminales)
   // ============================================================
-  test('Predicción deserción: score 100, riskLevel DESERTOR', () => {
+  test('Predicción deserción: score 100, riskLevel DESERTOR sin graduationProbability', () => {
     const studentDesertion = { academicStatus: 'desercion', enrolledCourses: [] };
     const prediction = calculatePredictiveRisk(studentDesertion);
     assert.equal(prediction.score, 100);
     assert.equal(prediction.riskLevel, 'DESERTOR');
-    assert.equal(prediction.graduationProbability, 0);
+    assert.equal(prediction.graduationProbability, undefined);
+    assert.equal(prediction.isHeuristic, true);
+    assert.equal(prediction.indicatorType, 'HEURISTIC_EARLY_FOLLOWUP');
+    assert.equal(prediction.requiresHumanReview, true);
   });
 
-  test('Predicción titulado: score 0, riskLevel TITULADO', () => {
+  test('Predicción titulado: score 0, riskLevel TITULADO sin graduationProbability', () => {
     const studentGraduated = { academicStatus: 'titulado', enrolledCourses: [] };
     const prediction = calculatePredictiveRisk(studentGraduated);
     assert.equal(prediction.score, 0);
     assert.equal(prediction.riskLevel, 'TITULADO');
-    assert.equal(prediction.graduationProbability, 100);
+    assert.equal(prediction.graduationProbability, undefined);
+    assert.equal(prediction.isHeuristic, true);
   });
 
   // ============================================================
@@ -771,10 +775,14 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     });
   });
 
-  test('Predicción completa: graduationProbability inversamente proporcional al score', () => {
+  test('Predicción completa: indicador heurístico sin graduationProbability', () => {
     const highRisk = calculatePredictiveRisk(studentPaedisNoTutor);
     const lowRisk = calculatePredictiveRisk(studentNoRisk);
-    assert.ok(highRisk.graduationProbability < lowRisk.graduationProbability);
+    assert.equal(highRisk.graduationProbability, undefined);
+    assert.equal(lowRisk.graduationProbability, undefined);
+    assert.equal(highRisk.isHeuristic, true);
+    assert.equal(highRisk.indicatorType, 'HEURISTIC_EARLY_FOLLOWUP');
+    assert.equal(highRisk.requiresHumanReview, true);
     assert.ok(highRisk.score > lowRisk.score);
   });
 
@@ -880,11 +888,11 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     assert.equal(normalized[0].attendedSessions, 16);
   });
 
-  test('calculatePredictiveRisk: maneja student sin enrolledCourses', () => {
+  test('calculatePredictiveRisk: retorna SIN_DATOS cuando faltan registros académicos', () => {
     const student = { academicStatus: 'activo', isPaedis: false };
     const prediction = calculatePredictiveRisk(student);
-    assert.ok(prediction.score >= 0 && prediction.score <= 100);
-    assert.ok(['BAJO', 'MEDIO', 'ALTO', 'DESERTOR', 'TITULADO'].includes(prediction.riskLevel));
+    assert.equal(prediction.score, null);
+    assert.equal(prediction.riskLevel, 'SIN_DATOS');
   });
 
   test('calculatePredictiveRisk: estudiante DESERTOR retorna score 100 inmediato', () => {

@@ -1,15 +1,21 @@
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const jwt = require('jsonwebtoken');
 const app = require('../server');
-const { getJwtSecret } = require('../middleware/authMiddleware');
+const authService = require('../services/authService');
 const { request, setBaseUrl } = require('./testHelper');
 
 let server;
 
 describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría ActivityLog', () => {
   before(async () => {
+    authService.registerUser({
+      _id: 'seed_tutor_v_soto',
+      email: 'v.soto@duoc.cl',
+      fullName: 'Valentina Soto',
+      role: 'tutor_par',
+      tokenVersion: 0,
+    });
     await new Promise((resolve) => {
       server = http.createServer(app);
       server.listen(0, '127.0.0.1', () => {
@@ -20,36 +26,41 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
   });
 
   after(async () => {
+    authService.removeUserFromMemory('v.soto@duoc.cl');
     if (server) {
       await new Promise((resolve) => server.close(resolve));
     }
   });
-  const adminToken = jwt.sign(
-    { id: 'admin_test_1', email: 'c.guzman@duocuc.cl', role: 'admin' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
 
-  const coordinadorToken = jwt.sign(
-    { id: 'coord_test_1', email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
+  const adminToken = authService.generateJwt({
+    id: 'seed_admin_c_guzman',
+    email: 'c.guzman@duocuc.cl',
+    role: 'admin',
+    tokenVersion: 0,
+  });
 
-  const studentToken = jwt.sign(
-    { id: 'student_test_1', email: 'd.rojas@duocuc.cl', role: 'estudiante_paedis' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
+  const coordinadorToken = authService.generateJwt({
+    id: 'seed_coord_paedis',
+    email: 'coord.paedis@duoc.cl',
+    role: 'coordinador_paedis',
+    tokenVersion: 0,
+  });
 
-  const tutorToken = jwt.sign(
-    { id: 'tutor_test_1', email: 'v.soto@duocuc.cl', role: 'tutor_par' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
+  const studentToken = authService.generateJwt({
+    id: 'seed_est_d_rojas',
+    email: 'd.rojas@duocuc.cl',
+    role: 'estudiante_paedis',
+    tokenVersion: 0,
+  });
+
+  const tutorToken = authService.generateJwt({
+    id: 'seed_tutor_v_soto',
+    email: 'v.soto@duoc.cl',
+    role: 'tutor_par',
+    tokenVersion: 0,
+  });
 
   test('1. Permisos RBAC: Estudiantes y tutores son bloqueados (403) en endpoints destructivos/administrativos', async () => {
-    // Estudiante intenta importar
     const impRes = await request('/api/admin/courses/import', {
       method: 'POST',
       headers: { Authorization: `Bearer ${studentToken}` },
@@ -58,14 +69,12 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
     assert.equal(impRes.status, 403);
     assert.match(impRes.body?.message, /Administrador/i);
 
-    // Tutor intenta restablecer semilla
     const seedRes = await request('/api/admin/courses/seed', {
       method: 'POST',
       headers: { Authorization: `Bearer ${tutorToken}` },
     });
     assert.equal(seedRes.status, 403);
 
-    // Estudiante intenta vaciar catálogo
     const delRes = await request('/api/admin/courses', {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${studentToken}` },
@@ -90,7 +99,6 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
   });
 
   test('3. Consulta de Asignaturas: Estudiantes y Tutores pueden consultar cursos para el simulador', async () => {
-    // Estudiante consulta ramos de Informática
     const coursesRes = await request('/api/courses?carrera=INFORMATICA&limit=6', {
       headers: { Authorization: `Bearer ${studentToken}` },
     });
@@ -98,7 +106,6 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
     assert.equal(coursesRes.body?.success, true);
     assert.ok(coursesRes.body?.courses?.length > 0);
 
-    // Tutor consulta carreras disponibles
     const careersRes = await request('/api/courses/careers', {
       headers: { Authorization: `Bearer ${tutorToken}` },
     });
@@ -140,7 +147,6 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
   });
 
   test('6. Restablecer Catálogo Oficial Alameda 2026-002 y Auditoría ActivityLog (SEED, IMPORT, CLEAR)', async () => {
-    // 1. Restablecer Catálogo Oficial Alameda 2026-002
     const seedRes = await request('/api/admin/courses/seed', {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -149,7 +155,6 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
     assert.equal(seedRes.body?.success, true);
     assert.ok(seedRes.body?.result?.count >= 7000);
 
-    // 2. Verificar métricas recientes de administración
     const metricsRes = await request('/api/admin/metrics', {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
@@ -171,7 +176,6 @@ describe('Catálogo de Asignaturas Alameda 2026, Permisos RBAC y Auditoría Acti
     assert.equal(clearRes.status, 200);
     assert.equal(clearRes.body?.success, true);
 
-    // Re-sembrar para dejar el entorno limpio con Alameda 2026
     const reseedRes = await request('/api/admin/courses/seed', {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },

@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Career = require('../models/Career');
 const Sede = require('../models/Sede');
+const UserProfile = require('../models/UserProfile');
+const CourseOffering = require('../models/CourseOffering');
 const { DEFAULT_SEDE, escapeRegex, sanitizeString } = require('../utils/validationUtils');
 
 const DUOC_SCHOOLS = [
@@ -229,17 +231,121 @@ function createCatalogManager({
   idPrefix,
   singularLabel,
   pluralLabel,
+  relationType,
   mapSeedDoc,
   buildCreatePayload,
+  buildUpdatePayload,
 }) {
   let inMemoryItems = initialItems.map((item, idx) => {
-    const rawName = typeof item === 'object' && item !== null ? item.name : item;
     return {
       _id: `${idPrefix}_${idx + 1}`,
       id: `${idPrefix}_${idx + 1}`,
       ...mapSeedDoc(item, idx),
     };
   });
+
+  async function hasRelatedRecords(itemName) {
+    if (!itemName) return false;
+    const rx = new RegExp(`^${escapeRegex(itemName, 150)}$`, 'i');
+
+    if (mongoose.connection.readyState === 1) {
+      if (relationType === 'career') {
+        const [userRef, courseRef] = await Promise.all([
+          UserProfile.exists({ $or: [{ career: rx }, { carrera: rx }] }),
+          CourseOffering.exists({ carrera: rx }),
+        ]);
+        if (userRef || courseRef) return true;
+      } else if (relationType === 'sede') {
+        const [userRef, courseRef] = await Promise.all([
+          UserProfile.exists({ $or: [{ campus: rx }, { sede: rx }] }),
+          CourseOffering.exists({ sede: rx }),
+        ]);
+        if (userRef || courseRef) return true;
+      }
+      return false;
+    }
+
+    const authService = require('./authService');
+    const users = await authService.getAllUsers();
+    const lower = itemName.toLowerCase();
+    return users.some((u) => {
+      if (relationType === 'career') {
+        return (
+          String(u.career || '').toLowerCase() === lower ||
+          String(u.carrera || '').toLowerCase() === lower
+        );
+      }
+      if (relationType === 'sede') {
+        return (
+          String(u.campus || '').toLowerCase() === lower ||
+          String(u.sede || '').toLowerCase() === lower
+        );
+      }
+      return false;
+    });
+  }
+
+  async function cascadeRenameRelations(oldName, newName) {
+    if (!oldName || !newName || oldName.toLowerCase() === newName.toLowerCase()) return;
+    const oldRx = new RegExp(`^${escapeRegex(oldName, 150)}$`, 'i');
+
+    if (mongoose.connection.readyState === 1) {
+      if (relationType === 'career') {
+        await Promise.all([
+          UserProfile.updateMany({ career: oldRx }, { $set: { career: newName } }),
+          UserProfile.updateMany({ carrera: oldRx }, { $set: { carrera: newName } }),
+          CourseOffering.updateMany({ carrera: oldRx }, { $set: { carrera: newName.toUpperCase() } }),
+        ]);
+      } else if (relationType === 'sede') {
+        await Promise.all([
+          UserProfile.updateMany({ campus: oldRx }, { $set: { campus: newName } }),
+          UserProfile.updateMany({ sede: oldRx }, { $set: { sede: newName } }),
+          CourseOffering.updateMany({ sede: oldRx }, { $set: { sede: newName.toUpperCase() } }),
+        ]);
+      }
+      return;
+    }
+
+    const authService = require('./authService');
+    const users = await authService.getAllUsers();
+    const oldLower = oldName.toLowerCase();
+    for (const u of users) {
+      if (relationType === 'career') {
+        const updates = {};
+        if (String(u.career || '').toLowerCase() === oldLower) updates.career = newName;
+        if (String(u.carrera || '').toLowerCase() === oldLower) updates.carrera = newName;
+        if (Object.keys(updates).length > 0) {
+          authService.updateUserFieldsInMemory(u.email, updates);
+        }
+      } else if (relationType === 'sede') {
+        const updates = {};
+        if (String(u.campus || '').toLowerCase() === oldLower) updates.campus = newName;
+        if (String(u.sede || '').toLowerCase() === oldLower) updates.sede = newName;
+        if (Object.keys(updates).length > 0) {
+          authService.updateUserFieldsInMemory(u.email, updates);
+        }
+      }
+    }
+  }
+
+  async function findByIdentifier(target) {
+    if (mongoose.connection.readyState === 1) {
+      const doc = mongoose.Types.ObjectId.isValid(target)
+        ? await Model.findById(target)
+        : await Model.findOne({
+            name: { $regex: new RegExp(`^${escapeRegex(target, 150)}$`, 'i') },
+          });
+      if (doc) return doc;
+    }
+    return (
+      inMemoryItems.find(
+        (item) =>
+          String(item._id) === target ||
+          String(item.id) === target ||
+          item.name.toLowerCase() === target.toLowerCase()
+      ) || null
+    );
+  }
 
   async function seedIfEmptyInDb() {
     let dbItems = await Model.find({}).sort({ name: 1 }).lean();
@@ -335,19 +441,101 @@ function createCatalogManager({
     return created;
   }
 
+  async function update(rawId, rawBody = {}) {
+    const target = decodeURIComponent(String(rawId || '')).trim();
+    if (!target) {
+      throw createHttpError(400, `Identificador de la ${singularLabel} no proporcionado.`);
+    }
+
+    const existing = await findByIdentifier(target);
+    if (!existing) {
+      throw createHttpError(404, `No se encontró la ${singularLabel} especificada.`);
+    }
+
+    const hasNameField = Object.prototype.hasOwnProperty.call(rawBody, 'name');
+    const cleanName = hasNameField
+      ? sanitizeString(rawBody.name, 150) || ''
+      : existing.name;
+
+    if (!cleanName) {
+      throw createHttpError(400, `El nombre de la ${singularLabel} es obligatorio.`);
+    }
+
+    const duplicateMsg = `La ${singularLabel} ingresada ya se encuentra registrada en el sistema.`;
+    const oldName = existing.name;
+    const isSameRecord = (item) =>
+      String(item._id) === String(existing._id) ||
+      (item.id && existing.id && String(item.id) === String(existing.id));
+
+    if (mongoose.connection.readyState === 1) {
+      const nameRegex = new RegExp(`^${escapeRegex(cleanName, 150)}$`, 'i');
+      const dup = await Model.findOne({
+        _id: { $ne: existing._id },
+        name: { $regex: nameRegex },
+      });
+      if (dup) {
+        throw createHttpError(409, duplicateMsg);
+      }
+    } else {
+      const dupMem = inMemoryItems.some(
+        (item) => !isSameRecord(item) && item.name.toLowerCase() === cleanName.toLowerCase()
+      );
+      if (dupMem) {
+        throw createHttpError(409, duplicateMsg);
+      }
+    }
+
+    const updatePayload = buildUpdatePayload(cleanName, rawBody, existing);
+
+    let updated = null;
+    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(existing._id))) {
+      updated = await Model.findByIdAndUpdate(
+        existing._id,
+        { $set: updatePayload },
+        { returnDocument: 'after', runValidators: true }
+      ).lean();
+    }
+
+    const memIndex = inMemoryItems.findIndex(
+      (item) => isSameRecord(item) || item.name.toLowerCase() === oldName.toLowerCase()
+    );
+    if (memIndex >= 0) {
+      inMemoryItems[memIndex] = { ...inMemoryItems[memIndex], ...updatePayload };
+      if (!updated) updated = { ...inMemoryItems[memIndex] };
+    } else if (!updated) {
+      updated = { ...existing, ...updatePayload };
+    }
+
+    inMemoryItems.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+    if (oldName.toLowerCase() !== cleanName.toLowerCase()) {
+      await cascadeRenameRelations(oldName, cleanName);
+    }
+
+    return updated;
+  }
+
   async function remove(rawId) {
     const target = decodeURIComponent(String(rawId || '')).trim();
     if (!target) {
       throw createHttpError(400, `Identificador de la ${singularLabel} no proporcionado.`);
     }
 
+    const existing = await findByIdentifier(target);
+    if (!existing) {
+      throw createHttpError(404, `No se encontró la ${singularLabel} especificada.`);
+    }
+
+    if (await hasRelatedRecords(existing.name)) {
+      throw createHttpError(
+        409,
+        `No se puede eliminar la ${singularLabel} "${existing.name}" porque tiene estudiantes o asignaturas asociadas.`
+      );
+    }
+
     let deleted = false;
-    if (mongoose.connection.readyState === 1) {
-      const resDb = mongoose.Types.ObjectId.isValid(target)
-        ? await Model.findByIdAndDelete(target)
-        : await Model.findOneAndDelete({
-            name: { $regex: new RegExp(`^${escapeRegex(target, 150)}$`, 'i') },
-          });
+    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(existing._id))) {
+      const resDb = await Model.findByIdAndDelete(existing._id);
       if (resDb) deleted = true;
     }
 
@@ -356,7 +544,7 @@ function createCatalogManager({
       (item) =>
         String(item._id) !== target &&
         String(item.id) !== target &&
-        item.name.toLowerCase() !== target.toLowerCase()
+        item.name.toLowerCase() !== existing.name.toLowerCase()
     );
     if (inMemoryItems.length < prevLen) deleted = true;
 
@@ -364,10 +552,10 @@ function createCatalogManager({
       throw createHttpError(404, `No se encontró la ${singularLabel} especificada.`);
     }
 
-    return { deleted: true };
+    return { deleted: true, name: existing.name };
   }
 
-  return { list, create, remove };
+  return { list, create, update, remove };
 }
 
 const careerCatalog = createCatalogManager({
@@ -376,6 +564,7 @@ const careerCatalog = createCatalogManager({
   idPrefix: 'career',
   singularLabel: 'carrera',
   pluralLabel: 'carreras',
+  relationType: 'career',
   mapSeedDoc: (item, idx, existing) => {
     const name = typeof item === 'object' && item !== null ? item.name : item;
     return {
@@ -389,6 +578,15 @@ const careerCatalog = createCatalogManager({
     code: sanitizeString(rawBody.code, 20) || '',
     school: sanitizeString(rawBody.school, 120) || getSchoolForCareer(cleanName),
   }),
+  buildUpdatePayload: (cleanName, rawBody, existing) => ({
+    name: cleanName,
+    code:
+      rawBody.code !== undefined ? sanitizeString(rawBody.code, 20) || '' : (existing.code || ''),
+    school:
+      rawBody.school !== undefined
+        ? sanitizeString(rawBody.school, 120) || getSchoolForCareer(cleanName)
+        : (existing.school || getSchoolForCareer(cleanName)),
+  }),
 });
 
 const sedeCatalog = createCatalogManager({
@@ -397,6 +595,7 @@ const sedeCatalog = createCatalogManager({
   idPrefix: 'sede',
   singularLabel: 'sede',
   pluralLabel: 'sedes',
+  relationType: 'sede',
   mapSeedDoc: (item, _idx, existing) => {
     const isObj = typeof item === 'object' && item !== null;
     const name = isObj ? item.name : item;
@@ -411,6 +610,21 @@ const sedeCatalog = createCatalogManager({
   buildCreatePayload: (cleanName, rawBody) => {
     const region = sanitizeString(rawBody.region, 100) || 'Región Metropolitana';
     const city = sanitizeString(rawBody.city, 80) || (region === 'Región Metropolitana' ? 'Santiago' : '');
+    return {
+      name: cleanName,
+      region,
+      city,
+    };
+  },
+  buildUpdatePayload: (cleanName, rawBody, existing) => {
+    const region =
+      rawBody.region !== undefined
+        ? sanitizeString(rawBody.region, 100) || 'Región Metropolitana'
+        : (existing.region || 'Región Metropolitana');
+    const city =
+      rawBody.city !== undefined
+        ? sanitizeString(rawBody.city, 80) || (region === 'Región Metropolitana' ? 'Santiago' : '')
+        : (existing.city || 'Santiago');
     return {
       name: cleanName,
       region,
@@ -526,6 +740,8 @@ module.exports = {
   OFFICIAL_SEDES_SPECS,
   careerCatalog,
   sedeCatalog,
+  updateCareer: careerCatalog.update,
+  updateSede: sedeCatalog.update,
   getSchoolForCareer,
   migrateCatalogDuocData,
   ensureOfficialDuocCatalog,

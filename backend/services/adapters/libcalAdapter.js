@@ -3,16 +3,92 @@
  * Gestiona reserva de cubículos de estudio, salas multimedia y visores VR.
  */
 
+function stripTrailingSlashes(url = '') {
+  let clean = String(url || '').trim();
+  while (clean.endsWith('/')) {
+    clean = clean.slice(0, -1);
+  }
+  return clean;
+}
+
 class LibCalAdapter {
   constructor(options = {}) {
-    this.baseUrl = options.baseUrl || process.env.LIBCAL_BASE_URL || 'https://duoc.libcal.com/1.1';
-    this.clientId = options.clientId || process.env.LIBCAL_CLIENT_ID || '';
-    this.clientSecret = options.clientSecret || process.env.LIBCAL_CLIENT_SECRET || '';
+    this._baseUrl = options.baseUrl;
+    this._clientId = options.clientId;
+    this._clientSecret = options.clientSecret;
     this.timeoutMs = options.timeoutMs || 8000;
+    this.fetchImpl = options.fetchImpl || null;
+    this._tokenCache = null;
+  }
+
+  get baseUrl() {
+    return stripTrailingSlashes(
+      this._baseUrl ?? process.env.LIBCAL_BASE_URL ?? 'https://duoc.libcal.com/1.1'
+    );
+  }
+
+  get clientId() {
+    return String(this._clientId ?? process.env.LIBCAL_CLIENT_ID ?? '').trim();
+  }
+
+  get clientSecret() {
+    return String(this._clientSecret ?? process.env.LIBCAL_CLIENT_SECRET ?? '').trim();
   }
 
   isConfigured() {
     return Boolean(this.baseUrl && this.clientId && this.clientSecret && this.clientSecret.length > 5);
+  }
+
+  clearTokenCache() {
+    this._tokenCache = null;
+  }
+
+  /**
+   * Intercambia client_credentials contra ${baseUrl}/oauth/token con caché por expiración.
+   */
+  async getOAuthToken() {
+    if (!this.isConfigured()) {
+      throw new Error('LIBCAL_NOT_CONFIGURED');
+    }
+
+    const now = Date.now();
+    if (this._tokenCache && this._tokenCache.accessToken && now < this._tokenCache.expiresAtMs - 30000) {
+      return this._tokenCache.accessToken;
+    }
+
+    const fetchFn = this.fetchImpl || fetch;
+    const body = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+    }).toString();
+
+    const response = await fetchFn(`${this.baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body,
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(`LibCal OAuth HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    if (!payload?.access_token) {
+      throw new Error('LibCal OAuth response missing access_token');
+    }
+
+    const expiresInSec = Number(payload.expires_in) > 0 ? Number(payload.expires_in) : 3600;
+    this._tokenCache = {
+      accessToken: payload.access_token,
+      expiresAtMs: now + expiresInSec * 1000,
+    };
+
+    return payload.access_token;
   }
 
   /**
@@ -23,8 +99,11 @@ class LibCalAdapter {
 
     if (!this.isConfigured()) {
       return {
-        source: 'sandbox_local',
+        configured: false,
+        isOfficialAvailability: false,
+        source: 'practice_simulation',
         isSimulated: true,
+        mode: 'PRACTICE_SIMULATION',
         locationId,
         categoryId,
         date: queryDate,
@@ -33,23 +112,33 @@ class LibCalAdapter {
           { id: 'vr-02', name: 'Meta Quest 3 - Estación 2', available: true, capacity: 1 },
           { id: 'cub-01', name: 'CUB-01 Cubículo Inclusivo PAEDIS', available: true, capacity: 4 },
         ],
-        notice: 'LibCal en modo simulación local. Para reservas reales configure LIBCAL_CLIENT_ID y LIBCAL_CLIENT_SECRET.',
+        notice: 'Simulación formativa local: disponibilidad referencial de práctica sin conexión oficial a LibCal.',
       };
     }
 
-    const response = await fetch(`${this.baseUrl}/space/availability/${locationId}?date=${queryDate}&category=${categoryId}`, {
-      headers: {
-        'Authorization': `Bearer ${await this.getOAuthToken()}`,
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
+    const fetchFn = this.fetchImpl || fetch;
+    const token = await this.getOAuthToken();
+    const response = await fetchFn(
+      `${this.baseUrl}/space/availability/${encodeURIComponent(locationId)}?date=${encodeURIComponent(queryDate)}&category=${encodeURIComponent(categoryId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`LibCal API HTTP ${response.status}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    return {
+      configured: true,
+      isOfficialAvailability: true,
+      ...data,
+    };
   }
 
   /**
@@ -59,21 +148,24 @@ class LibCalAdapter {
     if (!this.isConfigured()) {
       return {
         success: true,
-        mode: 'simulated',
-        bookingId: `sim_booking_${Date.now()}`,
+        configured: false,
+        isOfficialBooking: false,
+        bookingId: null,
+        mode: 'PRACTICE_SIMULATION',
         spaceId,
         studentEmail,
         startTime,
         endTime,
-        confirmationCode: 'DUOC-VR-2026',
-        message: 'Reserva simulada exitosamente en entorno de prueba.',
+        message: 'Simulación formativa local: no genera reserva oficial en LibCal.',
       };
     }
 
-    const response = await fetch(`${this.baseUrl}/space/reserve`, {
+    const fetchFn = this.fetchImpl || fetch;
+    const token = await this.getOAuthToken();
+    const response = await fetchFn(`${this.baseUrl}/space/reserve`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${await this.getOAuthToken()}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ spaceId, email: studentEmail, start: startTime, end: endTime }),
@@ -84,12 +176,16 @@ class LibCalAdapter {
       throw new Error(`Error reservando espacio en LibCal: HTTP ${response.status}`);
     }
 
-    return response.json();
-  }
-
-  async getOAuthToken() {
-    return 'libcal_token_placeholder';
+    const data = await response.json();
+    return {
+      success: true,
+      configured: true,
+      isOfficialBooking: true,
+      mode: 'OFFICIAL',
+      ...data,
+    };
   }
 }
 
 module.exports = new LibCalAdapter();
+module.exports.LibCalAdapter = LibCalAdapter;

@@ -5,7 +5,7 @@ const zlib = require('zlib');
 const jwt = require('jsonwebtoken');
 
 const app = require('../server');
-const { getJwtSecret } = require('../middleware/authMiddleware');
+const authService = require('../services/authService');
 const { request, setBaseUrl } = require('./testHelper');
 const academicCalendarService = require('../services/academicCalendarService');
 const simulatorSnapshotService = require('../services/simulatorSnapshotService');
@@ -56,21 +56,27 @@ describe('CALENDARIO ACADÉMICO DUOC UC (2026-2027) Y SNAPSHOTS SIMULADOR (03:00
     simulatorSnapshotService.resetInMemorySnapshots();
   });
 
-  const adminToken = jwt.sign(
-    { id: 'seed_admin_c_guzman', email: 'c.guzman@duocuc.cl', role: 'admin', fullName: 'Cristian Guzmán' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
-  const coordinatorToken = jwt.sign(
-    { id: 'seed_coord_paedis', email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis', fullName: 'Coordinador PAEDIS' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
-  const studentToken = jwt.sign(
-    { id: 'seed_est_m_contreras', email: 'm.contreras@duocuc.cl', role: 'estudiante', fullName: 'Matías Contreras' },
-    getJwtSecret(),
-    { algorithm: 'HS256' }
-  );
+  const adminToken = authService.generateJwt({
+    id: 'seed_admin_c_guzman',
+    email: 'c.guzman@duocuc.cl',
+    role: 'admin',
+    fullName: 'Cristian Guzmán',
+    tokenVersion: 0,
+  });
+  const coordinatorToken = authService.generateJwt({
+    id: 'seed_coord_paedis',
+    email: 'coord.paedis@duoc.cl',
+    role: 'coordinador_paedis',
+    fullName: 'Coordinador PAEDIS',
+    tokenVersion: 0,
+  });
+  const studentToken = authService.generateJwt({
+    id: 'seed_est_m_contreras',
+    email: 'm.contreras@duocuc.cl',
+    role: 'estudiante',
+    fullName: 'Matías Contreras',
+    tokenVersion: 0,
+  });
 
   const adminHeaders = { Authorization: `Bearer ${adminToken}` };
   const coordinatorHeaders = { Authorization: `Bearer ${coordinatorToken}` };
