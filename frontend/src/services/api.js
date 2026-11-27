@@ -68,32 +68,21 @@ const request = async (path, { method = 'GET', body, auth = true, timeoutMs = DE
   }
 };
 
-function buildOfficialVivoDuocAuthUrl() {
-  const envUrl = import.meta.env?.VITE_VIVO_DUOC_OAUTH_URL;
-  if (envUrl) return envUrl;
-  const baseUrl = 'https://login.microsoftonline.com/72fd0b5a-8a6a-4cff-89f6-bde961f7e250/oauth2/v2.0/authorize';
-  const params = new URLSearchParams({
-    client_id: '674913e2-e170-4787-833f-e307f87db6e5',
-    nonce: '23077c7bfb49e35770b10965bcbb9df5',
-    redirect_uri: 'https://experienciavivo.duoc.cl/auth/openidc/callback',
-    response_type: 'code',
-    scope: 'openid profile email offline_access api://674913e2-e170-4787-833f-e307f87db6e5/access',
-    state: '181261858bac94807f59900cdd53d715',
-    sso_reload: 'true',
-  });
-  return `${baseUrl}?${params.toString()}`;
-}
-
-export const OFFICIAL_VIVO_DUOC_OAUTH_URL = buildOfficialVivoDuocAuthUrl();
+export const OFFICIAL_VIVO_DUOC_OAUTH_URL = stripTrailingSlash(
+  import.meta.env?.VITE_VIVO_DUOC_OAUTH_URL || ''
+);
 
 export const api = {
   /**
-   * Enlace oficial de autenticación OAuth Vivo Duoc (Microsoft Entra ID)
+   * Delegado al endpoint seguro /auth/oidc/authorize (PKCE + state generado en servidor).
+   * Solo usa VITE_VIVO_DUOC_OAUTH_URL si se configura explícitamente en entorno.
    */
   getOfficialOAuthUrl(email = '') {
+    if (!OFFICIAL_VIVO_DUOC_OAUTH_URL) return '';
     const clean = (email || '').trim().toLowerCase();
     if (!clean) return OFFICIAL_VIVO_DUOC_OAUTH_URL;
-    return `${OFFICIAL_VIVO_DUOC_OAUTH_URL}&login_hint=${encodeURIComponent(clean)}`;
+    const separator = OFFICIAL_VIVO_DUOC_OAUTH_URL.includes('?') ? '&' : '?';
+    return `${OFFICIAL_VIVO_DUOC_OAUTH_URL}${separator}login_hint=${encodeURIComponent(clean)}`;
   },
 
   /**
@@ -111,20 +100,56 @@ export const api = {
   },
 
   /**
-   * Obtener los 10 usuarios institucionales de la Base de Datos Nexo360 y URL oficial Microsoft SSO
+   * Consultar estado de configuración OIDC (Microsoft Entra ID) y modo demo
    */
-  async getInstitutionalUsers() {
-    return request('/auth/users', { auth: false });
+  async getOidcStatus() {
+    return request('/auth/oidc/status', { auth: false });
   },
 
   /**
-   * Iniciar sesión en Nexo360 tras pasar por el Login Oficial de Microsoft Duoc UC
+   * Solicitar URL de autorización OIDC con PKCE al backend
    */
-  async ssoLogin(email) {
+  async getOidcAuthorizeUrl() {
+    return request('/auth/oidc/authorize', { auth: false });
+  },
+
+  /**
+   * Completar callback OIDC validando code y state en el backend
+   */
+  async completeOidcCallback(code, state) {
+    return request('/auth/oidc/callback', {
+      method: 'POST',
+      auth: false,
+      body: { code, state },
+    });
+  },
+
+  /**
+   * Obtener cuentas de demostración mínimas (solo disponible en desarrollo cuando está habilitado)
+   */
+  async getDemoAccounts() {
+    return request('/auth/demo-accounts', { auth: false });
+  },
+
+  /**
+   * Obtener los usuarios institucionales de la Base de Datos Nexo360 (requiere sesión autorizada)
+   */
+  async getInstitutionalUsers() {
+    return request('/auth/users');
+  },
+
+  /**
+   * Iniciar sesión en Nexo360 mediante token OIDC ({idToken, code, state}) o selección demo en desarrollo
+   */
+  async ssoLogin(payloadOrEmail) {
+    const body =
+      typeof payloadOrEmail === 'string'
+        ? { email: payloadOrEmail }
+        : (payloadOrEmail || {});
     return request('/auth/sso-login', {
       method: 'POST',
       auth: false,
-      body: { email },
+      body,
     });
   },
 
@@ -165,11 +190,37 @@ export const api = {
   },
 
   /**
+   * Exportar bitácora de auditoría (solo administradores)
+   */
+  async exportActivityLogs(params = {}) {
+    const clean = Object.entries(params).filter(([, v]) => v !== '' && v != null);
+    const qs = new URLSearchParams(clean).toString();
+    return request(`/admin/activity-logs/export${qs ? `?${qs}` : ''}`);
+  },
+
+  /**
    * Directorio de estudiantes con analítica predictiva de deserción
    */
   async getAdminStudents(params = {}) {
     const qs = new URLSearchParams(params).toString();
     return request(`/admin/students${qs ? `?${qs}` : ''}`);
+  },
+
+  /**
+   * Registrar intervención interna de seguimiento para un estudiante
+   */
+  async createStudentIntervention(studentId, payload) {
+    return request(`/admin/students/${encodeURIComponent(studentId)}/interventions`, {
+      method: 'POST',
+      body: payload,
+    });
+  },
+
+  /**
+   * Obtener intervenciones persistidas de un estudiante
+   */
+  async getStudentInterventions(studentId) {
+    return request(`/admin/students/${encodeURIComponent(studentId)}/interventions`);
   },
 
   /**
@@ -239,6 +290,16 @@ export const api = {
   },
 
   /**
+   * Actualizar Carrera Duoc UC existente
+   */
+  async updateAdminCareer(id, payload) {
+    return request(`/admin/careers/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: payload,
+    });
+  },
+
+  /**
    * Eliminar Carrera Duoc UC
    */
   async deleteAdminCareer(id) {
@@ -261,6 +322,16 @@ export const api = {
     return request('/admin/sedes', {
       method: 'POST',
       body: sedeData,
+    });
+  },
+
+  /**
+   * Actualizar Sede Duoc UC existente
+   */
+  async updateAdminSede(id, payload) {
+    return request(`/admin/sedes/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: payload,
     });
   },
 
@@ -481,6 +552,13 @@ export const api = {
       method: 'PATCH',
       body: payload,
     });
+  },
+
+  /**
+   * Consultar expediente confidencial PAEDIS segregado por estudiante
+   */
+  async getPaedisRecord(studentId) {
+    return request(`/admin/paedis/${encodeURIComponent(studentId)}/record`);
   },
 
   /**

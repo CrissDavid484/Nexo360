@@ -356,6 +356,18 @@ export const DashboardPage = () => {
                 >
                   Nexo360 es la plataforma oficial de orientación, trámites estudiantiles, accesibilidad PAEDIS y simulación académica de Duoc UC - Sede Alameda. Encuentra guías paso a paso, requisitos, simuladores prácticos y enlaces directos a tus servicios estudiantiles.
                 </p>
+
+                <div
+                  role="note"
+                  aria-label="Indicación para comenzar búsqueda de trámites"
+                  {...getVoiceProps('Comienza la búsqueda de tus trámites aquí')}
+                  className="mt-4 inline-flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-amber-50 border border-amber-300 border-l-4 border-l-brand-gold text-brand-navy shadow-2xs"
+                >
+                  <Compass className="w-4 h-4 text-brand-navy shrink-0" aria-hidden="true" />
+                  <p className="text-sm font-bold text-brand-navy leading-snug">
+                    Comienza la búsqueda de tus trámites aquí
+                  </p>
+                </div>
               </div>
 
               <div className="mt-6 pt-5 border-t border-neutral-100">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   GraduationCap,
   Search,
@@ -6,6 +6,8 @@ import {
   X,
   Eye,
   Brain,
+  ClipboardList,
+  Clock,
 } from 'lucide-react';
 import { api } from '@services/api';
 import { useAuth } from '@context/AuthContext';
@@ -16,13 +18,12 @@ import {
 import { explainPredictiveRisk } from '@utils/satUtils';
 import { ExplainabilityPanel } from './ExplainabilityPanel';
 import { StudentDetailModal } from '@components/admin/StudentDetailModal';
-
-export { StudentDetailModal };
 import { ADMIN_THEME } from '@components/admin/adminTheme';
 import { Card } from '@components/ui/Card';
 import { Badge } from '@components/ui/Badge';
 import { Button } from '@components/ui/Button';
-import { Modal } from '@components/ui/Modal';
+
+export { StudentDetailModal };
 
 const STUDENT_STATUS_FILTERS = [
   { id: 'all', label: 'Todos' },
@@ -32,39 +33,12 @@ const STUDENT_STATUS_FILTERS = [
   { id: 'paedis', label: 'Solo PAEDIS' },
 ];
 
-const SEDE_FILTERS = [
-  { id: 'all', label: 'Todas' },
-  { id: 'ALAMEDA', label: 'Sede Alameda' },
-  { id: 'ANTONIO VARAS', label: 'Sede Antonio Varas' },
-  { id: 'PLAZA NORTE', label: 'Sede Plaza Norte' },
-];
-
 const CARRERA_FILTERS = [
   { id: 'INGENIERÍA EN INFORMÁTICA', label: 'Ingeniería en Informática' },
   { id: 'INGENIERÍA EN INFRAESTRUCTURA TECNOLÓGICA', label: 'Ing. en Infraestructura Tecnológica' },
   { id: 'INGENIERÍA EN INFRAEST. Y PLATAFORMAS TECN.', label: 'Ing. en Infraest. y Plataformas Tecn.' },
   { id: 'ANALISTA PROGRAMADOR COMPUTACIONAL', label: 'Analista Programador' },
 ];
-
-const YEAR_FILTERS = [
-  { id: 'all', label: 'Todos' },
-  { id: '2024', label: '2024' },
-  { id: '2025', label: '2025' },
-  { id: '2026', label: '2026' },
-];
-
-const ACADEMIC_STATUS_BADGE_MAP = {
-  activo: 'bg-emerald-50 text-emerald-900 border-emerald-300',
-  titulado: 'bg-purple-50 text-purple-900 border-purple-200',
-  desercion: 'bg-rose-50 text-rose-900 border-rose-300',
-};
-
-const ATTENDANCE_STATUS_TEXT = {
-  ri: '⚠️ RI (Reprobado)',
-  preventive: 'Alerta Preventiva',
-  normal: 'Cumple Asistencia',
-  justified: 'Justificada',
-};
 
 const TRAFFIC_LIGHT_COLOR_MAP = {
   rojo: 'red',
@@ -92,15 +66,15 @@ const STAFF_ROLES = new Set([
 
 const isStaffOrAdministrativeRole = (role) => STAFF_ROLES.has((role || '').toLowerCase());
 
-function StudentCard({ student, isSelected, onClick, onExplain, getVoiceProps }) {
+function StudentCard({ student, isSelected, onClick, onExplain, interventionsCount = 0, getVoiceProps }) {
   const studentSede = student.campus || student.sede || DEFAULT_CAMPUS;
   const isStaff = isStaffOrAdministrativeRole(student.role);
   const pred = student.prediction || explainPredictiveRisk(student);
   const fallbackTraffic = explainPredictiveRisk(student);
-  const effectiveTraffic = pred.trafficLight || fallbackTraffic.trafficLight || 'green';
+  const effectiveTraffic = pred.trafficLight || fallbackTraffic.trafficLight || 'neutral';
   const effectiveKey =
-    effectiveTraffic === 'red' ? 'rojo' : effectiveTraffic === 'yellow' ? 'amarillo' : 'verde';
-  const trafficColor = TRAFFIC_LIGHT_COLOR_MAP[effectiveKey] || 'green';
+    effectiveTraffic === 'red' ? 'rojo' : effectiveTraffic === 'yellow' ? 'amarillo' : effectiveTraffic === 'neutral' ? 'sin_datos' : 'verde';
+  const trafficColor = TRAFFIC_LIGHT_COLOR_MAP[effectiveKey] || (effectiveKey === 'sin_datos' ? 'neutral' : 'green');
 
   const cardClasses = `min-h-[140px] p-4 text-left rounded-2xl border transition-all cursor-pointer ${
     isSelected
@@ -138,10 +112,10 @@ function StudentCard({ student, isSelected, onClick, onExplain, getVoiceProps })
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex items-center gap-1.5">
                 <span className={`w-3.5 h-3.5 rounded-full transition-all ${
-                  trafficColor === 'red' ? 'bg-rose-500' : trafficColor === 'yellow' ? 'bg-amber-400' : 'bg-emerald-500'
+                  trafficColor === 'red' ? 'bg-rose-500' : trafficColor === 'yellow' ? 'bg-amber-400' : trafficColor === 'neutral' ? 'bg-neutral-400' : 'bg-emerald-500'
                 }`} aria-hidden="true" />
                 <span className={`text-xs font-black ${isSelected ? 'text-white' : 'text-neutral-700'}`}>
-                  {effectiveTraffic === 'red' ? 'Alto' : effectiveTraffic === 'yellow' ? 'Medio' : 'Bajo'}
+                  {effectiveTraffic === 'red' ? 'Alto' : effectiveTraffic === 'yellow' ? 'Medio' : effectiveTraffic === 'neutral' ? 'Sin datos' : 'Bajo'}
                 </span>
               </div>
             </div>
@@ -186,7 +160,7 @@ function StudentCard({ student, isSelected, onClick, onExplain, getVoiceProps })
             <div className="text-center min-w-0">
               <span className={`text-xs font-semibold uppercase tracking-wider block ${isSelected ? 'text-brand-gold/80' : 'text-neutral-500'}`}>Asist. Global</span>
               <span className={`text-xs font-bold block ${isSelected ? 'text-white' : 'text-neutral-900'}`}>
-                {student.attendanceRate ?? 88.9}%
+                {student.attendanceRate !== undefined && student.attendanceRate !== null ? `${student.attendanceRate}%` : 'Sin datos'}
               </span>
             </div>
           </div>
@@ -195,13 +169,18 @@ function StudentCard({ student, isSelected, onClick, onExplain, getVoiceProps })
         </button>
 
         <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Badge
               variant={student.academicStatus === 'desercion' ? 'error' : student.academicStatus === 'titulado' ? 'warning' : 'success'}
               size="sm"
             >
               {student.academicStatus || 'activo'}
             </Badge>
+            {interventionsCount > 0 && (
+              <Badge variant="info" size="sm">
+                Bitácora: {interventionsCount}
+              </Badge>
+            )}
           </div>
           {!isStaff ? (
             <Button
@@ -226,14 +205,10 @@ function StudentCard({ student, isSelected, onClick, onExplain, getVoiceProps })
   );
 }
 
-
-
 export const StudentDirectory = ({
   students = [],
-  metrics,
   isLoading,
   onRefresh,
-  isCoordinator,
   isAdmin,
   getVoiceProps,
   announce,
@@ -252,8 +227,9 @@ export const StudentDirectory = ({
   const [modalInitialView, setModalInitialView] = useState('ficha');
   const [statusFeedback, setStatusFeedback] = useState(null);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [interventionsByStudent, setInterventionsByStudent] = useState({});
+  const [isLoadingInterventions, setIsLoadingInterventions] = useState(false);
 
-  // SEDE_FILTERS dinámico desde usuarios reales de MongoDB
   const SEDE_FILTERS = useMemo(() => {
     const sedes = new Set();
     students.forEach((s) => {
@@ -333,6 +309,42 @@ export const StudentDirectory = ({
     [activeSourceList, userSegment, searchTerm, filterStatus, filterSede, filterCareer, filterYear]
   );
 
+  const selectedStudent = useMemo(() => {
+    if (!selectedStudentKey) return null;
+    return (
+      filteredStudents.find((s) => (s._id || s.id || s.email) === selectedStudentKey) ||
+      activeSourceList.find((s) => (s._id || s.id || s.email) === selectedStudentKey) ||
+      null
+    );
+  }, [selectedStudentKey, filteredStudents, activeSourceList]);
+
+  // Cargar intervenciones persistidas desde la base de datos cuando se selecciona un estudiante
+  useEffect(() => {
+    if (!selectedStudentKey || !selectedStudent || isStaffOrAdministrativeRole(selectedStudent.role)) {
+      return;
+    }
+    let mounted = true;
+    const loadInterventions = async () => {
+      setIsLoadingInterventions(true);
+      try {
+        const res = await api.getStudentInterventions(selectedStudentKey);
+        if (!mounted) return;
+        const list = res?.interventions || res?.data || [];
+        if (res?.success && Array.isArray(list)) {
+          setInterventionsByStudent((prev) => ({ ...prev, [selectedStudentKey]: list }));
+        }
+      } catch {
+        // Silencioso si el backend aún no tiene registros o endpoint no responde
+      } finally {
+        if (mounted) setIsLoadingInterventions(false);
+      }
+    };
+    loadInterventions();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedStudentKey, selectedStudent]);
+
   const handleStatusChange = useCallback(async (targetStudent, nextStatus) => {
     try {
       setIsSavingStatus(true);
@@ -378,24 +390,80 @@ export const StudentDirectory = ({
     announce('Abriendo explicabilidad predictiva para ' + (student.fullName || student.nombre), 'polite');
   }, [announce]);
 
-  const handleExecuteAction = useCallback((nba, student) => {
+  const handleExecuteAction = useCallback(async (nba, student) => {
+    const studentId = student?._id || student?.id || student?.email;
+    if (!studentId) return;
+
     const actionTitle = nba?.title || nba?.action || 'Acompañamiento tutorial';
-    const studentName = student?.fullName || student?.nombre || 'Estudiante';
-    setStatusFeedback({
-      type: 'success',
-      text: `Recomendación registrada: "${actionTitle}" para ${studentName}. Derivada al equipo de acompañamiento académico y docente.`,
-    });
-    announce(`Recomendación registrada para ${studentName}: ${actionTitle}. Derivada al equipo de acompañamiento.`, 'polite');
+    const actionCategory = nba?.triggeredRule || nba?.category || 'SEGUIMIENTO_SAT';
+    const notes =
+      nba?.notes ||
+      (nba?.action && nba?.title && nba.action !== nba.title
+        ? nba.action
+        : `Prioridad ${nba?.priority || 1} • SLA ${nba?.slaHours || 48}h`);
+
+    setStatusFeedback(null);
+
+    try {
+      const res = await api.createStudentIntervention(studentId, {
+        actionTitle,
+        actionCategory,
+        notes,
+      });
+
+      if (!res || res.success === false) {
+        const errMsg = res?.message || 'No se pudo registrar la intervención en la bitácora interna.';
+        setStatusFeedback({ type: 'error', text: errMsg });
+        announce(errMsg, 'assertive');
+        return;
+      }
+
+      const created = res.intervention || {
+        _id: `int-${Date.now()}`,
+        actionTitle,
+        actionCategory,
+        notes,
+        status: 'REGISTRADA',
+        externalDerivationPerformed: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      setInterventionsByStudent((prev) => ({
+        ...prev,
+        [studentId]: [created, ...(prev[studentId] || [])],
+      }));
+
+      const honestMessage =
+        'Intervención registrada en bitácora interna de seguimiento (requiere gestión manual del responsable asignado).';
+      setStatusFeedback({ type: 'success', text: honestMessage });
+      announce(honestMessage, 'polite');
+    } catch (err) {
+      const errMsg = err?.message || 'Error de conexión al registrar la intervención en bitácora.';
+      setStatusFeedback({ type: 'error', text: errMsg });
+      announce(errMsg, 'assertive');
+    }
   }, [announce]);
+
+  const selectedInterventions = useMemo(() => {
+    if (!selectedStudentKey) return [];
+    if (Array.isArray(interventionsByStudent[selectedStudentKey])) {
+      return interventionsByStudent[selectedStudentKey];
+    }
+    return Array.isArray(selectedStudent?.interventions) ? selectedStudent.interventions : [];
+  }, [selectedStudentKey, interventionsByStudent, selectedStudent]);
 
   return (
     <>
       <section aria-labelledby="students-directory-title" className="animate-fade-in-up space-y-5">
         {statusFeedback && (
-          <div role="status" aria-live="polite" className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm font-bold ${statusFeedback.type === 'success' ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-rose-50 border-rose-300 text-rose-950'}`}>
+          <div
+            role={statusFeedback.type === 'error' ? 'alert' : 'status'}
+            aria-live={statusFeedback.type === 'error' ? 'assertive' : 'polite'}
+            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs sm:text-sm font-bold ${statusFeedback.type === 'success' ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-rose-50 border-rose-300 text-rose-950'}`}
+          >
             <span>{statusFeedback.text}</span>
             <button type="button" onClick={() => setStatusFeedback(null)} className="p-1 text-neutral-500 hover:text-neutral-900" aria-label="Cerrar notificación">
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         )}
@@ -409,11 +477,10 @@ export const StudentDirectory = ({
             <p className={ADMIN_THEME.moduleSubtitle}>
               {userSegment === 'staff'
                 ? 'Funcionarios, docentes, coordinación PAEDIS y administradores. Haz clic para ver su ficha.'
-                : 'Tarjetas con información escaneable. Haz clic para abrir ficha completa en modal con asistencia, semáforo predictivo y explicabilidad.'}
+                : 'Tarjetas con información escaneable. Haz clic para abrir ficha completa en modal con asistencia, semáforo predictivo y bitácora interna.'}
             </p>
           </div>
 
-          {/* Selector visible Estudiantes / Administrativos */}
           <div
             role="group"
             aria-label="Tipo de usuarios registrados"
@@ -444,6 +511,59 @@ export const StudentDirectory = ({
           </div>
         </div>
 
+        {/* Bitácora interna de intervenciones persistidas para el estudiante seleccionado */}
+        {selectedStudent && !isStaffOrAdministrativeRole(selectedStudent.role) && (
+          <Card variant="outlined" padding="md" className="rounded-2xl space-y-3 bg-white border-neutral-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 pb-2">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-brand-navy" aria-hidden="true" />
+                <h3 className="text-xs sm:text-sm font-bold text-neutral-900">
+                  Bitácora Interna de Intervenciones • {selectedStudent.fullName || selectedStudent.nombre}
+                </h3>
+              </div>
+              <span className="text-[11px] font-semibold text-neutral-600 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                Gestión manual requerida (sin derivación automática externa)
+              </span>
+            </div>
+
+            {isLoadingInterventions ? (
+              <p className="text-xs text-neutral-500">Cargando intervenciones registradas...</p>
+            ) : selectedInterventions.length === 0 ? (
+              <p className="text-xs text-neutral-500">
+                No existen intervenciones registradas en bitácora interna para este estudiante.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {selectedInterventions.map((item, idx) => (
+                  <li
+                    key={item._id || item.id || `${item.actionTitle}-${idx}`}
+                    className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <strong className="text-neutral-900">{item.actionTitle}</strong>
+                        <Badge variant="info" size="sm">{item.status || 'REGISTRADA'}</Badge>
+                      </div>
+                      {item.notes && <p className="text-neutral-600">{item.notes}</p>}
+                      {(item.responsibleName || item.responsibleEmail) && (
+                        <p className="text-[11px] text-neutral-500">
+                          Responsable asignado: {item.responsibleName || item.responsibleEmail}
+                        </p>
+                      )}
+                    </div>
+                    {item.createdAt && (
+                      <span className="text-[11px] text-neutral-500 inline-flex items-center gap-1 shrink-0">
+                        <Clock className="w-3 h-3" aria-hidden="true" />
+                        {new Date(item.createdAt).toLocaleDateString('es-CL')}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 border-b border-neutral-100 pb-4" role="group" aria-label="Filtrar usuarios">
           {userSegment === 'students' && (
@@ -467,7 +587,6 @@ export const StudentDirectory = ({
             </div>
           )}
 
-          {/* Sede - Select */}
           <div className="flex items-center gap-1.5">
             <label htmlFor="student-filter-sede" className={`${ADMIN_THEME.cardLabel} hidden sm:block`}>Sede:</label>
             <select
@@ -551,11 +670,13 @@ export const StudentDirectory = ({
             {filteredStudents.map((student) => {
               const key = student._id || student.id || student.email;
               const isSelected = selectedStudentKey === key;
+              const count = interventionsByStudent[key]?.length ?? student.interventions?.length ?? 0;
               return (
                 <StudentCard
                   key={key}
                   student={student}
                   isSelected={isSelected}
+                  interventionsCount={count}
                   onClick={() => {
                     setSelectedStudentKey(key);
                     setModalInitialView('ficha');
@@ -573,7 +694,7 @@ export const StudentDirectory = ({
           <StudentDetailModal
             isOpen={true}
             onClose={() => setSelectedStudentKey(null)}
-            student={filteredStudents.find((s) => (s._id || s.id || s.email) === selectedStudentKey) || activeSourceList.find((s) => (s._id || s.id || s.email) === selectedStudentKey)}
+            student={selectedStudent}
             onExplain={handleOpenExplainability}
             onStatusChange={handleStatusChange}
             onDelete={handleDeleteUser}

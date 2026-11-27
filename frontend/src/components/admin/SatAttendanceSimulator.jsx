@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Sliders,
   RotateCcw,
@@ -12,24 +12,20 @@ import {
   Minus,
   ArrowUpRight,
   Sparkles,
+  Info,
+  CalendarPlus,
+  History,
 } from 'lucide-react';
 import { useAccessibility } from '@context/AccessibilityContext';
 import { ADMIN_THEME } from '@components/admin/adminTheme';
+import { calculateBidirectionalSimulation, DUOC_ATTENDANCE_THRESHOLDS } from '@utils/satUtils';
 
-/**
- * Retorna metadatos de semáforo según porcentaje y estado de justificación institucional.
- * Umbrales Duoc UC SAT:
- * - Verde: >= 75% (Cumple umbral mínimo RI)
- * - Amarillo: 70% a 74.9% (Alerta preventiva)
- * - Rojo: < 70% (Riesgo inminente de Reprobación por Inasistencia)
- * - Violeta: Licencia médica o excepción PAEDIS vigente
- */
-function getTrafficLightMeta(pct, isJustified) {
+function getTrafficLightMeta(pct, isJustified, minRequired = DUOC_ATTENDANCE_THRESHOLDS.RI_CRITICAL) {
   if (isJustified) {
     return {
       status: 'justified',
-      label: 'Justificado / Protegido',
-      sublabel: 'Ajuste PAEDIS o Licencia Médica Vigente (Ley N° 21.719)',
+      label: 'Justificación Simulada (Hipotética)',
+      sublabel: 'Escenario hipotético PAEDIS / Licencia (no otorga excepción oficial)',
       badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
       badgeDot: 'bg-purple-600',
       barColor: 'bg-purple-600',
@@ -40,12 +36,28 @@ function getTrafficLightMeta(pct, isJustified) {
     };
   }
 
+  if (pct === null || pct === undefined || !Number.isFinite(Number(pct))) {
+    return {
+      status: 'no_data',
+      label: 'Sin Registros (0 clases)',
+      sublabel: 'Aún no se registran sesiones dictadas',
+      badgeClass: 'bg-neutral-100 text-neutral-800 border-neutral-300',
+      badgeDot: 'bg-neutral-500',
+      barColor: 'bg-neutral-400',
+      textColor: 'text-neutral-700',
+      borderColor: 'border-neutral-200',
+      bgTint: 'bg-neutral-50/70',
+      icon: Info,
+    };
+  }
+
   const num = Number(pct);
-  if (num >= 75) {
+  const regularMin = minRequired + 5;
+  if (num >= regularMin) {
     return {
       status: 'normal',
-      label: 'Verde • Cumple Umbral (≥75%)',
-      sublabel: 'Asistencia Regular',
+      label: `Verde • Asistencia Regular (≥${regularMin}%)`,
+      sublabel: 'Cumple normativa institucional',
       badgeClass: 'bg-emerald-100 text-emerald-950 border-emerald-300',
       badgeDot: 'bg-emerald-600',
       barColor: 'bg-emerald-600',
@@ -56,10 +68,10 @@ function getTrafficLightMeta(pct, isJustified) {
     };
   }
 
-  if (num >= 70) {
+  if (num >= minRequired) {
     return {
       status: 'preventive',
-      label: 'Amarillo • Zona Preventiva (70% - 74.9%)',
+      label: `Amarillo • Zona Preventiva (${minRequired}% - ${(regularMin - 0.1).toFixed(1)}%)`,
       sublabel: 'Margen Crítico Restante',
       badgeClass: 'bg-amber-100 text-amber-950 border-amber-300',
       badgeDot: 'bg-amber-500',
@@ -73,7 +85,7 @@ function getTrafficLightMeta(pct, isJustified) {
 
   return {
     status: 'ri',
-    label: 'Riesgo Crítico RI (<70%)',
+    label: `Riesgo Crítico RI (<${minRequired}%)`,
     sublabel: 'Causal Inminente de Reprobación por Inasistencia',
     badgeClass: 'bg-rose-100 text-rose-950 border-rose-300',
     badgeDot: 'bg-rose-600',
@@ -82,6 +94,36 @@ function getTrafficLightMeta(pct, isJustified) {
     borderColor: 'border-rose-200',
     bgTint: 'bg-rose-50/70',
     icon: AlertOctagon,
+  };
+}
+
+function buildBaselineSnapshot(course) {
+  if (!course) return null;
+  const rawTotal = course.completedSessions ?? course.totalSessions;
+  const totalSessions = rawTotal === undefined || rawTotal === null ? 0 : Math.max(0, Number(rawTotal));
+  const attendedSessions =
+    totalSessions === 0
+      ? 0
+      : Math.max(0, Math.min(totalSessions, Number(course.attendedSessions ?? 0)));
+  return {
+    courseCode: course.courseCode,
+    totalSessions,
+    attendedSessions,
+    consecutiveAbsences: Number(course.consecutiveAbsences || 0),
+    paedisJustified: Boolean(course.paedisJustified),
+    missedKeySession: Boolean(course.missedKeySession),
+    minAttendanceRequired:
+      Number.isFinite(Number(course.minAttendanceRequired)) && Number(course.minAttendanceRequired) > 0
+        ? Number(course.minAttendanceRequired)
+        : DUOC_ATTENDANCE_THRESHOLDS.RI_CRITICAL,
+    scheduledSessions:
+      course.scheduledSessions !== undefined && course.scheduledSessions !== null
+        ? Number(course.scheduledSessions)
+        : null,
+    pendingSessions:
+      course.pendingSessions !== undefined && course.pendingSessions !== null
+        ? Number(course.pendingSessions)
+        : null,
   };
 }
 
@@ -99,90 +141,172 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
 }) {
   const { getVoiceProps } = useAccessibility();
 
-  // Deltas locales para feedback táctil e instantáneo en tiempo real
-  const [addedAttendances, setAddedAttendances] = useState(0);
-  const [addedAbsences, setAddedAbsences] = useState(0);
+  const baselineMapRef = useRef(new Map());
+  const selectionKey = `${selectedUserId || ''}::${selectedCourseCode || course?.courseCode || ''}`;
+
+  // Capturar el baseline exacto la primera vez que se selecciona un estudiante/asignatura
+  if (course && !baselineMapRef.current.has(selectionKey)) {
+    baselineMapRef.current.set(selectionKey, buildBaselineSnapshot(course));
+  }
+
+  const baseline = baselineMapRef.current.get(selectionKey) || buildBaselineSnapshot(course);
+
+  // Separación explícita: proyección futura vs corrección de registro pasado
+  const [futureAttendedDelta, setFutureAttendedDelta] = useState(0);
+  const [futureMissedDelta, setFutureMissedDelta] = useState(0);
+  const [pastCorrectionDelta, setPastCorrectionDelta] = useState(0);
   const [isJustifiedOverride, setIsJustifiedOverride] = useState(null);
 
-  // Cada vez que cambia el estudiante o la asignatura, reiniciar los deltas locales
   useEffect(() => {
-    setAddedAttendances(0);
-    setAddedAbsences(0);
+    setFutureAttendedDelta(0);
+    setFutureMissedDelta(0);
+    setPastCorrectionDelta(0);
     setIsJustifiedOverride(null);
-  }, [selectedUserId, selectedCourseCode]);
+  }, [selectionKey]);
 
-  // Datos base de la asignatura
-  const baseTotal = Math.max(1, Number(course?.totalSessions || 20));
-  const baseAttended = Math.max(
-    0,
-    Math.min(baseTotal, Number(course?.attendedSessions ?? Math.round(baseTotal * 0.75)))
-  );
+  const baseTotal = baseline?.totalSessions ?? 0;
+  const baseAttended = baseline?.attendedSessions ?? 0;
   const baseAbsences = Math.max(0, baseTotal - baseAttended);
-  const baseConsecutiveAbsences = Number(course?.consecutiveAbsences || 0);
-  const baseJustified = Boolean(course?.paedisJustified);
-  const basePct = Math.round((baseAttended / baseTotal) * 1000) / 10;
-  const minRequiredSessions = Math.ceil(baseTotal * 0.70);
-  const maxAllowedAbsences = Math.max(0, baseTotal - minRequiredSessions);
+  const baseConsecutiveAbsences = baseline?.consecutiveAbsences ?? 0;
+  const baseJustified = baseline?.paedisJustified ?? false;
+  const minRequiredThreshold = baseline?.minAttendanceRequired ?? DUOC_ATTENDANCE_THRESHOLDS.RI_CRITICAL;
 
-  // Valores simulados interactivos
-  const currentJustified = isJustifiedOverride !== null ? isJustifiedOverride : baseJustified;
+  const basePct = baseTotal === 0 ? null : Math.round((baseAttended / baseTotal) * 1000) / 10;
+
+  // Cálculo simulado combinando corrección de registro pasado (sobre baseTotal) + clases futuras (+1 a total y/o attended)
+  const correctedPastAttended =
+    baseTotal === 0 ? 0 : Math.max(0, Math.min(baseTotal, baseAttended + pastCorrectionDelta));
+  const simulatedTotal = baseTotal + futureAttendedDelta + futureMissedDelta;
   const simulatedAttended = Math.max(
     0,
-    Math.min(baseTotal, baseAttended + addedAttendances - addedAbsences)
+    Math.min(simulatedTotal, correctedPastAttended + futureAttendedDelta)
   );
-  const simulatedAbsences = Math.max(0, baseTotal - simulatedAttended);
-  const simulatedPct = Math.round((simulatedAttended / baseTotal) * 1000) / 10;
-  const deltaPct = Math.round((simulatedPct - basePct) * 10) / 10;
-  const deltaClasses = simulatedAttended - baseAttended;
+  const simulatedAbsences = Math.max(0, simulatedTotal - simulatedAttended);
+  const simulatedPct =
+    simulatedTotal === 0 ? null : Math.round((simulatedAttended / simulatedTotal) * 1000) / 10;
 
-  // Faltas consecutivas proyectadas
+  const deltaPct =
+    basePct !== null && simulatedPct !== null
+      ? Math.round((simulatedPct - basePct) * 10) / 10
+      : null;
+
+  const currentJustified = isJustifiedOverride !== null ? isJustifiedOverride : baseJustified;
+
   const simulatedConsecutive = Math.max(
     0,
-    addedAbsences > 0
-      ? baseConsecutiveAbsences + addedAbsences
-      : Math.max(0, baseConsecutiveAbsences - addedAttendances)
+    futureMissedDelta > 0 || pastCorrectionDelta < 0
+      ? baseConsecutiveAbsences + futureMissedDelta + Math.max(0, -pastCorrectionDelta)
+      : Math.max(0, baseConsecutiveAbsences - futureAttendedDelta - Math.max(0, pastCorrectionDelta))
   );
 
-  // Cálculo exacto de cuántas clases consecutivas se requieren para alcanzar el 70% (evitar RI)
-  const classesNeededFor70 = Math.max(0, minRequiredSessions - simulatedAttended);
-  const baseClassesNeededFor70 = Math.max(0, minRequiredSessions - baseAttended);
-  const baseClassesNeededFor75 = Math.max(0, Math.ceil(baseTotal * 0.75) - baseAttended);
-  const classesNeededFor75 = Math.max(0, Math.ceil(baseTotal * 0.75) - simulatedAttended);
+  // Evaluar factibilidad real de recuperación desde el estado simulado actual
+  const basePending =
+    baseline?.pendingSessions !== undefined && baseline?.pendingSessions !== null
+      ? baseline.pendingSessions
+      : baseline?.scheduledSessions !== null && baseline?.scheduledSessions !== undefined
+        ? Math.max(0, baseline.scheduledSessions - baseTotal)
+        : null;
 
-  // Semáforo actual vs simulado
-  const baseMeta = useMemo(() => getTrafficLightMeta(basePct, baseJustified), [basePct, baseJustified]);
+  const remainingPendingSessions =
+    basePending === null
+      ? null
+      : Math.max(0, basePending - (futureAttendedDelta + futureMissedDelta));
+
+  const simAnalysis = useMemo(() => {
+    return calculateBidirectionalSimulation({
+      totalSessions: simulatedTotal,
+      attendedSessions: simulatedAttended,
+      consecutiveAbsences: simulatedConsecutive,
+      paedisJustified: currentJustified,
+      minAttendanceRequired: minRequiredThreshold,
+      pendingSessions: remainingPendingSessions,
+    });
+  }, [
+    simulatedTotal,
+    simulatedAttended,
+    simulatedConsecutive,
+    currentJustified,
+    minRequiredThreshold,
+    remainingPendingSessions,
+  ]);
+
+  const minRequiredSessions = simAnalysis?.recovery?.minRequiredSessions ?? Math.ceil(simulatedTotal * (minRequiredThreshold / 100));
+  const maxAllowedAbsences = Math.max(0, simulatedTotal - minRequiredSessions);
+  const classesNeededForMin = simAnalysis?.recovery?.futureClassesNeeded ?? 0;
+  const recoveryPossible = simAnalysis?.recoveryPossible ?? false;
+  const canAddFutureSession = remainingPendingSessions === null || remainingPendingSessions > 0;
+
+  const baseMeta = useMemo(
+    () => getTrafficLightMeta(basePct, baseJustified, minRequiredThreshold),
+    [basePct, baseJustified, minRequiredThreshold]
+  );
   const simMeta = useMemo(
-    () => getTrafficLightMeta(simulatedPct, currentJustified),
-    [simulatedPct, currentJustified]
+    () => getTrafficLightMeta(simulatedPct, currentJustified, minRequiredThreshold),
+    [simulatedPct, currentJustified, minRequiredThreshold]
   );
 
-  const hasLocalDelta = addedAttendances !== 0 || addedAbsences !== 0 || isJustifiedOverride !== null;
+  const hasLocalDelta =
+    futureAttendedDelta !== 0 ||
+    futureMissedDelta !== 0 ||
+    pastCorrectionDelta !== 0 ||
+    isJustifiedOverride !== null;
 
-  // Manejador de restablecimiento
   const handleReset = useCallback(async () => {
-    setAddedAttendances(0);
-    setAddedAbsences(0);
+    setFutureAttendedDelta(0);
+    setFutureMissedDelta(0);
+    setPastCorrectionDelta(0);
     setIsJustifiedOverride(null);
     if (onRunSimulation) {
       await onRunSimulation('reset');
     }
   }, [onRunSimulation]);
 
-  // Manejador de recuperación al 70% reglamentario (evitar RI Duoc UC 2026)
-  const handleRecoverTo70 = useCallback(async () => {
-    if (baseClassesNeededFor70 > 0) {
-      setAddedAttendances(baseClassesNeededFor70);
-      setAddedAbsences(0);
+  // Proyectar próxima clase (+1 clase futura asistida -> (attended+1)/(total+1))
+  const handleFutureAttend = useCallback(async () => {
+    if (!canAddFutureSession) return;
+    setFutureAttendedDelta((prev) => prev + 1);
+    if (onRunSimulation) {
+      await onRunSimulation('future_class_attend');
     }
+  }, [canAddFutureSession, onRunSimulation]);
+
+  // Proyectar próxima clase inasistida -> attended/(total+1)
+  const handleFutureMiss = useCallback(async () => {
+    if (!canAddFutureSession) return;
+    setFutureMissedDelta((prev) => prev + 1);
+    if (onRunSimulation) {
+      await onRunSimulation('future_class_miss');
+    }
+  }, [canAddFutureSession, onRunSimulation]);
+
+  // Corregir registro pasado (+1 asistencia sin cambiar total)
+  const handlePastCorrectionPositive = useCallback(async () => {
+    if (baseTotal === 0 || correctedPastAttended >= baseTotal) return;
+    setPastCorrectionDelta((prev) => prev + 1);
+    if (onRunSimulation) {
+      await onRunSimulation('correct_past_attendance');
+    }
+  }, [baseTotal, correctedPastAttended, onRunSimulation]);
+
+  // Corregir registro pasado (-1 asistencia / +1 falta sin cambiar total)
+  const handlePastCorrectionNegative = useCallback(async () => {
+    if (baseTotal === 0 || correctedPastAttended <= 0) return;
+    setPastCorrectionDelta((prev) => prev - 1);
+    if (onRunSimulation) {
+      await onRunSimulation('add_absence');
+    }
+  }, [baseTotal, correctedPastAttended, onRunSimulation]);
+
+  // Simular recuperación mediante clases futuras consecutivas (solo si recoveryPossible)
+  const handleRecoverToMin = useCallback(async () => {
+    if (!recoveryPossible || !Number.isFinite(classesNeededForMin) || classesNeededForMin <= 0) return;
+    setFutureAttendedDelta((prev) => prev + classesNeededForMin);
     if (onRunSimulation) {
       await onRunSimulation('recover_to_70');
     }
-  }, [baseClassesNeededFor70, onRunSimulation]);
+  }, [recoveryPossible, classesNeededForMin, onRunSimulation]);
 
-  // Alias retrocompatible
-  const handleRecoverTo75 = handleRecoverTo70;
-
-  // Manejador del toggle de justificación médica
+  // Simulación hipotética de excepción médica/PAEDIS (no otorga excepción oficial)
   const handleToggleJustified = useCallback(async () => {
     const nextState = !currentJustified;
     setIsJustifiedOverride(nextState);
@@ -191,53 +315,26 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
     }
   }, [currentJustified, onRunSimulation]);
 
-  // Manejador de incremento de asistencia
-  const handleAddAttendance = useCallback(async () => {
-    if (simulatedAttended >= baseTotal) return;
-    setAddedAttendances((prev) => prev + 1);
-    if (onRunSimulation) {
-      await onRunSimulation('add_attendance');
-    }
-  }, [simulatedAttended, baseTotal, onRunSimulation]);
-
-  // Manejador de decremento de asistencia
-  const handleSubtractAttendance = useCallback(async () => {
-    if (addedAttendances > 0) {
-      setAddedAttendances((prev) => prev - 1);
-    } else if (simulatedAttended > 0) {
-      setAddedAbsences((prev) => prev + 1);
-      if (onRunSimulation) {
-        await onRunSimulation('add_absence');
-      }
-    }
-  }, [addedAttendances, simulatedAttended, onRunSimulation]);
-
-  // Manejador de incremento de inasistencias
-  const handleAddAbsence = useCallback(async () => {
-    if (simulatedAttended <= 0) return;
-    setAddedAbsences((prev) => prev + 1);
-    if (onRunSimulation) {
-      await onRunSimulation('add_absence');
-    }
-  }, [simulatedAttended, onRunSimulation]);
-
-  // Manejador de decremento de inasistencias
-  const handleSubtractAbsence = useCallback(async () => {
-    if (addedAbsences > 0) {
-      setAddedAbsences((prev) => prev - 1);
-    } else if (simulatedAttended < baseTotal) {
-      setAddedAttendances((prev) => prev + 1);
-      if (onRunSimulation) {
-        await onRunSimulation('add_attendance');
-      }
-    }
-  }, [addedAbsences, simulatedAttended, baseTotal, onRunSimulation]);
-
   const SimIcon = simMeta.icon;
 
   return (
     <div className="space-y-6">
-      {/* Barra superior de encabezado y reset */}
+      {/* Aviso explícito de alcance informativo */}
+      <div
+        role="note"
+        aria-label="Aviso de alcance de la simulación"
+        {...getVoiceProps(
+          'Simulador informativo: las proyecciones y correcciones simuladas no modifican la asistencia oficial en Vivo Duoc ni otorgan excepciones oficiales.'
+        )}
+        className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 border-l-4 border-l-[#FFB81C] text-xs text-neutral-900 flex items-start gap-2.5"
+      >
+        <Info className="w-4 h-4 text-[#002B49] shrink-0 mt-0.5" aria-hidden="true" />
+        <p className="leading-relaxed">
+          <strong>Simulador informativo (sin efectos oficiales):</strong> las proyecciones y simulaciones no modifican la asistencia oficial en Vivo Duoc/SAP ni otorgan excepciones o justificaciones formales.
+        </p>
+      </div>
+
+      {/* Barra superior de encabezado y reset exacto */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-[#002B49] border border-neutral-200">
@@ -248,7 +345,7 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
             Simulador de Cumplimiento Académico & Proyección RI
           </h3>
           <p className={`${ADMIN_THEME.moduleSubtitle} max-w-2xl`}>
-            Ajusta asistencias e inasistencias en tiempo real para proyectar el riesgo de Reprobación por Inasistencia (RI) según la normativa del <strong>70% de asistencia mínima (Duoc UC 2026)</strong>.
+            Distingue entre <strong>proyección de próximas clases futuras (+1 sesión al total)</strong> y <strong>corrección hipotética de registro pasado</strong> según el umbral mínimo de <strong>{minRequiredThreshold}% (RI &lt;{minRequiredThreshold}%)</strong>.
           </p>
         </div>
 
@@ -256,11 +353,11 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
           type="button"
           onClick={handleReset}
           disabled={isSimulating || (!hasLocalDelta && !activeSimulationInfo)}
-          {...getVoiceProps('Restablecer simulación a los valores reales del estudiante')}
-          className="self-start sm:self-auto shrink-0 min-h-[42px] px-4 py-2 bg-white hover:bg-neutral-50 active:bg-neutral-100 text-neutral-800 text-xs font-bold rounded-xl border border-neutral-300 shadow-2xs inline-flex items-center gap-2 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
+          {...getVoiceProps('Restablecer valores exactos del estudiante')}
+          className="self-start sm:self-auto shrink-0 min-h-[42px] px-4 py-2 bg-white hover:bg-neutral-50 active:bg-neutral-100 text-neutral-800 text-xs font-bold rounded-xl border border-neutral-300 shadow-2xs inline-flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
         >
           <RotateCcw className={`w-3.5 h-3.5 text-neutral-600 ${isSimulating ? 'animate-spin' : ''}`} aria-hidden="true" />
-          <span>Restablecer a Valores Base</span>
+          <span>Restablecer valores exactos</span>
         </button>
       </div>
 
@@ -300,7 +397,7 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
           >
             {student?.courseAttendance?.map((c) => (
               <option key={c.courseCode} value={c.courseCode}>
-                {c.courseCode} - {c.courseName} ({c.attendancePercentage}%)
+                {c.courseCode} - {c.courseName} ({c.attendancePercentage ?? 'Sin datos'}%)
               </option>
             ))}
           </select>
@@ -325,20 +422,18 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
             onClick={handleReset}
             className="font-bold underline hover:text-[#002B49]/80 cursor-pointer"
           >
-            Restablecer valores originales
+            Restablecer valores exactos
           </button>
         </div>
       )}
 
       {/* INDICADOR PRINCIPAL UNIFICADO */}
-      <div className={`p-6 sm:p-8 rounded-3xl border ${simMeta.borderColor} ${simMeta.bgTint} transition-all duration-300 shadow-xs space-y-6`}>
-        {/* Encabezado del Indicador: Real vs Simulado */}
+      <div className={`p-6 sm:p-8 rounded-3xl border ${simMeta.borderColor} ${simMeta.bgTint} transition-colors duration-300 shadow-xs space-y-6`}>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          {/* Lado Izquierdo: Estado Actual */}
           <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-                Asistencia Actual (Real)
+                Línea Base Exacta
               </span>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${baseMeta.badgeClass}`}>
                 <span className={`w-2 h-2 rounded-full ${baseMeta.badgeDot}`} aria-hidden="true" />
@@ -348,40 +443,39 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
 
             <div className="flex items-baseline gap-3">
               <span className="text-3xl sm:text-4xl font-black text-neutral-900 tracking-tight font-mono">
-                {basePct}%
+                {basePct === null ? 'Sin datos' : `${basePct}%`}
               </span>
               <span className="text-sm font-semibold text-neutral-600">
-                {baseAttended} / {baseTotal} clases asistidas
+                {baseAttended} / {baseTotal} clases registradas
               </span>
             </div>
             <p className="text-xs text-neutral-500">
               {baseAbsences} inasistencia(s) acumulada(s) • {baseConsecutiveAbsences} consecutiva(s)
+              {remainingPendingSessions !== null && ` • ${remainingPendingSessions} sesión(es) pendiente(s)`}
             </p>
           </div>
 
-          {/* Divisor / Flecha de Transición */}
           <div className="hidden lg:flex flex-col items-center justify-center px-4">
             <div className="w-10 h-10 rounded-full bg-white border border-neutral-200 shadow-2xs flex items-center justify-center">
-              {deltaPct > 0 ? (
+              {deltaPct !== null && deltaPct > 0 ? (
                 <TrendingUp className="w-5 h-5 text-emerald-600" aria-hidden="true" />
-              ) : deltaPct < 0 ? (
+              ) : deltaPct !== null && deltaPct < 0 ? (
                 <TrendingDown className="w-5 h-5 text-rose-600" aria-hidden="true" />
               ) : (
                 <Sliders className="w-5 h-5 text-neutral-400" aria-hidden="true" />
               )}
             </div>
-            {deltaPct !== 0 && (
+            {deltaPct !== null && deltaPct !== 0 && (
               <span className={`text-[11px] font-black mt-1.5 px-2 py-0.5 rounded-full font-mono ${deltaPct > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
                 {deltaPct > 0 ? `+${deltaPct}%` : `${deltaPct}%`}
               </span>
             )}
           </div>
 
-          {/* Lado Derecho: Estado Simulado Proyectado */}
           <div className="flex-1 space-y-2 lg:text-right">
-            <div className="flex items-center gap-2 lg:justify-end">
+            <div className="flex items-center gap-2 lg:justify-end flex-wrap">
               <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-                Asistencia Simulada (Proyección)
+                Escenario Simulado
               </span>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border shadow-2xs ${simMeta.badgeClass}`}>
                 <SimIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -391,88 +485,97 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
 
             <div className="flex items-baseline gap-3 lg:justify-end">
               <span className={`text-3xl sm:text-4xl font-black tracking-tight font-mono ${simMeta.textColor}`}>
-                {simulatedPct}%
+                {simulatedPct === null ? 'Sin datos' : `${simulatedPct}%`}
               </span>
               <span className="text-sm font-semibold text-neutral-700">
-                {simulatedAttended} / {baseTotal} clases proyectadas
+                {simulatedAttended} / {simulatedTotal} clases proyectadas
               </span>
             </div>
 
             <div className="flex items-center gap-2 lg:justify-end text-xs font-semibold">
-              {deltaClasses !== 0 ? (
-                <span className={deltaClasses > 0 ? 'text-emerald-700' : 'text-rose-700'}>
-                  {deltaClasses > 0 ? `+${deltaClasses}` : deltaClasses} clase(s) respecto al estado real
+              {hasLocalDelta ? (
+                <span className="text-[#002B49]">
+                  {futureAttendedDelta > 0 && `+${futureAttendedDelta} futura(s) asistida(s) `}
+                  {futureMissedDelta > 0 && `+${futureMissedDelta} futura(s) inasistida(s) `}
+                  {pastCorrectionDelta !== 0 && `(${pastCorrectionDelta > 0 ? `+${pastCorrectionDelta}` : pastCorrectionDelta} corrección pasada)`}
                 </span>
               ) : (
-                <span className="text-neutral-500">Sin variación respecto a la asistencia base</span>
+                <span className="text-neutral-500">Sin variación respecto a la línea base exacta</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* BARRA DE PROGRESO CON MARCADOR VISUAL DEL 70% */}
+        {/* BARRA DE PROGRESO CON MARCADOR VISUAL DEL UMBRAL RI */}
         <div className="space-y-2 pt-2">
           <div className="flex items-center justify-between text-xs font-semibold text-neutral-600">
             <span>0%</span>
             <div className="flex items-center gap-1.5 font-bold text-neutral-900 bg-white px-2.5 py-0.5 rounded-full border border-neutral-200 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-[#002B49]" aria-hidden="true" />
-              <span>Umbral Institucional RI: 70%</span>
+              <span>Umbral Institucional RI: {minRequiredThreshold}%</span>
             </div>
             <span>100%</span>
           </div>
 
-          {/* Contenedor relativo de la barra con marcador vertical */}
           <div className="relative w-full h-8 bg-neutral-200/80 rounded-full overflow-hidden p-1 shadow-inner">
-            {/* Barra de progreso real (base) */}
-            <div
-              className="absolute left-1 top-1 bottom-1 bg-neutral-400/40 rounded-full transition-all duration-300"
-              style={{ width: `calc(${Math.min(100, Math.max(0, basePct))}% - 8px)` }}
-              title={`Asistencia actual: ${basePct}%`}
-            />
+            {basePct !== null && (
+              <div
+                className="absolute left-1 top-1 bottom-1 bg-neutral-400/40 rounded-full transition-all duration-300"
+                style={{ width: `calc(${Math.min(100, Math.max(0, basePct))}% - 8px)` }}
+                title={`Línea base exacta: ${basePct}%`}
+              />
+            )}
 
-            {/* Barra de progreso simulada interactiva */}
             <div
               className={`h-full rounded-full transition-all duration-500 ease-out shadow-xs ${simMeta.barColor}`}
-              style={{ width: `${Math.min(100, Math.max(0, simulatedPct))}%` }}
+              style={{ width: `${simulatedPct === null ? 0 : Math.min(100, Math.max(0, simulatedPct))}%` }}
               role="progressbar"
-              aria-valuenow={simulatedPct}
+              aria-valuenow={simulatedPct ?? 0}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={`Porcentaje simulado: ${simulatedPct}%`}
+              aria-label={simulatedPct === null ? 'Sin registros de asistencia' : `Porcentaje simulado: ${simulatedPct}%`}
             />
 
-            {/* Línea marcadora fija en 70% */}
             <div
               className="absolute top-0 bottom-0 w-1 bg-neutral-900 z-10 shadow-sm pointer-events-none"
-              style={{ left: '70%' }}
-              title="Umbral mínimo RI (70%)"
+              style={{ left: `${minRequiredThreshold}%` }}
+              title={`Umbral mínimo RI (${minRequiredThreshold}%)`}
             >
               <div className="w-3 h-3 rounded-full bg-[#FFB81C] border-2 border-neutral-900 absolute -top-1 -left-1 shadow-xs" />
             </div>
           </div>
 
-          {/* Subtítulo explicativo del progreso */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-neutral-600 pt-1">
             <span>
-              {simulatedPct >= 70 ? (
+              {simulatedPct === null ? (
+                <strong className="text-neutral-700 flex items-center gap-1">
+                  <Info className="w-3.5 h-3.5" aria-hidden="true" />
+                  Sin clases registradas aún (0/0). Proyecta la próxima clase para simular.
+                </strong>
+              ) : simulatedPct >= minRequiredThreshold ? (
                 <strong className="text-emerald-700 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                  Cumple con el reglamento institucional (mínimo 70% de asistencia para evitar Reprobación por Inasistencia).
+                  Cumple el mínimo reglamentario ({minRequiredThreshold}% para evitar RI).
                 </strong>
               ) : currentJustified ? (
                 <strong className="text-purple-800 flex items-center gap-1">
                   <HeartHandshake className="w-3.5 h-3.5" aria-hidden="true" />
-                  Régimen de excepción activo: las inasistencias no conllevan Reprobación por Inasistencia.
+                  Simulación hipotética de excepción activa (no constituye excepción oficial).
+                </strong>
+              ) : !recoveryPossible ? (
+                <strong className="text-rose-700 flex items-center gap-1">
+                  <AlertOctagon className="w-3.5 h-3.5" aria-hidden="true" />
+                  Recuperación imposible con las sesiones pendientes disponibles.
                 </strong>
               ) : (
                 <strong className="text-rose-700 flex items-center gap-1">
                   <AlertOctagon className="w-3.5 h-3.5" aria-hidden="true" />
-                  Bajo el umbral reglamentario: requiere al menos {classesNeededFor70} clase(s) asistida(s) consecutivas para salir de RI (&lt;70%).
+                  Bajo el umbral RI ({minRequiredThreshold}%): requiere +{classesNeededForMin} clase(s) futura(s) consecutiva(s) para alcanzar {minRequiredThreshold}%.
                 </strong>
               )}
             </span>
             <span className="font-mono font-medium">
-              Faltas máx. permitidas: {maxAllowedAbsences} | Acumuladas: {simulatedAbsences}
+              Faltas máx. sobre total actual: {maxAllowedAbsences} | Acumuladas: {simulatedAbsences}
             </span>
           </div>
         </div>
@@ -512,166 +615,174 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
             </div>
             <p className="text-[10px] text-neutral-500 leading-tight">
               {simulatedConsecutive >= 3
-                ? '¡Alerta crítica! 3 o más faltas seguidas activan alerta automática.'
+                ? 'Alerta crítica: 3 o más faltas seguidas activan alerta automática.'
                 : 'Bajo el límite crítico de 3 faltas consecutivas.'}
             </p>
           </div>
 
           <div className="bg-white/80 backdrop-blur-xs p-3.5 rounded-2xl border border-neutral-200/90 space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 block">
-              Estado de Justificación
+              Régimen Evaluado
             </span>
             <div className="flex items-center gap-2">
               <span className={`text-sm font-black ${currentJustified ? 'text-purple-800' : 'text-neutral-800'}`}>
-                {currentJustified ? 'Excepción Médica Activa' : 'Régimen Estándar'}
+                {currentJustified ? 'Excepción Simulada' : `Estándar (${minRequiredThreshold}% RI)`}
               </span>
             </div>
             <p className="text-[10px] text-neutral-500 leading-tight">
               {currentJustified
-                ? 'Inasistencias amparadas por justificación formal o PAEDIS.'
-                : 'Aplica el requisito general de 75% de asistencia obligatoria.'}
+                ? 'Simulación hipotética: no otorga excepción oficial.'
+                : `Aplica el requisito mínimo de ${minRequiredThreshold}% de asistencia (RI <${minRequiredThreshold}%).`}
             </p>
           </div>
         </div>
       </div>
 
-      {/* CONTROLES INTERACTIVOS DIRECTOS */}
+      {/* CONTROLES SEPARADOS: PROYECCIÓN FUTURA VS CORRECCIÓN PASADA */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Stepper: Asistencias Adicionales */}
+        {/* 1. Proyectar próxima clase (+1 clase futura) */}
         <div className="p-5 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between shadow-2xs">
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
-                <TrendingUp className="w-4 h-4 text-emerald-600" aria-hidden="true" />
-                <span>Asistencias Adicionales</span>
-              </label>
-              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
-                +{addedAttendances}
+              <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
+                <CalendarPlus className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+                <span>Proyectar próxima clase (+1 clase futura)</span>
               </span>
             </div>
             <p className="text-[11px] text-neutral-500">
-              Suma clases asistidas para evaluar la recuperación porcentual.
+              Suma +1 sesión al denominador total: asistir ({simulatedAttended + 1}/{simulatedTotal + 1}) o faltar ({simulatedAttended}/{simulatedTotal + 1}).
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <button
+              type="button"
+              onClick={handleFutureAttend}
+              disabled={isSimulating || !canAddFutureSession}
+              {...getVoiceProps('Proyectar próxima clase asistida, más 1 clase futura')}
+              className="w-full min-h-[40px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Asistir (+1 futura)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleFutureMiss}
+              disabled={isSimulating || !canAddFutureSession}
+              {...getVoiceProps('Proyectar próxima clase inasistida, más 1 clase futura')}
+              className="w-full min-h-[40px] px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-xs inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] cursor-pointer"
+            >
+              <Minus className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Faltar (+1 futura)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Corregir registro pasado (mantiene total de sesiones) */}
+        <div className="p-5 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between shadow-2xs">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
+                <History className="w-4 h-4 text-[#002B49]" aria-hidden="true" />
+                <span>Corregir registro pasado</span>
+              </span>
+              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200">
+                {pastCorrectionDelta >= 0 ? `+${pastCorrectionDelta}` : pastCorrectionDelta}
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-500">
+              Ajusta asistencias pasadas sobre las {baseTotal} sesiones ya dictadas sin alterar el total.
             </p>
           </div>
 
           <div className="flex items-center gap-2 pt-2">
             <button
               type="button"
-              onClick={handleSubtractAttendance}
-              disabled={isSimulating || (addedAttendances <= 0 && simulatedAttended <= 0)}
-              {...getVoiceProps('Disminuir una clase asistida en la simulación')}
-              className="flex-1 min-h-[42px] px-3 py-2 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 rounded-xl font-black text-sm border border-neutral-200 inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-              aria-label="Disminuir asistencia"
+              onClick={handlePastCorrectionNegative}
+              disabled={isSimulating || baseTotal === 0 || correctedPastAttended <= 0}
+              {...getVoiceProps('Corregir registro pasado restando 1 asistencia')}
+              className="flex-1 min-h-[42px] px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl font-black text-sm border border-neutral-200 inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] cursor-pointer"
+              aria-label="Corregir registro pasado (-1 asistencia)"
             >
-              <Minus className="w-4 h-4" />
+              <Minus className="w-4 h-4" aria-hidden="true" />
             </button>
             <div className="px-3 py-2 bg-neutral-50 rounded-xl border border-neutral-200 text-center min-w-[50px]">
               <span className="font-mono font-black text-sm text-neutral-900">
-                {simulatedAttended}
+                {correctedPastAttended}
               </span>
             </div>
             <button
               type="button"
-              onClick={handleAddAttendance}
-              disabled={isSimulating || simulatedAttended >= baseTotal}
-              {...getVoiceProps('Añadir una clase asistida en la simulación')}
-              className="flex-1 min-h-[42px] px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-black text-sm shadow-xs inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-              aria-label="Aumentar asistencia"
+              onClick={handlePastCorrectionPositive}
+              disabled={isSimulating || baseTotal === 0 || correctedPastAttended >= baseTotal}
+              {...getVoiceProps('Corregir registro pasado sumando 1 asistencia')}
+              className="flex-1 min-h-[42px] px-3 py-2 bg-[#002B49] hover:bg-[#001D33] text-white rounded-xl font-black text-sm shadow-xs inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] cursor-pointer"
+              aria-label="Corregir registro pasado (+1 asistencia)"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        {/* Stepper: Inasistencias Adicionales */}
-        <div className="p-5 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between shadow-2xs">
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
-                <AlertOctagon className="w-4 h-4 text-rose-600" aria-hidden="true" />
-                <span>Inasistencias Adicionales</span>
-              </label>
-              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 border border-rose-200">
-                +{addedAbsences}
-              </span>
-            </div>
-            <p className="text-[11px] text-neutral-500">
-              Proyecta el impacto de faltar a futuras sesiones programadas.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleSubtractAbsence}
-              disabled={isSimulating || (addedAbsences <= 0 && simulatedAttended >= baseTotal)}
-              {...getVoiceProps('Disminuir una falta en la simulación')}
-              className="flex-1 min-h-[42px] px-3 py-2 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 rounded-xl font-black text-sm border border-neutral-200 inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-              aria-label="Disminuir falta"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <div className="px-3 py-2 bg-neutral-50 rounded-xl border border-neutral-200 text-center min-w-[50px]">
-              <span className="font-mono font-black text-sm text-neutral-900">
-                {simulatedAbsences}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddAbsence}
-              disabled={isSimulating || simulatedAttended <= 0}
-              {...getVoiceProps('Añadir una falta en la simulación')}
-              className="flex-1 min-h-[42px] px-3 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl font-black text-sm shadow-xs inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C]"
-              aria-label="Aumentar falta"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Acción Rápida: Simular Recuperación a ≥70% (Evitar RI) */}
+        {/* 3. Recuperación al umbral mínimo (deshabilitada si es imposible) */}
         <div className="p-5 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between shadow-2xs">
           <div className="space-y-1">
             <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
-              <span>Recuperación a ≥70% (Evitar RI)</span>
+              <span>Recuperación a ≥{minRequiredThreshold}%</span>
             </span>
             <p className="text-[11px] text-neutral-500">
-              Calcula y aplica exactamente las clases consecutivas necesarias para salir de causal de RI (&lt;70%).
+              {!recoveryPossible
+                ? 'Las sesiones pendientes no alcanzan para superar el umbral mínimo.'
+                : `Proyecta las clases futuras consecutivas necesarias para alcanzar ${minRequiredThreshold}%.`}
             </p>
           </div>
 
           <div className="pt-2">
             <button
               type="button"
-              onClick={handleRecoverTo70}
-              disabled={isSimulating || simulatedPct >= 70}
+              onClick={handleRecoverToMin}
+              disabled={
+                isSimulating ||
+                !recoveryPossible ||
+                (simulatedPct !== null && simulatedPct >= minRequiredThreshold) ||
+                !Number.isFinite(classesNeededForMin) ||
+                classesNeededForMin <= 0
+              }
               {...getVoiceProps(
-                simulatedPct >= 70
-                  ? 'La asignatura ya cumple el 70 por ciento reglamentario'
-                  : `Simular recuperación a 70% requiriendo ${classesNeededFor70} clases consecutivas`
+                !recoveryPossible
+                  ? 'Recuperación imposible con las sesiones pendientes'
+                  : simulatedPct !== null && simulatedPct >= minRequiredThreshold
+                    ? `La asignatura ya cumple el ${minRequiredThreshold} por ciento reglamentario`
+                    : `Proyectar recuperación a ${minRequiredThreshold}% con ${classesNeededForMin} clases futuras`
               )}
-              className={`w-full min-h-[42px] px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${simulatedPct >= 70 ? 'bg-neutral-100 text-neutral-500 border border-neutral-200' : 'bg-[#002B49] hover:bg-[#002B49]/90 text-white'}`}
+              className={`w-full min-h-[42px] px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
+                !recoveryPossible || (simulatedPct !== null && simulatedPct >= minRequiredThreshold)
+                  ? 'bg-neutral-100 text-neutral-600 border border-neutral-200'
+                  : 'bg-[#002B49] hover:bg-[#002B49]/90 text-white'
+              }`}
             >
               <ArrowUpRight className="w-4 h-4 shrink-0 text-[#FFB81C]" aria-hidden="true" />
               <span>
-                {simulatedPct >= 70
-                  ? 'Cumple Umbral (≥70%)'
-                  : `Recuperar a 70% (+${classesNeededFor70} ${classesNeededFor70 === 1 ? 'clase' : 'clases'})`}
+                {!recoveryPossible
+                  ? 'Recuperación imposible'
+                  : simulatedPct !== null && simulatedPct >= minRequiredThreshold
+                    ? `Cumple Umbral (≥${minRequiredThreshold}%)`
+                    : `Recuperar a ${minRequiredThreshold}% (+${classesNeededForMin} ${classesNeededForMin === 1 ? 'clase' : 'clases'})`}
               </span>
             </button>
           </div>
         </div>
 
-        {/* Control: Licencia Médica / Excepción PAEDIS */}
+        {/* 4. Simulación hipotética de excepción */}
         <div className="p-5 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between shadow-2xs">
           <div className="space-y-1">
             <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
               <HeartHandshake className="w-4 h-4 text-purple-700" aria-hidden="true" />
-              <span>Licencia Médica / PAEDIS</span>
+              <span>Excepción Hipotética</span>
             </span>
             <p className="text-[11px] text-neutral-500">
-              Exime las inasistencias por causal médica o ajuste formal (Ley N° 21.719).
+              Simula cómo se vería el estado con licencia o ajuste PAEDIS (no otorga excepción oficial).
             </p>
           </div>
 
@@ -682,13 +793,17 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
               disabled={isSimulating}
               {...getVoiceProps(
                 currentJustified
-                  ? 'Quitar justificación médica o curricular formal'
-                  : 'Aplicar justificación médica o ajuste PAEDIS formal'
+                  ? 'Quitar simulación hipotética de excepción'
+                  : 'Simular excepción hipotética de licencia o ajuste PAEDIS'
               )}
-              className={`w-full min-h-[42px] px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${currentJustified ? 'bg-purple-700 hover:bg-purple-800 text-white' : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300'}`}
+              className={`w-full min-h-[42px] px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${
+                currentJustified
+                  ? 'bg-purple-700 hover:bg-purple-800 text-white'
+                  : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300'
+              }`}
             >
               <HeartHandshake className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span>{currentJustified ? 'Licencia Médica Activa' : 'Aplicar Licencia Médica'}</span>
+              <span>{currentJustified ? 'Quitar Simulación' : 'Simular Excepción'}</span>
             </button>
           </div>
         </div>

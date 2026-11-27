@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Eye,
   EyeOff,
@@ -27,40 +27,105 @@ export const LoginForm = ({ onDirectSuccess, onForgotPassword }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const { announce, getVoiceProps, clearReadingMode } = useAccessibility();
 
-  const handleQuickSelect = (user) => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    if (!code || !state) return;
+
+    let active = true;
+    const finishOidc = async () => {
+      setIsSsoLoading(true);
+      setErrorMessage('');
+      announce('Validando autenticación institucional Microsoft Entra ID...', 'polite');
+      try {
+        const res = await api.completeOidcCallback(code, state);
+        if (!active) return;
+        if (res?.success && res.token && res.user) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          announce(`Bienvenido/a a Nexo360, ${res.user.nombre || res.user.fullName}`, 'polite');
+          onDirectSuccess(res.token, res.user);
+          return;
+        }
+        const msg = res?.message || 'No fue posible validar el inicio de sesión institucional con Microsoft Entra ID.';
+        setErrorMessage(msg);
+        announce(msg, 'assertive');
+      } catch (err) {
+        if (!active) return;
+        const msg = err?.message || 'Error al completar autenticación con Microsoft Entra ID.';
+        setErrorMessage(msg);
+        announce(msg, 'assertive');
+      } finally {
+        if (active) setIsSsoLoading(false);
+      }
+    };
+
+    finishOidc();
+    return () => {
+      active = false;
+    };
+  }, [announce, onDirectSuccess]);
+
+  const handleQuickSelect = async (user) => {
     setEmail(user.email);
-    setPassword(user.password || 'Duoc2026!');
+    setPassword('');
     setErrorMessage('');
     const name = user.fullName || user.nombre || user.label || user.email;
-    const role = user.roleLabel || user.roleTag || user.role || 'Estudiante';
-    announce(`Perfil de prueba seleccionado: ${name} (${role})`, 'polite');
+    const role = user.roleLabel || user.roleTag || user.role || 'Usuario';
+    announce(`Cuenta demo seleccionada: ${name} (${role}). Iniciando sesión de prueba...`, 'polite');
+
+    setIsSsoLoading(true);
+    try {
+      const res = await api.ssoLogin({ email: user.email });
+      if (res?.success && res.token && res.user) {
+        announce(`Bienvenido/a a Nexo360, ${res.user.nombre || res.user.fullName}`, 'polite');
+        onDirectSuccess(res.token, res.user);
+        return;
+      }
+      const msg = res?.message || 'El acceso rápido demo no está habilitado en este entorno.';
+      setErrorMessage(msg);
+      announce(msg, 'assertive');
+    } catch (err) {
+      const msg = err?.message || 'No se pudo iniciar sesión con la cuenta de prueba seleccionada.';
+      setErrorMessage(msg);
+      announce(msg, 'assertive');
+    } finally {
+      setIsSsoLoading(false);
+    }
   };
 
   /**
-   * Inicio de sesión institucional instantáneo mediante Microsoft SSO contra MongoDB
+   * Inicio de sesión institucional mediante Microsoft Entra ID (OIDC + PKCE)
    */
   const handleMicrosoftSso = async () => {
     setErrorMessage('');
-    const cleanEmail = email.trim().toLowerCase() || 'c.guzman@duocuc.cl';
-
     setIsSsoLoading(true);
-    announce('Iniciando sesión institucional con cuenta Microsoft Duoc UC...', 'polite');
+    announce('Verificando configuración de Microsoft Entra ID (Duoc UC)...', 'polite');
 
     try {
-      const res = await api.ssoLogin(cleanEmail);
-
-      if (res?.success && res.token && res.user) {
-        announce(
-          `Bienvenido/a a Nexo360, ${res.user.nombre || res.user.fullName}`,
-          'polite'
-        );
-        onDirectSuccess(res.token, res.user);
-      } else {
-        throw new Error(res?.message || 'Error al iniciar sesión institucional.');
+      const statusRes = await api.getOidcStatus();
+      if (!statusRes?.success || !statusRes?.enabled) {
+        const msg =
+          'El inicio de sesión único con Microsoft Entra ID (SSO Duoc UC) está pendiente de configuración institucional por Duoc UC. Ingresa con tu correo y contraseña institucional.';
+        setErrorMessage(msg);
+        announce(msg, 'assertive');
+        setIsSsoLoading(false);
+        return;
       }
+
+      const authRes = await api.getOidcAuthorizeUrl();
+      const targetUrl = authRes?.authorizeUrl || authRes?.url;
+      if (!authRes?.success || !targetUrl) {
+        throw new Error(authRes?.message || 'No fue posible obtener la URL oficial de autorización Microsoft Entra ID.');
+      }
+
+      announce('Redirigiendo al portal oficial de Microsoft Entra ID Duoc UC...', 'polite');
+      window.location.assign(targetUrl);
     } catch (err) {
       console.error('Error en SSO Microsoft:', err);
-      const msg = err.message || 'Error al conectar con la base de datos institucional.';
+      const msg =
+        err?.message ||
+        'Microsoft Entra ID SSO no disponible en este momento. Ingresa con tu correo y contraseña institucional.';
       setErrorMessage(msg);
       announce(msg, 'assertive');
       setIsSsoLoading(false);
@@ -135,8 +200,8 @@ export const LoginForm = ({ onDirectSuccess, onForgotPassword }) => {
           >
             {isSsoLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-[#002B49]" />
-                <span>Accediendo a cuenta institucional...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-[#002B49]" aria-hidden="true" />
+                <span>Conectando con Microsoft Entra ID...</span>
               </>
             ) : (
               <>
@@ -155,7 +220,7 @@ export const LoginForm = ({ onDirectSuccess, onForgotPassword }) => {
           </span>
         </div>
 
-        {/* Alerta de Error */}
+        {/* Alerta de Error / Estado SSO */}
         {errorMessage && (
           <div
             id="login-error-alert"
@@ -263,7 +328,7 @@ export const LoginForm = ({ onDirectSuccess, onForgotPassword }) => {
           </button>
         </form>
 
-        {/* Contraseñas de prueba (Selector de Estudiantes y Cuentas Demo de la BD) */}
+        {/* Selector de cuentas de prueba (solo visible si el backend habilita modo demo) */}
         <DemoAccountsSelector
           onSelectAccount={handleQuickSelect}
           selectedEmail={email}

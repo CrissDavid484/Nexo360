@@ -11,7 +11,6 @@ import {
   BookOpen,
   HeartHandshake,
   Download,
-  X,
   ShieldCheck,
   Save,
 } from 'lucide-react';
@@ -22,7 +21,6 @@ import { useOnClickOutside } from '@hooks/useOnClickOutside';
 import { DEFAULT_CAMPUS } from '@utils/studentUtils';
 import { ADMIN_THEME } from '@components/admin/adminTheme';
 import { Card } from '@components/ui/Card';
-import { Badge } from '@components/ui/Badge';
 import { Button } from '@components/ui/Button';
 import { Input } from '@components/ui/Input';
 import { Select } from '@components/ui/Select';
@@ -47,8 +45,58 @@ const CASE_FILTERS = [
   { id: 'all', label: 'Todos' },
   { id: 'pendiente-ficha', label: 'Ficha Pendiente' },
   { id: 'sin-ajustes', label: 'Sin Ajustes' },
-  { id: 'riesgo', label: 'Riesgo <75%' },
+  { id: 'riesgo', label: 'Riesgo <70%' },
 ];
+
+const DOCENTE_SHEET_STATES = {
+  BORRADOR: {
+    code: 'BORRADOR',
+    label: 'Borrador',
+    badgeClass: 'bg-neutral-100 text-neutral-800 border-neutral-300',
+  },
+  APROBADA: {
+    code: 'APROBADA',
+    label: 'Aprobada',
+    badgeClass: 'bg-blue-100 text-blue-900 border-blue-300',
+  },
+  PREPARADA: {
+    code: 'PREPARADA',
+    label: 'Preparada (.txt)',
+    badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300',
+  },
+  PENDIENTE_ENVIO: {
+    code: 'PENDIENTE_ENVIO',
+    label: 'Pendiente de Envío',
+    badgeClass: 'bg-amber-100 text-amber-950 border-amber-300',
+  },
+  ENVIADA: {
+    code: 'ENVIADA',
+    label: 'Enviada',
+    badgeClass: 'bg-cyan-100 text-cyan-950 border-cyan-300',
+  },
+  ENTREGADA: {
+    code: 'ENTREGADA',
+    label: 'Entregada',
+    badgeClass: 'bg-emerald-100 text-emerald-950 border-emerald-300',
+  },
+  ACUSADA: {
+    code: 'ACUSADA',
+    label: 'Acusada',
+    badgeClass: 'bg-emerald-200 text-emerald-950 border-emerald-400',
+  },
+};
+
+const NOTIFIED_SHEET_STATES = new Set(['ENVIADA', 'ENTREGADA', 'ACUSADA']);
+
+function resolveSheetState(student) {
+  const raw = String(student?.fichaDocenteEstado || '').toUpperCase().trim();
+  if (DOCENTE_SHEET_STATES[raw]) return raw;
+  return student?.fichaDocenteNotificada ? 'ENVIADA' : 'BORRADOR';
+}
+
+function isSheetNotifiedState(state) {
+  return NOTIFIED_SHEET_STATES.has(String(state || '').toUpperCase());
+}
 
 const ADJUSTMENT_PRESETS = [
   {
@@ -89,8 +137,7 @@ function isPaedisStudentRecord(student) {
   const isFlaggedPaedis = student?.isPaedis === true || student?.role === 'estudiante_paedis';
   const isStudentRole =
     student?.role?.startsWith('estudiante') ||
-    student?.role === 'tutor_par' ||
-    student?.email === 'c.guzman@duocuc.cl';
+    student?.role === 'tutor_par';
   return isFlaggedPaedis && isStudentRole;
 }
 
@@ -108,9 +155,10 @@ function inferBarrierCategory(student) {
 }
 
 function matchesPaedisCaseFilter(student, caseFilter, query) {
+  const sheetState = resolveSheetState(student);
   if (caseFilter === 'sin-ajustes' && (student.ajustesAprobados?.length || 0) > 0) return false;
-  if (caseFilter === 'pendiente-ficha' && student.fichaDocenteNotificada) return false;
-  if (caseFilter === 'riesgo' && Number(student.attendanceRate ?? 100) >= 75) return false;
+  if (caseFilter === 'pendiente-ficha' && isSheetNotifiedState(sheetState)) return false;
+  if (caseFilter === 'riesgo' && Number(student.attendanceRate ?? 100) >= 70) return false;
 
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -164,7 +212,7 @@ function mergeCourseAcknowledgments(student) {
 }
 
 function updateSimulatorRiskCounters(student, counters) {
-  const isRisk = Number(student.attendanceRate ?? 100) < 75;
+  const isRisk = Number(student.attendanceRate ?? 100) < 70;
   if (student.hasUsedSimulator) {
     counters.simAdopted++;
     if (isRisk) counters.simAtRisk++;
@@ -190,7 +238,7 @@ function computePaedisAnalytics(paedisStudents) {
     const barrier = inferBarrierCategory(s);
     barrierCounts[barrier] = (barrierCounts[barrier] || 0) + 1;
     if (Array.isArray(s.ajustesAprobados) && s.ajustesAprobados.length > 0) withAdjustments++;
-    if (s.fichaDocenteNotificada) notifiedCount++;
+    if (isSheetNotifiedState(resolveSheetState(s))) notifiedCount++;
 
     updateSimulatorRiskCounters(s, riskCounters);
   }
@@ -211,7 +259,8 @@ function buildDocenteConfidentialText(
   student,
   adjustments = [],
   acknowledgments = [],
-  semester = '2026-1'
+  semester = '2026-1',
+  sheetState = 'BORRADOR'
 ) {
   const effectiveSemester = student?.vigenciaSemestrePaedis || semester;
   const adjustmentLines =
@@ -227,7 +276,7 @@ function buildDocenteConfidentialText(
       ? acknowledgments.map(
           (ack) =>
             `  - [${ack.sigla}] ${ack.nombre} | Docente: ${ack.profesor} | Estado: ${
-              ack.confirmado ? 'Acuse Confirmado ✓' : 'Pendiente de Notificación ⏳'
+              ack.confirmado ? 'Acuse Confirmado' : 'Pendiente de Entrega Manual'
             }`
         )
       : ['  - Ficha general aplicable a la carga académica vigente del periodo.'];
@@ -235,7 +284,7 @@ function buildDocenteConfidentialText(
   return [
     '====================================================================',
     'FICHA DOCENTE CONFIDENCIAL DE AJUSTES RAZONABLES - PAEDIS DUOC UC',
-    `Sede: ${student?.campus || DEFAULT_CAMPUS} | Periodo Académico: ${effectiveSemester}`,
+    `Sede: ${student?.campus || DEFAULT_CAMPUS} | Periodo Académico: ${effectiveSemester} | Estado: ${sheetState}`,
     'Normativa: Cumplimiento Ley N° 21.719 (Protección de Datos Personales)',
     '====================================================================',
     `Estudiante: ${student?.fullName || student?.nombre || ''}`,
@@ -249,8 +298,8 @@ function buildDocenteConfidentialText(
     'pedagógicas y evaluativas acordadas para el periodo vigente.',
     '',
     '[MODALIDAD DE ENTREGA: PREPARACIÓN Y EXPORTACIÓN MANUAL]',
-    'Aviso institucional: Si los docentes no cuentan con correo institucional automatizado,',
-    'la entrega de esta Ficha Confidencial se realiza y registra manualmente por la Coordinación PAEDIS.',
+    'La generación o descarga de este archivo deja la ficha en estado PREPARADA',
+    'o PENDIENTE_ENVIO; el envío o entrega debe registrarse manualmente con evidencia.',
     '',
     'AJUSTES RAZONABLES APROBADOS:',
     ...adjustmentLines,
@@ -294,7 +343,7 @@ function PaedisAnalyticsHeader({ analytics, getVoiceProps }) {
         variant="interactive"
         padding="md"
         {...getVoiceProps(
-          `Cobertura de ajustes razonables: ${analytics.coveragePct} por ciento. ${analytics.notifiedCount} fichas docentes notificadas.`
+          `Cobertura de ajustes razonables: ${analytics.coveragePct} por ciento. ${analytics.notifiedCount} fichas docentes enviadas o entregadas.`
         )}
         className="bg-white rounded-2xl border border-neutral-300 border-t-4 border-t-emerald-600 p-4 shadow-xs space-y-2"
       >
@@ -311,7 +360,7 @@ function PaedisAnalyticsHeader({ analytics, getVoiceProps }) {
           </span>
         </div>
         <p className="text-[11px] text-neutral-600 pt-1 border-t border-neutral-100">
-          {analytics.notifiedCount} ficha(s) docente(s) confidenciales emitidas este periodo.
+          {analytics.notifiedCount} ficha(s) docente(s) en estado Enviada, Entregada o Acusada.
         </p>
       </Card>
 
@@ -347,8 +396,6 @@ function PaedisStudentList({
   students,
   selectedKey,
   onSelectStudent,
-  resolveStudentKey,
-  inferBarrierCategory,
   getVoiceProps,
 }) {
   return (
@@ -369,7 +416,8 @@ function PaedisStudentList({
             const isSelected = key === selectedKey;
             const barrier = inferBarrierCategory(s);
             const adjustmentsCount = Array.isArray(s.ajustesAprobados) ? s.ajustesAprobados.length : 0;
-            const hasFicha = Boolean(s.fichaDocenteNotificada);
+            const sheetState = resolveSheetState(s);
+            const stateMeta = DOCENTE_SHEET_STATES[sheetState] || DOCENTE_SHEET_STATES.BORRADOR;
             const semester = s.vigenciaSemestrePaedis || '2026-1';
 
             return (
@@ -379,7 +427,7 @@ function PaedisStudentList({
                 onClick={() => onSelectStudent(s)}
                 aria-pressed={isSelected}
                 {...getVoiceProps(
-                  `Estudiante ${s.fullName || s.nombre}, barrera ${barrier}, ${adjustmentsCount} ajustes, periodo ${semester}`
+                  `Estudiante ${s.fullName || s.nombre}, barrera ${barrier}, ${adjustmentsCount} ajustes, ficha ${stateMeta.label}, periodo ${semester}`
                 )}
                 className={`w-full min-h-[44px] text-left block p-3.5 rounded-2xl border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold ${
                   isSelected
@@ -410,15 +458,13 @@ function PaedisStudentList({
                   >
                     {barrier}
                   </span>
-                  {hasFicha && (
-                    <span
-                      className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${
-                        isSelected ? 'bg-emerald-400 text-neutral-950' : 'bg-emerald-100 text-emerald-950'
-                      }`}
-                    >
-                      Ficha OK
-                    </span>
-                  )}
+                  <span
+                    className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                      isSelected ? 'bg-white/15 text-white border-white/30' : stateMeta.badgeClass
+                    }`}
+                  >
+                    {stateMeta.label}
+                  </span>
                 </div>
 
                 <div className={`text-xs truncate mt-1 ${isSelected ? 'text-neutral-300' : 'text-neutral-500'}`}>
@@ -541,14 +587,26 @@ function DocenteSheetModal({
   student,
   adjustments,
   acknowledgments,
+  sheetState,
+  sheetHistory,
   onToggleAck,
-  onConfirmNotify,
+  onTransitionSheetState,
   isSaving,
   announce,
   getVoiceProps,
 }) {
   const modalRef = useRef(null);
   const closeBtnRef = useRef(null);
+
+  const [targetState, setTargetState] = useState(sheetState || 'BORRADOR');
+  const [medioEntrega, setMedioEntrega] = useState('Entrega manual / Correo institucional');
+  const [evidencia, setEvidencia] = useState('');
+  const [transitionError, setTransitionError] = useState('');
+
+  useEffect(() => {
+    setTargetState(sheetState || 'BORRADOR');
+    setTransitionError('');
+  }, [sheetState, isOpen]);
 
   useAccessibleModal({
     isOpen,
@@ -562,13 +620,15 @@ function DocenteSheetModal({
   if (!isOpen || !student) return null;
 
   const currentSemester = student.vigenciaSemestrePaedis || '2026-1';
+  const currentMeta = DOCENTE_SHEET_STATES[sheetState] || DOCENTE_SHEET_STATES.BORRADOR;
 
-  const handleDownloadTxt = () => {
+  const handleDownloadTxt = async () => {
     const content = buildDocenteConfidentialText(
       student,
       adjustments,
       acknowledgments,
-      currentSemester
+      currentSemester,
+      sheetState
     );
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -577,7 +637,34 @@ function DocenteSheetModal({
     anchor.download = `Ficha_Docente_PAEDIS_${(student.rut || 'estudiante').replace(/[^0-9kK]/g, '')}_${currentSemester}.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
-    announce('Ficha Docente Confidencial descargada en formato texto seguro.', 'polite');
+
+    // Descargar .txt pasa a PREPARADA (o mantiene PENDIENTE_ENVIO); NUNCA marca ENVIADA/ENTREGADA/notificada automáticamente
+    const nextDownloadState = sheetState === 'PENDIENTE_ENVIO' ? 'PENDIENTE_ENVIO' : 'PREPARADA';
+    announce('Ficha Docente descargada en .txt. Estado registrado como PREPARADA para entrega manual.', 'polite');
+    await onTransitionSheetState?.(nextDownloadState, {
+      medioEntrega: 'Descarga archivo .txt',
+      evidencia: 'Documento generado y descargado localmente (pendiente de envío o entrega manual).',
+    });
+  };
+
+  const handleSubmitTransition = async (e) => {
+    e.preventDefault();
+    setTransitionError('');
+
+    if (isSheetNotifiedState(targetState) && !evidencia.trim()) {
+      const msg = 'Para marcar como ENVIADA, ENTREGADA o ACUSADA debes ingresar una nota de entrega manual o evidencia.';
+      setTransitionError(msg);
+      announce(msg, 'assertive');
+      return;
+    }
+
+    const ok = await onTransitionSheetState?.(targetState, {
+      medioEntrega: medioEntrega.trim() || 'Gestión manual PAEDIS',
+      evidencia: evidencia.trim(),
+    });
+    if (ok) {
+      setEvidencia('');
+    }
   };
 
   return (
@@ -589,13 +676,18 @@ function DocenteSheetModal({
       initialFocusRef={closeBtnRef}
     >
       <div className="space-y-5">
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-950 flex items-start gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
-          <div>
-            <strong>Privacidad Clínica Resguardada (Ley N° 21.719):</strong> Esta ficha omite
-            automáticamente el diagnóstico clínico declarado y las notas privadas de entrevista (Capa 1),
-            exhibiendo solo las adecuaciones pedagógicas aplicables en clase y certámenes (Capa 2).
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-950 flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-start gap-2.5 flex-1 min-w-[240px]">
+            <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <strong>Privacidad Clínica Resguardada (Ley N° 21.719):</strong> Esta ficha omite
+              el diagnóstico clínico declarado y las notas privadas de entrevista (Capa 1),
+              exhibiendo solo las adecuaciones pedagógicas aplicables en aula y certámenes (Capa 2).
+            </div>
           </div>
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${currentMeta.badgeClass}`}>
+            Estado actual: {currentMeta.label} ({currentMeta.code})
+          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs">
@@ -695,28 +787,127 @@ function DocenteSheetModal({
           )}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-neutral-200 bg-neutral-50">
-          <Button
-            type="button"
-            onClick={handleDownloadTxt}
-            {...getVoiceProps('Descargar Ficha Docente Confidencial en formato texto seguro')}
-            className="min-h-[44px] px-4 py-2 inline-flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" aria-hidden="true" />
-            <span>Descargar Ficha (.txt)</span>
-          </Button>
+        {/* Transición explícita de estado con evidencia / nota de entrega manual */}
+        <form onSubmit={handleSubmitTransition} className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-brand-navy">
+              Registro de Estado y Entrega Manual de Ficha Docente
+            </h4>
+            <span className="text-[11px] text-neutral-600">
+              Descargar el archivo .txt solo marca PREPARADA (no enviada).
+            </span>
+          </div>
 
-          <Button
-            type="button"
-            disabled={isSaving}
-            onClick={onConfirmNotify}
-            {...getVoiceProps('Emitir y notificar Ficha Docente a los profesores')}
-            className="min-h-[44px] px-5 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white inline-flex items-center gap-2"
-          >
-            <ShieldCheck className="w-4 h-4 text-brand-gold" aria-hidden="true" />
-            <span>{isSaving ? 'Notificando...' : 'Notificar a Docentes de Aula'}</span>
-          </Button>
-        </footer>
+          {transitionError && (
+            <div role="alert" className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs font-semibold">
+              {transitionError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="sheet-state-select" className="block text-xs font-bold text-neutral-700 mb-1">
+                Estado de la Ficha
+              </label>
+              <select
+                id="sheet-state-select"
+                value={targetState}
+                onChange={(e) => {
+                  setTargetState(e.target.value);
+                  setTransitionError('');
+                }}
+                disabled={isSaving}
+                className="w-full min-h-[40px] px-3 py-1.5 rounded-xl border border-neutral-300 bg-white text-xs font-semibold text-neutral-900"
+              >
+                {Object.values(DOCENTE_SHEET_STATES).map((st) => (
+                  <option key={st.code} value={st.code}>
+                    {st.code} — {st.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="sheet-delivery-method" className="block text-xs font-bold text-neutral-700 mb-1">
+                Medio de Entrega
+              </label>
+              <Input
+                id="sheet-delivery-method"
+                type="text"
+                disabled={isSaving}
+                value={medioEntrega}
+                onChange={(e) => setMedioEntrega(e.target.value)}
+                placeholder="Ej. Entrega presencial / Correo institucional manual"
+                className="w-full min-h-[40px] px-3 py-1.5 border border-neutral-300 rounded-xl text-xs bg-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="sheet-delivery-evidence" className="block text-xs font-bold text-neutral-700 mb-1">
+              Nota de Entrega Manual / Evidencia {isSheetNotifiedState(targetState) ? '(Obligatoria para Enviada/Entregada/Acusada)' : '(Opcional)'}
+            </label>
+            <Input
+              id="sheet-delivery-evidence"
+              type="text"
+              disabled={isSaving}
+              value={evidencia}
+              onChange={(e) => {
+                setEvidencia(e.target.value);
+                setTransitionError('');
+              }}
+              placeholder="Ej. Entregada a docente titular en reunión de coordinación / Folio de recepción..."
+              className="w-full min-h-[40px] px-3 py-1.5 border border-neutral-300 rounded-xl text-xs bg-white"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isSaving}
+              onClick={handleDownloadTxt}
+              {...getVoiceProps('Descargar Ficha Docente Confidencial en formato texto seguro')}
+              className="min-h-[44px] px-4 py-2 inline-flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" aria-hidden="true" />
+              <span>Descargar Ficha (.txt)</span>
+            </Button>
+
+            <Button
+              type="submit"
+              disabled={isSaving}
+              loading={isSaving}
+              {...getVoiceProps('Registrar transición de estado de Ficha Docente')}
+              className="min-h-[44px] px-5 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white inline-flex items-center gap-2"
+            >
+              <ShieldCheck className="w-4 h-4 text-brand-gold" aria-hidden="true" />
+              <span>{isSaving ? 'Guardando...' : 'Registrar Estado de Ficha'}</span>
+            </Button>
+          </div>
+        </form>
+
+        {Array.isArray(sheetHistory) && sheetHistory.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700">
+              Historial de Estados de la Ficha ({sheetHistory.length})
+            </h4>
+            <ul className="space-y-1.5 max-h-40 overflow-y-auto text-xs">
+              {sheetHistory.map((h, idx) => (
+                <li key={`${h.estado}-${h.fecha}-${idx}`} className="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <strong className="text-brand-navy">{h.estado}</strong>
+                    {h.medioEntrega && <span className="text-neutral-600"> • {h.medioEntrega}</span>}
+                    {h.evidencia && <p className="text-neutral-600 mt-0.5">{h.evidencia}</p>}
+                  </div>
+                  <span className="text-[11px] text-neutral-500">
+                    {h.actorEmail || ''} {h.fecha ? `• ${new Date(h.fecha).toLocaleString('es-CL')}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -743,7 +934,6 @@ export const PaedisManagement = ({
   const [isDocenteModalOpen, setIsDocenteModalOpen] = useState(false);
 
   const [formState, setFormState] = useState({
-    // Capa 1: Expediente Confidencial
     barreraPaedis: 'Visual / Sensorial',
     acreditacionPaedis: 'Credencial RND SENADIS / COMPIN',
     diagnosticoDeclarado: '',
@@ -752,11 +942,11 @@ export const PaedisManagement = ({
     clearReadingByDefault: false,
     highContrastByDefault: false,
     dyslexicFontByDefault: false,
-
-    // Capa 2: Ajustes Razonables Operativos
     vigenciaSemestrePaedis: '2026-1',
     ajustesAprobados: [],
     acusesDocentes: [],
+    fichaDocenteEstado: 'BORRADOR',
+    fichaDocenteHistorial: [],
   });
 
   const [newAdjustment, setNewAdjustment] = useState({ tipo: '', descripcion: '' });
@@ -777,6 +967,7 @@ export const PaedisManagement = ({
 
   useEffect(() => {
     if (!selectedStudent) return;
+    const key = resolveStudentKey(selectedStudent);
     const isVisual =
       inferBarrierCategory(selectedStudent) === 'Visual / Sensorial' ||
       /visual|ciego|no vidente|baja visi[oó]n/i.test(selectedStudent.diagnosticoDeclarado || '');
@@ -798,8 +989,33 @@ export const PaedisManagement = ({
         ? selectedStudent.ajustesAprobados
         : [],
       acusesDocentes: mergeCourseAcknowledgments(selectedStudent),
+      fichaDocenteEstado: resolveSheetState(selectedStudent),
+      fichaDocenteHistorial: Array.isArray(selectedStudent.fichaDocenteHistorial)
+        ? selectedStudent.fichaDocenteHistorial
+        : [],
     });
     setStatusFeedback(null);
+
+    let active = true;
+    api.getPaedisRecord(key).then((res) => {
+      if (!active || !res?.success || !res?.record) return;
+      const rec = res.record;
+      setFormState((prev) => ({
+        ...prev,
+        barreraPaedis: rec.barreraPaedis || prev.barreraPaedis,
+        acreditacionPaedis: rec.acreditacionPaedis || prev.acreditacionPaedis,
+        diagnosticoDeclarado: rec.diagnosticoDeclarado ?? prev.diagnosticoDeclarado,
+        notasConfidencialesPaedis: rec.notasConfidenciales ?? prev.notasConfidencialesPaedis,
+        vigenciaSemestrePaedis: rec.vigenciaSemestrePaedis || prev.vigenciaSemestrePaedis,
+        ajustesAprobados: Array.isArray(rec.ajustesAprobados) && rec.ajustesAprobados.length > 0 ? rec.ajustesAprobados : prev.ajustesAprobados,
+        fichaDocenteEstado: rec.fichaDocenteEstado || prev.fichaDocenteEstado,
+        fichaDocenteHistorial: Array.isArray(rec.fichaDocenteHistorial) ? rec.fichaDocenteHistorial : prev.fichaDocenteHistorial,
+      }));
+    }).catch(() => {});
+
+    return () => {
+      active = false;
+    };
   }, [selectedStudent]);
 
   const analytics = useMemo(() => computePaedisAnalytics(paedisStudents), [paedisStudents]);
@@ -863,10 +1079,6 @@ export const PaedisManagement = ({
     }));
   };
 
-  /**
-   * Renovación Semestral con 1 Clic
-   * Calcula el periodo siguiente y extiende la vigencia de los ajustes aprobados.
-   */
   const handleRenewSemester = async () => {
     if (!selectedStudent) return;
     const currentSem = formState.vigenciaSemestrePaedis || '2026-1';
@@ -894,7 +1106,7 @@ export const PaedisManagement = ({
       vigenciaSemestrePaedis: nextSem,
       ajustesAprobados: renewedAdjustments,
       notasConfidencialesPaedis: updatedNotes,
-      fichaDocenteNotificada: false,
+      fichaDocenteEstado: 'BORRADOR',
     }));
 
     setIsSaving(true);
@@ -905,13 +1117,14 @@ export const PaedisManagement = ({
         renewForSemester: nextSem,
         ajustesAprobados: renewedAdjustments,
         notasConfidencialesPaedis: updatedNotes,
+        fichaDocenteEstado: 'BORRADOR',
         fichaDocenteNotificada: false,
       };
       const res = await api.updatePaedisCase(resolveStudentKey(selectedStudent), payload);
       if (!res?.success) throw new Error(res?.message || 'Error al renovar semestre.');
       if (onStudentUpdated && res.student) onStudentUpdated(res.student);
 
-      const msg = `Expediente renovado exitosamente para el periodo ${nextSem}.`;
+      const msg = `Expediente renovado exitosamente para el periodo ${nextSem}. Ficha docente restablecida a BORRADOR.`;
       setStatusFeedback({ type: 'success', text: msg });
       announce(msg, 'polite');
     } catch (err) {
@@ -923,10 +1136,13 @@ export const PaedisManagement = ({
     }
   };
 
-  const persistPaedisCase = async (notifyDocentes = false) => {
-    if (!selectedStudent) return;
+  const persistPaedisCase = async (explicitSheetState = null, transitionMeta = null) => {
+    if (!selectedStudent) return false;
     setIsSaving(true);
     setStatusFeedback(null);
+
+    const nextSheetState = explicitSheetState || formState.fichaDocenteEstado || 'BORRADOR';
+    const notifiedFlag = isSheetNotifiedState(nextSheetState);
 
     try {
       const payload = {
@@ -936,7 +1152,10 @@ export const PaedisManagement = ({
           ...a,
           semestreVigencia: a.semestreVigencia || formState.vigenciaSemestrePaedis || '2026-1',
         })),
-        ...(notifyDocentes ? { fichaDocenteNotificada: true } : {}),
+        fichaDocenteEstado: nextSheetState,
+        fichaDocenteNotificada: notifiedFlag,
+        ...(transitionMeta?.medioEntrega ? { medioEntrega: transitionMeta.medioEntrega } : {}),
+        ...(transitionMeta?.evidencia ? { evidencia: transitionMeta.evidencia } : {}),
         accessibilityPreferences: {
           ...(selectedStudent.accessibilityPreferences || {}),
           voiceReader: Boolean(formState.voiceReaderByDefault),
@@ -950,20 +1169,47 @@ export const PaedisManagement = ({
       if (!res?.success) {
         throw new Error(res?.message || 'No se pudo actualizar el expediente PAEDIS.');
       }
+
+      const historyFromServer = res.record?.fichaDocenteHistorial || res.student?.fichaDocenteHistorial;
+      setFormState((prev) => ({
+        ...prev,
+        fichaDocenteEstado: res.record?.fichaDocenteEstado || res.student?.fichaDocenteEstado || nextSheetState,
+        fichaDocenteHistorial: Array.isArray(historyFromServer)
+          ? historyFromServer
+          : explicitSheetState
+            ? [
+                {
+                  estado: nextSheetState,
+                  fecha: new Date().toISOString(),
+                  medioEntrega: transitionMeta?.medioEntrega || '',
+                  evidencia: transitionMeta?.evidencia || '',
+                },
+                ...(prev.fichaDocenteHistorial || []),
+              ]
+            : prev.fichaDocenteHistorial,
+      }));
+
       if (onStudentUpdated && res.student) onStudentUpdated(res.student);
 
-      const successMsg = res.message || 'Expediente PAEDIS actualizado correctamente.';
+      const stateLabel = DOCENTE_SHEET_STATES[nextSheetState]?.label || nextSheetState;
+      const successMsg = explicitSheetState
+        ? `Estado de Ficha Docente actualizado a ${nextSheetState} (${stateLabel}).`
+        : (res.message || 'Expediente PAEDIS actualizado correctamente.');
       setStatusFeedback({ type: 'success', text: successMsg });
       announce(successMsg, 'polite');
-      if (notifyDocentes) setIsDocenteModalOpen(false);
+      return true;
     } catch (err) {
       const errorMsg = err?.message || 'Error al guardar el expediente PAEDIS.';
       setStatusFeedback({ type: 'error', text: errorMsg });
       announce(errorMsg, 'assertive');
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
+
+  const selectedSheetState = formState.fichaDocenteEstado || 'BORRADOR';
+  const selectedSheetMeta = DOCENTE_SHEET_STATES[selectedSheetState] || DOCENTE_SHEET_STATES.BORRADOR;
 
   return (
     <section aria-labelledby="paedis-ops-heading" className="space-y-6 w-full max-w-full overflow-x-clip">
@@ -983,15 +1229,20 @@ export const PaedisManagement = ({
         </div>
 
         {selectedStudent && (
-          <Button
-            type="button"
-            onClick={() => setIsDocenteModalOpen(true)}
-            {...getVoiceProps('Abrir Ficha Docente Confidencial de Ajustes Razonables')}
-            className="min-h-[42px] px-4 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 cursor-pointer shadow-xs shrink-0 focus-visible:ring-4 focus-visible:ring-amber-400"
-          >
-            <FileText className="w-4 h-4 text-brand-gold" aria-hidden="true" />
-            <span>Ver Ficha Docente ({formState.vigenciaSemestrePaedis || '2026-1'})</span>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${selectedSheetMeta.badgeClass}`}>
+              Ficha: {selectedSheetMeta.label}
+            </span>
+            <Button
+              type="button"
+              onClick={() => setIsDocenteModalOpen(true)}
+              {...getVoiceProps('Abrir Ficha Docente Confidencial de Ajustes Razonables')}
+              className="min-h-[42px] px-4 py-2.5 bg-brand-navy hover:bg-brand-navyDark text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 cursor-pointer shadow-xs shrink-0 focus-visible:ring-4 focus-visible:ring-amber-400"
+            >
+              <FileText className="w-4 h-4 text-brand-gold" aria-hidden="true" />
+              <span>Ver Ficha Docente ({formState.vigenciaSemestrePaedis || '2026-1'})</span>
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1040,8 +1291,6 @@ export const PaedisManagement = ({
             students={filteredStudents}
             selectedKey={resolveStudentKey(selectedStudent)}
             onSelectStudent={(s) => setSelectedKey(resolveStudentKey(s))}
-            resolveStudentKey={resolveStudentKey}
-            inferBarrierCategory={inferBarrierCategory}
             getVoiceProps={getVoiceProps}
           />
         </div>
@@ -1070,19 +1319,19 @@ export const PaedisManagement = ({
 
                 <span
                   className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
-                    Number(selectedStudent.attendanceRate ?? 100) < 75
+                    Number(selectedStudent.attendanceRate ?? 100) < 70
                       ? 'bg-rose-50 text-rose-800 border-rose-300'
                       : 'bg-emerald-50 text-emerald-800 border-emerald-300'
                   }`}
                 >
-                  Asistencia: {selectedStudent.attendanceRate ?? 88.9}%
+                  Asistencia: {selectedStudent.attendanceRate ?? 'Sin datos'}%
                 </span>
               </div>
 
               {statusFeedback && (
                 <div
-                  role="status"
-                  aria-live="polite"
+                  role={statusFeedback.type === 'error' ? 'alert' : 'status'}
+                  aria-live={statusFeedback.type === 'error' ? 'assertive' : 'polite'}
                   className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 ${
                     statusFeedback.type === 'success'
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
@@ -1098,7 +1347,7 @@ export const PaedisManagement = ({
                 </div>
               )}
 
-              {/* CAPA 1: EXPEDIENTE CONFIDENCIAL (EXCLUSIVO COORDINADOR PAEDIS) */}
+              {/* CAPA 1: EXPEDIENTE CONFIDENCIAL */}
               <div className="p-5 rounded-2xl bg-purple-50/50 border border-purple-200 space-y-4">
                 <div className="flex items-center justify-between border-b border-purple-200/80 pb-3">
                   <div className="flex items-center gap-2">
@@ -1178,7 +1427,6 @@ export const PaedisManagement = ({
                   />
                 </div>
 
-                {/* Pre-configuración de Accesibilidad Inicial */}
                 <div className="pt-3 border-t border-purple-200/80 space-y-2">
                   <span className="text-xs font-bold text-neutral-800 block">
                     Perfil de Accesibilidad Inicial (Pre-activación automática en el inicio de sesión):
@@ -1227,7 +1475,7 @@ export const PaedisManagement = ({
                 </div>
               </div>
 
-              {/* CAPA 2: AJUSTES RAZONABLES OPERATIVOS (AULA Y EVALUACIÓN - VIGENCIA SEMESTRAL) */}
+              {/* CAPA 2: AJUSTES RAZONABLES OPERATIVOS */}
               <div className="p-5 rounded-2xl bg-white border-2 border-neutral-200 space-y-4 shadow-2xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3">
                   <div className="flex items-center gap-2">
@@ -1244,7 +1492,6 @@ export const PaedisManagement = ({
                     </div>
                   </div>
 
-                  {/* Renovación Semestral con 1 Clic */}
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="text-right">
                       <span className="text-[10px] font-bold text-neutral-500 uppercase block">Vigencia</span>
@@ -1286,14 +1533,14 @@ export const PaedisManagement = ({
                   className="min-h-[44px] px-4 py-2 bg-white hover:bg-neutral-50 border border-neutral-300 text-brand-navy font-bold text-xs sm:text-sm rounded-xl inline-flex items-center gap-2 cursor-pointer shadow-2xs"
                 >
                   <FileText className="w-4 h-4 text-brand-navy" aria-hidden="true" />
-                  <span>Generar Ficha Docente ({formState.vigenciaSemestrePaedis || '2026-1'})</span>
+                  <span>Gestionar Ficha Docente ({selectedSheetMeta.label})</span>
                 </Button>
 
                 <Button
                   type="button"
                   disabled={isSaving}
                   onClick={() => {
-                    persistPaedisCase(false).catch((err) => {
+                    persistPaedisCase(null).catch((err) => {
                       console.error('[PaedisCaseManagement] Error guardando:', err);
                     });
                   }}
@@ -1315,12 +1562,10 @@ export const PaedisManagement = ({
         student={selectedStudent}
         adjustments={formState.ajustesAprobados}
         acknowledgments={formState.acusesDocentes}
+        sheetState={selectedSheetState}
+        sheetHistory={formState.fichaDocenteHistorial}
         onToggleAck={handleToggleTeacherAck}
-        onConfirmNotify={() => {
-          persistPaedisCase(true).catch((err) => {
-            console.error('[PaedisCaseManagement] Error notificando ficha:', err);
-          });
-        }}
+        onTransitionSheetState={(nextEstado, meta) => persistPaedisCase(nextEstado, meta)}
         isSaving={isSaving}
         announce={announce}
         getVoiceProps={getVoiceProps}

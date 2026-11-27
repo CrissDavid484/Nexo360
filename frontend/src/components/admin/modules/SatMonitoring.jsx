@@ -65,13 +65,15 @@ function getSatTriggerFactor(student) {
     const criticalCourse = courses.find((c) => {
       const pct = Number(c.attendancePercentage ?? 100);
       const abs = Number(c.consecutiveAbsences || 0);
-      return !c.paedisJustified && (pct < 75 || abs >= 3 || c.missedKeySession);
+      const minReq = Number(c.minAttendanceRequired ?? 70);
+      return !c.paedisJustified && (pct < minReq || abs >= 3 || c.missedKeySession);
     }) || courses[0];
 
     const pct = criticalCourse ? Math.round(Number(criticalCourse.attendancePercentage ?? 0) * 10) / 10 : 0;
     const abs = criticalCourse ? Number(criticalCourse.consecutiveAbsences || 0) : 0;
+    const minReq = Number(criticalCourse?.minAttendanceRequired ?? 70);
 
-    let triggerReason = (criticalCourse?.courseCode || 'Asignatura') + ' (' + (criticalCourse?.courseName || 'Ramo') + '): ' + pct + '% de asistencia (bajo el 70% exigido).';
+    let triggerReason = (criticalCourse?.courseCode || 'Asignatura') + ' (' + (criticalCourse?.courseName || 'Ramo') + '): ' + pct + `% de asistencia (bajo el ${minReq}% exigido).`;
     if (abs >= 3) triggerReason += ' Acumula ' + abs + ' inasistencias consecutivas.';
     if (criticalCourse?.missedKeySession) triggerReason += ' Falta a evaluación o certamen clave institucional.';
 
@@ -133,7 +135,7 @@ function getSatTriggerFactor(student) {
     courseCode: '',
     courseName: '',
     attendancePct: 100,
-    description: 'Todas las asignaturas monitoreadas presentan asistencia regular superior al 80% reglamentario.',
+    description: 'Todas las asignaturas monitoreadas presentan asistencia regular (≥75%).',
     boxClass: 'bg-emerald-50 border-emerald-300 text-emerald-950',
     badgeClass: 'bg-emerald-700 text-white',
     icon: CheckCircle2,
@@ -143,9 +145,13 @@ function getSatTriggerFactor(student) {
 
 function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
   const rawPct = extractCourseAttendanceRate(course);
-  const pct = Math.round(rawPct * 10) / 10;
+  const pct = rawPct === null ? null : Math.round(rawPct * 10) / 10;
   const isJustified = Boolean(course.paedisJustified);
-  const { status, label } = evaluateAttendanceStatus(pct, { isJustified, mode: 'sat75' });
+  const { status, label } = evaluateAttendanceStatus(pct, {
+    isJustified,
+    mode: 'ri70',
+    threshold: course.minAttendanceRequired ?? 70,
+  });
   const consecutiveAbs = Number(course.consecutiveAbsences || 0);
 
   const statusDotClass = isJustified
@@ -171,9 +177,8 @@ function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
     course.courseName +
     '. ' +
     label +
-    ', asistencia ' +
-    pct +
-    ' por ciento, ' +
+    (pct === null ? ', sin registros de asistencia' : ', asistencia ' + pct + ' por ciento') +
+    ', ' +
     consecutiveAbs +
     ' inasistencias consecutivas';
 
@@ -197,7 +202,7 @@ function SatCourseRow({ course, onSelectCourseForSimulation, getVoiceProps }) {
 
       <div className="flex items-center gap-3 shrink-0">
         <div className="text-right">
-          <span className={`text-xs font-black block leading-tight ${pctTextClass}`}>{pct}%</span>
+          <span className={`text-xs font-black block leading-tight ${pctTextClass}`}>{pct === null ? 'Sin datos' : `${pct}%`}</span>
           <span className="text-[10px] text-neutral-500 block leading-tight">
             {course.attendedSessions}/{course.totalSessions}
           </span>
@@ -351,6 +356,9 @@ export function SatMonitoring({ announce: announceProp, isCoordinator: propCoord
           announce('Asistencia de ' + simulationTarget.courseCode + ' restablecida exitosamente.', 'polite');
         } else {
           const actionLabels = {
+            future_class_attend: 'Proyectar próxima clase (+1 futura asistida)',
+            future_class_miss: 'Proyectar próxima clase (+1 futura inasistida)',
+            correct_past_attendance: 'Corregir registro pasado (+1 asistencia)',
             add_attendance: '+1 Asistencia',
             remove_absence: '1 Falta Menos',
             recover_to_70: 'Recuperar ≥70% (Evitar RI)',
@@ -359,7 +367,7 @@ export function SatMonitoring({ announce: announceProp, isCoordinator: propCoord
             add_absence: '+1 Falta (Inasistencia)',
             drop_below_70: 'Baja <70% (RI)',
             drop_below_75: 'Baja <75% (RI)',
-            paedis_justify: 'Licencia / Justificativo',
+            paedis_justify: 'Simulación Hipotética de Excepción',
           };
           const label = actionLabels[actionType] || actionType;
           setActiveSimulationInfo({
