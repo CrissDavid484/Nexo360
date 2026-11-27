@@ -1,76 +1,115 @@
 /**
  * CONTROLADOR VIVO DUOC UC
- * Endpoint protegido: GET /api/vivo-duoc/dashboard
- * Deriva identidad desde req.user.email (JWT Nexo360) — prevención IDOR
+ * Endpoints protegidos:
+ * - GET /api/vivo-duoc/dashboard
+ * - GET /api/vivo-duoc/profile
+ * - GET /api/vivo-duoc/attendance
+ * - GET /api/vivo-duoc/grades
+ * - GET /api/vivo-duoc/schedule
+ *
+ * Deriva identidad desde req.user (JWT Nexo360) — prevención IDOR.
  */
 
-const adapters = require('../services/adapters');
-const satAlertService = require('../services/satAlertService');
-const predictiveRiskService = require('../services/predictiveRiskService');
+const academicDataService = require('../services/academicDataService');
+
+function buildIdentityContext(req) {
+  return {
+    user: req.user,
+    email: req.user?.email,
+    role: req.user?.role || 'student',
+    targetEmail: req.query?.targetEmail || req.user?.email,
+  };
+}
 
 async function getDashboard(req, res) {
   try {
-    const nombreUsuario = req.user?.email?.split('@')[0];
-    if (!nombreUsuario) {
+    if (!req.user?.email) {
       return res.status(400).json({
         success: false,
         code: 'USER_EMAIL_REQUIRED',
-        message: 'No se pudo derivar el nombre de usuario desde la sesión autenticada',
+        message: 'No se pudo derivar el correo institucional desde la sesión autenticada',
       });
     }
 
-    const vivoDuocAdapter = adapters.vivoDuocAdapter;
-    if (vivoDuocAdapter.isLiveMode() && adapters.entraIdAdapter) {
-      vivoDuocAdapter.setEntraIdAdapter(adapters.entraIdAdapter);
-    }
+    const identityContext = buildIdentityContext(req);
+    const result = await academicDataService.getStudentAcademicDashboard(identityContext);
 
-    const dashboard = await vivoDuocAdapter.getFullDashboard(nombreUsuario);
+    if (!result.success) {
+      if (result.status === 'not_configured') {
+        return res.status(503).json({
+          success: false,
+          status: 'not_configured',
+          code: 'ACADEMIC_INTEGRATION_DISABLED',
+          message: result.message || 'Integración académica Duoc UC deshabilitada en esta sede o entorno',
+          source: 'none',
+        });
+      }
 
-    if (!dashboard.success) {
-      const statusCode = dashboard.code === 'DUOC_TOKEN_EXPIRED' ? 401 : 502;
+      if (result.code === 'DUOC_TOKEN_EXPIRED' || result.status === 'unauthorized') {
+        return res.status(401).json({
+          success: false,
+          status: 'unauthorized',
+          code: 'DUOC_TOKEN_EXPIRED',
+          message: 'El token de sesión de Vivo Duoc expiró.',
+          source: result.source,
+        });
+      }
+
+      if (result.code === 'FORBIDDEN_IDOR') {
+        return res.status(403).json({
+          success: false,
+          status: 'forbidden',
+          code: 'FORBIDDEN_IDOR',
+          message: result.message,
+        });
+      }
+
+      const statusCode = result.code === 'DUOC_UPSTREAM_ERROR' ? 502 : 500;
       return res.status(statusCode).json({
         success: false,
-        code: dashboard.code || 'DUOC_UPSTREAM_ERROR',
-        message: dashboard.message || 'Error consultando API Vivo Duoc',
-        source: dashboard.source,
+        status: result.status || 'unavailable',
+        code: result.code || 'DUOC_UPSTREAM_ERROR',
+        message: result.message || 'Error consultando API Vivo Duoc',
+        source: result.source,
       });
     }
 
-    const normalizedForSat = vivoDuocAdapter.normalizeForSatPredictive(dashboard);
-
-    let satEvaluation = null;
-    let predictiveRisk = null;
-
-    if (normalizedForSat) {
-      satEvaluation = satAlertService.evaluateStudentSat(normalizedForSat);
-      predictiveRisk = predictiveRiskService.calculatePredictiveRisk(normalizedForSat);
-    }
-
-    return res.json({
+    return res.status(200).json({
       success: true,
-      data: dashboard.data,
-      satEvaluation,
-      predictiveRisk,
-      meta: {
-        source: dashboard.source,
-        generatedAt: dashboard.generatedAt,
-        errors: dashboard.errors,
-      },
+      status: result.status, // 'complete' | 'partial'
+      source: result.source,
+      isSimulated: result.isSimulated,
+      data: result.data,
+      sections: result.sections,
+      sat: result.sat,
+      predictiveRisk: result.predictiveRisk,
+      meta: result.meta,
     });
   } catch (err) {
     console.error('[VivoDuocController] Error:', err.message);
 
-    if (err.message === 'DUOC_TOKEN_EXPIRED') {
+    if (err.code === 'FORBIDDEN_IDOR') {
+      return res.status(403).json({
+        success: false,
+        status: 'forbidden',
+        code: 'FORBIDDEN_IDOR',
+        message: err.message,
+      });
+    }
+
+    if (err.message === 'DUOC_TOKEN_EXPIRED' || err.code === 'DUOC_TOKEN_EXPIRED') {
       return res.status(401).json({
         success: false,
+        status: 'unauthorized',
         code: 'DUOC_TOKEN_EXPIRED',
         message: 'El token de sesión de Vivo Duoc expiró.',
       });
     }
 
-    if (err.message?.startsWith('DUOC_UPSTREAM_ERROR')) {
+    if (err.message?.startsWith('DUOC_UPSTREAM_ERROR') || err.code === 'DUOC_UPSTREAM_ERROR') {
       return res.status(502).json({
         success: false,
+        status: 'unavailable',
         code: 'DUOC_UPSTREAM_ERROR',
         message: err.message,
       });
@@ -84,4 +123,62 @@ async function getDashboard(req, res) {
   }
 }
 
-module.exports = { getDashboard };
+async function getProfile(req, res) {
+  try {
+    if (!req.user?.email) {
+      return res.status(400).json({ success: false, code: 'USER_EMAIL_REQUIRED' });
+    }
+    const result = await academicDataService.getStudentAcademicProfile(buildIdentityContext(req));
+    const status = result.status === 'not_configured' ? 503 : result.success ? 200 : 502;
+    return res.status(status).json(result);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function getAttendance(req, res) {
+  try {
+    if (!req.user?.email) {
+      return res.status(400).json({ success: false, code: 'USER_EMAIL_REQUIRED' });
+    }
+    const result = await academicDataService.getStudentAttendance(buildIdentityContext(req));
+    const status = result.status === 'not_configured' ? 503 : result.success ? 200 : 502;
+    return res.status(status).json(result);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function getGrades(req, res) {
+  try {
+    if (!req.user?.email) {
+      return res.status(400).json({ success: false, code: 'USER_EMAIL_REQUIRED' });
+    }
+    const result = await academicDataService.getStudentGrades(buildIdentityContext(req));
+    const status = result.status === 'not_configured' ? 503 : result.success ? 200 : 502;
+    return res.status(status).json(result);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function getSchedule(req, res) {
+  try {
+    if (!req.user?.email) {
+      return res.status(400).json({ success: false, code: 'USER_EMAIL_REQUIRED' });
+    }
+    const result = await academicDataService.getStudentSchedule(buildIdentityContext(req));
+    const status = result.status === 'not_configured' ? 503 : result.success ? 200 : 502;
+    return res.status(status).json(result);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = {
+  getDashboard,
+  getProfile,
+  getAttendance,
+  getGrades,
+  getSchedule,
+};
