@@ -69,7 +69,7 @@ export const ActivateAccountPage = () => {
       }
     }
 
-    checkToken();
+    void checkToken();
     return () => {
       isMounted = false;
     };
