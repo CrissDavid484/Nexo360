@@ -1,24 +1,41 @@
 services:
   # =====================================================================
-  # 1. BASE DE DATOS MONGODB 7 (Optimizada para VPS de bajo consumo de RAM)
+  # 1. BASE DE DATOS MONGODB 7 (Autenticada y optimizada para VPS 1GB RAM)
   # =====================================================================
   mongodb:
     image: mongo:7
     container_name: nexo360-mongodb
     restart: unless-stopped
     # Seguridad: Sin puertos expuestos públicamente; accesible solo dentro de la red interna
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_INITDB_ROOT_USERNAME:?Error: MONGO_INITDB_ROOT_USERNAME es obligatorio}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_INITDB_ROOT_PASSWORD:?Error: MONGO_INITDB_ROOT_PASSWORD es obligatorio}"
+      MONGO_INITDB_DATABASE: nexo360
+      MONGO_APP_USER: "${MONGO_APP_USER:?Error: MONGO_APP_USER es obligatorio}"
+      MONGO_APP_PASSWORD: "${MONGO_APP_PASSWORD:?Error: MONGO_APP_PASSWORD es obligatorio}"
     volumes:
       - nexo360_mongodb_data:/data/db
+      - ./backend/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - nexo360-net
-    # Límite de caché WiredTiger a 256MB para evitar agotamiento de memoria (OOM) en VPS de 1GB de RAM
-    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    # Autenticación obligatoria + límite WiredTiger a 256MB para evitar OOM en VPS
+    command: ["mongod", "--auth", "--wiredTigerCacheSizeGB", "0.25"]
+    mem_limit: 512m
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.75"
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\"",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
 
   # =====================================================================
   # 2. BACKEND API DE PRODUCCIÓN (Node.js 22 + Express + Mongoose 9)
@@ -33,15 +50,40 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - MONGODB_URI=mongodb://mongodb:27017/nexo360
-      - JWT_SECRET=${JWT_SECRET:?Error: JWT_SECRET es obligatorio en producción}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
-      - APP_PUBLIC_URL=${APP_PUBLIC_URL:-http://localhost}
+      - "MONGODB_URI=mongodb://${MONGO_APP_USER:?Error: MONGO_APP_USER es obligatorio}:${MONGO_APP_PASSWORD:?Error: MONGO_APP_PASSWORD es obligatorio}@mongodb:27017/nexo360?authSource=nexo360"
+      - "JWT_SECRET=${JWT_SECRET:?Error: JWT_SECRET es obligatorio en producción}"
+      - "FRONTEND_URL=${FRONTEND_URL:?Error: FRONTEND_URL es obligatorio en producción}"
+      - "APP_PUBLIC_URL=${APP_PUBLIC_URL:-${FRONTEND_URL}}"
+      - ENABLE_DEMO_ACCOUNTS=false
+      - ALLOW_IN_MEMORY_FALLBACK=false
+      - AZURE_ENTRA_TENANT_ID=${AZURE_ENTRA_TENANT_ID:-}
+      - AZURE_ENTRA_CLIENT_ID=${AZURE_ENTRA_CLIENT_ID:-}
+      - AZURE_ENTRA_CLIENT_SECRET=${AZURE_ENTRA_CLIENT_SECRET:-}
+      - AZURE_ENTRA_REDIRECT_URI=${AZURE_ENTRA_REDIRECT_URI:-}
+      - SICOL_API_URL=${SICOL_API_URL:-}
+      - SICOL_API_KEY=${SICOL_API_KEY:-}
+      - SICOL_CLIENT_ID=${SICOL_CLIENT_ID:-}
+      - LIBCAL_BASE_URL=${LIBCAL_BASE_URL:-}
+      - LIBCAL_CLIENT_ID=${LIBCAL_CLIENT_ID:-}
+      - LIBCAL_CLIENT_SECRET=${LIBCAL_CLIENT_SECRET:-}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
-      - SMTP_FROM=${SMTP_FROM:-Nexo360 Duoc UC <no-reply@duocuc.cl>}
+      - SMTP_FROM=${SMTP_FROM:-}
+    mem_limit: 384m
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.75"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/api/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       mongodb:
         condition: service_healthy
@@ -59,6 +101,12 @@ services:
     restart: unless-stopped
     ports:
       - "${APP_PORT:-80}:8080"
+    mem_limit: 128m
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.50"
     depends_on:
       backend:
         condition: service_healthy

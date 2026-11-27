@@ -1,0 +1,109 @@
+name: Nexo360 CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend Tests, Coverage & Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend --ignore-scripts
+
+      - name: Run backend tests with LCOV coverage
+        env:
+          NODE_ENV: test
+        run: npm run test:coverage --prefix backend
+
+      - name: Audit backend production dependencies
+        run: npm audit --prefix backend --audit-level=high --omit=dev
+
+      - name: Upload backend LCOV coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-lcov
+          path: backend/coverage/lcov.info
+          if-no-files-found: error
+
+  frontend:
+    name: Frontend Tests, Build & Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend --ignore-scripts
+
+      - name: Run frontend tests
+        run: npm test --prefix frontend
+
+      - name: Build frontend bundle (Vite)
+        run: npm run build --prefix frontend
+
+      - name: Audit frontend production dependencies
+        run: npm audit --prefix frontend --audit-level=high --omit=dev
+
+  docker-compose-check:
+    name: Validate Production Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.prod.yml syntax & interpolation
+        env:
+          MONGO_INITDB_ROOT_USERNAME: ci_root_user
+          MONGO_INITDB_ROOT_PASSWORD: ci_root_password_not_for_prod_123
+          MONGO_APP_USER: ci_nexo360_app
+          MONGO_APP_PASSWORD: ci_app_password_not_for_prod_123
+          JWT_SECRET: ci_dummy_jwt_secret_key_with_at_least_32_characters
+          FRONTEND_URL: https://nexo360.example.invalid
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
+  sonarqube:
+    name: SonarQube Scan
+    needs: [backend, frontend, docker-compose-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download backend LCOV coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-lcov
+          path: backend/coverage
+
+      - name: Run SonarQube analysis
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}

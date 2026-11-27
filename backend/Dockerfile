@@ -28,9 +28,9 @@ USER node
 # Exponer puerto de la API
 EXPOSE 5000
 
-# Verificación de salud nativa del contenedor (usando IPv4 127.0.0.1 para Alpine BusyBox)
-HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:5000/api/health || exit 1
+# Verificación de salud nativa del contenedor (readiness real contra MongoDB, IPv4 127.0.0.1 para Alpine BusyBox)
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:5000/api/health/ready || exit 1
 
 # Comando de inicio
 CMD ["node", "server.js"]

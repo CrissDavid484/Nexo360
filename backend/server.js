@@ -98,16 +98,93 @@ app.use(
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Health check de la API y estado de MongoDB (usado por Docker Healthcheck)
-app.get('/api/health', (req, res) => {
-  const dbStates = {
-    0: 'disconnected',
-    1: 'connected',
-    2: 'connecting',
-    3: 'disconnecting',
+const DB_STATES = Object.freeze({
+  0: 'disconnected',
+  1: 'connected',
+  2: 'connecting',
+  3: 'disconnecting',
+});
+
+const DISALLOWED_PRODUCTION_JWT_SECRETS = new Set([
+  'nexo360_duoc_paedis_secret_key_wcag_2026',
+  'genera_una_clave_jwt_robusta_y_segura_para_produccion_2026_duoc',
+]);
+
+function validateProductionConfig() {
+  if (process.env.NODE_ENV !== 'production') {
+    return;
+  }
+
+  const jwtSecret = String(process.env.JWT_SECRET || '').trim();
+  const normalizedJwt = jwtSecret.toLowerCase();
+  if (
+    !jwtSecret ||
+    jwtSecret.length < 32 ||
+    DISALLOWED_PRODUCTION_JWT_SECRETS.has(jwtSecret) ||
+    normalizedJwt.startsWith('genera_una_clave') ||
+    normalizedJwt.includes('<reemplazar_')
+  ) {
+    throw new Error(
+      'Configuración inválida en producción: JWT_SECRET es obligatorio, debe tener al menos 32 caracteres y no puede usar claves de desarrollo ni placeholders.'
+    );
+  }
+
+  const mongoUri = String(process.env.MONGODB_URI || '').trim();
+  if (!mongoUri || mongoUri.toLowerCase().includes('<reemplazar_')) {
+    throw new Error(
+      'Configuración inválida en producción: MONGODB_URI es obligatorio y debe apuntar a una instancia MongoDB válida.'
+    );
+  }
+
+  if (process.env.ENABLE_DEMO_ACCOUNTS === 'true') {
+    throw new Error(
+      'Configuración inválida en producción: ENABLE_DEMO_ACCOUNTS no puede estar habilitado en producción.'
+    );
+  }
+
+  if (process.env.ALLOW_IN_MEMORY_FALLBACK === 'true') {
+    throw new Error(
+      'Configuración inválida en producción: ALLOW_IN_MEMORY_FALLBACK no puede estar habilitado en producción.'
+    );
+  }
+}
+
+function getMongoHealthSnapshot() {
+  const readyState = mongoose.connection.readyState;
+  return {
+    isDbConnected: readyState === 1,
+    mongoState: DB_STATES[readyState] || 'unknown',
   };
-  const isDbConnected = mongoose.connection.readyState === 1;
-  const mongoState = dbStates[mongoose.connection.readyState] || 'unknown';
+}
+
+// Liveness check: verifica únicamente que el proceso Express esté vivo
+app.get('/api/health/live', (req, res) => {
+  res.status(200).json({
+    status: 'ALIVE',
+    service: 'Nexo360 Backend API',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Readiness check: responde 200 solo cuando MongoDB está conectado (readyState === 1)
+app.get('/api/health/ready', (req, res) => {
+  const { isDbConnected, mongoState } = getMongoHealthSnapshot();
+  const statusCode = isDbConnected ? 200 : 503;
+
+  res.status(statusCode).json({
+    status: isDbConnected ? 'READY' : 'NOT_READY',
+    database: {
+      engine: 'MongoDB',
+      status: mongoState,
+      connected: isDbConnected,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Health check de la API y estado de MongoDB (compatibilidad con auditorías y monitoreo)
+app.get('/api/health', (req, res) => {
+  const { isDbConnected, mongoState } = getMongoHealthSnapshot();
   const isProd = process.env.NODE_ENV === 'production';
   const isTest = process.env.NODE_ENV === 'test';
   const statusCode = (isDbConnected || isTest) ? 200 : 503;
@@ -166,6 +243,8 @@ app.use((err, req, res, next) => {
 });
 
 async function startServer() {
+  validateProductionConfig();
+
   try {
     await connectDB();
     await academicCalendarService.ensureSeedCalendars();
@@ -187,8 +266,10 @@ async function startServer() {
 if (require.main === module) {
   startServer().catch((err) => {
     console.error('[Server Fatal]:', err.message);
-    process.exitCode = 1;
+    process.exit(1);
   });
 }
+
+app.validateProductionConfig = validateProductionConfig;
 
 module.exports = app;

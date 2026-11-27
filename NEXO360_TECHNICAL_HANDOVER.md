@@ -2,102 +2,119 @@
 
 **Institución Destinataria:** Duoc UC — Dirección de Tecnologías de la Información & Coordinación PAEDIS  
 **Fecha de Entrega:** 26 de Noviembre de 2026  
-**Versión de Entrega:** 2.0.0-PROD  
+**Estado Técnico Global:** `PREPARADO TÉCNICAMENTE CON DEPENDENCIAS INSTITUCIONALES PENDIENTES`  
 **Repositorio de Código:** https://github.com/CrissDavid484/Nexo360  
-**Repositorio de Documentación:** https://github.com/DanielaD1az/Nexo360  
+**Repositorio de Documentación:** https://github.com/DanielaD1az/Nexo360
 
 ---
 
 ## 1. Visión General de la Arquitectura
 
-Nexo360 es una plataforma modular basada en la pila MERN (MongoDB, Express, React, Node.js) diseñada bajo principios de arquitectura limpia, accesibilidad universal (WCAG 2.2 AA/AAA) y cumplimiento estricto de la Ley N° 21.719 sobre Protección de Datos Personales en Chile.
+Nexo360 es una aplicación web modular basada en la pila MERN (MongoDB 7, Express, React 18, Node.js 22) orientada a la gestión estudiantil y el Programa de Apoyo a Estudiantes con Discapacidad (PAEDIS), con soporte WCAG 2.2 AA/AAA y controles técnicos alineados a la Ley N° 21.719.
 
 ```
 +-------------------------------------------------------------------------------+
 |                                  CLIENTE (SPA)                                |
-|  React 19 + Vite 6 + Tailwind CSS + Lucide Icons + LiveAnnouncer (A11y WCAG)  |
+|  React 18 + Vite 6 + Tailwind CSS + Lucide Icons + LiveAnnouncer (A11y WCAG)  |
 +-------------------------------------------------------------------------------+
-                                      │ HTTPS (CORS Filtrado)
+                                      │ HTTPS / HTTP (Nginx Reverse Proxy :8080)
                                       ▼
 +-------------------------------------------------------------------------------+
-|                            REVERSE PROXY (NGINX)                              |
-|           Terminación SSL + Cabeceras OWASP + Gzip + Cache Control            |
+|                            REVERSE PROXY (NGINX ALPINE)                       |
+|      Contenedor no-root (USER nginx) • Proxy /api/ -> backend:5000            |
 +-------------------------------------------------------------------------------+
-                                      │ Proxy Pass
+                                      │ HTTP interno (red nexo360-net)
                                       ▼
 +-------------------------------------------------------------------------------+
-|                         BACKEND API (EXPRESS / NODE.JS)                       |
-|  - Middleware: Auth JWT (HS256), RBAC, Permissions, RateLimiter, Helmet       |
-|  - Rutas: /api/auth, /api/admin, /api/courses, /api/calendar, /api/health     |
-|  - Controladores y Servicios Especializados                                   |
-|  - Adaptadores Externos: entraIdAdapter, sicolAdapter, libcalAdapter, smtp    |
+|                         BACKEND API (EXPRESS / NODE.JS 22)                    |
+|  - Contenedor no-root (USER node) • validateProductionConfig() fail-fast      |
+|  - Middleware: JWT HS256 (iss/aud/tokenVersion), RBAC, requirePermission      |
+|  - Rutas: /api/auth, /api/modules, /api/admin, /api/courses, /api/calendar    |
+|  - Salud: /api/health/live, /api/health/ready, /api/health                    |
+|  - Adaptadores: entraIdAdapter, sicolAdapter, libcalAdapter, smtpAdapter      |
 +-------------------------------------------------------------------------------+
-                                      │ Mongoose ODM (Conexión Autenticada)
+                                      │ Mongoose ODM (usuario readWrite en nexo360)
                                       ▼
 +-------------------------------------------------------------------------------+
-|                               MONGODB DATABASE                                |
-|  - users_profiles: Datos generales de estudiantes, docentes y directivos      |
-|  - paedis_records: Expedientes clínicos confidenciales segregados            |
-|  - attendance_simulations: Escenarios volátiles de prueba (TTL 7 días)        |
-|  - courses / academic_catalogs: Asignaturas y periodos oficiales Duoc UC      |
-|  - activity_logs: Bitácora inmutable de auditoría institucional               |
+|                          MONGODB 7 (--auth, WiredTiger 0.25GB)                |
+|  - users_profiles: Perfiles institucionales (campos clínicos legacy select:false)
+|  - paedis_records: Expedientes clínicos PAEDIS canónicos y Ficha Docente      |
+|  - student_interventions: Bitácora persistente de intervenciones              |
+|  - attendance_simulations: Escenarios SAT no destructivos (TTL 7 días)        |
+|  - courses / careers / sedes / academic_calendars / simulator_chart_snapshots |
+|  - activity_logs: Bitácora de auditoría institucional                         |
 +-------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Segregación del Modelo de Datos y Ley N° 21.719
+## 2. Modelo de Datos, Segregación PAEDIS y Ley N° 21.719
 
-Para dar cumplimiento legal y técnico irrestricto a la Ley N° 21.719, la base de datos no mezcla datos académicos generales con expedientes de salud o discapacidad:
-
-1. **`users_profiles` (`UserProfile.js`):** Almacena identificación, correo institucional, rol, preferencias de accesibilidad y matrícula. No contiene campos de diagnósticos clínicos ni notas confidenciales de la UAP.
-2. **`paedis_records` (`PaedisRecord.js`):** Contiene el diagnóstico declarado, la barrera evaluada, los ajustes razonables asignados y el historial de acuses docentes. Cuenta con índices en `userEmail` y `studentEmail`, y su acceso está restringido exclusivamente al rol `coordinador_paedis`.
-3. **`attendance_simulations` (`AttendanceSimulation.js`):** Registra las proyecciones formativas ejecutadas por administradores o coordinadores sobre el semáforo SAT. Se auto-elimina tras 7 días mediante un índice TTL de MongoDB (`expires: 604800`).
+1. **`users_profiles` (`backend/models/UserProfile.js`):**
+   - Almacena identificación institucional, rol, permisos granulares, `tokenVersion` (revocación de sesiones), `isBlocked`/`isActive`, preferencias de accesibilidad y matrícula.
+   - **Compatibilidad de migración:** `UserProfile.js` conserva los campos heredados `diagnosticoDeclarado` y `notasConfidencialesPaedis` marcados con `select: false`. Las rutas de creación/actualización (`createStudent`, `updatePaedisCase`) ya **no** escriben antecedentes clínicos en `UserProfile`, y los serializadores `toPublicProfile()` y `toAdminView()` los excluyen.
+   - **Migración idempotente:** `authService.syncPaedisRecordsMigration()` consulta explícitamente con `.select('+diagnosticoDeclarado +notasConfidencialesPaedis')` para trasladar datos heredados hacia `PaedisRecord` sin pérdida silenciosa.
+   - **Consentimiento (pendiente de revisión legal):** Los valores por defecto son `consentGiven: false`, `consentDate: null`, `legalBasis: 'PENDIENTE_REVISION_INSTITUCIONAL'` e `informationDelivered: false`.
+   - **Contraseñas:** `comparePassword()` acepta únicamente hashes `bcryptjs` (`$2a$` / `$2b$`), sin fallback en texto plano.
+2. **`paedis_records` (`backend/models/PaedisRecord.js`):**
+   - Colección canónica confidencial (`studentId`/`userId`, `studentEmail`/`userEmail`, `diagnosticoDeclarado`, `notasConfidenciales`, `ajustesRazonables`, `fichaDocenteEstado` con enum de 7 estados desde `BORRADOR` hasta `ACUSADA`, `fichaDocenteHistorial`, `tutorPaedisAsignado`).
+   - Invariante en `pre('validate')`: `fichaDocenteNotificada` solo vale `true` cuando `fichaDocenteEstado` es `'ENVIADA'`, `'ENTREGADA'` o `'ACUSADA'`. Descargar la ficha `.txt` en frontend transiciona a `'PREPARADA'`, nunca a notificada/enviada.
+3. **`student_interventions` (`backend/models/StudentIntervention.js`):**
+   - Registra intervenciones reales sobre estudiantes (`status` en `REGISTRADA`, `EN_SEGUIMIENTO`, `COMPLETADA`, `CANCELADA`) con `externalDerivationPerformed: false`, dejando explícito que las derivaciones requieren gestión manual del responsable asignado.
+4. **`attendance_simulations` (`backend/models/AttendanceSimulation.js`):**
+   - Persiste simulaciones SAT no destructivas (`TTL 7 días`) calculadas sobre el umbral reglamentario `70%` (`minAttendanceRequired`) y proyecciones separadas para clases futuras `(attended+1)/(total+1)` y correcciones pasadas `(attended+1)/total`.
 
 ---
 
 ## 3. Adaptadores de Integración Institucional (`backend/services/adapters/`)
 
-La plataforma provee una arquitectura de adaptadores desacoplada que permite funcionar tanto en modo autónomo (con base de datos local y simulaciones formativas) como en modo integrado con los sistemas centrales de Duoc UC:
+Todos los adaptadores están implementados como contratos desacoplados y probados localmente con simulaciones/mocks. **Ninguno ha sido ejecutado ni probado contra servidores reales de Duoc UC.**
 
-| Adaptador | Archivo | Función y Contrato | Estado Actual |
+| Adaptador | Archivo | Contrato Implementado | Estado Actual y Dependencia |
 | :--- | :--- | :--- | :--- |
-| **Microsoft Entra ID** | `entraIdAdapter.js` | Autenticación institucional OIDC / Azure AD con Tenant ID oficial de Duoc UC (`72fd0b5a...`). Mapea claims a roles y valida expiración y audiencia de tokens. | Preparado con fallback de desarrollo y validación estricta en producción. |
-| **SICOL / Banner** | `sicolAdapter.js` | Sincronización de nóminas y porcentaje de asistencia oficial desde el ERP académico. | Preparado con interfaz asíncrona y respaldo a MongoDB local. |
-| **Springshare LibCal** | `libcalAdapter.js` | Consulta y reserva de cubículos de estudio y visores de realidad virtual Meta Quest 3 en Biblioteca Alameda. | Preparado con sandbox formativo y endpoints OAuth2. |
-| **SMTP Institucional** | `smtpAdapter.js` | Envío de correos de bienvenida, recuperación de contraseñas y notificaciones PAEDIS con sanitización CRLF y prevención de inyección. | Totalmente operativo con servidor SMTP real o outbox de desarrollo. |
+| **Microsoft Entra ID** | `entraIdAdapter.js` | Flujo OIDC con PKCE `S256`, almacén de `state` de un solo uso (10 min), verificación de firma `RS256` contra JWKS y validación de `tid`/`nonce`/`exp`/`nbf` y dominio `@duocuc.cl`. Sin defaults heredados. | **BLOQUEADO POR CREDENCIALES:** Si faltan `AZURE_ENTRA_TENANT_ID`, `AZURE_ENTRA_CLIENT_ID`, `AZURE_ENTRA_CLIENT_SECRET` o `AZURE_ENTRA_REDIRECT_URI`, falla cerrado (`OIDC_NOT_CONFIGURED`). |
+| **SICOL / Banner** | `sicolAdapter.js` | Cliente HTTP con timeout y reintento único en `502`/`503`/`504`, leyendo `SICOL_API_URL`, `SICOL_API_KEY` y `SICOL_CLIENT_ID`. | **BLOQUEADO POR CREDENCIALES:** Sin `SICOL_API_URL` y `SICOL_API_KEY`, retorna `{ configured: false, mode: 'UNCONFIGURED', data: null }`. |
+| **Springshare LibCal** | `libcalAdapter.js` | Autenticación OAuth2 `client_credentials` contra `${baseUrl}/oauth/token` con caché por expiración. | **BLOQUEADO POR CREDENCIALES:** Sin configuración real, `reserveSpace()` opera como simulador formativo (`{ configured: false, isOfficialBooking: false, bookingId: null, mode: 'PRACTICE_SIMULATION' }`). |
+| **SMTP Institucional** | `smtpAdapter.js` | Envío de correos diferenciando estados `PREPARADO`, `ENVIADO_SMTP`, `MODO_PRUEBA_LOCAL` y `FALLIDO` sin reportar falsamente `ENTREGADO`. | **PENDIENTE CONFIGURACIÓN SMTP:** Requiere `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM` en producción para envío real. |
 
 ---
 
-## 4. Control de Acceso y Roles (RBAC)
+## 4. Control de Acceso (RBAC), Validación de Arranque y Salud
 
-Nexo360 define cuatro roles institucionales nativos:
-
-1. **`admin` / `administrador`:** Administrador TI de la plataforma. Gestiona usuarios, catálogos territoriales y de asignaturas, monitoreo de servidor y bitácora de auditoría. Por diseño de privacidad, no puede ver diagnósticos clínicos PAEDIS.
-2. **`coordinador_paedis`:** Gestor del Programa de Apoyo a Estudiantes con Discapacidad. Acceso exclusivo a `PaedisRecord`, emisión de Fichas Docentes y seguimiento de casos en SAT.
-3. **`profesor`:** Docente de aula. Consulta listas de estudiantes autorizadas y confirma acuse de recibo de ajustes razonables para su ramo.
-4. **`estudiante`:** Usuario final del portal estudiantil. Acceso a toma de ramos formativa, simulador de biblioteca, tickets de mesa de ayuda y configuración de accesibilidad. Bloqueado (403) ante cualquier ruta administrativa.
-
----
-
-## 5. Parámetros de Operación y Monitoreo
-
-### 5.1 Endpoint de Diagnóstico y Salud (`/api/health`)
-- **HTTP 200 OK:** El servidor Express está activo y MongoDB se encuentra en estado `readyState === 1` (conectado).
-- **HTTP 503 Service Unavailable:** MongoDB se encuentra desconectado, reiniciando o inaccesible. Este código permite a los orquestadores (Docker Swarm, Kubernetes, Render) detectar fallos reales de base de datos y no enmascarar caídas.
-
-### 5.2 Bitácora de Auditoría (`ActivityLog`)
-Cada operación de creación, actualización de privilegios, simulación SAT o consulta a expedientes PAEDIS genera un registro inmutable en `activity_logs`. El Administrador TI puede consultar y filtrar estos registros desde el panel `/admin` con protección contra expresiones regulares complejas (ReDoS).
+- **Roles y permisos (`authMiddleware.js`, `adminRoutes.js`):**
+  - `admin` / `administrador`: Gestión TI, catálogos, usuarios y bitácora `ActivityLog`. No tiene permisos clínicos PAEDIS (`paedis_read`/`paedis_write` removidos de `STAFF_ROLE_META.admin`) y recibe `403` en rutas PAEDIS confidenciales.
+  - `coordinador_paedis`: Gestión exclusiva de expedientes `PaedisRecord`, Fichas Docentes e intervenciones.
+  - `profesor` y `estudiante`: Restringidos a sus rutas autorizadas; `requirePermission()` valida permisos explícitamente incluso cuando `permissions` está vacío (`[]`), y cualquier cambio de rol/permisos incrementa `tokenVersion` para invalidar tokens previos.
+- **Validación *Fail-Fast* en Producción (`backend/server.js`):**
+  - `validateProductionConfig()` se ejecuta en `startServer()` cuando `NODE_ENV === 'production'` (no interfiere al importar `app` en tests) y aborta el arranque si:
+    1. `JWT_SECRET` falta, tiene `< 32` caracteres o coincide con secretos de desarrollo/placeholders (`nexo360_duoc_paedis_secret_key_wcag_2026`, `genera_una_clave...`, `<REEMPLAZAR_...>`).
+    2. `MONGODB_URI` falta o contiene `<REEMPLAZAR_...>`.
+    3. `ENABLE_DEMO_ACCOUNTS === 'true'` o `ALLOW_IN_MEMORY_FALLBACK === 'true'`.
+- **Endpoints de Salud (`backend/server.js`):**
+  - `GET /api/health/live`: HTTP `200` (`ALIVE`) si el proceso Express responde.
+  - `GET /api/health/ready`: HTTP `200` (`READY`) únicamente cuando `mongoose.connection.readyState === 1`; en cualquier otro estado responde HTTP `503` (`NOT_READY`). Usado por `HEALTHCHECK` en `backend/Dockerfile` y `docker-compose.prod.yml`.
+  - `GET /api/health`: HTTP `200` (`OK`) si MongoDB está conectado, HTTP `200` (`TEST_DEGRADED`) solo en `NODE_ENV === 'test'`, o HTTP `503` (`ERROR`) si está desconectado fuera de pruebas.
 
 ---
 
-## 6. Procedimientos de Mantenimiento Rutinario
+## 5. CI/CD, Calidad de Código y Verificación Actual
 
-### 6.1 Respaldo de Base de Datos
-Se recomienda programar una tarea cron diaria en el servidor anfitrión:
-```bash
-0 2 * * * docker exec nexo360-mongodb mongodump --uri="mongodb://root:PASS@localhost:27017/nexo360?authSource=admin" --out=/backups/mongo_$(date +\%F)
-```
+- **Pipeline CI (`.github/workflows/ci.yml`):**
+  - `backend`: `npm ci --prefix backend --ignore-scripts`, `npm run test:coverage --prefix backend` (genera `backend/coverage/lcov.info`), `npm audit --prefix backend --audit-level=high --omit=dev`.
+  - `frontend`: `npm ci --prefix frontend --ignore-scripts`, `npm test --prefix frontend`, `npm run build --prefix frontend`, `npm audit --prefix frontend --audit-level=high --omit=dev`.
+  - `docker-compose-check`: valida `docker compose -f docker-compose.prod.yml config --quiet`.
+  - `sonarqube`: descarga el artefacto LCOV y ejecuta `SonarSource/sonarqube-scan-action@v5` usando `sonar-project.properties` (`sonar.javascript.lcov.reportPaths=backend/coverage/lcov.info`) cuando `SONAR_TOKEN` está definido.
+- **Evidencia local verificada tras la última edición de código:**
+  - Backend: **172/172 pruebas aprobadas** (`node --test` y `npm run test:coverage --prefix backend`, **78.55% cobertura de líneas**).
+  - Frontend: **Tests 1–4** (`satSimulatorBidirectionalTest.mjs`), **Tests 1–6** (`dashboardSimulatorTest.mjs`), `courseImportPreviewTest.mjs` (`OK`) y `vite build` limpio (`1671 modules transformed`, `8.60s`).
+  - Auditoría de dependencias (`--omit=dev --audit-level=high`): `0` vulnerabilidades en `backend` y `frontend`.
 
-### 6.2 Rotación de Secretos
-Para rotar el `JWT_SECRET`, actualice la variable en `.env.production` y reinicie el contenedor backend (`docker compose restart backend`). Las sesiones activas de usuarios requerirán un nuevo inicio de sesión.
+---
+
+## 6. Resumen de Traspaso a Duoc UC (5 Bloques)
+
+1. **A. Trabajo de software restante (futuro):** Retirar los campos heredados `select: false` (`diagnosticoDeclarado`, `notasConfidencialesPaedis`) de `UserProfile.js` una vez verificada la migración en producción; sumar cobertura LCOV automatizada para frontend.
+2. **B. Infraestructura:** Aprovisionar host Linux, TLS/HTTPS en reverse proxy, completar `.env` desde `.env.prod.example` sin placeholders y confirmar almacenamiento persistente de `nexo360_mongodb_data`.
+3. **C. Autorizaciones y credenciales institucionales:** Entregar credenciales de Microsoft Entra ID, SICOL/Banner, LibCal, relé SMTP y secreto `SONAR_TOKEN` en GitHub.
+4. **D. Validaciones legales, seguridad y accesibilidad:** Aprobación jurídica Ley N° 21.719 (`consentGiven`, `legalBasis`), pruebas *fail-fast* en *staging* y auditoría manual con lector de pantalla (NVDA / VoiceOver).
+5. **E. Puesta en marcha y pruebas finales:** Arranque completo de `docker-compose.prod.yml` en *staging*, verificación de `mongo-init.js` y prueba controlada de respaldo/reversión (`mongodump` / `mongorestore`).

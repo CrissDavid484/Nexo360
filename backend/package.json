@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/qa.audit.test.js tests/excelParser.test.js tests/courses.admin.test.js tests/verifier.comprehensive.test.mjs tests/admin.registry.test.js tests/auth.scraper.ley21719.test.js tests/profileAccessibility.test.js tests/predictiveRisk.test.js tests/academicCalendar.snapshots.test.js tests/routingSecurity.test.js",
+    "test": "node --test tests/qa.audit.test.js tests/excelParser.test.js tests/courses.admin.test.js tests/verifier.comprehensive.test.mjs tests/admin.registry.test.js tests/auth.scraper.ley21719.test.js tests/profileAccessibility.test.js tests/predictiveRisk.test.js tests/academicCalendar.snapshots.test.js tests/routingSecurity.test.js tests/security.hardening.test.js tests/sat.paedis.risk.test.js",
+    "test:coverage": "node -e \"require('node:fs').mkdirSync('coverage',{recursive:true})\" && node --test --experimental-test-coverage --test-coverage-exclude=\"tests/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info tests/qa.audit.test.js tests/excelParser.test.js tests/courses.admin.test.js tests/verifier.comprehensive.test.mjs tests/admin.registry.test.js tests/auth.scraper.ley21719.test.js tests/profileAccessibility.test.js tests/predictiveRisk.test.js tests/academicCalendar.snapshots.test.js tests/routingSecurity.test.js tests/security.hardening.test.js tests/sat.paedis.risk.test.js",
     "parse:alameda": "node scripts/parseAlamedaMd.js"
   },
   "dependencies": {

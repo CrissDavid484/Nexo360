@@ -6,6 +6,8 @@ node_modules/
 # Producción y compilación
 dist/
 build/
+coverage/
+backend/coverage/
 
 # Variables de entorno sensibles (Zero-Knowledge)
 .env
