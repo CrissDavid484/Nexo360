@@ -37,6 +37,7 @@ class MicrosoftEntraIdAdapter {
     };
     this._authStateStore = new Map();
     this._jwksCache = null;
+    this._duocApiTokenCache = new Map();
   }
 
   get tenantId() {
@@ -433,20 +434,33 @@ class MicrosoftEntraIdAdapter {
 
   /**
    * Obtiene un access token válido para la API de Duoc UC.
-   * En producción, esto usaría el refresh token almacenado en la sesión del usuario
-   * para obtener un nuevo access token via On-Behalf-Of o flujo de refresh token.
-   * @param {string} userId - ID del usuario en Nexo360
+   * Si no está configurado OIDC, retorna null fail-closed.
+   * Si existe un token de servicio institucional o un token en caché para el usuario, lo retorna.
+   * @param {string} [userId] - ID del usuario en Nexo360
    * @returns {Promise<{accessToken: string, expiresIn: number}|null>}
    */
   async getAccessTokenForDuocApi(userId) {
     if (!this.isConfigured()) {
       return null;
     }
-    // Placeholder: en implementación real, recuperar refresh token de BD/sesión
-    // y hacer token refresh contra Microsoft Entra ID
-    // const refreshToken = await sessionStore.getRefreshToken(userId);
-    // const tokens = await this.refreshAccessToken(refreshToken);
-    // return { accessToken: tokens.access_token, expiresIn: tokens.expires_in };
+
+    if (userId && this._duocApiTokenCache?.has(userId)) {
+      const cached = this._duocApiTokenCache.get(userId);
+      if (cached && Date.now() < cached.expiresAt) {
+        return {
+          accessToken: cached.accessToken,
+          expiresIn: Math.max(1, Math.round((cached.expiresAt - Date.now()) / 1000)),
+        };
+      }
+    }
+
+    if (process.env.DUOC_API_SERVICE_TOKEN) {
+      return {
+        accessToken: process.env.DUOC_API_SERVICE_TOKEN,
+        expiresIn: 3600,
+      };
+    }
+
     return null;
   }
 

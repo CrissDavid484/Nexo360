@@ -921,14 +921,24 @@ export function generateTargetPackages(courses, difficulty = 'facil') {
       });
     }
 
-    if (selected.length < requiredRegularCount && cfg.jornada === 'Vespertino') {
+    if (selected.length < requiredRegularCount) {
       fillPackageCourses({
         courses: ASIGNATURAS_DISPONIBLES,
         selected,
         occupiedSlots,
         limit: requiredRegularCount,
+        filterBlock: cfg.filterBlock,
         jornada: cfg.jornada,
       });
+      if (selected.length < requiredRegularCount) {
+        fillPackageCourses({
+          courses: ASIGNATURAS_DISPONIBLES,
+          selected,
+          occupiedSlots,
+          limit: requiredRegularCount,
+          jornada: cfg.jornada,
+        });
+      }
       if (selected.length < requiredRegularCount) {
         fillPackageCourses({
           courses: CATALOGO_INFRAESTRUCTURA_TECNOLOGICA,

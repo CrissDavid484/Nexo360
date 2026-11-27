@@ -3,15 +3,7 @@
  * Gestiona sincronización de asignaturas, listas de clase y asistencias oficiales.
  */
 
-const RETRYABLE_HTTP_STATUSES = new Set([502, 503, 504]);
-
-function stripTrailingSlashes(url = '') {
-  let clean = String(url || '').trim();
-  while (clean.endsWith('/')) {
-    clean = clean.slice(0, -1);
-  }
-  return clean;
-}
+const { stripTrailingSlashes, fetchWithRetry } = require('./adapterUtils');
 
 class SicolAdapter {
   constructor(options = {}) {
@@ -39,20 +31,7 @@ class SicolAdapter {
   }
 
   async _fetchWithRetry(url, options = {}) {
-    const fetchFn = this.fetchImpl || fetch;
-    let lastResponse = null;
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await fetchFn(url, {
-        ...options,
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-      lastResponse = response;
-      if (response.ok || !RETRYABLE_HTTP_STATUSES.has(response.status) || attempt === 1) {
-        return response;
-      }
-    }
-    return lastResponse;
+    return fetchWithRetry(this.fetchImpl, url, options, this.timeoutMs);
   }
 
   /**

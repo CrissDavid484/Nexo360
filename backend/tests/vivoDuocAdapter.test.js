@@ -212,6 +212,40 @@ describe('VivoDuocAdapter — Tests Unitarios', () => {
         assert.ok(err.message.includes('DUOC_TOKEN_EXPIRED'));
       }
     });
+
+    test('getAccessTokenForDuocApi retorna null si no está configurado, y token si hay credencial configurada', async () => {
+      const entraIdAdapter = require('../services/adapters/entraIdAdapter');
+      const unconfigured = await entraIdAdapter.getAccessTokenForDuocApi('user123');
+      assert.equal(unconfigured, null);
+
+      const origToken = process.env.DUOC_API_SERVICE_TOKEN;
+      const origTenant = process.env.AZURE_ENTRA_TENANT_ID;
+      const origClient = process.env.AZURE_ENTRA_CLIENT_ID;
+      const origRedirect = process.env.AZURE_ENTRA_REDIRECT_URI;
+      const origSecret = process.env.AZURE_ENTRA_CLIENT_SECRET;
+      try {
+        process.env.AZURE_ENTRA_TENANT_ID = 'test-tenant';
+        process.env.AZURE_ENTRA_CLIENT_ID = 'test-client';
+        process.env.AZURE_ENTRA_REDIRECT_URI = 'https://nexo360.duoc.cl/auth/callback';
+        process.env.AZURE_ENTRA_CLIENT_SECRET = 'test-secret';
+        process.env.DUOC_API_SERVICE_TOKEN = 'token-institucional-123';
+
+        const tokenData = await entraIdAdapter.getAccessTokenForDuocApi('user123');
+        assert.ok(tokenData);
+        assert.equal(tokenData.accessToken, 'token-institucional-123');
+      } finally {
+        if (origToken !== undefined) process.env.DUOC_API_SERVICE_TOKEN = origToken;
+        else delete process.env.DUOC_API_SERVICE_TOKEN;
+        if (origTenant !== undefined) process.env.AZURE_ENTRA_TENANT_ID = origTenant;
+        else delete process.env.AZURE_ENTRA_TENANT_ID;
+        if (origClient !== undefined) process.env.AZURE_ENTRA_CLIENT_ID = origClient;
+        else delete process.env.AZURE_ENTRA_CLIENT_ID;
+        if (origRedirect !== undefined) process.env.AZURE_ENTRA_REDIRECT_URI = origRedirect;
+        else delete process.env.AZURE_ENTRA_REDIRECT_URI;
+        if (origSecret !== undefined) process.env.AZURE_ENTRA_CLIENT_SECRET = origSecret;
+        else delete process.env.AZURE_ENTRA_CLIENT_SECRET;
+      }
+    });
   });
 
   describe('Protección IDOR (deriva identidad desde email autenticado)', () => {
@@ -279,16 +313,27 @@ describe('VivoDuocAdapter — Tests Unitarios', () => {
   describe('VivoDuocController — Manejo HTTP 401, 502 y 500', () => {
     const { getDashboard } = require('../controllers/vivoDuocController');
 
-    test('400 si req.user.email no está presente', async () => {
-      let status = 0;
-      let body = null;
+    function createMockRes() {
       const res = {
-        status: (s) => { status = s; return res; },
-        json: (b) => { body = b; return res; },
+        statusCode: 0,
+        payload: null,
+        status(code) {
+          this.statusCode = code;
+          return this;
+        },
+        json(data) {
+          this.payload = data;
+          return this;
+        },
       };
+      return res;
+    }
+
+    test('400 si req.user.email no está presente', async () => {
+      const res = createMockRes();
       await getDashboard({ user: {} }, res);
-      assert.equal(status, 400);
-      assert.equal(body.code, 'USER_EMAIL_REQUIRED');
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.payload.code, 'USER_EMAIL_REQUIRED');
     });
 
     test('401 si error es DUOC_TOKEN_EXPIRED', async () => {
@@ -297,16 +342,11 @@ describe('VivoDuocAdapter — Tests Unitarios', () => {
         throw new Error('DUOC_TOKEN_EXPIRED');
       };
       try {
-        let status = 0;
-        let body = null;
-        const res = {
-          status: (s) => { status = s; return res; },
-          json: (b) => { body = b; return res; },
-        };
+        const res = createMockRes();
         await getDashboard({ user: { email: 'est.test@duocuc.cl' } }, res);
-        assert.equal(status, 401);
-        assert.equal(body.code, 'DUOC_TOKEN_EXPIRED');
-        assert.equal(body.message, 'El token de sesión de Vivo Duoc expiró.');
+        assert.equal(res.statusCode, 401);
+        assert.equal(res.payload.code, 'DUOC_TOKEN_EXPIRED');
+        assert.equal(res.payload.message, 'El token de sesión de Vivo Duoc expiró.');
       } finally {
         vivoDuocAdapter.getFullDashboard = origGetFull;
       }
@@ -318,16 +358,11 @@ describe('VivoDuocAdapter — Tests Unitarios', () => {
         throw new Error('DUOC_UPSTREAM_ERROR: HTTP 504 Gateway Timeout');
       };
       try {
-        let status = 0;
-        let body = null;
-        const res = {
-          status: (s) => { status = s; return res; },
-          json: (b) => { body = b; return res; },
-        };
+        const res = createMockRes();
         await getDashboard({ user: { email: 'est.test@duocuc.cl' } }, res);
-        assert.equal(status, 502);
-        assert.equal(body.code, 'DUOC_UPSTREAM_ERROR');
-        assert.equal(body.message, 'DUOC_UPSTREAM_ERROR: HTTP 504 Gateway Timeout');
+        assert.equal(res.statusCode, 502);
+        assert.equal(res.payload.code, 'DUOC_UPSTREAM_ERROR');
+        assert.equal(res.payload.message, 'DUOC_UPSTREAM_ERROR: HTTP 504 Gateway Timeout');
       } finally {
         vivoDuocAdapter.getFullDashboard = origGetFull;
       }
@@ -339,15 +374,10 @@ describe('VivoDuocAdapter — Tests Unitarios', () => {
         throw new Error('Unexpected crash in parsing');
       };
       try {
-        let status = 0;
-        let body = null;
-        const res = {
-          status: (s) => { status = s; return res; },
-          json: (b) => { body = b; return res; },
-        };
+        const res = createMockRes();
         await getDashboard({ user: { email: 'est.test@duocuc.cl' } }, res);
-        assert.equal(status, 500);
-        assert.equal(body.code, 'INTERNAL_ERROR');
+        assert.equal(res.statusCode, 500);
+        assert.equal(res.payload.code, 'INTERNAL_ERROR');
       } finally {
         vivoDuocAdapter.getFullDashboard = origGetFull;
       }

@@ -5,17 +5,24 @@
  * Prevención IDOR: deriva identidad desde req.user.email (JWT Nexo360)
  */
 
-const RETRYABLE_HTTP_STATUSES = new Set([502, 503, 504]);
+const { stripTrailingSlashes, fetchWithRetry } = require('./adapterUtils');
 
 const DUOC_BASE_URL = 'https://api-oci-ext-prd.duoc.cl';
 
-function stripTrailingSlashes(url = '') {
-  let clean = String(url || '').trim();
-  while (clean.endsWith('/')) {
-    clean = clean.slice(0, -1);
-  }
-  return clean;
-}
+const ALLOWED_VIVO_DUOC_ENDPOINTS = new Set([
+  '/InfoPersona/InfoPersona',
+  '/perfil-academico/v1/perfil-academico/perfilAcademico',
+  '/vivo/v1/matriculaVigente',
+  '/notas/v1/notas/notasAlumno',
+  '/modyo-duoc-api/attendances/me',
+  '/horario/v1/horario/horario',
+]);
+
+const ALLOWED_VIVO_DUOC_HOSTS = [
+  'api-oci-ext-prd.duoc.cl',
+  'localhost',
+  '127.0.0.1',
+];
 
 class VivoDuocAdapter {
   constructor(options = {}) {
@@ -80,20 +87,14 @@ class VivoDuocAdapter {
   }
 
   async _fetchWithRetry(url, options = {}) {
-    const fetchFn = this.fetchImpl || fetch;
-    let lastResponse = null;
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await fetchFn(url, {
-        ...options,
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-      lastResponse = response;
-      if (response.ok || !RETRYABLE_HTTP_STATUSES.has(response.status) || attempt === 1) {
-        return response;
-      }
+    const allowed = [...ALLOWED_VIVO_DUOC_HOSTS];
+    try {
+      const baseHost = new URL(this.baseUrl).hostname;
+      if (!allowed.includes(baseHost)) allowed.push(baseHost);
+    } catch {
+      // fallback a hosts permitidos
     }
-    return lastResponse;
+    return fetchWithRetry(this.fetchImpl, url, options, this.timeoutMs, allowed);
   }
 
   async _getAuthHeaders() {
@@ -135,15 +136,21 @@ class VivoDuocAdapter {
       return { ...mockResult, cached: false };
     }
 
-    const headers = await this._getAuthHeaders();
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) searchParams.set(k, v);
-    });
-    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
-    const url = `${this.baseUrl}${endpoint}${query}`;
+    if (!ALLOWED_VIVO_DUOC_ENDPOINTS.has(endpoint)) {
+      throw new Error(`[VivoDuocAdapter] Endpoint no autorizado: ${endpoint}`);
+    }
 
-    const response = await this._fetchWithRetry(url, { headers });
+    const headers = await this._getAuthHeaders();
+    const safeBaseUrl = this.baseUrl.startsWith('http') ? this.baseUrl : `https://${this.baseUrl}`;
+    const targetUrl = new URL(endpoint, safeBaseUrl);
+
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) {
+        targetUrl.searchParams.set(encodeURIComponent(String(k)), String(v));
+      }
+    });
+
+    const response = await this._fetchWithRetry(targetUrl.href, { headers });
 
     if (response.status === 401) {
       throw new Error('DUOC_TOKEN_EXPIRED');
