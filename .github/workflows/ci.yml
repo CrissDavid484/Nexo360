@@ -101,13 +101,20 @@ jobs:
           name: backend-lcov
           path: backend/coverage
 
-      - name: Report SonarQube configuration state
-        if: ${{ secrets.SONAR_TOKEN == '' }}
+      - name: Check SonarQube configuration
+        id: check-sonar
         run: |
-          echo "::warning title=SonarQube Not Configured::BLOQUEADO POR CONFIGURACIÓN: El secreto SONAR_TOKEN no está configurado en el repositorio GitHub. El análisis estático de SonarCloud/SonarQube queda suspendido a la espera de credenciales institucionales autorizadas."
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "has_token=false" >> $GITHUB_OUTPUT
+            echo "::warning title=SonarQube Not Configured::BLOQUEADO POR CONFIGURACIÓN: El secreto SONAR_TOKEN no está configurado en el repositorio GitHub. El análisis estático de SonarCloud/SonarQube queda suspendido a la espera de credenciales institucionales autorizadas."
+          else
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Run SonarQube analysis
-        if: ${{ secrets.SONAR_TOKEN != '' }}
+        if: steps.check-sonar.outputs.has_token == 'true'
         uses: SonarSource/sonarqube-scan-action@0303d6b62e310685c0e34d0b9cde218036885c4d # v5.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
