@@ -57,6 +57,10 @@ const VivoDuocSummaryView = lazyLoad(
   () => import('../components/views/VivoDuocSummaryView'),
   'VivoDuocSummaryView'
 );
+const AcademicDashboardSection = lazyLoad(
+  () => import('../components/dashboard/academic/AcademicDashboardSection'),
+  'AcademicDashboardSection'
+);
 const TomaRamosSimulator = lazyLoad(
   () => import('../components/simulation/TomaRamosSimulator'),
   'TomaRamosSimulator'
@@ -204,6 +208,7 @@ export const DashboardPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [faqExpanded, setFaqExpanded] = useState(null);
+  const [vivoViewMode, setVivoViewMode] = useState('academic');
 
   // Registrar uso del simulador para las métricas del panel de administración y restablecer scroll
   useEffect(() => {
@@ -1043,8 +1048,65 @@ export const DashboardPage = () => {
           )}
 
           {activeTab === 'vivo-duoc' && (
-            <div className="animate-fade-in-up">
-              <VivoDuocSummaryView />
+            <div className="animate-fade-in-up space-y-6">
+              {/* Selector de subvista: Panel Académico Oficial vs Manual y Guía de Servicios */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-2 shadow-xs flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5" role="tablist" aria-label="Modo de visualización Experiencia Vivo">
+                  <button
+                    type="button"
+                    role="tab"
+                    id="tab-vivo-academic"
+                    aria-selected={vivoViewMode === 'academic'}
+                    aria-controls="panel-vivo-academic"
+                    onClick={() => setVivoViewMode('academic')}
+                    className={`min-h-[44px] min-w-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                      vivoViewMode === 'academic'
+                        ? 'bg-brand-navy text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                    <span>Mi Panel Académico</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="tab"
+                    id="tab-vivo-manual"
+                    aria-selected={vivoViewMode === 'manual'}
+                    aria-controls="panel-vivo-manual"
+                    onClick={() => setVivoViewMode('manual')}
+                    className={`min-h-[44px] min-w-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49] ${
+                      vivoViewMode === 'manual'
+                        ? 'bg-brand-navy text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <BookOpen className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                    <span>Manual y Guía de Servicios</span>
+                  </button>
+                </div>
+
+                <span className="text-xs text-slate-500 px-2 hidden md:inline">
+                  {vivoViewMode === 'academic'
+                    ? 'Datos oficiales y analítica en tiempo real'
+                    : 'Instrucciones y accesos directos al portal'}
+                </span>
+              </div>
+
+              {vivoViewMode === 'academic' ? (
+                <div id="panel-vivo-academic" role="tabpanel" aria-labelledby="tab-vivo-academic">
+                  <AcademicDashboardSection
+                    onNavigateToSat={() => handleTabChange('toma-ramos')}
+                    onNavigateToManual={() => setVivoViewMode('manual')}
+                    onNavigateToHelpCenter={() => handleTabChange('centro-ayuda')}
+                  />
+                </div>
+              ) : (
+                <div id="panel-vivo-manual" role="tabpanel" aria-labelledby="tab-vivo-manual">
+                  <VivoDuocSummaryView />
+                </div>
+              )}
             </div>
           )}
 
