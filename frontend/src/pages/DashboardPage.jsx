@@ -360,12 +360,12 @@ export const DashboardPage = () => {
                 <div
                   role="note"
                   aria-label="Indicación para comenzar búsqueda de trámites"
-                  {...getVoiceProps('Comienza la búsqueda de tus trámites aquí')}
-                  className="mt-4 inline-flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-amber-50 border border-amber-300 border-l-4 border-l-brand-gold text-brand-navy shadow-2xs"
+                  {...getVoiceProps('¡Comienza la búsqueda de tus trámites aquí!')}
+                  className="mt-4 inline-flex items-center gap-2.5 text-brand-navy"
                 >
-                  <Compass className="w-4 h-4 text-brand-navy shrink-0" aria-hidden="true" />
-                  <p className="text-sm font-bold text-brand-navy leading-snug">
-                    Comienza la búsqueda de tus trámites aquí
+                  <Compass className="w-5 h-5 text-brand-navy shrink-0" aria-hidden="true" />
+                  <p className="text-base sm:text-lg font-bold text-brand-navy leading-snug tracking-tight">
+                    ¡Comienza la búsqueda de tus trámites aquí!
                   </p>
                 </div>
               </div>
