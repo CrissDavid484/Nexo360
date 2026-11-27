@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const authService = require('../services/authService');
+const entraIdAdapter = require('../services/adapters/entraIdAdapter');
 const {
   EMAIL_REGEX,
   UUID_V4_REGEX,
@@ -6,6 +8,10 @@ const {
   normalizeInstitutionalEmail,
   sanitizeAccessibilityPreferences,
 } = require('../utils/validationUtils');
+
+function isDemoModeEnabled() {
+  return process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO_ACCOUNTS === 'true';
+}
 
 /**
  * Valida y normaliza un correo institucional del cuerpo de la solicitud.
@@ -70,36 +76,166 @@ function ensureRegisteredForSimulator(req, res) {
 }
 
 /**
- * Helper para obtener o crear el perfil del estudiante autenticado.
+ * Obtiene el perfil del usuario registrado en BD o store non-prod (sin auto-creación).
  */
-async function getOrCreateActiveUserProfile(reqUser) {
+async function getActiveRegisteredUserProfile(reqUser) {
   if (!reqUser || !reqUser.email) {
     const err = new Error('Usuario no autenticado');
     err.statusCode = 401;
     throw err;
   }
-  const user = await authService.findOrCreateUserProfile(reqUser.email);
+  const user = await authService.findRegisteredUser(reqUser.email.trim().toLowerCase(), false);
+  if (!user) {
+    const err = new Error('Usuario no encontrado o sesión revocada.');
+    err.statusCode = 401;
+    throw err;
+  }
   return authService.formatUserResponse(user);
 }
+
+/**
+ * GET /api/auth/oidc/status
+ */
+exports.getOidcStatus = (req, res) =>
+  res.status(200).json({
+    success: true,
+    enabled: entraIdAdapter.isConfigured(),
+    demoModeEnabled: isDemoModeEnabled(),
+  });
+
+/**
+ * GET /api/auth/oidc/authorize
+ */
+exports.getOidcAuthorize = (req, res) => {
+  if (!entraIdAdapter.isConfigured()) {
+    return res.status(503).json({
+      success: false,
+      code: 'OIDC_NOT_CONFIGURED',
+      message: 'Microsoft Entra ID OIDC no está configurado en este entorno.',
+    });
+  }
+
+  try {
+    const loginHint = typeof req.query?.loginHint === 'string' ? req.query.loginHint : '';
+    const prompt = typeof req.query?.prompt === 'string' ? req.query.prompt : 'select_account';
+    const authReq = entraIdAdapter.createAuthorizationRequest({ prompt, loginHint });
+    return res.status(200).json({
+      success: true,
+      authorizeUrl: authReq.url,
+      url: authReq.url,
+      state: authReq.state,
+      expiresAt: authReq.expiresAt,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 503).json({
+      success: false,
+      code: error.code || 'OIDC_AUTHORIZE_ERROR',
+      message: error.message || 'No se pudo iniciar el flujo OIDC con Microsoft Entra ID.',
+    });
+  }
+};
+
+/**
+ * POST /api/auth/oidc/callback
+ */
+exports.oidcCallback = async (req, res) => {
+  if (!entraIdAdapter.isConfigured()) {
+    return res.status(503).json({
+      success: false,
+      code: 'OIDC_NOT_CONFIGURED',
+      message: 'Microsoft Entra ID OIDC no está configurado en este entorno.',
+    });
+  }
+
+  try {
+    const { code, state } = req.body || {};
+    if (typeof code !== 'string' || !code.trim() || typeof state !== 'string' || !state.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren los parámetros code y state de autorización OIDC.',
+      });
+    }
+
+    const authState = entraIdAdapter.consumeAuthorizationState(state.trim());
+    const tokenResponse = await entraIdAdapter.exchangeCodeForTokens(code.trim(), {
+      codeVerifier: authState.codeVerifier,
+    });
+    const rawIdToken = tokenResponse?.id_token || tokenResponse?.idToken;
+    if (!rawIdToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'Microsoft Entra ID no entregó un id_token válido.',
+      });
+    }
+
+    const verifiedProfile = await entraIdAdapter.validateIdToken(rawIdToken, {
+      expectedNonce: authState.nonce,
+    });
+    const oidcResult = await authService.completeOidcLogin(verifiedProfile);
+
+    return res.status(200).json({
+      success: true,
+      status: 'COMPLETED',
+      token: oidcResult.token,
+      user: oidcResult.user,
+      isRegisteredInDb: oidcResult.isRegisteredInDb,
+      officialLoginUrl: oidcResult.officialLoginUrl,
+      message: 'Sesión institucional iniciada exitosamente mediante Microsoft Entra ID.',
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        code: error.code,
+        message: error.message,
+      });
+    }
+    console.error('[AuthController] Error en oidcCallback.');
+    return res.status(401).json({
+      success: false,
+      message: 'No se pudo validar la autenticación con Microsoft Entra ID.',
+    });
+  }
+};
+
+/**
+ * GET /api/auth/demo-accounts
+ */
+exports.getDemoAccounts = (req, res) => {
+  if (!isDemoModeEnabled()) {
+    return res.status(404).json({
+      success: false,
+      message: 'Recurso no disponible.',
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    accounts: authService.getDemoAccountsSummary(),
+  });
+};
 
 /**
  * GET /api/auth/users
  */
 exports.getInstitutionalUsers = async (req, res) => {
   try {
-    const isProd = process.env.NODE_ENV === 'production';
-    const isDemoEnabled = process.env.ENABLE_DEMO_ACCOUNTS === 'true';
-
-    // En producción estricta sin cuentas demo activas, bloquear enumeración anónima
-    if (isProd && !isDemoEnabled && !req.user) {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'Acceso no autorizado: la consulta de usuarios requiere sesión activa en producción.',
+        message: 'Acceso no autorizado: la consulta de usuarios requiere sesión activa.',
+      });
+    }
+
+    if (process.env.NODE_ENV === 'production' && mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        success: false,
+        message: 'Servicio temporalmente no disponible: base de datos desconectada.',
       });
     }
 
     const users = await authService.getAllUsers();
-    const callerRole = req.user?.role;
+    const callerRole = String(req.user.role || '').toLowerCase();
     const isPaedisCoord = callerRole === 'coordinador_paedis';
     const isAdmin = callerRole === 'admin' || callerRole === 'administrador';
 
@@ -126,43 +262,113 @@ exports.getInstitutionalUsers = async (req, res) => {
 
 /**
  * POST /api/auth/sso-login
+ * NUNCA emite sesión desde un correo arbitrario, idToken no verificado o code no verificado.
  */
 exports.ssoLogin = async (req, res) => {
   try {
-    const isProd = process.env.NODE_ENV === 'production';
-    const isDemoEnabled = process.env.ENABLE_DEMO_ACCOUNTS === 'true';
+    const body = req.body || {};
+    const hasIdToken = typeof body.idToken === 'string' && body.idToken.trim().length > 0;
+    const hasCode = typeof body.code === 'string' && body.code.trim().length > 0;
 
-    // En producción estricta sin demo, no se permite emisión de tokens directos sin verificación de credenciales
-    if (isProd && !isDemoEnabled && !req.body?.idToken && !req.body?.code) {
+    if (hasIdToken || hasCode) {
+      if (!entraIdAdapter.isConfigured()) {
+        return res.status(503).json({
+          success: false,
+          code: 'OIDC_NOT_CONFIGURED',
+          message: 'Microsoft Entra ID OIDC no está configurado para validar credenciales SSO.',
+        });
+      }
+
+      let verifiedProfile;
+      if (hasCode) {
+        if (typeof body.state !== 'string' || !body.state.trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'El flujo de código OIDC requiere el parámetro state.',
+          });
+        }
+        const authState = entraIdAdapter.consumeAuthorizationState(body.state.trim());
+        const tokenResponse = await entraIdAdapter.exchangeCodeForTokens(body.code.trim(), {
+          codeVerifier: authState.codeVerifier,
+        });
+        const rawIdToken = tokenResponse?.id_token || tokenResponse?.idToken;
+        if (!rawIdToken) {
+          return res.status(401).json({
+            success: false,
+            message: 'No se recibió un id_token válido desde Microsoft Entra ID.',
+          });
+        }
+        verifiedProfile = await entraIdAdapter.validateIdToken(rawIdToken, {
+          expectedNonce: authState.nonce,
+        });
+      } else {
+        let expectedNonce;
+        if (typeof body.state === 'string' && body.state.trim()) {
+          const authState = entraIdAdapter.consumeAuthorizationState(body.state.trim());
+          expectedNonce = authState.nonce;
+        }
+        verifiedProfile = await entraIdAdapter.validateIdToken(body.idToken.trim(), {
+          expectedNonce,
+        });
+      }
+
+      const ssoResult = await authService.completeOidcLogin(verifiedProfile);
+      return res.status(200).json({
+        success: true,
+        status: 'COMPLETED',
+        token: ssoResult.token,
+        user: ssoResult.user,
+        isRegisteredInDb: ssoResult.isRegisteredInDb,
+        officialLoginUrl: ssoResult.officialLoginUrl,
+        message: 'Sesión institucional iniciada exitosamente en Nexo360.',
+      });
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(entraIdAdapter.isConfigured() ? 401 : 503).json({
+        success: false,
+        message:
+          'En entorno de producción, el inicio de sesión institucional requiere autenticación formal verificada con Microsoft Entra ID.',
+      });
+    }
+
+    if (!isDemoModeEnabled()) {
       return res.status(401).json({
         success: false,
-        message: 'En entorno de producción, el inicio de sesión institucional requiere autenticación formal con Microsoft Entra ID.',
+        message:
+          'El inicio de sesión SSO directo requiere credenciales verificadas de Microsoft Entra ID.',
       });
     }
 
     const cleanEmail = parseInstitutionalEmailOrReply(
-      req.body?.email,
+      body.email,
       res,
       'Por favor ingrese o seleccione su correo institucional de Duoc UC.'
     );
     if (!cleanEmail) return;
 
-    const ssoResult = await authService.completeSsoLogin(cleanEmail);
-
+    const demoResult = await authService.completeDemoSsoLogin(cleanEmail);
     return res.status(200).json({
       success: true,
       status: 'COMPLETED',
-      token: ssoResult.token,
-      user: ssoResult.user,
-      isRegisteredInDb: ssoResult.isRegisteredInDb,
-      officialLoginUrl: ssoResult.officialLoginUrl,
-      message: 'Sesión institucional iniciada exitosamente en Nexo360.',
+      token: demoResult.token,
+      user: demoResult.user,
+      isRegisteredInDb: demoResult.isRegisteredInDb,
+      officialLoginUrl: demoResult.officialLoginUrl,
+      message: 'Sesión institucional demo iniciada en Nexo360.',
     });
-  } catch {
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        code: error.code,
+        message: error.message,
+      });
+    }
     console.error('[AuthController] Error en ssoLogin.');
     return res.status(500).json({
       success: false,
-      message: 'Error al validar el usuario en la base de datos de Nexo360.',
+      message: 'Error al validar la sesión institucional en Nexo360.',
     });
   }
 };
@@ -266,7 +472,7 @@ exports.recordSimulatorUsage = async (req, res) => {
  */
 exports.getProfile = async (req, res) => {
   try {
-    const user = await getOrCreateActiveUserProfile(req.user);
+    const user = await getActiveRegisteredUserProfile(req.user);
     return res.status(200).json({
       success: true,
       user,
@@ -424,7 +630,7 @@ exports.updatePhoto = async (req, res) => {
 exports.getTomaRamos = async (req, res) => {
   try {
     if (!ensureRegisteredForSimulator(req, res)) return;
-    const user = await getOrCreateActiveUserProfile(req.user);
+    const user = await getActiveRegisteredUserProfile(req.user);
     return res.status(200).json({
       success: true,
       enrolledCourses: user.enrolledCourses || [],
@@ -531,7 +737,6 @@ exports.forgotPassword = async (req, res) => {
     const isProd = process.env.NODE_ENV === 'production';
     const isTest = process.env.NODE_ENV === 'test';
 
-    // En suite de tests mantenemos respuesta anti-enumeración idéntica
     if (isTest) {
       return res.status(200).json({
         success: true,
@@ -542,7 +747,6 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    // Si el correo no está registrado en la base de datos de Nexo360
     if (!result.delivered && result.deliveryMode === 'none') {
       return res.status(404).json({
         success: false,
@@ -676,7 +880,7 @@ exports.getLey21719Info = (req, res) =>
       ],
       consentMetadata: {
         version: '1.0 - Ley 21.719',
-        consentGivenByDefault: true,
+        consentGivenByDefault: false,
         dataRetention: 'Periodo académico activo conforme a Ley N° 21.719',
         rightsARCO: 'Acceso, Rectificación, Cancelación y Oposición garantizados',
       },
