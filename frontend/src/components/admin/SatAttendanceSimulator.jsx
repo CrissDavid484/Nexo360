@@ -319,21 +319,6 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
 
   return (
     <div className="space-y-6">
-      {/* Aviso explícito de alcance informativo */}
-      <div
-        role="note"
-        aria-label="Aviso de alcance de la simulación"
-        {...getVoiceProps(
-          'Simulador informativo: las proyecciones y correcciones simuladas no modifican la asistencia oficial en Vivo Duoc ni otorgan excepciones oficiales.'
-        )}
-        className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 border-l-4 border-l-[#FFB81C] text-xs text-neutral-900 flex items-start gap-2.5"
-      >
-        <Info className="w-4 h-4 text-[#002B49] shrink-0 mt-0.5" aria-hidden="true" />
-        <p className="leading-relaxed">
-          <strong>Simulador informativo (sin efectos oficiales):</strong> las proyecciones y simulaciones no modifican la asistencia oficial en Vivo Duoc/SAP ni otorgan excepciones o justificaciones formales.
-        </p>
-      </div>
-
       {/* Barra superior de encabezado y reset exacto */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100">
         <div className="space-y-1">
