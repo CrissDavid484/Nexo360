@@ -162,14 +162,16 @@ function validateProductionConfig() {
   }
 
   if (process.env.ENABLE_DEMO_ACCOUNTS === 'true') {
-    throw new Error(
-      'Configuración inválida en producción: ENABLE_DEMO_ACCOUNTS no puede estar habilitado en producción.'
+    process.env.ENABLE_DEMO_ACCOUNTS = 'false';
+    console.warn(
+      '[Configuración Producción / Render Advertencia]: ENABLE_DEMO_ACCOUNTS no puede estar activo en producción. Se desactivó automáticamente para proteger la seguridad institucional y permitir el arranque del servicio.'
     );
   }
 
   if (process.env.ALLOW_IN_MEMORY_FALLBACK === 'true') {
-    throw new Error(
-      'Configuración inválida en producción: ALLOW_IN_MEMORY_FALLBACK no puede estar habilitado en producción.'
+    process.env.ALLOW_IN_MEMORY_FALLBACK = 'false';
+    console.warn(
+      '[Configuración Producción / Render Advertencia]: ALLOW_IN_MEMORY_FALLBACK fue desactivado automáticamente en producción.'
     );
   }
 }
