@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { verifyToken } = require('../middleware/authMiddleware');
+const { verifyToken, optionalToken } = require('../middleware/authMiddleware');
 const { createRateLimiter } = require('../middleware/rateLimitMiddleware');
 
 const loginLimiter = createRateLimiter({
@@ -22,8 +22,8 @@ const passwordRecoveryLimiter = createRateLimiter({
   message: 'Demasiados intentos de recuperación de contraseña. Intente nuevamente en 15 minutos.',
 });
 
-// Rutas públicas de autenticación institucional
-router.get('/users', authController.getInstitutionalUsers);
+// Rutas de autenticación institucional
+router.get('/users', optionalToken, authController.getInstitutionalUsers);
 router.get('/ley21719', authController.getLey21719Info);
 router.post('/sso-login', loginLimiter, authController.ssoLogin);
 router.post('/login', loginLimiter, authController.login);

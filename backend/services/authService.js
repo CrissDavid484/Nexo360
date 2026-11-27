@@ -1119,6 +1119,7 @@ class AuthService {
       email: user.email,
       role: user.role,
       fullName: user.fullName || user.nombre,
+      permissions: Array.isArray(user.permissions) ? user.permissions : [],
       isPaedis: user.isPaedis,
       isRegisteredInDb: user.isRegisteredInDb !== false,
       career: user.career,

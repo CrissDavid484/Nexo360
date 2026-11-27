@@ -3,7 +3,15 @@
  * Incluye control de timeout (AbortController), manejo seguro de JSON y validación HTTP.
  */
 
-const rawApiUrl = (import.meta.env?.VITE_API_URL || '').trim().replace(/\/+$/, '');
+function stripTrailingSlash(url) {
+  let val = String(url || '').trim();
+  while (val.endsWith('/')) {
+    val = val.slice(0, -1);
+  }
+  return val;
+}
+
+const rawApiUrl = stripTrailingSlash(import.meta.env?.VITE_API_URL || '');
 const API_BASE = rawApiUrl
   ? (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`)
   : '/api';

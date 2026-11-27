@@ -1600,11 +1600,42 @@ exports.simulateSatCourse = async (req, res) => {
         typeof req.body.paedisJustified === 'boolean' ? req.body.paedisJustified : undefined,
     });
 
-    user.courseAttendance = updatedCourses;
-    const satEval = satAlertService.evaluateStudentSat(user);
+    // Simulación en memoria: no mutar user.courseAttendance en MongoDB ni llamar a user.save()
+    const simulatedStudent = {
+      ...(user.toObject ? user.toObject() : user),
+      courseAttendance: updatedCourses,
+    };
+    const satEval = satAlertService.evaluateStudentSat(simulatedStudent);
 
-    if (typeof user.save === 'function') {
-      await user.save();
+    // Persistir escenario volátil en AttendanceSimulation con TTL de 7 días (si la BD está conectada)
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const AttendanceSimulation = require('../models/AttendanceSimulation');
+        const origCourse = currentAttendance.find((c) => c.courseCode === rawCourseCode);
+        const simCourse = updatedCourses.find((c) => c.courseCode === rawCourseCode);
+        const basePct = origCourse ? (origCourse.attendancePercentage ?? origCourse.asistencia ?? 0) : 0;
+        const simPct = simCourse ? (simCourse.attendancePercentage ?? simCourse.asistencia ?? 0) : 0;
+
+        const rawDocId = user._id || user.id;
+        const validObjectId =
+          rawDocId && mongoose.Types.ObjectId.isValid(rawDocId)
+            ? new mongoose.Types.ObjectId(rawDocId)
+            : undefined;
+
+        await AttendanceSimulation.create({
+          userId: validObjectId,
+          userEmail: user.email,
+          courseCode: rawCourseCode,
+          actionApplied: rawAction.toUpperCase().includes('PAEDIS')
+            ? 'CUSTOM_STEPPER'
+            : (rawAction.toUpperCase() || 'CUSTOM_STEPPER'),
+          baselinePercentage: basePct,
+          simulatedPercentage: simPct,
+          deltaPercentage: Math.round((simPct - basePct) * 10) / 10,
+        });
+      } catch (simErr) {
+        console.warn('[AdminController] Escenario de simulación no registrado en BD:', simErr.message);
+      }
     }
 
     await authService.logActivity({
@@ -1624,11 +1655,11 @@ exports.simulateSatCourse = async (req, res) => {
       },
     });
 
-    const formatted = authService.formatUserResponse(user);
+    const formatted = authService.formatUserResponse(simulatedStudent);
 
     return res.status(200).json({
       success: true,
-      message: 'Simulación de corte semanal SAP aplicada exitosamente.',
+      message: 'Simulación de corte semanal SAP aplicada exitosamente (no destructiva).',
       student: {
         ...formatted,
         satEvaluation: satEval,

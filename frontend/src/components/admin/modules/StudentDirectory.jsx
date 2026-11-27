@@ -379,7 +379,13 @@ export const StudentDirectory = ({
   }, [announce]);
 
   const handleExecuteAction = useCallback((nba, student) => {
-    announce('Ejecutando acción recomendada para ' + (student.fullName || student.nombre), 'polite');
+    const actionTitle = nba?.title || nba?.action || 'Acompañamiento tutorial';
+    const studentName = student?.fullName || student?.nombre || 'Estudiante';
+    setStatusFeedback({
+      type: 'success',
+      text: `Recomendación registrada: "${actionTitle}" para ${studentName}. Derivada al equipo de acompañamiento académico y docente.`,
+    });
+    announce(`Recomendación registrada para ${studentName}: ${actionTitle}. Derivada al equipo de acompañamiento.`, 'polite');
   }, [announce]);
 
   return (

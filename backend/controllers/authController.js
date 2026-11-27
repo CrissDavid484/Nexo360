@@ -87,6 +87,17 @@ async function getOrCreateActiveUserProfile(reqUser) {
  */
 exports.getInstitutionalUsers = async (req, res) => {
   try {
+    const isProd = process.env.NODE_ENV === 'production';
+    const isDemoEnabled = process.env.ENABLE_DEMO_ACCOUNTS === 'true';
+
+    // En producción estricta sin cuentas demo activas, bloquear enumeración anónima
+    if (isProd && !isDemoEnabled && !req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Acceso no autorizado: la consulta de usuarios requiere sesión activa en producción.',
+      });
+    }
+
     const users = await authService.getAllUsers();
     const callerRole = req.user?.role;
     const isPaedisCoord = callerRole === 'coordinador_paedis';
@@ -118,6 +129,17 @@ exports.getInstitutionalUsers = async (req, res) => {
  */
 exports.ssoLogin = async (req, res) => {
   try {
+    const isProd = process.env.NODE_ENV === 'production';
+    const isDemoEnabled = process.env.ENABLE_DEMO_ACCOUNTS === 'true';
+
+    // En producción estricta sin demo, no se permite emisión de tokens directos sin verificación de credenciales
+    if (isProd && !isDemoEnabled && !req.body?.idToken && !req.body?.code) {
+      return res.status(401).json({
+        success: false,
+        message: 'En entorno de producción, el inicio de sesión institucional requiere autenticación formal con Microsoft Entra ID.',
+      });
+    }
+
     const cleanEmail = parseInstitutionalEmailOrReply(
       req.body?.email,
       res,

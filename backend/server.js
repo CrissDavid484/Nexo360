@@ -36,6 +36,15 @@ app.use((req, res, next) => {
   next();
 });
 
+function stripTrailingSlashes(str) {
+  if (!str) return '';
+  let s = String(str).trim();
+  while (s.endsWith('/')) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
 // Configuración CORS para desarrollo local, Render y Cloudflare Pages
 const rawFrontendOrigins = [
   process.env.FRONTEND_URL,
@@ -46,7 +55,7 @@ const rawFrontendOrigins = [
   'http://127.0.0.1:5174',
 ]
   .filter(Boolean)
-  .flatMap((entry) => entry.split(',').map((u) => u.trim().replace(/\/+$/, '')))
+  .flatMap((entry) => entry.split(',').map((u) => stripTrailingSlashes(u)))
   .filter(Boolean);
 
 const allowedOrigins = [...new Set(rawFrontendOrigins)];
@@ -59,7 +68,7 @@ app.use(
         return callback(null, true);
       }
 
-      const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+      const normalizedOrigin = stripTrailingSlashes(origin);
 
       let isPagesDev = false;
       try {

@@ -40,13 +40,17 @@ function sanitizeArticleHtml(html) {
     .replace(/<script\b[^>]*\/?>/gi, '')
     .replace(/<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g, (_tag, tagName, attrs) => {
       const cleanAttrs = attrs
-        .replace(/\s+on[a-z]+=(?:"[^"]*"|'[^']*'|\S+)/gi, '')
+        .replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/gi, '')
         .replace(
-          /\s+(href|src|action|formaction|xlink:href)=(["'])\s*(?:javascript|vbscript|data:text\/html):[^"']*\2/gi,
-          ' $1=$2#$2'
+          /\s+(href|src|action|formaction|xlink:href)\s*=\s*"(?:\s*(?:javascript|vbscript|data:text\/html):[^"]*)"/gi,
+          ' $1="#"'
         )
         .replace(
-          /\s+(href|src|action|formaction|xlink:href)=(?:javascript|vbscript|data:text\/html):[^\s>]+/gi,
+          /\s+(href|src|action|formaction|xlink:href)\s*=\s*'(?:\s*(?:javascript|vbscript|data:text\/html):[^']*)'/gi,
+          ' $1=\'#\''
+        )
+        .replace(
+          /\s+(href|src|action|formaction|xlink:href)\s*=\s*(?:javascript|vbscript|data:text\/html):[^\s"'>]+/gi,
           ' $1="#"'
         );
       return `<${tagName}${cleanAttrs}>`;
@@ -65,20 +69,27 @@ function normalizeEmbeddedYouTubeHtml(html) {
       let updatedAttrs = rawAttrs.replace(/\/\s*$/, '').trimEnd();
       let watchUrl = '';
 
-      updatedAttrs = updatedAttrs.replace(
-        /src=(["'])(?:https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([\w-]+)([^"']*)\1/i,
-        (_match, quote, videoId, query) => {
-          let cleanQuery = query || '';
-          if (!/[?&]rel=/.test(cleanQuery)) {
-            cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}rel=0`;
-          }
-          if (!/[?&]modestbranding=/.test(cleanQuery)) {
-            cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}modestbranding=1`;
-          }
-          watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-          return `src=${quote}https://www.youtube.com/embed/${videoId}${cleanQuery}${quote}`;
+      const handleEmbedMatch = (quote, videoId, query) => {
+        let cleanQuery = query || '';
+        if (!/[?&]rel=/.test(cleanQuery)) {
+          cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}rel=0`;
         }
-      );
+        if (!/[?&]modestbranding=/.test(cleanQuery)) {
+          cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}modestbranding=1`;
+        }
+        watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        return `src=${quote}https://www.youtube.com/embed/${videoId}${cleanQuery}${quote}`;
+      };
+
+      updatedAttrs = updatedAttrs
+        .replace(
+          /src="(?:\s*https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]+)([^"]*)"/i,
+          (_match, videoId, query) => handleEmbedMatch('"', videoId, query)
+        )
+        .replace(
+          /src='(?:\s*https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]+)([^']*)'/i,
+          (_match, videoId, query) => handleEmbedMatch("'", videoId, query)
+        );
 
       if (!/\breferrerpolicy\s*=/i.test(updatedAttrs)) {
         updatedAttrs += ' referrerpolicy="strict-origin-when-cross-origin"';

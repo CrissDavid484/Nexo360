@@ -151,6 +151,28 @@ const requirePaedisCoordinator = (req, res, next) => {
 };
 
 /**
+ * Middleware para validar permisos granulares sobre el recurso solicitado.
+ */
+const requirePermission = (permission) => (req, res, next) => {
+  const user = req.user;
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+  }
+  const role = (user.role || '').toLowerCase();
+  if (role === 'admin' || role === 'administrador') {
+    return next();
+  }
+  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+  if (permissions.includes(permission) || permissions.includes('full_access')) {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    message: `Acceso restringido: Se requiere el permiso '${permission}' para esta operación.`,
+  });
+};
+
+/**
  * Middleware opcional: si hay token válido adjunta el usuario; ante token inválido continúa anónimo.
  */
 const optionalToken = async (req, res, next) => {
@@ -172,6 +194,7 @@ module.exports = {
   requireAdmin,
   requireAdminOrCoordinator,
   requirePaedisCoordinator,
+  requirePermission,
   optionalToken,
   getJwtSecret,
 };

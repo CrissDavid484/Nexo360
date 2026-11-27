@@ -407,7 +407,20 @@ function decodeXmlEntities(str) {
 }
 
 function stripTagsAndClean(raw) {
-  return decodeXmlEntities(String(raw || '').replace(/<[^>]+>/g, ''))
+  const str = String(raw || '');
+  let withoutTags = '';
+  let inTag = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '<') {
+      inTag = true;
+    } else if (ch === '>') {
+      inTag = false;
+    } else if (!inTag) {
+      withoutTags += ch;
+    }
+  }
+  return decodeXmlEntities(withoutTags)
     .replace(/\r?\n+/g, ' ')
     .replace(/\|/g, '\\|')
     .trim();
@@ -424,9 +437,10 @@ function parseSpreadsheetMlRows(xml) {
     let cellMatch;
     while ((cellMatch = cellRegex.exec(rowXml)) !== null) {
       const attrs = cellMatch[1] || '';
-      const idxAttr = attrs.match(/(?:\w+:)?Index=["'](\d+)["']/i);
+      const idxAttr = attrs.match(/\b(?:[a-zA-Z0-9_]+:)?Index\s*=\s*(?:"(\d+)"|'(\d+)')/i);
       if (idxAttr) {
-        const targetIdx = Math.max(0, Number.parseInt(idxAttr[1], 10) - 1);
+        const rawIdx = idxAttr[1] || idxAttr[2];
+        const targetIdx = Math.max(0, Number.parseInt(rawIdx, 10) - 1);
         while (row.length < targetIdx) row.push('');
       }
       const dataMatch = cellMatch[2].match(/<(?:\w+:)?Data\b[^>]*>([\s\S]*?)<\/(?:\w+:)?Data>/i);
@@ -439,11 +453,12 @@ function parseSpreadsheetMlRows(xml) {
 
 function extractXmlAttributes(attrString) {
   const result = {};
-  const attrRegex = /([a-zA-Z_][\w.-]*)\s*=\s*["']([^"']*)["']/g;
+  const attrRegex = /([a-zA-Z_][\w.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
   let m;
   while ((m = attrRegex.exec(attrString || '')) !== null) {
     const key = m[1].includes(':') ? m[1].split(':').pop() : m[1];
-    result[key] = decodeXmlEntities(m[2]).replace(/\|/g, '\\|').trim();
+    const val = m[2] !== undefined ? m[2] : m[3];
+    result[key] = decodeXmlEntities(val).replace(/\|/g, '\\|').trim();
   }
   return result;
 }
