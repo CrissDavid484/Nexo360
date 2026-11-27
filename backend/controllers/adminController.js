@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const UserProfile = require('../models/UserProfile');
+const PaedisRecord = require('../models/PaedisRecord');
 const ActivityLog = require('../models/ActivityLog');
 const authService = require('../services/authService');
 const emailService = require('../services/emailService');
@@ -477,6 +478,22 @@ exports.getStudents = async (req, res) => {
 
       return studentData;
     });
+
+    if (isCoordinator && isPaedis === 'true') {
+      try {
+        await authService.logActivity({
+          userId: req.user?._id || req.user?.id,
+          userEmail: req.user?.email || 'coordinacion.paedis@duoc.cl',
+          userName: req.user?.fullName || 'Coordinación PAEDIS',
+          userRole: req.user?.role || 'coordinador_paedis',
+          action: 'paedis_records_consulted',
+          details: `Consulta de expedientes confidenciales PAEDIS (${enriched.length} registros). Trazabilidad Ley N° 21.719.`,
+          metadata: { count: enriched.length, filter: 'isPaedis=true' },
+        });
+      } catch (logErr) {
+        console.warn('[AdminController] Error al registrar auditoría de acceso PAEDIS:', logErr?.message);
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -1878,6 +1895,35 @@ exports.updatePaedisCase = async (req, res) => {
 
     const syncResult = await authService.updateProfileFields(user.email, updates);
     const updatedUser = syncResult.user || { ...user, ...updates };
+
+    // Sincronización segregada del expediente confidencial en PaedisRecord (Ley N° 21.719)
+    try {
+      if (mongoose.connection?.readyState === 1) {
+        await PaedisRecord.findOneAndUpdate(
+          { studentEmail: user.email.toLowerCase() },
+          {
+            $set: {
+              studentId: user._id,
+              studentEmail: user.email.toLowerCase(),
+              studentName: user.fullName || user.email,
+              estadoCaso: updates.estadoCasoPaedis || user.estadoCasoPaedis || 'EVALUACION',
+              barreraPaedis: updates.barreraPaedis || user.barreraPaedis,
+              diagnosticoDeclarado: updates.diagnosticoDeclarado || user.diagnosticoDeclarado,
+              acreditacionPaedis: updates.acreditacionPaedis || user.acreditacionPaedis,
+              ajustesAprobados: updates.ajustesAprobados || user.ajustesAprobados || [],
+              notasConfidenciales: updates.notasConfidencialesPaedis || user.notasConfidencialesPaedis,
+              acusesDocentes: updates.acusesDocentes || user.acusesDocentes || [],
+              fichaDocenteNotificada: updates.fichaDocenteNotificada ?? user.fichaDocenteNotificada ?? false,
+              updatedBy: req.user?.email || 'coordinacion.paedis@duoc.cl',
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
+    } catch (errSync) {
+      console.warn('[AdminController] Advertencia al sincronizar PaedisRecord:', errSync?.message);
+    }
+
     const isNotifyAction = body.fichaDocenteNotificada === true;
 
     await authService.logActivity({

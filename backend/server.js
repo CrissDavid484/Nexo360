@@ -11,6 +11,7 @@ const calendarRoutes = require('./routes/calendarRoutes');
 const simulatorSnapshotService = require('./services/simulatorSnapshotService');
 const academicCalendarService = require('./services/academicCalendarService');
 const catalogService = require('./services/catalogService');
+const authService = require('./services/authService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -96,16 +97,20 @@ app.get('/api/health', (req, res) => {
     2: 'connecting',
     3: 'disconnecting',
   };
+  const isDbConnected = mongoose.connection.readyState === 1;
   const mongoState = dbStates[mongoose.connection.readyState] || 'unknown';
   const isProd = process.env.NODE_ENV === 'production';
+  const isTest = process.env.NODE_ENV === 'test';
+  const statusCode = (isDbConnected || isTest) ? 200 : 503;
 
-  res.status(200).json({
-    status: 'OK',
+  res.status(statusCode).json({
+    status: isDbConnected ? 'OK' : (isTest ? 'TEST_DEGRADED' : 'ERROR'),
     service: 'Nexo360 Backend API • Duoc UC - Sede Alameda (Plataforma Oficial)',
     campus: 'Duoc UC - Sede Alameda',
     database: {
       engine: 'MongoDB',
       status: mongoState,
+      connected: isDbConnected,
       ...(isProd ? {} : { host: mongoose.connection.host || 'localhost', name: mongoose.connection.name || 'nexo360' }),
     },
     accessibilityStandard: 'WCAG 2.2 AA / AAA',
@@ -156,6 +161,7 @@ async function startServer() {
     await connectDB();
     await academicCalendarService.ensureSeedCalendars();
     await catalogService.migrateCatalogDuocData();
+    await authService.syncPaedisRecordsMigration();
     simulatorSnapshotService.startSnapshotScheduler();
   } catch (err) {
     console.error('[MongoDB Error] Fallo al conectar en inicio:', err.message);

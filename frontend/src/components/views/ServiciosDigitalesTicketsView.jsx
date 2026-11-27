@@ -58,7 +58,19 @@ export const ServiciosDigitalesTicketsView = () => {
           </p>
         </div>
 
-        <div className="shrink-0">
+        <div className="shrink-0 flex flex-wrap items-center gap-2">
+          <a
+            href="https://centrodeayudaonline.duoc.cl/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Abrir Centro de Ayuda para estudiantes Online (nueva pestaña)"
+            {...getVoiceProps('Ir a Centro de Ayuda para estudiantes Online')}
+            className="min-h-[44px] px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl font-semibold text-xs sm:text-sm inline-flex items-center gap-2 border border-slate-300 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
+          >
+            <span>Centro de Ayuda Online</span>
+            <ExternalLink className="w-3.5 h-3.5 text-neutral-600 shrink-0" aria-hidden="true" />
+          </a>
+
           <a
             href="https://centroayuda.duoc.cl/hc/es-419/requests/new?ticket_form_id="
             target="_blank"

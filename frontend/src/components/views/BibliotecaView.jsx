@@ -224,6 +224,9 @@ export const BibliotecaView = () => {
             <span className="text-xs font-bold text-brand-navy bg-neutral-100 px-3 py-1 rounded-full border border-neutral-200/80">
               Bibliotecas Duoc UC • {DEFAULT_CAMPUS}
             </span>
+            <span className="text-xs font-bold text-amber-900 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-300">
+              Simulador de Práctica Formativa • No es Reserva Oficial
+            </span>
             <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
               Espacios Disponibles
             </span>
@@ -238,9 +241,7 @@ export const BibliotecaView = () => {
           </h2>
 
           <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-normal">
-            Prepara y practica tu reserva para <strong>Duoc UC - {DEFAULT_CAMPUS}</strong>. Consulta los espacios disponibles de{' '}
-            <strong className="text-neutral-900">Salas de estudio</strong> y{' '}
-            <strong className="text-neutral-900">Lentes VR</strong>, o accede directamente a las plataformas oficiales de reserva y check-in.
+            Entorno interactivo de práctica formativa para <strong>Duoc UC - {DEFAULT_CAMPUS}</strong>. Permite ejercitar la selección de bloques horarios y validación de check-in sin alterar el sistema de inventario oficial. Para reservas vinculantes, accede directamente a LibCal mediante los accesos oficiales contiguos.
           </p>
         </div>
 

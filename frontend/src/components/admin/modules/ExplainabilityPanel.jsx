@@ -78,12 +78,10 @@ export const ExplainabilityContent = React.memo(({
             </div>
             <div className="flex items-center gap-6 text-center lg:text-right">
               <div>
-                <div className="text-4xl font-black text-brand-navy">{prediction.score}</div>
+                <div className="text-4xl font-black text-brand-navy">
+                  {prediction.score !== null && prediction.score !== undefined ? prediction.score : 'N/A'}
+                </div>
                 <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">PUNTAJE PREDICTIVO (0-100)</div>
-              </div>
-              <div>
-                <div className={'text-2xl font-black text-semantic-' + riskConfig.color + '-600'}>{prediction.graduationProbability}%</div>
-                <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Prob. Titulación</div>
               </div>
             </div>
           </div>

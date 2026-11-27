@@ -71,7 +71,7 @@ function getSatTriggerFactor(student) {
     const pct = criticalCourse ? Math.round(Number(criticalCourse.attendancePercentage ?? 0) * 10) / 10 : 0;
     const abs = criticalCourse ? Number(criticalCourse.consecutiveAbsences || 0) : 0;
 
-    let triggerReason = (criticalCourse?.courseCode || 'Asignatura') + ' (' + (criticalCourse?.courseName || 'Ramo') + '): ' + pct + '% de asistencia (bajo el 75% exigido).';
+    let triggerReason = (criticalCourse?.courseCode || 'Asignatura') + ' (' + (criticalCourse?.courseName || 'Ramo') + '): ' + pct + '% de asistencia (bajo el 70% exigido).';
     if (abs >= 3) triggerReason += ' Acumula ' + abs + ' inasistencias consecutivas.';
     if (criticalCourse?.missedKeySession) triggerReason += ' Falta a evaluación o certamen clave institucional.';
 
@@ -93,11 +93,11 @@ function getSatTriggerFactor(student) {
     const prevCourse = courses.find((c) => {
       const pct = Number(c.attendancePercentage ?? 100);
       const abs = Number(c.consecutiveAbsences || 0);
-      return !c.paedisJustified && ((pct >= 75 && pct <= 79) || abs === 2);
+      return !c.paedisJustified && ((pct >= 70 && pct <= 74.9) || abs === 2);
     }) || courses[0];
 
     const pct = prevCourse ? Math.round(Number(prevCourse.attendancePercentage ?? 0) * 10) / 10 : 0;
-    const desc = (prevCourse?.courseCode || 'Asignatura') + ' (' + (prevCourse?.courseName || 'Ramo') + '): ' + pct + '% de asistencia (zona de riesgo preventivo 75% a 79%). Requiere acompañamiento temprano.';
+    const desc = (prevCourse?.courseCode || 'Asignatura') + ' (' + (prevCourse?.courseName || 'Ramo') + '): ' + pct + '% de asistencia (zona de riesgo preventivo 70% a 74.9%). Requiere acompañamiento temprano.';
     return {
       severity: 'PREVENTIVE',
       title: 'Factor Disparador: Alerta Preventiva (Margen Crítico Restante)',
@@ -353,9 +353,11 @@ export function SatMonitoring({ announce: announceProp, isCoordinator: propCoord
           const actionLabels = {
             add_attendance: '+1 Asistencia',
             remove_absence: '1 Falta Menos',
+            recover_to_70: 'Recuperar ≥70% (Evitar RI)',
             recover_to_75: 'Recuperar ≥75%',
             future_perfect: 'Asistencia Perfecta Futura',
             add_absence: '+1 Falta (Inasistencia)',
+            drop_below_70: 'Baja <70% (RI)',
             drop_below_75: 'Baja <75% (RI)',
             paedis_justify: 'Licencia / Justificativo',
           };
@@ -423,8 +425,8 @@ export function SatMonitoring({ announce: announceProp, isCoordinator: propCoord
 
   const kpiCards = [
     { id: 'kpi-monitored', label: 'Alumnos Monitoreados', value: satData.metrics?.totalMonitored ?? 0, icon: BookOpen, color: 'text-neutral-900', bgColor: 'bg-blue-50', borderColor: 'border-blue-100', subtitle: 'Carga académica inscrita activa' },
-    { id: 'kpi-critical', label: 'Nivel 2: Crítico (<75% / 3 Faltas)', value: satData.metrics?.criticalCount ?? 0, icon: AlertOctagon, color: 'text-rose-700', bgColor: 'bg-rose-50', borderColor: 'border-rose-100', subtitle: 'En causal inminente de RI • Duoc UC - ' + DEFAULT_CAMPUS },
-    { id: 'kpi-preventive', label: 'Nivel 1: Preventivo (75-79%)', value: satData.metrics?.preventiveCount ?? 0, icon: AlertTriangle, color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-100', subtitle: 'Margen mínimo de faltas restante' },
+    { id: 'kpi-critical', label: 'Nivel 2: Crítico (<70% / 3 Faltas)', value: satData.metrics?.criticalCount ?? 0, icon: AlertOctagon, color: 'text-rose-700', bgColor: 'bg-rose-50', borderColor: 'border-rose-100', subtitle: 'En causal inminente de RI • Duoc UC - ' + DEFAULT_CAMPUS },
+    { id: 'kpi-preventive', label: 'Nivel 1: Preventivo (70-74.9%)', value: satData.metrics?.preventiveCount ?? 0, icon: AlertTriangle, color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-100', subtitle: 'Margen mínimo de faltas restante' },
     { id: 'kpi-justified', label: 'Excepción / PAEDIS Justificado', value: satData.metrics?.paedisJustifiedCount ?? 0, icon: ShieldCheck, color: 'text-purple-700', bgColor: 'bg-purple-50', borderColor: 'border-purple-100', subtitle: 'Ajuste médico o curricular formal' },
   ];
 
@@ -441,7 +443,7 @@ export function SatMonitoring({ announce: announceProp, isCoordinator: propCoord
               Monitoreo Determinista de Asistencia & Ficha de Intervención de Ciclo Cerrado
             </h2>
             <p className={`${ADMIN_THEME.moduleSubtitle} max-w-3xl`}>
-              Cumplimiento normativo en <strong>Duoc UC - Sede Alameda</strong> (mínimo <strong>75% de asistencia por asignatura</strong> para evitar Reprobación por Inasistencia - RI) con trazabilidad de ciclo cerrado e integración a ajustes PAEDIS.
+              Cumplimiento normativo en <strong>Duoc UC - Sede Alameda</strong> (mínimo <strong>70% de asistencia por asignatura</strong> para evitar Reprobación por Inasistencia - RI) con trazabilidad de ciclo cerrado e integración a ajustes PAEDIS.
             </p>
           </div>
           <Button

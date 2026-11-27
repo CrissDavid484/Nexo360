@@ -298,8 +298,9 @@ function computePaedisScore(student, config) {
     const ajustesCount = Array.isArray(student.ajustesAprobados) ? student.ajustesAprobados.length : 0;
 
     if (!hasTutor) {
-      score += 30;
-      factors.push('Estudiante PAEDIS sin Tutor PAEDIS asignado: Requiere asignación urgente');
+      // Principio de Equidad y Ley N° 21.719: La condición PAEDIS no penaliza el riesgo del estudiante.
+      // Se mantiene puntaje neutro y se registra recomendación de tutoría.
+      factors.push('Estudiante PAEDIS sin Tutor PAEDIS asignado: Requiere asignación prioritaria de acompañamiento');
     } else if (ajustesCount > 0) {
       score -= 15;
       factors.push(`Acompañamiento PAEDIS activo con ${ajustesCount} ajuste(s) razonable(s)`);
@@ -638,6 +639,33 @@ function calculatePredictiveRisk(user = {}) {
   const status = user.academicStatus || 'activo';
 
   const sourceCourses = user.enrolledCourses || user.courseAttendance || [];
+
+  const hasNoCourses = !sourceCourses || sourceCourses.length === 0;
+  const hasNoExplicitAttendance = user.attendanceRate === null || user.sinDatosSuficientes === true || (hasNoCourses && user.hasNoData);
+
+  if (hasNoExplicitAttendance) {
+    return {
+      score: null,
+      riskLevel: 'SIN_DATOS',
+      predictionLabel: 'Sin datos suficientes',
+      color: 'slate',
+      trafficLight: 'gray',
+      factors: ['Sin registros de asistencia o asignaturas suficientes para emitir predicción'],
+      graduationProbability: null,
+      breakdown: null,
+      nextBestAction: {
+        action: 'Completar registro académico o sincronizar asignaturas en Vivo Duoc',
+        priority: 10,
+        slaHours: 72,
+        triggeredRule: 'sin_datos_suficientes',
+      },
+      effectiveAttendance: null,
+      courseDetails: [],
+      coursesInRI: [],
+      coursesInAlert: [],
+    };
+  }
+
   const attendanceSummary = extractCourseAttendanceDetails(sourceCourses, user.attendanceRate);
 
   const terminalPrediction = buildTerminalStatusPrediction(status, attendanceSummary, config);

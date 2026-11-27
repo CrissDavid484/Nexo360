@@ -121,7 +121,7 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
   const baseConsecutiveAbsences = Number(course?.consecutiveAbsences || 0);
   const baseJustified = Boolean(course?.paedisJustified);
   const basePct = Math.round((baseAttended / baseTotal) * 1000) / 10;
-  const minRequiredSessions = Math.ceil(baseTotal * 0.75);
+  const minRequiredSessions = Math.ceil(baseTotal * 0.70);
   const maxAllowedAbsences = Math.max(0, baseTotal - minRequiredSessions);
 
   // Valores simulados interactivos
@@ -143,9 +143,11 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
       : Math.max(0, baseConsecutiveAbsences - addedAttendances)
   );
 
-  // Cálculo exacto de cuántas clases consecutivas se requieren para alcanzar el 75%
-  const classesNeededFor75 = Math.max(0, minRequiredSessions - simulatedAttended);
-  const baseClassesNeededFor75 = Math.max(0, minRequiredSessions - baseAttended);
+  // Cálculo exacto de cuántas clases consecutivas se requieren para alcanzar el 70% (evitar RI)
+  const classesNeededFor70 = Math.max(0, minRequiredSessions - simulatedAttended);
+  const baseClassesNeededFor70 = Math.max(0, minRequiredSessions - baseAttended);
+  const baseClassesNeededFor75 = Math.max(0, Math.ceil(baseTotal * 0.75) - baseAttended);
+  const classesNeededFor75 = Math.max(0, Math.ceil(baseTotal * 0.75) - simulatedAttended);
 
   // Semáforo actual vs simulado
   const baseMeta = useMemo(() => getTrafficLightMeta(basePct, baseJustified), [basePct, baseJustified]);
@@ -166,16 +168,19 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
     }
   }, [onRunSimulation]);
 
-  // Manejador de recuperación al 75%
-  const handleRecoverTo75 = useCallback(async () => {
-    if (baseClassesNeededFor75 > 0) {
-      setAddedAttendances(baseClassesNeededFor75);
+  // Manejador de recuperación al 70% reglamentario (evitar RI Duoc UC 2026)
+  const handleRecoverTo70 = useCallback(async () => {
+    if (baseClassesNeededFor70 > 0) {
+      setAddedAttendances(baseClassesNeededFor70);
       setAddedAbsences(0);
     }
     if (onRunSimulation) {
-      await onRunSimulation('recover_to_75');
+      await onRunSimulation('recover_to_70');
     }
-  }, [baseClassesNeededFor75, onRunSimulation]);
+  }, [baseClassesNeededFor70, onRunSimulation]);
+
+  // Alias retrocompatible
+  const handleRecoverTo75 = handleRecoverTo70;
 
   // Manejador del toggle de justificación médica
   const handleToggleJustified = useCallback(async () => {
@@ -243,7 +248,7 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
             Simulador de Cumplimiento Académico & Proyección RI
           </h3>
           <p className={`${ADMIN_THEME.moduleSubtitle} max-w-2xl`}>
-            Ajusta asistencias e inasistencias en tiempo real para proyectar el riesgo de Reprobación por Inasistencia (RI) según la normativa del <strong>75% de asistencia mínima</strong>.
+            Ajusta asistencias e inasistencias en tiempo real para proyectar el riesgo de Reprobación por Inasistencia (RI) según la normativa del <strong>70% de asistencia mínima (Duoc UC 2026)</strong>.
           </p>
         </div>
 
@@ -405,13 +410,13 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
           </div>
         </div>
 
-        {/* BARRA DE PROGRESO CON MARCADOR VISUAL DEL 75% */}
+        {/* BARRA DE PROGRESO CON MARCADOR VISUAL DEL 70% */}
         <div className="space-y-2 pt-2">
           <div className="flex items-center justify-between text-xs font-semibold text-neutral-600">
             <span>0%</span>
             <div className="flex items-center gap-1.5 font-bold text-neutral-900 bg-white px-2.5 py-0.5 rounded-full border border-neutral-200 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-[#002B49]" aria-hidden="true" />
-              <span>Umbral Institucional RI: 75%</span>
+              <span>Umbral Institucional RI: 70%</span>
             </div>
             <span>100%</span>
           </div>
@@ -436,11 +441,11 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
               aria-label={`Porcentaje simulado: ${simulatedPct}%`}
             />
 
-            {/* Línea marcadora fija en 75% */}
+            {/* Línea marcadora fija en 70% */}
             <div
               className="absolute top-0 bottom-0 w-1 bg-neutral-900 z-10 shadow-sm pointer-events-none"
-              style={{ left: '75%' }}
-              title="Umbral mínimo RI (75%)"
+              style={{ left: '70%' }}
+              title="Umbral mínimo RI (70%)"
             >
               <div className="w-3 h-3 rounded-full bg-[#FFB81C] border-2 border-neutral-900 absolute -top-1 -left-1 shadow-xs" />
             </div>
@@ -449,10 +454,10 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
           {/* Subtítulo explicativo del progreso */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-neutral-600 pt-1">
             <span>
-              {simulatedPct >= 75 ? (
+              {simulatedPct >= 70 ? (
                 <strong className="text-emerald-700 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                  Cumple con el reglamento institucional (mínimo 75% de asistencia requerido para aprobar).
+                  Cumple con el reglamento institucional (mínimo 70% de asistencia para evitar Reprobación por Inasistencia).
                 </strong>
               ) : currentJustified ? (
                 <strong className="text-purple-800 flex items-center gap-1">
@@ -462,7 +467,7 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
               ) : (
                 <strong className="text-rose-700 flex items-center gap-1">
                   <AlertOctagon className="w-3.5 h-3.5" aria-hidden="true" />
-                  Bajo el umbral reglamentario: requiere al menos {classesNeededFor75} clase(s) asistida(s) consecutivas para salir de RI.
+                  Bajo el umbral reglamentario: requiere al menos {classesNeededFor70} clase(s) asistida(s) consecutivas para salir de RI (&lt;70%).
                 </strong>
               )}
             </span>
@@ -624,35 +629,35 @@ export const SatAttendanceSimulator = React.memo(function SatAttendanceSimulator
           </div>
         </div>
 
-        {/* Acción Rápida: Simular Recuperación a 75% */}
+        {/* Acción Rápida: Simular Recuperación a ≥70% (Evitar RI) */}
         <div className="p-5 rounded-2xl border border-neutral-200 bg-white space-y-3 flex flex-col justify-between shadow-2xs">
           <div className="space-y-1">
             <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-[#FFB81C]" aria-hidden="true" />
-              <span>Recuperación al 75%</span>
+              <span>Recuperación a ≥70% (Evitar RI)</span>
             </span>
             <p className="text-[11px] text-neutral-500">
-              Calcula y aplica exactamente las clases consecutivas necesarias para salir de RI.
+              Calcula y aplica exactamente las clases consecutivas necesarias para salir de causal de RI (&lt;70%).
             </p>
           </div>
 
           <div className="pt-2">
             <button
               type="button"
-              onClick={handleRecoverTo75}
-              disabled={isSimulating || simulatedPct >= 75}
+              onClick={handleRecoverTo70}
+              disabled={isSimulating || simulatedPct >= 70}
               {...getVoiceProps(
-                simulatedPct >= 75
-                  ? 'La asignatura ya cumple el 75 por ciento'
-                  : `Simular recuperación al 75% requiriendo ${classesNeededFor75} clases consecutivas`
+                simulatedPct >= 70
+                  ? 'La asignatura ya cumple el 70 por ciento reglamentario'
+                  : `Simular recuperación a 70% requiriendo ${classesNeededFor70} clases consecutivas`
               )}
-              className={`w-full min-h-[42px] px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${simulatedPct >= 75 ? 'bg-neutral-100 text-neutral-500 border border-neutral-200' : 'bg-[#002B49] hover:bg-[#002B49]/90 text-white'}`}
+              className={`w-full min-h-[42px] px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FFB81C] ${simulatedPct >= 70 ? 'bg-neutral-100 text-neutral-500 border border-neutral-200' : 'bg-[#002B49] hover:bg-[#002B49]/90 text-white'}`}
             >
               <ArrowUpRight className="w-4 h-4 shrink-0 text-[#FFB81C]" aria-hidden="true" />
               <span>
-                {simulatedPct >= 75
-                  ? 'Cumple Umbral (≥75%)'
-                  : `Recuperar a 75% (+${classesNeededFor75} ${classesNeededFor75 === 1 ? 'clase' : 'clases'})`}
+                {simulatedPct >= 70
+                  ? 'Cumple Umbral (≥70%)'
+                  : `Recuperar a 70% (+${classesNeededFor70} ${classesNeededFor70 === 1 ? 'clase' : 'clases'})`}
               </span>
             </button>
           </div>

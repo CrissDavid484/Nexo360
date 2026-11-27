@@ -6,7 +6,8 @@ Plataforma One-Stop-Shop institucional para **Duoc UC - Sede Alameda**, orientad
 
 ## Métricas de Calidad y Estado del Código
 
-- **Tests Automatizados:** **134 tests backend pasando** (100% de éxito en 6 suites con `node --test`) + suite de integración frontend.
+- **Tests Automatizados:** **141 tests backend pasando** (100% de éxito en suites con `node --test`) + suite de integración frontend de simulación SAT.
+- **Dictamen de Producción:** [NEXO360_PRODUCTION_READINESS.md](file:///c:/Users/Jonathan/Documents/Nueva%20carpeta/Nexo360/NEXO360_PRODUCTION_READINESS.md) (Dictamen B: Preparado Técnicamente con Validaciones Externas Pendientes).
 - **SonarQube Clean Code:**
   - **Reliability:** Rating A (0 Bugs).
   - **Security:** Rating A (0 Vulnerabilidades, 0 Security Hotspots).
@@ -48,8 +49,8 @@ Nexo360/
 │   │   ├── seedCourseRows.json     # Respaldo de oferta académica estándar
 │   │   └── seedUsers.json          # 14 perfiles institucionales (estudiantes, PAEDIS y staff)
 │   ├── middleware/                 # authMiddleware (JWT / RBAC estricto), rateLimitMiddleware (OWASP A04)
-│   ├── models/                     # UserProfile, AcademicCalendar, SimulatorChartSnapshot,
-│   │                               # CourseOffering, Career, Sede, ActivityLog
+│   ├── models/                     # UserProfile, PaedisRecord (Ley 21.719), AttendanceSimulation (TTL 7d),
+│   │                               # AcademicCalendar, SimulatorChartSnapshot, CourseOffering, Career, Sede, ActivityLog
 │   ├── routes/                     # /api/auth, /api/admin, /api/courses, /api/calendar, /api/modules
 │   ├── scripts/                    # parseAlamedaMd.js (ingesta automatizada de catálogos)
 │   ├── services/                   # academicCalendarService, simulatorSnapshotService,

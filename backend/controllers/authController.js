@@ -88,11 +88,21 @@ async function getOrCreateActiveUserProfile(reqUser) {
 exports.getInstitutionalUsers = async (req, res) => {
   try {
     const users = await authService.getAllUsers();
+    const callerRole = req.user?.role;
+    const isPaedisCoord = callerRole === 'coordinador_paedis';
+    const isAdmin = callerRole === 'admin' || callerRole === 'administrador';
+
+    const serializedUsers = users.map((u) => {
+      if (isPaedisCoord) return authService.toPaedisRestricted(u);
+      if (isAdmin) return authService.toAdminView(u);
+      return authService.toPublicProfile(u);
+    });
+
     return res.status(200).json({
       success: true,
-      totalUsers: users.length,
+      totalUsers: serializedUsers.length,
       officialLoginUrl: authService.getOfficialLoginUrl(),
-      users,
+      users: serializedUsers,
     });
   } catch {
     console.error('[AuthController] Error obteniendo usuarios de la BD.');

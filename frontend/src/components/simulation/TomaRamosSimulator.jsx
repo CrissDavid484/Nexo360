@@ -1021,9 +1021,14 @@ export const TomaRamosSimulator = ({ onExit }) => {
       >
         <div className="px-6 sm:px-8 py-5 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
-            <span className="text-xs font-semibold text-[#002B49] block">
-              Vida Académica Duoc UC - Sede Alameda
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-[#002B49] block">
+                Vida Académica Duoc UC - Sede Alameda
+              </span>
+              <span className="text-xs font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-300">
+                Entorno de Simulación Formativa • No altera registros del sistema académico oficial
+              </span>
+            </div>
             <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
               Inscripción y Modificación de Asignaturas (Toma de Ramos)
             </h2>

@@ -283,12 +283,14 @@ export function calculateAttendanceRiskLevel(percentage, options = {}) {
 
   const pct = Number(percentage);
   const numConsecutive = Number(consecutiveAbsences || 0);
+  const riLimit = options.threshold !== undefined ? options.threshold : (options.mode === 'ri70' ? 70 : 75);
+  const warningMax = riLimit === 70 ? 74.9 : 79.9;
 
-  if (pct < 75 || numConsecutive >= 3 || missedKeySession) {
+  if (pct < riLimit || numConsecutive >= 3 || missedKeySession) {
     return {
       level: 'LEVEL_2_CRITICAL',
       riskTier: 'Alto',
-      label: 'Alto (Crítico RI <75%)',
+      label: `Alto (Crítico RI <${riLimit}%)`,
       badgeClass: 'bg-rose-100 text-rose-900 border-rose-300',
       textClass: 'text-rose-700',
       dotClass: 'bg-rose-500',
@@ -296,11 +298,11 @@ export function calculateAttendanceRiskLevel(percentage, options = {}) {
     };
   }
 
-  if (pct <= 79.9 || numConsecutive === 2) {
+  if (pct <= warningMax || numConsecutive === 2) {
     return {
       level: 'LEVEL_1_PREVENTIVE',
       riskTier: 'Moderado',
-      label: 'Moderado (Preventivo 75%-79%)',
+      label: `Moderado (Preventivo ${riLimit}%-${Math.round(warningMax)}%)`,
       badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
       textClass: 'text-amber-700',
       dotClass: 'bg-amber-500',
@@ -311,7 +313,7 @@ export function calculateAttendanceRiskLevel(percentage, options = {}) {
   return {
     level: 'NONE',
     riskTier: 'Normal',
-    label: 'Normal / Bajo (≥80% Regular)',
+    label: `Normal / Bajo (≥${Math.ceil(warningMax)}% Regular)`,
     badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
     textClass: 'text-emerald-700',
     dotClass: 'bg-emerald-500',
@@ -377,8 +379,11 @@ export function calculateBidirectionalSimulation(course) {
   });
   const negTriggersRi = !isJustified && (negPct < 75 || negConsecutive >= 3);
 
-  // Metas de recuperación
-  const neededFor75 = Math.max(0, minRequiredSessions - attendedSessions);
+  // Metas de recuperación (Umbral Duoc UC 70% RI / 75% Regular)
+  const minRequiredSessions70 = Math.ceil(totalSessions * 0.70);
+  const minRequiredSessions75 = minRequiredSessions;
+  const neededFor70 = Math.max(0, minRequiredSessions70 - attendedSessions);
+  const neededFor75 = Math.max(0, minRequiredSessions75 - attendedSessions);
   const minSessionsFor80 = Math.ceil(totalSessions * 0.8);
   const neededFor80 = Math.max(0, minSessionsFor80 - attendedSessions);
 
@@ -414,9 +419,15 @@ export function calculateBidirectionalSimulation(course) {
     },
     recovery: {
       minRequiredSessions,
+      minRequiredSessions70,
+      minRequiredSessions75,
+      neededFor70,
       neededFor75,
       neededFor80,
-      canReach75: totalSessions - currentAbsences >= minRequiredSessions,
+      classesNeededFor70: neededFor70,
+      classesNeededFor75: neededFor75,
+      canReach70: totalSessions - currentAbsences >= minRequiredSessions70,
+      canReach75: totalSessions - currentAbsences >= minRequiredSessions75,
       canReach80: totalSessions - currentAbsences >= minSessionsFor80,
     },
     // Compatibilidad retroactiva

@@ -398,13 +398,13 @@ const CareerAlamedaBarChart = ({ items, getVoiceProps }) => {
                 {item.paedisTotal > 0 && (
                   <div
                     className="h-full bg-indigo-600 transition-all duration-200"
-                    style={{ width: `${Math.max(paedisPct, 4)}%` }}
+                    style={{ width: `${paedisPct}%` }}
                   />
                 )}
                 {item.regularTotal > 0 && (
                   <div
                     className="h-full bg-[#002B49] dark:bg-sky-500 transition-all duration-200"
-                    style={{ width: `${Math.max(regularPct, 4)}%` }}
+                    style={{ width: `${regularPct}%` }}
                   />
                 )}
               </div>
@@ -528,19 +528,23 @@ const NumericSeriesChart = ({ data, color, unitLabel = 'estudiantes', height = 2
 };
 
 const HistoricalAdoptionChart = ({ data, getVoiceProps }) => {
-  const safeData = useMemo(() => {
-    if (!Array.isArray(data) || data.length === 0) {
-      return [
-        { period: '2024-1', label: '1° Sem 2024', startedTotal: 185, completedTotal: 162, completionRate: 87.6 },
-        { period: '2024-2', label: '2° Sem 2024', startedTotal: 215, completedTotal: 194, completionRate: 90.2 },
-        { period: '2025-1', label: '1° Sem 2025', startedTotal: 280, completedTotal: 256, completionRate: 91.4 },
-        { period: '2025-2', label: '2° Sem 2025', startedTotal: 340, completedTotal: 318, completionRate: 93.5 },
-        { period: '2026-1', label: '1° Sem 2026', startedTotal: 395, completedTotal: 372, completionRate: 94.2 },
-        { period: '2026-2', label: '2° Sem 2026', startedTotal: 4, completedTotal: 4, completionRate: 100 },
-      ];
-    }
-    return data;
-  }, [data]);
+  if (!Array.isArray(data) || data.length === 0) {
+    return (
+      <div
+        {...getVoiceProps('Sin registros históricos suficientes de adopción del simulador en MongoDB.')}
+        className="flex flex-col items-center justify-center py-10 px-4 text-center border border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 my-2"
+      >
+        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          Sin registros históricos suficientes en MongoDB
+        </p>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+          Los indicadores de adopción semestral se calcularán automáticamente conforme los estudiantes interactúen con el simulador.
+        </p>
+      </div>
+    );
+  }
+
+  const safeData = data;
 
   const maxVal = Math.max(...safeData.map((d) => Math.max(d.startedTotal || 0, d.completedTotal || 0)), 1);
   const chartWidth = 640;
@@ -904,18 +908,21 @@ export const AdminDashboard = ({
     ) {
       return metrics.simulatorAdoption.historicalAdoption;
     }
-    const currentTotal = Math.max(startedOnlyTotal + completedTotal, 4);
-    const currCompleted = Math.max(completedTotal, 4);
-    const currRate = currentTotal > 0 ? Number(((currCompleted / currentTotal) * 100).toFixed(1)) : 100;
-
-    return [
-      { period: '2024-1', label: '1° Sem 2024', startedTotal: 185, completedTotal: 162, completionRate: 87.6 },
-      { period: '2024-2', label: '2° Sem 2024', startedTotal: 215, completedTotal: 194, completionRate: 90.2 },
-      { period: '2025-1', label: '1° Sem 2025', startedTotal: 280, completedTotal: 256, completionRate: 91.4 },
-      { period: '2025-2', label: '2° Sem 2025', startedTotal: 340, completedTotal: 318, completionRate: 93.5 },
-      { period: '2026-1', label: '1° Sem 2026', startedTotal: 395, completedTotal: 372, completionRate: 94.2 },
-      { period: '2026-2', label: '2° Sem 2026 (Actual)', startedTotal: currentTotal, completedTotal: currCompleted, completionRate: currRate },
-    ];
+    const currentTotal = (startedOnlyTotal || 0) + (completedTotal || 0);
+    const currCompleted = completedTotal || 0;
+    if (currentTotal > 0) {
+      const currRate = Number(((currCompleted / currentTotal) * 100).toFixed(1));
+      return [
+        {
+          period: '2026-2',
+          label: '2° Sem 2026 (Actual)',
+          startedTotal: currentTotal,
+          completedTotal: currCompleted,
+          completionRate: currRate,
+        },
+      ];
+    }
+    return [];
   }, [metrics, startedOnlyTotal, completedTotal]);
 
   const paedisSeries = useMemo(() => {

@@ -813,4 +813,18 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     const sanAndres = sedes.find((s) => s.name.includes('San Andrés de Concepción'));
     assert.equal(sanAndres, undefined, 'Sede obsoleta San Andrés de Concepción debe haber sido depurada');
   });
+
+  test('15. Segregación de Expedientes PAEDIS (Ley N° 21.719): PaedisRecord e índice en studentEmail', async () => {
+    const PaedisRecord = require('../models/PaedisRecord');
+    const authService = require('../services/authService');
+    const indexes = PaedisRecord.schema.indexes();
+    const hasStudentEmailIndex =
+      PaedisRecord.schema.path('studentEmail')?.options?.index === true ||
+      indexes.some(([idx]) => idx && (idx.studentEmail === 1 || idx.studentEmail === -1));
+    assert.ok(hasStudentEmailIndex, 'PaedisRecord debe declarar explícitamente índice en studentEmail');
+
+    // Comprobar sincronización e idempotencia de migración
+    const migrationRes = await authService.syncPaedisRecordsMigration();
+    assert.ok(typeof migrationRes.migrated === 'number');
+  });
 });

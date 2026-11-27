@@ -186,12 +186,11 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     assert.ok(factors.some(f => f.includes('favorable')));
   });
 
-  test('computePaedisScore: Sin tutor PAEDIS aumenta score', () => {
+  test('computePaedisScore: Condición PAEDIS sin tutor no penaliza score de riesgo (Principio de Equidad)', () => {
     const config = loadWeightsConfig();
-    // El motor detecta "sin tutor" en el string (case insensitive)
     const { score, factors } = computePaedisScore({ isPaedis: true, tutorPaedisAsignado: 'Sin tutor', ajustesAprobados: [] }, config);
-    assert.ok(score > 50);
-    assert.ok(factors.some(f => f.includes('sin Tutor PAEDIS')));
+    assert.equal(score, 50, 'La condición PAEDIS debe mantenerse en puntaje neutro sin penalización');
+    assert.ok(factors.some(f => f.includes('Tutor PAEDIS')));
   });
 
   test('computePaedisScore: Con ajustes aprobados reduce score', () => {
@@ -900,5 +899,13 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     const prediction = calculatePredictiveRisk(student);
     assert.equal(prediction.score, 0);
     assert.equal(prediction.riskLevel, 'TITULADO');
+  });
+
+  test('calculatePredictiveRisk: retorna Sin datos suficientes cuando faltan registros', () => {
+    const student = { academicStatus: 'activo', attendanceRate: null, enrolledCourses: [] };
+    const prediction = calculatePredictiveRisk(student);
+    assert.equal(prediction.riskLevel, 'SIN_DATOS');
+    assert.equal(prediction.predictionLabel, 'Sin datos suficientes');
+    assert.equal(prediction.score, null);
   });
 });

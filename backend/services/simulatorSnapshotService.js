@@ -366,18 +366,15 @@ function buildSimulatorAdoptionMetrics(students, simulatorLogs, now = new Date()
     },
   };
 
-  const totalCurrent = Math.max(startedOnlyTotal + completedTotal, 4);
-  const completedCurrent = Math.max(completedTotal, 4);
-  const rateCurrent = totalCurrent > 0 ? Number(((completedCurrent / totalCurrent) * 100).toFixed(1)) : 100;
+  const totalCurrent = startedOnlyTotal + completedTotal;
+  const completedCurrent = completedTotal;
+  const rateCurrent = totalCurrent > 0 ? Number(((completedCurrent / totalCurrent) * 100).toFixed(1)) : 0;
 
-  const historicalAdoption = [
-    { period: '2024-1', label: '1° Sem 2024', startedTotal: 185, completedTotal: 162, completionRate: 87.6 },
-    { period: '2024-2', label: '2° Sem 2024', startedTotal: 215, completedTotal: 194, completionRate: 90.2 },
-    { period: '2025-1', label: '1° Sem 2025', startedTotal: 280, completedTotal: 256, completionRate: 91.4 },
-    { period: '2025-2', label: '2° Sem 2025', startedTotal: 340, completedTotal: 318, completionRate: 93.5 },
-    { period: '2026-1', label: '1° Sem 2026', startedTotal: 395, completedTotal: 372, completionRate: 94.2 },
-    { period: '2026-2', label: '2° Sem 2026 (Actual)', startedTotal: totalCurrent, completedTotal: completedCurrent, completionRate: rateCurrent },
-  ];
+  const historicalAdoption = totalCurrent > 0
+    ? [
+        { period: '2026-2', label: '2° Sem 2026 (Actual)', startedTotal: totalCurrent, completedTotal: completedCurrent, completionRate: rateCurrent },
+      ]
+    : [];
 
   return {
     startedOnlyTotal,

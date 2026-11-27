@@ -26,8 +26,8 @@ function calculateCourseSatStatus(course) {
   }
 
   const reasons = [];
-  if (attendancePct < 75) {
-    reasons.push(`Asistencia crítica (${attendancePct}% < 75%): Riesgo inminente de Reprobación por Inasistencia (RI)`);
+  if (attendancePct < 70) {
+    reasons.push(`Asistencia crítica (${attendancePct}% < 70%): Riesgo inminente de Reprobación por Inasistencia (RI)`);
   }
   if (consecutiveAbs >= 3) {
     reasons.push(`${consecutiveAbs} inasistencias consecutivas registradas`);
@@ -46,7 +46,7 @@ function calculateCourseSatStatus(course) {
     };
   }
 
-  if (attendancePct >= 75 && attendancePct <= 79) {
+  if (attendancePct >= 70 && attendancePct <= 74.9) {
     reasons.push(`Asistencia al límite (${attendancePct}%): Margen crítico de faltas restante`);
   }
   if (consecutiveAbs === 2) {
@@ -71,7 +71,7 @@ function calculateCourseSatStatus(course) {
     label: 'Sin Riesgo (Asistencia Regular)',
     badgeColor: 'emerald',
     isAlert: false,
-    reasons: ['Cumplimiento regular sobre el 80% de asistencia'],
+    reasons: ['Cumplimiento regular sobre el 75% de asistencia'],
   };
 }
 
@@ -196,15 +196,20 @@ function applySimulatedCourseUpdate(courseAttendance = [], simulationOptions = {
     } else if (action === 'add_attendance' || action === 'add_presence' || action === 'positive_attendance') {
       attended = Math.min(total, attended + 1);
       consecutiveAbs = Math.max(0, consecutiveAbs - 1);
-      if (attended / total >= 0.75 && consecutiveAbs < 3) {
+      if (attended / total >= 0.70 && consecutiveAbs < 3) {
         missedKey = false;
       }
     } else if (action === 'remove_absence' || action === 'reduce_absence') {
       attended = Math.min(total, attended + 1);
       consecutiveAbs = Math.max(0, consecutiveAbs - 1);
-      if (attended / total >= 0.75 && consecutiveAbs < 3) {
+      if (attended / total >= 0.70 && consecutiveAbs < 3) {
         missedKey = false;
       }
+    } else if (action === 'recover_to_70' || action === 'reach_70') {
+      const minReq = Math.ceil(total * 0.70);
+      attended = Math.min(total, Math.max(attended, minReq));
+      consecutiveAbs = 0;
+      missedKey = false;
     } else if (action === 'recover_to_75' || action === 'reach_75') {
       const minReq = Math.ceil(total * 0.75);
       attended = Math.min(total, Math.max(attended, minReq));
@@ -214,6 +219,11 @@ function applySimulatedCourseUpdate(courseAttendance = [], simulationOptions = {
       attended = total;
       consecutiveAbs = 0;
       missedKey = false;
+    } else if (action === 'drop_below_70') {
+      attended = Math.max(0, Math.floor(total * 0.65));
+      consecutiveAbs = Math.max(3, consecutiveAbs + 1);
+      missedKey = true;
+      justified = false;
     } else if (action === 'drop_below_75') {
       attended = Math.max(0, Math.floor(total * 0.68));
       consecutiveAbs = Math.max(3, consecutiveAbs + 1);
@@ -233,7 +243,7 @@ function applySimulatedCourseUpdate(courseAttendance = [], simulationOptions = {
         attended = Math.max(0, Math.min(total, attended + delta));
         if (delta > 0) {
           consecutiveAbs = Math.max(0, consecutiveAbs - delta);
-          if (attended / total >= 0.75 && consecutiveAbs < 3) missedKey = false;
+          if (attended / total >= 0.70 && consecutiveAbs < 3) missedKey = false;
         } else if (delta < 0) {
           consecutiveAbs = Math.max(0, consecutiveAbs - delta);
         }

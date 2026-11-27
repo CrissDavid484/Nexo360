@@ -613,7 +613,7 @@ class AuthService {
       isNewlyCreated = true;
     }
 
-    const isPasswordValid = await this.verifyUserPassword(userDoc, password, isNewlyCreated);
+    const isPasswordValid = await this.verifyUserPassword(userDoc, password);
     if (!isPasswordValid) {
       throw createAuthError(
         401,
@@ -650,16 +650,19 @@ class AuthService {
     };
   }
 
-  async verifyUserPassword(userDoc, password, isNewlyCreated) {
-    if (isNewlyCreated) return true;
-    if (!userDoc.password) return password === DEFAULT_SEED_PASSWORD;
+  async verifyUserPassword(userDoc, password) {
+    if (!userDoc || !password) return false;
     if (typeof userDoc.comparePassword === 'function') {
       return userDoc.comparePassword(password);
     }
-    if (userDoc.password.startsWith('$2a$') || userDoc.password.startsWith('$2b$')) {
-      return bcrypt.compare(password, userDoc.password);
+    const stored = userDoc.password;
+    if (!stored) {
+      return password === DEFAULT_SEED_PASSWORD;
     }
-    return userDoc.password === password;
+    if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
+      return bcrypt.compare(password, stored);
+    }
+    return stored === password;
   }
 
   /**
@@ -981,6 +984,118 @@ class AuthService {
         ? raw.badges
         : (STAFF_ROLE_DEFAULTS[role]?.badges || []),
     };
+  }
+
+  /**
+   * Contrato de perfil público (estudiantes y vistas generales).
+   * Excluye RUT, teléfono, email personal y expedientes clínicos confidenciales.
+   */
+  toPublicProfile(userProfile) {
+    const formatted = this.formatUserResponse(userProfile);
+    return {
+      id: formatted.id,
+      _id: formatted._id,
+      email: formatted.email,
+      fullName: formatted.fullName,
+      nombre: formatted.nombre,
+      firstName: formatted.firstName,
+      paternalLastName: formatted.paternalLastName,
+      maternalLastName: formatted.maternalLastName,
+      role: formatted.role,
+      rol: formatted.rol,
+      roleLabel: formatted.roleLabel,
+      career: formatted.career,
+      carrera: formatted.carrera,
+      campus: formatted.campus,
+      sede: formatted.sede,
+      academicStatus: formatted.academicStatus,
+      statusReason: formatted.statusReason,
+      photo: formatted.photo,
+      isPaedis: formatted.isPaedis,
+      isRegisteredInDb: formatted.isRegisteredInDb,
+      accessibilityPreferences: formatted.accessibilityPreferences,
+    };
+  }
+
+  /**
+   * Contrato de perfil administrativo (Gestión académica y TI).
+   * Contiene trazabilidad institucional pero excluye diagnósticos médicos y notas clínicas confidenciales.
+   */
+  toAdminView(userProfile) {
+    const formatted = this.formatUserResponse(userProfile);
+    const {
+      diagnosticoDeclarado,
+      notasConfidencialesPaedis,
+      acreditacionPaedis,
+      barreraPaedis,
+      ...adminSafe
+    } = formatted;
+    return adminSafe;
+  }
+
+  /**
+   * Contrato de perfil confidencial PAEDIS (Coordinación de Inclusión y titular).
+   * Integra o combina expediente segregado PaedisRecord conforme a Ley N° 21.719.
+   */
+  toPaedisRestricted(userProfile, paedisRecord = null) {
+    const formatted = this.formatUserResponse(userProfile);
+    if (paedisRecord) {
+      const rec = typeof paedisRecord.toObject === 'function' ? paedisRecord.toObject() : paedisRecord;
+      return {
+        ...formatted,
+        diagnosticoDeclarado: rec.diagnosticoDeclarado || formatted.diagnosticoDeclarado,
+        ajustesAprobados: Array.isArray(rec.ajustesAprobados) ? rec.ajustesAprobados : formatted.ajustesAprobados,
+        barreraPaedis: rec.barreraPaedis || formatted.barreraPaedis,
+        acreditacionPaedis: rec.acreditacionPaedis || formatted.acreditacionPaedis,
+        notasConfidencialesPaedis: rec.notasConfidencialesPaedis || formatted.notasConfidencialesPaedis,
+        acusesDocentes: Array.isArray(rec.acusesDocentes) ? rec.acusesDocentes : formatted.acusesDocentes,
+      };
+    }
+    return formatted;
+  }
+
+  /**
+   * Migración idempotente para sincronizar datos confidenciales en colección PaedisRecord.
+   */
+  async syncPaedisRecordsMigration() {
+    if (mongoose.connection.readyState !== 1) return { migrated: 0 };
+    try {
+      const PaedisRecord = require('../models/PaedisRecord');
+      const usersWithPaedis = await UserProfile.find({
+        $or: [
+          { isPaedis: true },
+          { diagnosticoDeclarado: { $exists: true, $ne: '' } },
+          { role: 'estudiante_paedis' },
+        ],
+      }).lean();
+
+      let migratedCount = 0;
+      for (const u of usersWithPaedis) {
+        if (!u.email) continue;
+        await PaedisRecord.findOneAndUpdate(
+          { $or: [{ userEmail: u.email.toLowerCase() }, { studentEmail: u.email.toLowerCase() }] },
+          {
+            $setOnInsert: {
+              userId: u._id,
+              userEmail: u.email.toLowerCase(),
+              studentEmail: u.email.toLowerCase(),
+              diagnosticoDeclarado: u.diagnosticoDeclarado || '',
+              ajustesAprobados: Array.isArray(u.ajustesAprobados) ? u.ajustesAprobados : [],
+              barreraPaedis: u.barreraPaedis || 'Visual / Sensorial',
+              acreditacionPaedis: u.acreditacionPaedis || 'Credencial RND SENADIS',
+              notasConfidencialesPaedis: u.notasConfidencialesPaedis || '',
+              acusesDocentes: Array.isArray(u.acusesDocentes) ? u.acusesDocentes : [],
+            },
+          },
+          { upsert: true, new: true }
+        );
+        migratedCount++;
+      }
+      return { migrated: migratedCount };
+    } catch (err) {
+      console.warn('[AuthService] Error en syncPaedisRecordsMigration:', err.message);
+      return { migrated: 0, error: err.message };
+    }
   }
 
   registerUser(userData) {

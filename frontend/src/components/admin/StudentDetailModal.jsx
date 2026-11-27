@@ -296,22 +296,22 @@ export function StudentDetailModal({
           ) : (
             <>
               {/* Quick Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="p-3 bg-white rounded-xl border border-neutral-200">
                   <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Asistencia Global</span>
                   <span className="text-2xl font-black text-neutral-900 block">{displayAttendanceRate}%</span>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-neutral-200">
                   <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">PUNTAJE PREDICTIVO</span>
-                  <span className="text-2xl font-black text-neutral-900 block">{pred.score ?? 15}%</span>
-                </div>
-                <div className="p-3 bg-white rounded-xl border border-neutral-200">
-                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Prob. Titulación</span>
-                  <span className="text-2xl font-black text-neutral-900 block">{pred.graduationProbability ?? 90}%</span>
+                  <span className="text-2xl font-black text-neutral-900 block">
+                    {pred.score !== null && pred.score !== undefined ? `${pred.score}%` : 'N/A'}
+                  </span>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-neutral-200">
                   <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Nivel SAT</span>
-                  <span className="text-2xl font-black text-neutral-900 block">{pred.riskLevel || 'BAJO'}</span>
+                  <span className="text-2xl font-black text-neutral-900 block">
+                    {pred.riskLevel === 'SIN_DATOS' ? 'Sin datos' : (pred.riskLevel || 'BAJO')}
+                  </span>
                 </div>
               </div>
 
@@ -405,7 +405,7 @@ export function StudentDetailModal({
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-neutral-200/60 pt-2.5">
                     <div>
                       <span className="text-sm font-black text-neutral-900 block">{effectiveTraffic === 'red' ? 'Alto Riesgo' : effectiveTraffic === 'yellow' ? 'Riesgo Moderado' : 'Bajo Riesgo'}</span>
-                      <span className="text-xs text-neutral-600 font-semibold block">Nivel: <strong>{pred.riskLevel || 'BAJO'}</strong> • Prob. Titulación: <strong>{pred.graduationProbability ?? 90}%</strong></span>
+                      <span className="text-xs text-neutral-600 font-semibold block">Nivel: <strong>{pred.predictionLabel || pred.riskLevel || 'BAJO'}</strong></span>
                     </div>
                     <span className={`text-xs font-black px-3 py-1 rounded-xl self-start sm:self-auto border ${satBadgeMeta.badgeClass}`}>Puntaje: {pred.score ?? 15}%</span>
                   </div>

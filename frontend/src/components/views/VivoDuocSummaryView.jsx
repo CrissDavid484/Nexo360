@@ -172,9 +172,14 @@ export const VivoDuocSummaryView = () => {
       {/* 1. Encabezado Oficial Accesible (WCAG 2.2 AAA: Contraste >= 7:1) */}
       <header className="bg-neutral-0 px-6 sm:px-8 py-6 sm:py-7 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-neutral-200 shadow-sm">
         <div>
-          <span className="text-xs font-black tracking-wider uppercase text-brand-navy block mb-1">
-            Experiencia Vivo Duoc • {DEFAULT_CAMPUS} • Manual Institucional
-          </span>
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            <span className="text-xs font-black tracking-wider uppercase text-brand-navy block">
+              Experiencia Vivo Duoc • {DEFAULT_CAMPUS} • Manual Institucional
+            </span>
+            <span className="text-xs font-bold text-sky-900 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
+              Guía Formativa • No muta registros del sistema institucional
+            </span>
+          </div>
           <h2
             id="vivoduoc-view-title"
             {...getVoiceProps(`Guía y Manual de Botones de Experiencia Vivo para Duoc UC ${DEFAULT_CAMPUS}`)}

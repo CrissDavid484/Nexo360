@@ -43,10 +43,18 @@ async function resolveUserFromHeader(authHeader) {
 
   const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
 
-  if (decoded.id && mongoose.connection.readyState === 1) {
+  if (decoded.email && mongoose.connection.readyState === 1) {
     try {
-      const user = await UserProfile.findById(decoded.id).lean();
-      return { status: 'ok', user: user || decoded };
+      const query = mongoose.Types.ObjectId.isValid(decoded.id)
+        ? { $or: [{ _id: decoded.id }, { email: decoded.email }] }
+        : { email: decoded.email };
+      const user = await UserProfile.findOne(query).lean();
+      if (user) {
+        if (user.isBlocked === true || user.academicStatus === 'desercion_bloqueada') {
+          return { status: 'blocked', user: null };
+        }
+        return { status: 'ok', user };
+      }
     } catch (dbError) {
       console.warn('[AuthMiddleware] Error consultando UserProfile en MongoDB:', dbError.message);
       return { status: 'ok', user: decoded };
@@ -66,6 +74,13 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'No autorizado: Token de autenticación no proporcionado',
+      });
+    }
+
+    if (resolved.status === 'blocked') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado: Esta cuenta institucional se encuentra deshabilitada o suspendida.',
       });
     }
 
