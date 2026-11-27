@@ -34,23 +34,72 @@ function escapeHtml(text) {
     .replace(/'/g, '&#39;');
 }
 
+function convertYouTubeEmbedsToCards(html) {
+  if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const iframes = doc.querySelectorAll('iframe');
+      if (iframes.length === 0) return html;
+
+      iframes.forEach((iframe) => {
+        const src = iframe.getAttribute('src') || '';
+        const ytMatch = src.match(/youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]+)/i);
+        if (ytMatch) {
+          const videoId = ytMatch[1];
+          const card = doc.createElement('div');
+          card.className =
+            'my-4 p-4 rounded-xl border border-blue-200 bg-blue-50/70 dark:bg-slate-800/80 dark:border-blue-900/40 text-sm';
+          const headerDiv = doc.createElement('div');
+          headerDiv.className = 'flex items-center gap-2';
+          const titleSpan = doc.createElement('span');
+          titleSpan.className = 'font-semibold text-blue-900 dark:text-blue-300';
+          titleSpan.textContent = '📹 Video Tutorial Institucional';
+          headerDiv.appendChild(titleSpan);
+
+          const descP = doc.createElement('p');
+          descP.className = 'mt-1 text-slate-600 dark:text-slate-400';
+          descP.textContent = 'Puedes ver este instructivo en YouTube:';
+
+          const linkA = doc.createElement('a');
+          linkA.href = `https://www.youtube.com/watch?v=${videoId}`;
+          linkA.target = '_blank';
+          linkA.rel = 'noopener noreferrer';
+          linkA.className =
+            'inline-flex items-center gap-1 mt-2 font-medium text-blue-700 dark:text-blue-400 hover:underline';
+          linkA.textContent = 'Abrir video en YouTube ↗';
+
+          card.appendChild(headerDiv);
+          card.appendChild(descP);
+          card.appendChild(linkA);
+          iframe.replaceWith(card);
+        }
+      });
+      return doc.body.innerHTML;
+    } catch {
+      return html;
+    }
+  }
+  return html;
+}
+
 function sanitizeArticleHtml(html) {
   if (typeof html !== 'string' || !html) return '';
   try {
-    const clean = DOMPurify.sanitize(html, {
+    const preprocessed = convertYouTubeEmbedsToCards(html);
+
+    const clean = DOMPurify.sanitize(preprocessed, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'span', 'ul', 'ol', 'li',
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'table', 'thead',
-        'tbody', 'tr', 'th', 'td', 'a', 'div', 'hr', 'code', 'pre', 'iframe',
+        'tbody', 'tr', 'th', 'td', 'a', 'div', 'hr', 'code', 'pre', 'figure',
       ],
       ALLOWED_ATTR: [
         'href', 'title', 'target', 'rel', 'class', 'className', 'style',
-        'src', 'width', 'height', 'frameborder', 'allow', 'allowfullscreen',
-        'aria-label', 'aria-hidden', 'role',
+        'src', 'width', 'height', 'aria-label', 'aria-hidden', 'role',
       ],
-      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
       ADD_ATTR: ['target', 'rel'],
-      FORBID_TAGS: ['script', 'style', 'object', 'embed', 'form', 'input', 'textarea', 'button'],
+      FORBID_TAGS: ['script', 'style', 'object', 'embed', 'form', 'input', 'textarea', 'button', 'iframe'],
       FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'srcdoc'],
     });
 
@@ -68,16 +117,6 @@ function sanitizeArticleHtml(html) {
         }
       });
 
-      // Restringir iframes estrictamente a proveedores educativos autorizados
-      const iframes = doc.querySelectorAll('iframe');
-      iframes.forEach((iframe) => {
-        const src = iframe.getAttribute('src') || '';
-        const isAllowedHost = /^(?:https?:)?\/\/(?:www\.)?(?:youtube\.com|youtube-nocookie\.com|player\.vimeo\.com)\//i.test(src);
-        if (!isAllowedHost) {
-          iframe.remove();
-        }
-      });
-
       return doc.body.innerHTML;
     }
 
@@ -89,48 +128,7 @@ function sanitizeArticleHtml(html) {
 }
 
 function normalizeEmbeddedYouTubeHtml(html) {
-  if (typeof html !== 'string' || !html) return '';
-  const sanitized = sanitizeArticleHtml(html);
-  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') return sanitized;
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(sanitized, 'text/html');
-    const iframes = doc.querySelectorAll('iframe');
-    if (iframes.length === 0) return sanitized;
-
-    iframes.forEach((iframe) => {
-      const src = iframe.getAttribute('src') || '';
-      const ytMatch = src.match(/(?:https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]+)/i);
-      if (ytMatch) {
-        const videoId = ytMatch[1];
-        try {
-          const url = new URL(src, 'https://www.youtube.com');
-          url.searchParams.set('rel', '0');
-          url.searchParams.set('modestbranding', '1');
-          iframe.setAttribute('src', url.toString());
-        } catch {
-          iframe.setAttribute('src', `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`);
-        }
-        iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-
-        const nextP = iframe.nextElementSibling;
-        if (!nextP || !nextP.textContent.includes('Abrir tutorial')) {
-          const p = doc.createElement('p');
-          p.className = 'mt-2 mb-3 text-xs';
-          const a = doc.createElement('a');
-          a.href = `https://www.youtube.com/watch?v=${videoId}`;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          a.textContent = 'Abrir tutorial en YouTube';
-          p.appendChild(a);
-          iframe.insertAdjacentElement('afterend', p);
-        }
-      }
-    });
-    return doc.body.innerHTML;
-  } catch {
-    return sanitized;
-  }
+  return sanitizeArticleHtml(html);
 }
 
 function resolveModalHeader(category, activeTramite, activeArticle, clearReadingMode) {

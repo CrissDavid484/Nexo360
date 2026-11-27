@@ -178,6 +178,28 @@ export const resolveTabFromPathname = (pathname = '') => {
   return 'centro-ayuda';
 };
 
+function IntentPortalBanner({ tag, title, description, children, getVoiceProps }) {
+  return (
+    <div className="p-5 sm:p-6 bg-neutral-50/80 border border-neutral-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="space-y-1">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-navy text-white">
+          {tag}
+        </span>
+        <h3
+          {...getVoiceProps(title)}
+          className="text-base sm:text-lg font-bold text-neutral-900"
+        >
+          {title}
+        </h3>
+        <p className="text-xs sm:text-sm text-neutral-600 max-w-xl font-normal">
+          {description}
+        </p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { announce, getVoiceProps } = useAccessibility();
@@ -412,21 +434,12 @@ export const DashboardPage = () => {
 
                 {/* Banner de Intencionalidad Específica: Certificados de Notas Vivo Duoc */}
                 {searchAnalysis.isCertificadoNotasIntent && (
-                  <div className="p-5 sm:p-6 bg-neutral-50/80 border border-neutral-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-navy text-white">
-                        Acceso Oficial Directo • Vivo Duoc
-                      </span>
-                      <h3
-                        {...getVoiceProps('Portal de Certificados y Concentración de Notas')}
-                        className="text-base sm:text-lg font-bold text-neutral-900"
-                      >
-                        Portal de Certificados y Concentración de Notas
-                      </h3>
-                      <p className="text-xs sm:text-sm text-neutral-600 max-w-xl font-normal">
-                        Descarga de forma inmediata tu Certificado de Notas, Concentración de Calificaciones y Alumno Regular con firma electrónica avanzada y código QR oficial.
-                      </p>
-                    </div>
+                  <IntentPortalBanner
+                    tag="Acceso Oficial Directo • Vivo Duoc"
+                    title="Portal de Certificados y Concentración de Notas"
+                    description="Descarga de forma inmediata tu Certificado de Notas, Concentración de Calificaciones y Alumno Regular con firma electrónica avanzada y código QR oficial."
+                    getVoiceProps={getVoiceProps}
+                  >
                     <a
                       href="https://experienciavivo.duoc.cl/alumnos/certificados"
                       target="_blank"
@@ -437,26 +450,17 @@ export const DashboardPage = () => {
                       <span>Ir a Certificados Vivo Duoc</span>
                       <ExternalLink className="w-4 h-4 text-brand-gold" aria-hidden="true" />
                     </a>
-                  </div>
+                  </IntentPortalBanner>
                 )}
 
                 {/* Banner de Intencionalidad Específica: Toma de Ramos Oficial Duoc UC */}
                 {searchAnalysis.isTomaRamosIntent && (
-                  <div className="p-5 sm:p-6 bg-neutral-50/80 border border-neutral-200 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-navy text-white">
-                        Portal Oficial Directo • SICOL WebDynpro
-                      </span>
-                      <h3
-                        {...getVoiceProps('Inscripción de Asignaturas, Toma de Ramos Sede Alameda')}
-                        className="text-base sm:text-lg font-bold text-neutral-900"
-                      >
-                        Inscripción de Asignaturas (Toma de Ramos)
-                      </h3>
-                      <p className="text-xs sm:text-sm text-neutral-600 max-w-xl font-normal">
-                        Accede directamente a la plataforma oficial de Duoc UC - Sede Alameda para inscribir tus asignaturas, revisar secciones y confirmar tu carga horaria del semestre.
-                      </p>
-                    </div>
+                  <IntentPortalBanner
+                    tag="Portal Oficial Directo • SICOL WebDynpro"
+                    title="Inscripción de Asignaturas (Toma de Ramos)"
+                    description="Accede directamente a la plataforma oficial de Duoc UC - Sede Alameda para inscribir tus asignaturas, revisar secciones y confirmar tu carga horaria del semestre."
+                    getVoiceProps={getVoiceProps}
+                  >
                     <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                       <a
                         href="https://portalinsc.duoc.cl/webdynpro/dispatcher/duoc.com.student/sicol/StudentSicol?inportal=xi#"
@@ -478,7 +482,7 @@ export const DashboardPage = () => {
                         <span>Practicar en Simulador</span>
                       </button>
                     </div>
-                  </div>
+                  </IntentPortalBanner>
                 )}
 
                 {searchAnalysis.matchedSubmodules.length === 0 &&

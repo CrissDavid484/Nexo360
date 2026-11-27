@@ -868,7 +868,7 @@ function buildNewUserDocument({
     : [];
   let calculatedAttendance = typeof body.attendanceRate === 'number'
     ? body.attendanceRate
-    : (body.attendanceRate !== undefined && body.attendanceRate !== null && !isNaN(body.attendanceRate)
+    : (body.attendanceRate !== undefined && body.attendanceRate !== null && !Number.isNaN(Number(body.attendanceRate))
         ? Number.parseFloat(body.attendanceRate)
         : null);
 

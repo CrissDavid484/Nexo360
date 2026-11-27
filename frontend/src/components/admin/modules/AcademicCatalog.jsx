@@ -74,6 +74,67 @@ const CATALOG_CONFIG = {
   },
 };
 
+function ChileRegionCitySelects({
+  region,
+  city,
+  onChangeRegion,
+  onChangeCity,
+  disabled,
+  getVoiceProps = () => ({}),
+  className = 'w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold',
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div>
+        <label htmlFor="academic-sede-region-select" className="sr-only">
+          Región de Chile (16 regiones)
+        </label>
+        <select
+          id="academic-sede-region-select"
+          required
+          disabled={disabled}
+          value={region || ''}
+          onChange={(e) => onChangeRegion(e.target.value)}
+          {...getVoiceProps('Seleccionar región de Chile')}
+          aria-label="Región de Chile (16 regiones)"
+          className={className}
+        >
+          <option value="">Selecciona una región...</option>
+          {CHILE_REGIONS.map((reg) => (
+            <option key={reg} value={reg}>
+              {reg}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="academic-sede-city-select" className="sr-only">
+          Ciudad / Comuna de la sede
+        </label>
+        <select
+          id="academic-sede-city-select"
+          required
+          disabled={disabled || !region}
+          value={city || ''}
+          onChange={(e) => onChangeCity(e.target.value)}
+          aria-label="Ciudad o comuna de la sede"
+          {...getVoiceProps('Seleccionar ciudad o comuna de la sede')}
+          className={`${className} disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed`}
+        >
+          <option value="">
+            {region ? 'Selecciona una ciudad / comuna...' : 'Primero selecciona una región...'}
+          </option>
+          {getCitiesForRegion(region).map((cit) => (
+            <option key={cit} value={cit}>
+              {cit}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function CatalogCrudCard({
   kind,
   items,
@@ -204,57 +265,14 @@ function CatalogCrudCard({
                 {...getVoiceProps(cfg.addPlaceholder)}
                 className={`w-full ${ADMIN_THEME.controlInput}`}
               />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label htmlFor="academic-sede-region-select" className="sr-only">
-                    Región de Chile (16 regiones)
-                  </label>
-                  <select
-                    id="academic-sede-region-select"
-                    required
-                    disabled={isMutating}
-                    value={extraState?.region || ''}
-                    onChange={(e) => {
-                      const newRegion = e.target.value;
-                      onExtraStateChange({ region: newRegion, city: '' });
-                    }}
-                    {...getVoiceProps('Seleccionar región de Chile')}
-                    aria-label="Región de Chile (16 regiones)"
-                    className="w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
-                  >
-                    <option value="">Selecciona una región...</option>
-                    {CHILE_REGIONS.map((reg) => (
-                      <option key={reg} value={reg}>
-                        {reg}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="academic-sede-city-select" className="sr-only">
-                    Ciudad / Comuna de la sede
-                  </label>
-                  <select
-                    id="academic-sede-city-select"
-                    required
-                    disabled={isMutating || !extraState?.region}
-                    value={extraState?.city || ''}
-                    onChange={(e) => onExtraStateChange({ city: e.target.value })}
-                    aria-label="Ciudad o comuna de la sede"
-                    {...getVoiceProps('Seleccionar ciudad o comuna de la sede')}
-                    className="w-full min-h-[42px] px-3 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm text-neutral-800 bg-white disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-gold"
-                  >
-                    <option value="">
-                      {extraState?.region ? 'Selecciona una ciudad / comuna...' : 'Primero selecciona una región...'}
-                    </option>
-                    {getCitiesForRegion(extraState?.region).map((cit) => (
-                      <option key={cit} value={cit}>
-                        {cit}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <ChileRegionCitySelects
+                region={extraState?.region || ''}
+                city={extraState?.city || ''}
+                onChangeRegion={(newRegion) => onExtraStateChange({ region: newRegion, city: '' })}
+                onChangeCity={(newCity) => onExtraStateChange({ city: newCity })}
+                disabled={isMutating}
+                getVoiceProps={getVoiceProps}
+              />
               <Button
                 type="submit"
                 variant="primary"
@@ -323,31 +341,14 @@ function CatalogCrudCard({
                         ))}
                       </select>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <select
-                          disabled={isMutating}
-                          value={editDraft.region}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, region: e.target.value, city: '' }))}
-                          aria-label="Editar región"
-                          className="w-full min-h-[38px] px-3 py-1.5 rounded-xl border border-neutral-300 text-xs text-neutral-800 bg-white"
-                        >
-                          {CHILE_REGIONS.map((reg) => (
-                            <option key={reg} value={reg}>{reg}</option>
-                          ))}
-                        </select>
-                        <select
-                          disabled={isMutating || !editDraft.region}
-                          value={editDraft.city}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, city: e.target.value }))}
-                          aria-label="Editar ciudad"
-                          className="w-full min-h-[38px] px-3 py-1.5 rounded-xl border border-neutral-300 text-xs text-neutral-800 bg-white"
-                        >
-                          <option value="">Selecciona ciudad...</option>
-                          {getCitiesForRegion(editDraft.region).map((cit) => (
-                            <option key={cit} value={cit}>{cit}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <ChileRegionCitySelects
+                        region={editDraft.region}
+                        city={editDraft.city}
+                        onChangeRegion={(newRegion) => setEditDraft((prev) => ({ ...prev, region: newRegion, city: '' }))}
+                        onChangeCity={(newCity) => setEditDraft((prev) => ({ ...prev, city: newCity }))}
+                        disabled={isMutating}
+                        className="w-full min-h-[38px] px-3 py-1.5 rounded-xl border border-neutral-300 text-xs text-neutral-800 bg-white"
+                      />
                     )}
                     <div className="flex items-center justify-end gap-2">
                       <Button type="button" variant="secondary" size="sm" onClick={cancelEdit} disabled={isMutating}>

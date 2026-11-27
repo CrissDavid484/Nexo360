@@ -19,6 +19,22 @@ const {
 } = require('../services/predictiveRiskService');
 
 describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
+  // Helper factories para deduplicación de cursos
+  const makeCourse = (code, name, pct, attended, absences = 0, extra = {}) => ({
+    courseCode: code,
+    courseName: name,
+    attendancePercentage: pct,
+    totalSessions: 20,
+    attendedSessions: attended,
+    consecutiveAbsences: absences,
+    missedKeySession: false,
+    paedisJustified: false,
+    creditos: 10,
+    ...extra,
+  });
+  const prog = (pct, attended, absences = 0, extra = {}) => makeCourse('PROG101', 'Programación I', pct, attended, absences, extra);
+  const mat = (pct, attended, absences = 0, extra = {}) => makeCourse('MAT201', 'Cálculo II', pct, attended, absences, extra);
+
   // Fixtures de estudiantes para reutilizar
   const studentNoRisk = {
     academicStatus: 'activo',
@@ -28,8 +44,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     hasUsedSimulator: true,
     simulatorQualityScore: 85,
     enrolledCourses: [
-      { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 90, totalSessions: 20, attendedSessions: 18, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
-      { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 88, totalSessions: 20, attendedSessions: 17, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
+      prog(90, 18),
+      mat(88, 17),
     ],
     courseAttendanceHistory: [
       { courses: [{ attendancePercentage: 88 }] },
@@ -50,8 +66,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     ajustesAprobados: [],
     hasUsedSimulator: false,
     enrolledCourses: [
-      { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 65, totalSessions: 20, attendedSessions: 13, consecutiveAbsences: 3, missedKeySession: false, paedisJustified: false, creditos: 10 },
-      { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 72, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 2, missedKeySession: false, paedisJustified: false, creditos: 10 },
+      prog(65, 13, 3),
+      mat(72, 14, 2),
     ],
   };
 
@@ -62,8 +78,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     ajustesAprobados: [{ tipo: 'Tiempo extendido +25%', descripcion: '25% tiempo adicional' }],
     hasUsedSimulator: true,
     enrolledCourses: [
-      { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 70, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 1, missedKeySession: false, paedisJustified: false, creditos: 10 },
-      { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 74, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 1, missedKeySession: false, paedisJustified: false, creditos: 10 },
+      prog(70, 14, 1),
+      mat(74, 14, 1),
     ],
   };
 
@@ -74,8 +90,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     ajustesAprobados: [],
     hasUsedSimulator: false,
     enrolledCourses: [
-      { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 73, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 1, missedKeySession: false, paedisJustified: false, creditos: 10 },
-      { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 75, totalSessions: 20, attendedSessions: 15, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
+      prog(73, 14, 1),
+      mat(75, 15, 0),
     ],
   };
 
@@ -86,8 +102,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     ajustesAprobados: [],
     hasUsedSimulator: false,
     enrolledCourses: [
-      { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 73, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 1, missedKeySession: false, paedisJustified: false, creditos: 10 },
-      { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 75, totalSessions: 20, attendedSessions: 15, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
+      prog(73, 14, 1),
+      mat(75, 15, 0),
     ],
   };
 
@@ -109,8 +125,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
     ajustesAprobados: [],
     hasUsedSimulator: false,
     enrolledCourses: [
-      { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 90, totalSessions: 20, attendedSessions: 18, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
-      { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 88, totalSessions: 20, attendedSessions: 17, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
+      prog(90, 18),
+      mat(88, 17),
     ],
   };
 
@@ -341,8 +357,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: true,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 65, totalSessions: 20, attendedSessions: 13, consecutiveAbsences: 3, missedKeySession: false, paedisJustified: false, creditos: 10 },
-        { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 80, totalSessions: 20, attendedSessions: 16, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
+        prog(65, 13, 3),
+        mat(80, 16, 0),
       ],
     };
     const prediction = calculatePredictiveRisk(student);
@@ -369,7 +385,7 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: false,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 60, totalSessions: 20, attendedSessions: 12, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
+        prog(60, 12, 0),
       ],
     };
     const prediction = calculatePredictiveRisk(student);
@@ -416,9 +432,9 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: false,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 95, totalSessions: 20, attendedSessions: 19, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
-        { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 96, totalSessions: 20, attendedSessions: 19, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
-        { courseCode: 'ING101', courseName: 'Inglés Técnico', attendancePercentage: 94, totalSessions: 20, attendedSessions: 18, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 5 },
+        prog(95, 19, 0),
+        mat(96, 19, 0),
+        makeCourse('ING101', 'Inglés Técnico', 94, 18, 0, { creditos: 5 }),
       ],
     };
     const prediction = calculatePredictiveRisk(student);
@@ -502,8 +518,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
   // ============================================================
   test('extractCourseAttendanceDetails normaliza y detecta RI/Alerta', () => {
     const courses = [
-      { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 65, totalSessions: 20, attendedSessions: 13, consecutiveAbsences: 3, missedKeySession: false, paedisJustified: false },
-      { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 72, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 2, missedKeySession: false, paedisJustified: false },
+      prog(65, 13, 3),
+      mat(72, 14, 2),
     ];
     const { effectiveAttendance, courseDetails, coursesInRI, coursesInAlert } = extractCourseAttendanceDetails(courses);
     assert.equal(effectiveAttendance, 68.5);
@@ -651,7 +667,7 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: false,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 65, totalSessions: 20, attendedSessions: 13, consecutiveAbsences: 3, missedKeySession: false, paedisJustified: false, creditos: 10 },
+        prog(65, 13, 3),
       ],
     };
     const prediction = calculatePredictiveRisk(student);
@@ -670,8 +686,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: true,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 75, totalSessions: 20, attendedSessions: 15, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
-        { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 60, totalSessions: 20, attendedSessions: 12, consecutiveAbsences: 5, missedKeySession: false, paedisJustified: false, creditos: 10 }, // Score alto por asistencias
+        prog(75, 15, 0),
+        mat(60, 12, 5), // Score alto por asistencias
       ],
     };
     const prediction = calculatePredictiveRisk(student);
@@ -693,7 +709,7 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: false,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 60, totalSessions: 20, attendedSessions: 12, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
+        prog(60, 12, 0),
       ],
     };
     const prediction = calculatePredictiveRisk(student);
@@ -722,8 +738,8 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: true,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 73, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 1, missedKeySession: false, paedisJustified: false, creditos: 10 },
-        { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 74, totalSessions: 20, attendedSessions: 14, consecutiveAbsences: 1, missedKeySession: false, paedisJustified: false, creditos: 10 },
+        prog(73, 14, 1),
+        mat(74, 14, 1),
       ],
     };
     const prediction = calculatePredictiveRisk(student);
@@ -740,9 +756,9 @@ describe('Motor Predictivo de Deserción v2 — Tests Unitarios', () => {
       ajustesAprobados: [],
       hasUsedSimulator: false,
       enrolledCourses: [
-        { courseCode: 'PROG101', courseName: 'Programación I', attendancePercentage: 95, totalSessions: 20, attendedSessions: 19, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
-        { courseCode: 'MAT201', courseName: 'Cálculo II', attendancePercentage: 96, totalSessions: 20, attendedSessions: 19, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 10 },
-        { courseCode: 'ING101', courseName: 'Inglés Técnico', attendancePercentage: 94, totalSessions: 20, attendedSessions: 18, consecutiveAbsences: 0, missedKeySession: false, paedisJustified: false, creditos: 5 },
+        prog(95, 19, 0),
+        mat(96, 19, 0),
+        makeCourse('ING101', 'Inglés Técnico', 94, 18, 0, { creditos: 5 }),
       ],
     };
     const prediction = calculatePredictiveRisk(student);

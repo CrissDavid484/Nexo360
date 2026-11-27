@@ -1088,7 +1088,7 @@ class AuthService {
       academicStatus: raw.academicStatus || 'activo',
       statusReason: raw.statusReason || 'Estudiante regular activo',
       attendanceRate:
-        raw.attendanceRate !== undefined && raw.attendanceRate !== null && !isNaN(raw.attendanceRate)
+        raw.attendanceRate !== undefined && raw.attendanceRate !== null && !Number.isNaN(Number(raw.attendanceRate))
           ? Number(raw.attendanceRate)
           : null,
       isActivated: raw.isActivated !== false,

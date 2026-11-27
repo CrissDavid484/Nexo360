@@ -1020,16 +1020,15 @@ export const TomaRamosSimulator = ({ onExit }) => {
         className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
       >
         <div className="px-6 sm:px-8 py-5 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-[#002B49] block">
-              Vida Académica Duoc UC - Sede Alameda
+          <div className="space-y-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#002B49] block">
+              Vida Académica Duoc UC • Sede Alameda
             </span>
-            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 leading-tight">
               Inscripción y Modificación de Asignaturas (Toma de Ramos)
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
-              Revisa el video oficial paso a paso a tu izquierda y las instrucciones clave a la
-              derecha antes o durante tu práctica en el simulador de abajo.
+            <p className="text-sm text-slate-600 max-w-3xl leading-relaxed">
+              ¡Prepárate y practica tu toma de ramos! Revisa el video oficial paso a paso a la izquierda y las instrucciones clave a la derecha antes de simular tu horario.
             </p>
           </div>
 

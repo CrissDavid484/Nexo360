@@ -426,10 +426,10 @@ function stripTagsAndClean(raw) {
     .trim();
 }
 
-function findXmlTagBlocks(xml, targetTagName) {
-  const blocks = [];
-  if (!xml || typeof xml !== 'string') return blocks;
-  const targetLower = targetTagName.toLowerCase();
+function parseGenericXmlElements(xml, filterTagName = null) {
+  const elements = [];
+  if (!xml || typeof xml !== 'string') return elements;
+  const targetLower = filterTagName ? filterTagName.toLowerCase() : null;
   let i = 0;
   const len = xml.length;
 
@@ -449,9 +449,9 @@ function findXmlTagBlocks(xml, targetTagName) {
     const spaceIdx = fullTag.search(/\s/);
     const tagNameWithNs = (spaceIdx === -1 ? fullTag : fullTag.slice(0, spaceIdx)).replace(/\/$/, '');
     const colonIdx = tagNameWithNs.indexOf(':');
-    const localName = (colonIdx === -1 ? tagNameWithNs : tagNameWithNs.slice(colonIdx + 1)).toLowerCase();
+    const localName = colonIdx === -1 ? tagNameWithNs : tagNameWithNs.slice(colonIdx + 1);
 
-    if (localName !== targetLower) {
+    if (targetLower && localName.toLowerCase() !== targetLower) {
       i = openIdx + 1;
       continue;
     }
@@ -459,7 +459,7 @@ function findXmlTagBlocks(xml, targetTagName) {
     const attrs = spaceIdx === -1 ? '' : fullTag.slice(spaceIdx).replace(/\/$/, '').trim();
 
     if (fullTag.endsWith('/')) {
-      blocks.push({ attrs, inner: '' });
+      elements.push({ tag: localName, fullTag: tagNameWithNs, attrs, inner: '' });
       i = tagCloseIdx + 1;
       continue;
     }
@@ -480,29 +480,29 @@ function findXmlTagBlocks(xml, targetTagName) {
     }
 
     const inner = xml.slice(tagCloseIdx + 1, closeIdx);
-    blocks.push({ attrs, inner });
+    elements.push({ tag: localName, fullTag: tagNameWithNs, attrs, inner });
     i = closeIdx + closeLen;
   }
 
-  return blocks;
+  return elements;
 }
 
 function parseSpreadsheetMlRows(xml) {
-  const rowBlocks = findXmlTagBlocks(xml, 'Row');
+  const rowBlocks = parseGenericXmlElements(xml, 'Row');
   if (!rowBlocks || rowBlocks.length === 0) return null;
 
   const matrix = [];
   for (const rowBlock of rowBlocks) {
     const row = [];
-    const cellBlocks = findXmlTagBlocks(rowBlock.inner, 'Cell');
+    const cellBlocks = parseGenericXmlElements(rowBlock.inner, 'Cell');
     for (const cellBlock of cellBlocks) {
-      const idxAttr = cellBlock.attrs.match(/Index\s*=\s*(?:"(\d+)"|'(\d+)')/i);
+      const idxAttr = cellBlock.attrs.match(/Index\s*=\s*["'](\d+)["']/i);
       if (idxAttr) {
-        const rawIdx = idxAttr[1] || idxAttr[2];
+        const rawIdx = idxAttr[1];
         const targetIdx = Math.max(0, Number.parseInt(rawIdx, 10) - 1);
         while (row.length < targetIdx) row.push('');
       }
-      const dataBlocks = findXmlTagBlocks(cellBlock.inner, 'Data');
+      const dataBlocks = parseGenericXmlElements(cellBlock.inner, 'Data');
       const text = dataBlocks.length > 0 ? dataBlocks[0].inner : cellBlock.inner;
       row.push(stripTagsAndClean(text));
     }
@@ -570,61 +570,6 @@ function stripXmlCommentsAndProlog(xml) {
     s = s.slice(0, start) + s.slice(end + 3);
   }
   return s.trim();
-}
-
-function parseGenericXmlElements(xml) {
-  const elements = [];
-  if (!xml || typeof xml !== 'string') return elements;
-  let i = 0;
-  const len = xml.length;
-
-  while (i < len) {
-    const openIdx = xml.indexOf('<', i);
-    if (openIdx === -1) break;
-
-    const tagCloseIdx = xml.indexOf('>', openIdx);
-    if (tagCloseIdx === -1) break;
-
-    const fullTag = xml.slice(openIdx + 1, tagCloseIdx).trim();
-    if (fullTag.startsWith('/') || fullTag.startsWith('?') || fullTag.startsWith('!')) {
-      i = tagCloseIdx + 1;
-      continue;
-    }
-
-    const spaceIdx = fullTag.search(/\s/);
-    const tagNameWithNs = (spaceIdx === -1 ? fullTag : fullTag.slice(0, spaceIdx)).replace(/\/$/, '');
-    const colonIdx = tagNameWithNs.indexOf(':');
-    const localName = colonIdx === -1 ? tagNameWithNs : tagNameWithNs.slice(colonIdx + 1);
-
-    const attrs = spaceIdx === -1 ? '' : fullTag.slice(spaceIdx).replace(/\/$/, '').trim();
-
-    if (fullTag.endsWith('/')) {
-      elements.push({ tag: localName, fullTag: tagNameWithNs, attrs, inner: '' });
-      i = tagCloseIdx + 1;
-      continue;
-    }
-
-    const closingTag = `</${tagNameWithNs}>`.toLowerCase();
-    const fallbackClosing = `</${localName}>`.toLowerCase();
-    const lowerSub = xml.toLowerCase();
-    let closeIdx = lowerSub.indexOf(closingTag, tagCloseIdx);
-    let closeLen = closingTag.length;
-    if (closeIdx === -1) {
-      closeIdx = lowerSub.indexOf(fallbackClosing, tagCloseIdx);
-      closeLen = fallbackClosing.length;
-    }
-
-    if (closeIdx === -1) {
-      i = tagCloseIdx + 1;
-      continue;
-    }
-
-    const inner = xml.slice(tagCloseIdx + 1, closeIdx);
-    elements.push({ tag: localName, fullTag: tagNameWithNs, attrs, inner });
-    i = closeIdx + closeLen;
-  }
-
-  return elements;
 }
 
 function parseGenericXmlRecords(xml) {
