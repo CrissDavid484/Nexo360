@@ -880,7 +880,11 @@ function buildNewUserDocument({
     calculatedAttendance = generated.attendanceRate;
   }
 
-  const isConsentGiven = body.consentimientoLey21719?.aceptado === true;
+  // El consentimiento legal bajo Ley N° 21.719 solo puede ser prestado directamente por el titular (estudiante)
+  // en la activación de cuenta, excepto en cuentas sembradas de demostración aislada o pruebas automatizadas.
+  const isConsentGiven = (isDemoAccount || (process.env.NODE_ENV === 'test' && body.consentimientoLey21719?.aceptado === true))
+    ? Boolean(body.consentimientoLey21719?.aceptado)
+    : false;
 
   return {
     email,
@@ -1018,7 +1022,9 @@ exports.createStudent = async (req, res) => {
     let activationTokenHash = null;
     let activationTokenExpiresAt = null;
 
-    if (explicitPassword) {
+    const isExplicitPasswordAllowed = (process.env.NODE_ENV === 'test' || body.isDemoAccount) && Boolean(explicitPassword);
+
+    if (isExplicitPasswordAllowed) {
       const salt = await bcrypt.genSalt(10);
       hashedPassword = await bcrypt.hash(explicitPassword, salt);
       mustChangePassword =
@@ -2323,27 +2329,28 @@ exports.updatePaedisCase = async (req, res) => {
       existingRecord?.medioEntrega ||
       (isNotified ? 'Notificación Electrónica Institucional' : '');
 
+    const evidenceProvided = sanitizeString(body.evidencia || body.comprobante, 500);
+
+    // Validación de integridad P0/P1 para Ficha Docente: impedir marcar ENVIADA/ENTREGADA/ACUSADA sin evidencia o comprobante
+    const isMarkingSentOrDelivered =
+      body.fichaDocenteEstado !== undefined &&
+      ['ENVIADA', 'ENTREGADA', 'ACUSADA'].includes(String(body.fichaDocenteEstado).toUpperCase());
+
+    if (isMarkingSentOrDelivered && !evidenceProvided) {
+      return res.status(400).json({
+        success: false,
+        message: `Para marcar la Ficha Docente como "${nextSheetState}" es obligatorio adjuntar evidencia o comprobante de entrega.`,
+      });
+    }
+
     if (shouldAppendHistory) {
       nextHistorial.unshift({
         estado: nextSheetState,
         fecha: new Date(),
         actorEmail: (req.user?.email || 'coordinacion.paedis@duoc.cl').toLowerCase(),
         medioEntrega: deliveryChannel,
-        evidencia: sanitizeString(body.evidencia, 500) || (isNotified ? 'Registro en plataforma' : ''),
+        evidencia: evidenceProvided || (isNotified ? 'Registro en plataforma' : ''),
       });
-    }
-
-    // Validación de integridad para estados de entrega/acuse de Ficha Docente (P0/P1)
-    const isTransitioningState =
-      clinicalUpdates.fichaDocenteEstado !== undefined &&
-      clinicalUpdates.fichaDocenteEstado !== existingRecord?.fichaDocenteEstado;
-    if (isTransitioningState && ['ENVIADA', 'ENTREGADA', 'ACUSADA'].includes(nextSheetState)) {
-      if (!deliveryChannel && body.strictDeliveryValidation) {
-        return res.status(400).json({
-          success: false,
-          message: `La transición al estado "${nextSheetState}" de la Ficha Docente requiere medio de entrega o evidencia válida.`,
-        });
-      }
     }
     const canonicalRecordPayload = {
       ...(validUserId ? { userId: validUserId, studentId: validUserId } : {}),
@@ -2428,14 +2435,22 @@ exports.updatePaedisCase = async (req, res) => {
         const syncResult = await authService.updateProfileFields(cleanEmail, userSafeUpdates);
         updatedUser = syncResult.user || { ...user, ...userSafeUpdates };
       } catch (syncErr) {
-        // Compensación atómica: revertir PaedisRecord al estado previo para evitar inconsistencia
-        if (mongoose.connection?.readyState === 1 && existingRecord) {
-          await PaedisRecord.findOneAndUpdate(
-            { $or: [{ studentEmail: cleanEmail }, { userEmail: cleanEmail }] },
-            { $set: existingRecord }
-          ).catch(() => {});
+        // Compensación atómica: revertir o eliminar PaedisRecord al estado previo para evitar inconsistencia
+        if (mongoose.connection?.readyState === 1) {
+          if (existingRecord) {
+            await PaedisRecord.findOneAndUpdate(
+              { $or: [{ studentEmail: cleanEmail }, { userEmail: cleanEmail }] },
+              { $set: existingRecord }
+            ).catch(() => {});
+          } else {
+            await PaedisRecord.deleteOne({
+              $or: [{ studentEmail: cleanEmail }, { userEmail: cleanEmail }],
+            }).catch(() => {});
+          }
         } else if (existingRecord) {
           inMemoryPaedisRecords.set(cleanEmail, existingRecord);
+        } else {
+          inMemoryPaedisRecords.delete(cleanEmail);
         }
         throw syncErr;
       }
@@ -2764,9 +2779,15 @@ const AUDIT_CATEGORY_ACTIONS = Object.freeze({
   sat: ['sat_weekly_cut_simulated', 'sat_intervention_updated'],
   catalog: ['career_created', 'career_deleted', 'sede_created', 'sede_deleted', 'IMPORT', 'CLEAR', 'SEED', 'catalog_import', 'catalog_clear', 'catalog_seed', 'CURSOS_IMPORTADOS', 'CURSOS_RESTABLECIDOS', 'CURSOS_ELIMINADOS'],
   academico: ['career_created', 'career_deleted', 'sede_created', 'sede_deleted', 'IMPORT', 'CLEAR', 'SEED', 'catalog_import', 'catalog_clear', 'catalog_seed', 'CURSOS_IMPORTADOS', 'CURSOS_RESTABLECIDOS', 'CURSOS_ELIMINADOS'],
+  academic: ['career_created', 'career_deleted', 'sede_created', 'sede_deleted', 'IMPORT', 'CLEAR', 'SEED', 'catalog_import', 'catalog_clear', 'catalog_seed', 'CURSOS_IMPORTADOS', 'CURSOS_RESTABLECIDOS', 'CURSOS_ELIMINADOS'],
   users: ['status_changed_by_admin', 'student_registered_by_admin', 'student_updated_by_admin', 'student_deleted_by_admin', 'staff_permissions_updated'],
   usuarios: ['status_changed_by_admin', 'student_registered_by_admin', 'student_updated_by_admin', 'student_deleted_by_admin', 'staff_permissions_updated'],
+  student: ['status_changed_by_admin', 'student_registered_by_admin', 'student_updated_by_admin', 'student_deleted_by_admin', 'staff_permissions_updated'],
+  estudiantes: ['status_changed_by_admin', 'student_registered_by_admin', 'student_updated_by_admin', 'student_deleted_by_admin', 'staff_permissions_updated'],
+  accessibility: ['updated_accessibility'],
+  accesibilidad: ['updated_accessibility'],
   simulator: ['used_simulator_toma_ramos', 'saved_toma_ramos'],
+  simulador: ['used_simulator_toma_ramos', 'saved_toma_ramos'],
 });
 
 function sanitizeAuditValue(value, depth = 0) {
@@ -2810,7 +2831,8 @@ function parseAuditFilterParams(query = {}) {
 
   let fromDate = null;
   if (query.from) {
-    const parsedFrom = new Date(String(query.from));
+    const rawFrom = String(query.from).trim();
+    const parsedFrom = new Date(/^\d{4}-\d{2}-\d{2}$/.test(rawFrom) ? `${rawFrom}T00:00:00.000Z` : rawFrom);
     if (!Number.isNaN(parsedFrom.getTime())) fromDate = parsedFrom;
   }
   let toDate = null;

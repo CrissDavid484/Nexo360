@@ -159,6 +159,10 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
       let csvContent = '';
       if (typeof res === 'string') {
         csvContent = res;
+      } else if (typeof res?.text === 'string') {
+        csvContent = res.text;
+      } else if (typeof res?.data === 'string') {
+        csvContent = res.data;
       } else if (res?.logs && Array.isArray(res.logs)) {
         const escapeCsv = (val) => {
           let s = String(val ?? '');
@@ -168,6 +172,10 @@ export const AuditLog = ({ isAdmin, getVoiceProps, announce }) => {
         const header = ['id', 'createdAt', 'action', 'userEmail', 'userName', 'userRole', 'details'];
         const rows = res.logs.map((l) => [l.id, l.createdAt, l.action, l.userEmail, l.userName, l.userRole, l.details]);
         csvContent = [header, ...rows].map((r) => r.map(escapeCsv).join(',')).join('\n');
+      }
+
+      if (!csvContent || res?.success === false) {
+        throw new Error(res?.message || 'No se recibieron datos de bitácora para exportar.');
       }
 
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });

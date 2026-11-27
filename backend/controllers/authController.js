@@ -913,8 +913,8 @@ exports.verifyActivationToken = async (req, res) => {
  */
 exports.activateAccount = async (req, res) => {
   try {
-    const { token, password } = req.body || {};
-    const result = await authService.activateAccountWithToken(token, password);
+    const { token, password, consentimiento } = req.body || {};
+    const result = await authService.activateAccountWithToken(token, password, consentimiento);
     return res.status(200).json(result);
   } catch (error) {
     return res.status(error.statusCode || 400).json({

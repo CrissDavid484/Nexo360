@@ -700,7 +700,7 @@ class AuthService {
   /**
    * Activa una cuenta institucional permitiendo al titular definir su propia contraseña.
    */
-  async activateAccountWithToken(token, newPassword) {
+  async activateAccountWithToken(token, newPassword, consentimiento) {
     if (!token || typeof token !== 'string' || !token.trim()) {
       throw createAuthError(400, 'Token de activación no proporcionado o inválido.');
     }
@@ -744,6 +744,15 @@ class AuthService {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
+    const isConsentProvided = consentimiento?.aceptado === true;
+    const consentPayload = {
+      aceptado: isConsentProvided,
+      fechaAceptacion: isConsentProvided ? new Date() : null,
+      estado: isConsentProvided ? 'ACEPTADO' : 'PENDIENTE',
+      mecanismo: 'ACTIVACION_TITULAR',
+      finalidadTratamiento: 'Gestión académica, alertas tempranas SAT y acompañamiento PAEDIS según Ley N° 21.719',
+    };
+
     if (mongoose.connection.readyState === 1 && typeof userDoc.save === 'function') {
       userDoc.password = hashedPassword;
       userDoc.activationTokenHash = null;
@@ -751,6 +760,11 @@ class AuthService {
       userDoc.isActivated = true;
       userDoc.mustChangePassword = false;
       userDoc.statusUpdatedAt = new Date();
+      userDoc.consentimientoLey21719 = consentPayload;
+      if (userDoc.consentMetadata) {
+        userDoc.consentMetadata.consentGiven = isConsentProvided;
+        userDoc.consentMetadata.consentDate = isConsentProvided ? new Date() : null;
+      }
       await userDoc.save();
     } else {
       userDoc.password = hashedPassword;
@@ -759,6 +773,11 @@ class AuthService {
       userDoc.isActivated = true;
       userDoc.mustChangePassword = false;
       userDoc.statusUpdatedAt = new Date();
+      userDoc.consentimientoLey21719 = consentPayload;
+      if (userDoc.consentMetadata) {
+        userDoc.consentMetadata.consentGiven = isConsentProvided;
+        userDoc.consentMetadata.consentDate = isConsentProvided ? new Date() : null;
+      }
       inMemoryUsers.set(userDoc.email.toLowerCase(), userDoc);
     }
 

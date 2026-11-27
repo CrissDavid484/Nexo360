@@ -403,15 +403,19 @@ class MicrosoftEntraIdAdapter {
       );
     }
 
-    if (expectedNonce !== undefined) {
-      if (
-        typeof expectedNonce !== 'string' ||
-        !expectedNonce ||
-        typeof payload.nonce !== 'string' ||
-        !timingSafeEqualStr(payload.nonce, expectedNonce)
-      ) {
-        throw createOidcError(401, 'OIDC_NONCE_MISMATCH', 'Nonce OIDC inválido o faltante.');
-      }
+    if (!expectedNonce || typeof expectedNonce !== 'string') {
+      throw createOidcError(
+        401,
+        'OIDC_NONCE_REQUIRED',
+        'El parámetro expectedNonce es obligatorio para validar el token OIDC.'
+      );
+    }
+
+    if (
+      typeof payload.nonce !== 'string' ||
+      !timingSafeEqualStr(payload.nonce, expectedNonce)
+    ) {
+      throw createOidcError(401, 'OIDC_NONCE_MISMATCH', 'Nonce OIDC inválido o faltante.');
     }
 
     const profile = this.mapClaimsToUserProfile(payload);

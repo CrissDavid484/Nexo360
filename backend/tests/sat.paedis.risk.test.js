@@ -333,6 +333,14 @@ describe('SAT, PAEDIS, Riesgo Predictivo, Snapshots y Adaptadores — Suite Inte
       });
       await invalid.validate();
     });
+
+    await assert.rejects(async () => {
+      const invalidSheet = new PaedisRecord({
+        userEmail: 'bad_sheet@duocuc.cl',
+        fichaDocenteEstado: 'ESTADO_FICHA_INEXISTENTE',
+      });
+      await invalidSheet.validate();
+    });
   });
 
   test('UserProfile: consentimiento default false, campos clínicos select:false y comparePassword sin plaintext', async () => {

@@ -772,4 +772,85 @@ describe('Bloque 1 — Hardening de Seguridad y Autenticación P0 (Nexo360)', ()
       }
     }
   });
+
+  test('8. [CORS Security P0] Restricción estricta de orígenes: rechaza .pages.dev arbitrarios y spoofing de localhost', async () => {
+    // 8.1 Origen malicioso .pages.dev debe ser rechazado con 403
+    const badPagesRes = await request('/api/health/live', {
+      headers: { Origin: 'https://attacker.pages.dev' },
+    });
+    assert.equal(badPagesRes.status, 403);
+    assert.match(badPagesRes.body?.message || '', /CORS/i);
+
+    // 8.2 Subdominio no autorizado que contiene "nexo360.pages.dev" pero no pertenece (ej. evil-nexo360.pages.dev)
+    const spoofPagesRes = await request('/api/health/live', {
+      headers: { Origin: 'https://evil-nexo360.pages.dev' },
+    });
+    assert.equal(spoofPagesRes.status, 403);
+
+    // 8.3 Dominio que simula localhost en hostname (ej. attacker-localhost.com)
+    const spoofLocalhostRes = await request('/api/health/live', {
+      headers: { Origin: 'http://attacker-localhost.com' },
+    });
+    assert.equal(spoofLocalhostRes.status, 403);
+
+    // 8.4 Orígenes oficiales válidos son permitidos (200)
+    const prodPagesRes = await request('/api/health/live', {
+      headers: { Origin: 'https://nexo360.pages.dev' },
+    });
+    assert.equal(prodPagesRes.status, 200);
+
+    const stagingPagesRes = await request('/api/health/live', {
+      headers: { Origin: 'https://staging.nexo360.pages.dev' },
+    });
+    assert.equal(stagingPagesRes.status, 200);
+
+    const duocOfficialRes = await request('/api/health/live', {
+      headers: { Origin: 'https://nexo360.duoc.cl' },
+    });
+    assert.equal(duocOfficialRes.status, 200);
+
+    const localDevRes = await request('/api/health/live', {
+      headers: { Origin: 'http://localhost:5173' },
+    });
+    assert.equal(localDevRes.status, 200);
+  });
+
+  test('9. [SSO / OIDC Security P0] /sso-login exige state y nonce obligatorio; rechaza atajos', async () => {
+    const tenantId = '11111111-2222-3333-4444-555555555555';
+    const clientId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const redirectUri = 'http://localhost:5173/auth/callback';
+
+    await withEnv(
+      {
+        AZURE_ENTRA_TENANT_ID: tenantId,
+        AZURE_ENTRA_CLIENT_ID: clientId,
+        AZURE_ENTRA_REDIRECT_URI: redirectUri,
+      },
+      async () => {
+        // 9.1 Envío de idToken sin state -> 400
+        const noStateRes = await request('/api/auth/sso-login', {
+          method: 'POST',
+          body: { idToken: 'fake.id.token' },
+        });
+        assert.equal(noStateRes.status, 400);
+        assert.match(noStateRes.body?.message || '', /state/i);
+
+        // 9.2 Envío de code sin state -> 400
+        const noStateCodeRes = await request('/api/auth/sso-login', {
+          method: 'POST',
+          body: { code: 'fake-code' },
+        });
+        assert.equal(noStateCodeRes.status, 400);
+        assert.match(noStateCodeRes.body?.message || '', /state/i);
+
+        // 9.3 Envío de state inexistente o inventado -> 401
+        const invalidStateRes = await request('/api/auth/sso-login', {
+          method: 'POST',
+          body: { idToken: 'fake.id.token', state: 'unregistered-state-123' },
+        });
+        assert.equal(invalidStateRes.status, 401);
+        assert.match(invalidStateRes.body?.message || '', /inválido/i);
+      }
+    );
+  });
 });

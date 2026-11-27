@@ -40,18 +40,7 @@ const EnrolledCourseSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const { ReasonableAdjustmentSchema } = require('./PaedisRecord');
-
-const TeacherAcknowledgmentSchema = new mongoose.Schema(
-  {
-    sigla: { type: String, required: true, trim: true, maxlength: 30 },
-    nombre: { type: String, required: true, trim: true, maxlength: 140 },
-    profesor: { type: String, trim: true, maxlength: 120, default: 'Docente Titular' },
-    confirmado: { type: Boolean, default: false },
-    fechaAcuse: { type: Date, default: null },
-  },
-  { _id: false }
-);
+const { ReasonableAdjustmentSchema, TeacherAcknowledgmentSchema } = require('./PaedisRecord');
 
 /**
  * Esquema de Asistencia por Asignatura - Sistema de Alerta Temprana (SAT)

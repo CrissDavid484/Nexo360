@@ -192,8 +192,10 @@ function buildRegistrationPayload({ form, careerQuery, customDomain = '', custom
     campus: form.campus.trim(),
     isPaedis: isStudent && form.isPaedis,
     consentimientoLey21719: {
-      aceptado: true,
-      fechaAceptacion: new Date(),
+      aceptado: false,
+      fechaAceptacion: null,
+      estado: 'PENDIENTE',
+      mecanismo: 'PENDIENTE_ACTIVACION',
       finalidadTratamiento:
         'Gestión académica, acompañamiento PAEDIS y prevención de deserción estudiantil según Ley N° 21.719 de Chile',
     },

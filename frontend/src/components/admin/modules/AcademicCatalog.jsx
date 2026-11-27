@@ -7,6 +7,7 @@ import {
   DUOC_SCHOOLS,
   SEDES_DUOC_ITEMS,
   getSchoolForCareer,
+  getCatalogItemSubtitle,
 } from '@utils/studentUtils';
 import { ADMIN_THEME } from '@components/admin/adminTheme';
 import { Card } from '@components/ui/Card';
@@ -183,14 +184,7 @@ function CatalogCrudCard({
     }
   };
 
-  const getItemSubtitle = (item) => {
-    if (kind === 'careers') {
-      return item.school || getSchoolForCareer(item.name);
-    }
-    const region = item.region || 'Región Metropolitana';
-    const city = item.city || 'Santiago';
-    return `${region} · ${city}`;
-  };
+  const getItemSubtitle = (item) => getCatalogItemSubtitle(kind, item);
 
   return (
     <div className={`${ADMIN_THEME.cardSurface} space-y-4`}>

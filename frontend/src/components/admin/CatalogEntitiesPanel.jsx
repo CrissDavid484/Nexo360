@@ -9,6 +9,7 @@ import {
   getCitiesForRegion,
   DUOC_SCHOOLS,
   getSchoolForCareer,
+  getCatalogItemSubtitle,
 } from '../../utils/studentUtils';
 
 export { CHILE_CITIES_BY_REGION };
@@ -226,14 +227,7 @@ const EntityList = ({ kind, items, canManage, onAdd, onDelete }) => {
   const cfg = ENTITY_KINDS[kind];
   const Icon = cfg.icon;
 
-  const getItemSubtitle = (item) => {
-    if (kind === 'careers') {
-      return item.school || getSchoolForCareer(item.name);
-    }
-    const region = item.region || 'Región Metropolitana';
-    const city = item.city || 'Santiago';
-    return `${region} · ${city}`;
-  };
+  const getItemSubtitle = (item) => getCatalogItemSubtitle(kind, item);
 
   return (
     <section aria-labelledby={`entity-${kind}-title`} className="space-y-3">

@@ -923,6 +923,16 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
     assert.equal(exportRes.body?.success, true);
     assert.equal(exportRes.body?.count, 1);
     assert.equal(exportRes.body?.logs?.[0]?.metadata?.notaClinica, undefined);
+
+    const csvExportRes = await request(
+      `/api/admin/activity-logs/export?category=sat&q=${encodeURIComponent(marker)}&format=csv`,
+      { headers: adminHeaders }
+    );
+    assert.equal(csvExportRes.status, 200);
+    assert.ok(csvExportRes.headers['content-type'].includes('text/csv'));
+    assert.ok(csvExportRes.raw.includes('"id","createdAt","action","userEmail","userName","userRole","details"'));
+    assert.ok(csvExportRes.raw.includes('sat_intervention_updated'));
+    assert.ok(csvExportRes.raw.includes(marker));
   });
 
   test('18. PAEDIS Segregación y Fail-Loud: GET /paedis/:id/record, sin escritura clínica en UserProfile y 500 si falla MongoDB', async () => {
@@ -981,6 +991,29 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
           throw new Error('Simulated DB write failure');
         },
       });
+      // P0/P1: Rechazar Ficha Docente ENVIADA sin evidencia o comprobante (400)
+      let noEvidenceStatus = null;
+      let noEvidenceBody = null;
+      await adminController.updatePaedisCase(
+        {
+          params: { id: 'd.rojas@duocuc.cl' },
+          user: { email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis', fullName: 'Coordinador PAEDIS' },
+          body: { fichaDocenteEstado: 'ENVIADA' },
+        },
+        {
+          status(code) {
+            noEvidenceStatus = code;
+            return this;
+          },
+          json(payload) {
+            noEvidenceBody = payload;
+            return this;
+          },
+        }
+      );
+      assert.equal(noEvidenceStatus, 400);
+      assert.match(noEvidenceBody?.message, /evidencia o comprobante/i);
+
       let failStatus = null;
       let failBody = null;
       const mockRes = {
@@ -997,7 +1030,7 @@ describe('AUDITORÍA ADMIN-REGISTRY: Registro Ley 21.719, Roles RBAC, CRUD Carre
         {
           params: { id: 'd.rojas@duocuc.cl' },
           user: { email: 'coord.paedis@duoc.cl', role: 'coordinador_paedis', fullName: 'Coordinador PAEDIS' },
-          body: { fichaDocenteEstado: 'ENVIADA' },
+          body: { fichaDocenteEstado: 'ENVIADA', evidencia: 'Notificación oficial firmada #2026-99' },
         },
         mockRes
       );

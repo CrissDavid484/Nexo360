@@ -120,6 +120,15 @@ export function getSchoolForCareer(careerName = '') {
   return found ? found[1] : 'Escuela de Informática y Telecomunicaciones';
 }
 
+export function getCatalogItemSubtitle(kind, item = {}) {
+  if (kind === 'careers') {
+    return item.school || getSchoolForCareer(item.name);
+  }
+  const region = item.region || 'Región Metropolitana';
+  const city = item.city || 'Santiago';
+  return `${region} · ${city}`;
+}
+
 export const INSTITUTIONAL_DOMAINS = ['duocuc.cl', 'profesor.duoc.cl', 'duoc.cl'];
 export const STUDENT_DOMAINS = ['duocuc.cl'];
 export const STAFF_DOMAINS = ['profesor.duoc.cl', 'duoc.cl'];

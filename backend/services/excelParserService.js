@@ -52,6 +52,22 @@ function consolidateSections(offerings) {
 }
 
 /**
+ * Formatea una matriz o lista de registros con cabeceras en formato tabla Markdown.
+ */
+function formatMarkdownTable(headers, rows) {
+  const headerLine = `| ${headers.join(' | ')} |`;
+  const separatorLine = `| ${headers.map(() => ':-:').join(' | ')} |`;
+  const bodyLines = rows.map((row) => {
+    const cells = headers.map((h, colIdx) => {
+      const val = Array.isArray(row) ? row[colIdx] : row[h];
+      return String(val || '').replace(/\|/g, '\\|').trim();
+    });
+    return `| ${cells.join(' | ')} |`;
+  });
+  return [headerLine, separatorLine, ...bodyLines].join('\n');
+}
+
+/**
  * Convierte un libro de Excel (.xlsx / .xls) o Buffer a una tabla Markdown.
  */
 function xlsxToMarkdown(bufferOrPath, options = {}) {
@@ -69,20 +85,9 @@ function xlsxToMarkdown(bufferOrPath, options = {}) {
 
   const data = worksheet.data;
   const headers = (data[0] || []).map((h) => String(h || '').trim());
-  const headerLine = `| ${headers.join(' | ')} |`;
-  const separatorLine = `| ${headers.map(() => ':-:').join(' | ')} |`;
+  const validDataRows = data.slice(1).filter((row) => row && !row.every((cell) => cell === '' || cell === null || cell === undefined));
 
-  const rows = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row || row.every((cell) => cell === '' || cell === null || cell === undefined)) continue;
-    const formatted = headers.map((_, colIdx) =>
-      String(row[colIdx] || '').replace(/\|/g, '\\|').trim()
-    );
-    rows.push(`| ${formatted.join(' | ')} |`);
-  }
-
-  return [headerLine, separatorLine, ...rows].join('\n');
+  return formatMarkdownTable(headers, validDataRows);
 }
 
 /**
@@ -639,13 +644,7 @@ function xmlToMarkdown(xmlContent) {
   if (spreadsheetRows) {
     const [headers, ...dataRows] = spreadsheetRows;
     const cleanHeaders = headers.map((h, i) => h || `Col${i + 1}`);
-    const headerLine = `| ${cleanHeaders.join(' | ')} |`;
-    const separatorLine = `| ${cleanHeaders.map(() => ':-:').join(' | ')} |`;
-    const bodyLines = dataRows.map((row) => {
-      const cells = cleanHeaders.map((_, idx) => String(row[idx] || '').trim());
-      return `| ${cells.join(' | ')} |`;
-    });
-    return [headerLine, separatorLine, ...bodyLines].join('\n');
+    return formatMarkdownTable(cleanHeaders, dataRows);
   }
 
   const records = parseGenericXmlRecords(xml);
@@ -663,14 +662,7 @@ function xmlToMarkdown(xmlContent) {
   }
   if (headers.length === 0) return '';
 
-  const headerLine = `| ${headers.join(' | ')} |`;
-  const separatorLine = `| ${headers.map(() => ':-:').join(' | ')} |`;
-  const bodyLines = records.map((rec) => {
-    const cells = headers.map((h) => String(rec[h] || '').trim());
-    return `| ${cells.join(' | ')} |`;
-  });
-
-  return [headerLine, separatorLine, ...bodyLines].join('\n');
+  return formatMarkdownTable(headers, records);
 }
 
 /**

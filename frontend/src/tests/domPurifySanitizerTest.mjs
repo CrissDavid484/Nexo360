@@ -1,39 +1,31 @@
 import assert from 'node:assert/strict';
-import DOMPurify from 'dompurify';
+import { escapeHtml, sanitizeArticleHtml } from '../utils/sanitizeHtml.js';
 
-console.log('--- RUNNING DOMPURIFY SANITIZATION & XSS PROTECTION TEST SUITE ---');
+console.log('--- RUNNING SANITIZATION & XSS PROTECTION TEST SUITE (WCAG 2.2 / OWASP) ---');
 
-function escapeHtml(text) {
-  if (typeof text !== 'string') return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-// 1. Verificar disponibilidad de DOMPurify en el entorno de frontend
-assert.ok(DOMPurify !== undefined, 'DOMPurify debe estar disponible como módulo');
-
-// 2. Fallback fail-closed ante errores o entornos no-DOM
+// 1. Fallback fail-closed ante errores o entornos no-DOM
 const maliciousScript = '<p>Texto legítimo</p><script>alert("XSS")</script>';
 const escaped = escapeHtml(maliciousScript);
 assert.ok(!escaped.includes('<script>'), 'escapeHtml debe neutralizar etiquetas script ejecutables');
 assert.ok(escaped.includes('&lt;script&gt;'), 'escapeHtml debe codificar entidades HTML');
 console.log('✓ Test 1 Passed: Fallback seguro escapeHtml fail-closed');
 
-// 3. Neutralización de manejadores de eventos (onerror, onclick)
+// 2. Neutralización de manejadores de eventos (onerror, onclick)
 const maliciousAttrs = '<img src=x onerror=alert(1)>';
 const escapedAttrs = escapeHtml(maliciousAttrs);
 assert.ok(!escapedAttrs.includes('<img'), 'escapeHtml debe neutralizar etiquetas img con onerror');
 assert.ok(escapedAttrs.includes('&lt;img'), 'escapeHtml debe escapar <img');
 console.log('✓ Test 2 Passed: Neutralización de atributos y manejadores de evento');
 
-// 4. Bloqueo de javascript: URIs
+// 3. Bloqueo de javascript: URIs
 const maliciousUri = '<a href="javascript:alert(1)">Click</a>';
 const escapedUri = escapeHtml(maliciousUri);
 assert.ok(!escapedUri.includes('<a href='), 'escapeHtml debe neutralizar hipervínculos ejecutables');
 console.log('✓ Test 3 Passed: Bloqueo de enlaces ejecutables');
 
-console.log('--- ALL DOMPURIFY SANITIZATION TESTS PASSED! ---');
+// 4. Sanitización fail-closed de sanitizeArticleHtml en entorno node (sin DOMParser global)
+const sanitizedInNode = sanitizeArticleHtml(maliciousScript);
+assert.ok(!sanitizedInNode.includes('<script>'), 'sanitizeArticleHtml debe devolver HTML neutralizado en node');
+console.log('✓ Test 4 Passed: sanitizeArticleHtml fail-closed en entorno sin DOM');
+
+console.log('--- ALL SANITIZATION TESTS PASSED! ---');

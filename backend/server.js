@@ -71,6 +71,7 @@ app.use(
       const normalizedOrigin = stripTrailingSlashes(origin);
 
       let isAllowedCloudflareOrDuoc = false;
+      let isDevLocalhost = false;
       try {
         const { hostname } = new URL(normalizedOrigin);
         isAllowedCloudflareOrDuoc =
@@ -83,15 +84,22 @@ app.use(
             .map((h) => h.trim().toLowerCase())
             .filter(Boolean)
             .includes(hostname.toLowerCase());
+
+        isDevLocalhost =
+          process.env.NODE_ENV !== 'production' &&
+          (hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname === '::1' ||
+            hostname === '[::1]');
       } catch {
         isAllowedCloudflareOrDuoc = false;
+        isDevLocalhost = false;
       }
 
       if (
         allowedOrigins.includes(normalizedOrigin) ||
         isAllowedCloudflareOrDuoc ||
-        (process.env.NODE_ENV !== 'production' &&
-          (normalizedOrigin.includes('localhost') || normalizedOrigin.includes('127.0.0.1')))
+        isDevLocalhost
       ) {
         return callback(null, true);
       }

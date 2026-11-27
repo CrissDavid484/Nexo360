@@ -15,7 +15,7 @@ import { lazyLoad } from '../utils/lazyLoad';
 import { ModuleCard } from '../components/dashboard/ModuleCard';
 import { ModuleModal } from '../components/dashboard/ModuleModal';
 import { SearchBar } from '../components/dashboard/SearchBar';
-import { UnifiedNavbar } from '../components/common/UnifiedNavbar';
+import { UnifiedNavbar, TAB_ROUTE_MAP, resolveTabFromPath } from '../components/common/UnifiedNavbar';
 import { AccessibilityBar } from '../components/common/AccessibilityBar';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -144,38 +144,10 @@ export const PATH_TO_TAB = {
   '/admin': 'admin-panel',
 };
 
-export const TAB_TO_PATH = {
-  'centro-ayuda': '/centro-de-ayuda',
-  'toma-ramos': '/toma-ramos',
-  'biblioteca': '/biblioteca',
-  'vivo-duoc': '/vivo-duoc',
-  'tickets': '/soporte',
-  'soporte': '/soporte',
-  'perfil': '/perfil',
-  'admin-panel': '/panel-admin',
-  'panel-admin': '/panel-admin',
-};
+export const TAB_TO_PATH = TAB_ROUTE_MAP;
 
 export const resolveTabFromPathname = (pathname = '') => {
-  if (pathname.startsWith('/panel-admin') || pathname.startsWith('/admin-panel') || pathname.startsWith('/admin')) {
-    return 'admin-panel';
-  }
-  if (pathname.startsWith('/toma-ramos') || pathname.startsWith('/simulador')) {
-    return 'toma-ramos';
-  }
-  if (pathname.startsWith('/biblioteca')) {
-    return 'biblioteca';
-  }
-  if (pathname.startsWith('/vivo-duoc')) {
-    return 'vivo-duoc';
-  }
-  if (pathname.startsWith('/soporte') || pathname.startsWith('/tickets')) {
-    return 'tickets';
-  }
-  if (pathname.startsWith('/perfil')) {
-    return 'perfil';
-  }
-  return 'centro-ayuda';
+  return resolveTabFromPath(pathname) || 'centro-ayuda';
 };
 
 function IntentPortalBanner({ tag, title, description, children, getVoiceProps }) {

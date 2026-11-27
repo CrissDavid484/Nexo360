@@ -377,6 +377,27 @@ export const api = {
   },
 
   /**
+   * Verificar validez del token de activación de cuenta institucional
+   */
+  async verifyActivationToken(token) {
+    return request(`/auth/verify-activation-token?token=${encodeURIComponent(token)}`, {
+      method: 'GET',
+      auth: false,
+    });
+  },
+
+  /**
+   * Activar cuenta institucional y definir contraseña personal
+   */
+  async activateAccount({ token, password, consentimiento }) {
+    return request('/auth/activate-account', {
+      method: 'POST',
+      auth: false,
+      body: { token, password, consentimiento },
+    });
+  },
+
+  /**
    * Cambiar la contraseña del usuario autenticado
    */
   async changePassword({ currentPassword, newPassword }) {

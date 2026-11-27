@@ -13,6 +13,7 @@ import { LoginPage } from './pages/LoginPage';
 // Code-Splitting para optimización extrema de carga y rendimiento de red
 const DashboardPage = lazyLoad(() => import('./pages/DashboardPage'), 'DashboardPage');
 const NotFoundPage = lazyLoad(() => import('./pages/NotFoundPage'), 'NotFoundPage');
+const ActivateAccountPage = lazyLoad(() => import('./pages/ActivateAccountPage'), 'ActivateAccountPage');
 
 // Componente para proteger las rutas privadas institucionales
 const ProtectedRoute = ({ children }) => {
@@ -166,6 +167,8 @@ export const App = () => {
             <Route path="/" element={<RootRoute />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<LoginPage initialMode="reset" />} />
+            <Route path="/activar-cuenta" element={<ActivateAccountPage />} />
+            <Route path="/activate-account" element={<ActivateAccountPage />} />
 
             {/* Rutas Principales Institucionales con Enrutamiento Real y Persistencia F5 */}
             <Route
