@@ -37,7 +37,7 @@ export const AcademicProgress = ({ perfilAcademico = null }) => {
   const creditosInscritos = avanceCreditos.inscritos || 0;
   const creditosPendientes = avanceCreditos.pendientes || 0;
   const porcentajeAvance = avanceCreditos.porcentaje || `${Math.round((creditosAprobados / (creditosTotales || 1)) * 100)}%`;
-  const porcentajeNum = parseInt(String(porcentajeAvance).replace('%', ''), 10) || 0;
+  const porcentajeNum = Number.parseInt(String(porcentajeAvance).replace('%', ''), 10) || 0;
 
   const asignaturas = perfilAcademico.asignaturas || {};
   const totalAsig = asignaturas.total || 0;

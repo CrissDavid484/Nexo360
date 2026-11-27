@@ -75,7 +75,7 @@ class VivoDuocAdapter {
   }
 
   _hashParams(params = {}) {
-    const keys = Object.keys(params).sort();
+    const keys = Object.keys(params).sort((a, b) => a.localeCompare(b));
     if (keys.length === 0) return '';
     return keys.map((k) => `${k}=${params[k]}`).join('&');
   }
