@@ -43,11 +43,17 @@ async function resolveUserFromHeader(authHeader) {
 
   const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
 
-  if (decoded.email && mongoose.connection.readyState === 1) {
+  const rawEmail = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
+  const rawId =
+    typeof decoded.id === 'string' && mongoose.Types.ObjectId.isValid(decoded.id)
+      ? new mongoose.Types.ObjectId(decoded.id)
+      : null;
+
+  if (rawEmail && mongoose.connection.readyState === 1) {
     try {
-      const query = mongoose.Types.ObjectId.isValid(decoded.id)
-        ? { $or: [{ _id: decoded.id }, { email: decoded.email }] }
-        : { email: decoded.email };
+      const query = rawId
+        ? { $or: [{ _id: rawId }, { email: { $eq: rawEmail } }] }
+        : { email: { $eq: rawEmail } };
       const user = await UserProfile.findOne(query).lean();
       if (user) {
         if (user.isBlocked === true || user.academicStatus === 'desercion_bloqueada') {

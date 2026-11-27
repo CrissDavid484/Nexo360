@@ -779,6 +779,7 @@ function StaffRoleSection({
             return (
               <label
                 key={perm.id}
+                aria-label={`${perm.label}: ${perm.description}`}
                 className={`p-2 rounded-lg border text-left cursor-pointer transition-all flex items-start gap-2 ${
                   isChecked
                     ? 'bg-blue-50/70 border-blue-300 text-slate-900'
@@ -789,6 +790,7 @@ function StaffRoleSection({
                   type="checkbox"
                   checked={isChecked}
                   onChange={() => handleTogglePermission(perm.id)}
+                  aria-label={perm.label}
                   className="mt-0.5 w-4 h-4 rounded text-brand-navy focus:ring-brand-navy border-slate-300"
                 />
                 <div className="min-w-0 flex-1">

@@ -862,6 +862,7 @@ function AdminTeamManagement({
                   return (
                     <label
                       key={perm.id}
+                      aria-label={`${perm.label}: ${perm.description}`}
                       className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all flex items-start gap-2 ${
                         isChecked
                           ? 'bg-blue-50/80 border-blue-300 text-neutral-900 shadow-2xs'
@@ -872,6 +873,7 @@ function AdminTeamManagement({
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => handleTogglePermission(perm.id)}
+                        aria-label={perm.label}
                         className="mt-0.5 w-4 h-4 rounded text-brand-navy focus:ring-brand-navy border-neutral-300"
                       />
                       <div className="min-w-0 flex-1">
