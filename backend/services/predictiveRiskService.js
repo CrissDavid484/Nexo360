@@ -712,41 +712,6 @@ function calculatePredictiveRisk(user = {}) {
   };
 }
 
-/**
- * Retorna predicción inmediata para estados académicos terminales.
- */
-function buildTerminalStatusPrediction(status, attendanceSummary, config) {
-  if (status === 'desercion') {
-    return {
-      score: 100,
-      riskLevel: 'DESERTOR',
-      predictionLabel: 'Deserción Registrada',
-      color: 'red',
-      trafficLight: 'red',
-      factors: ['Estudiante actualmente en deserción / retiro académico'],
-      graduationProbability: 0,
-      breakdown: { attendance: 100, paedis: 0, simulator: 0, trend: 0, load: 0 },
-      ...attendanceSummary,
-    };
-  }
-
-  if (status === 'titulado') {
-    return {
-      score: 0,
-      riskLevel: 'TITULADO',
-      predictionLabel: 'Titulado / Egresado',
-      color: 'emerald',
-      trafficLight: 'green',
-      factors: ['Plan de estudios completado con éxito'],
-      graduationProbability: 100,
-      breakdown: { attendance: 0, paedis: 0, simulator: 0, trend: 0, load: 0 },
-      ...attendanceSummary,
-    };
-  }
-
-  return null;
-}
-
 module.exports = {
   calculatePredictiveRisk,
   // Exports para testing y reutilización

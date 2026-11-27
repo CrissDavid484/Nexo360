@@ -1087,24 +1087,50 @@ exports.updateStudentStatus = async (req, res) => {
 /**
  * PATCH /api/admin/users/:id/role
  */
+const VALID_INSTITUTIONAL_ROLES = Object.freeze([
+  'admin',
+  'administrador',
+  'estudiante_paedis',
+  'estudiante',
+  'tutor_par',
+  'profesor',
+  'director',
+  'subdirector',
+  'coordinador_paedis',
+  'administrativo',
+]);
+
+function isSelfModification(reqUser, targetUser, targetId) {
+  const actorId = String(reqUser?._id || reqUser?.id || '');
+  const targetDocId = String(targetUser?._id || targetUser?.id || targetId || '');
+  return Boolean(
+    (actorId && targetDocId === actorId) ||
+    (reqUser?.email && targetUser?.email && reqUser.email.toLowerCase() === targetUser.email.toLowerCase())
+  );
+}
+
+function parsePermissionsAndBadges(body = {}) {
+  const fields = {};
+  if (Array.isArray(body.permissions)) {
+    fields.permissions = body.permissions
+      .map((p) => sanitizeString(p, 50))
+      .filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p));
+  }
+  if (Array.isArray(body.badges)) {
+    fields.badges = body.badges
+      .map((b) => sanitizeString(b, 40))
+      .filter(Boolean)
+      .slice(0, 10);
+  }
+  return fields;
+}
+
 exports.updateUserRole = async (req, res) => {
   try {
     const { id } = req.params;
     const rawRole = sanitizeString(req.body?.role, 40)?.toLowerCase() || '';
-    const validRoles = UserProfile.schema.path('role').enumValues || [
-      'admin',
-      'administrador',
-      'estudiante_paedis',
-      'estudiante',
-      'tutor_par',
-      'profesor',
-      'director',
-      'subdirector',
-      'coordinador_paedis',
-      'administrativo',
-    ];
 
-    if (!validRoles.includes(rawRole)) {
+    if (!VALID_INSTITUTIONAL_ROLES.includes(rawRole)) {
       return res.status(400).json({
         success: false,
         message: 'Rol institucional no válido.',
@@ -1119,12 +1145,7 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
-    const actorId = String(req.user?._id || req.user?.id || '');
-    const targetDocId = targetUser._id || targetUser.id || id;
-    if (
-      (actorId && String(targetDocId) === actorId) ||
-      (req.user?.email && targetUser.email && req.user.email.toLowerCase() === targetUser.email.toLowerCase())
-    ) {
+    if (isSelfModification(req.user, targetUser, id)) {
       return res.status(400).json({
         success: false,
         message: 'No puede modificar su propio rol mientras está en sesión.',
@@ -1133,32 +1154,20 @@ exports.updateUserRole = async (req, res) => {
 
     const roleLabel = ROLE_LABELS[rawRole] || 'Personal Administrativo';
     const isPaedis = rawRole === 'estudiante_paedis';
-    let updatedUser = null;
+    const targetDocId = targetUser._id || targetUser.id || id;
 
     const updateFields = {
       role: rawRole,
       roleLabel,
       isPaedis,
+      ...parsePermissionsAndBadges(req.body),
     };
 
-    if (Array.isArray(req.body?.permissions)) {
-      updateFields.permissions = req.body.permissions
-        .map((p) => sanitizeString(p, 50))
-        .filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p));
-    }
-    if (Array.isArray(req.body?.badges)) {
-      updateFields.badges = req.body.badges
-        .map((b) => sanitizeString(b, 40))
-        .filter(Boolean)
-        .slice(0, 10);
-    }
-
+    let updatedUser = null;
     if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(String(targetDocId))) {
       updatedUser = await UserProfile.findByIdAndUpdate(
         targetDocId,
-        {
-          $set: updateFields,
-        },
+        { $set: updateFields },
         { returnDocument: 'after', runValidators: true }
       );
     } else {
@@ -1200,35 +1209,19 @@ exports.updateUserPermissions = async (req, res) => {
       });
     }
 
-    const actorId = String(req.user?._id || req.user?.id || '');
-    const targetDocId = targetUser._id || targetUser.id || id;
-    if (
-      (actorId && String(targetDocId) === actorId) ||
-      (req.user?.email && targetUser.email && req.user.email.toLowerCase() === targetUser.email.toLowerCase())
-    ) {
+    if (isSelfModification(req.user, targetUser, id)) {
       return res.status(400).json({
         success: false,
         message: 'No puede modificar sus propios permisos o rol mientras está en sesión.',
       });
     }
 
-    const updateFields = {};
-    const validRoles = UserProfile.schema.path('role').enumValues || [
-      'admin',
-      'administrador',
-      'estudiante_paedis',
-      'estudiante',
-      'tutor_par',
-      'profesor',
-      'director',
-      'subdirector',
-      'coordinador_paedis',
-      'administrativo',
-    ];
+    const targetDocId = targetUser._id || targetUser.id || id;
+    const updateFields = { ...parsePermissionsAndBadges(req.body) };
 
     if (req.body?.role) {
       const rawRole = sanitizeString(req.body.role, 40)?.toLowerCase() || '';
-      if (!validRoles.includes(rawRole)) {
+      if (!VALID_INSTITUTIONAL_ROLES.includes(rawRole)) {
         return res.status(400).json({
           success: false,
           message: 'Rol institucional no válido.',
@@ -1237,19 +1230,6 @@ exports.updateUserPermissions = async (req, res) => {
       updateFields.role = rawRole;
       updateFields.roleLabel = ROLE_LABELS[rawRole] || 'Personal Administrativo';
       updateFields.isPaedis = rawRole === 'estudiante_paedis';
-    }
-
-    if (Array.isArray(req.body?.permissions)) {
-      updateFields.permissions = req.body.permissions
-        .map((p) => sanitizeString(p, 50))
-        .filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p));
-    }
-
-    if (Array.isArray(req.body?.badges)) {
-      updateFields.badges = req.body.badges
-        .map((b) => sanitizeString(b, 40))
-        .filter(Boolean)
-        .slice(0, 10);
     }
 
     let updatedUser = null;

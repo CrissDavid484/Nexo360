@@ -123,3 +123,5 @@ PaedisRecordSchema.pre('validate', function (next) {
 });
 
 module.exports = mongoose.model('PaedisRecord', PaedisRecordSchema);
+module.exports.ReasonableAdjustmentSchema = ReasonableAdjustmentSchema;
+module.exports.TeacherAcknowledgmentSchema = TeacherAcknowledgmentSchema;

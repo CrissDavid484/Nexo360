@@ -40,15 +40,7 @@ const EnrolledCourseSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const ReasonableAdjustmentSchema = new mongoose.Schema(
-  {
-    tipo: { type: String, required: true, trim: true, maxlength: 80 },
-    descripcion: { type: String, required: true, trim: true, maxlength: 300 },
-    fechaAprobacion: { type: Date, default: Date.now },
-    semestreVigencia: { type: String, trim: true, maxlength: 20, default: '2026-1' },
-  },
-  { _id: false }
-);
+const { ReasonableAdjustmentSchema } = require('./PaedisRecord');
 
 const TeacherAcknowledgmentSchema = new mongoose.Schema(
   {

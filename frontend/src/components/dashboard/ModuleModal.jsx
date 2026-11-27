@@ -34,76 +34,82 @@ function escapeHtml(text) {
 }
 
 function sanitizeArticleHtml(html) {
-  if (typeof html !== 'string') return '';
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<script\b[^>]*\/?>/gi, '')
-    .replace(/<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g, (_tag, tagName, attrs) => {
-      const cleanAttrs = attrs
-        .replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/gi, '')
-        .replace(
-          /\s+(href|src|action|formaction|xlink:href)\s*=\s*"(?:\s*(?:javascript|vbscript|data:text\/html):[^"]*)"/gi,
-          ' $1="#"'
-        )
-        .replace(
-          /\s+(href|src|action|formaction|xlink:href)\s*=\s*'(?:\s*(?:javascript|vbscript|data:text\/html):[^']*)'/gi,
-          ' $1=\'#\''
-        )
-        .replace(
-          /\s+(href|src|action|formaction|xlink:href)\s*=\s*(?:javascript|vbscript|data:text\/html):[^\s"'>]+/gi,
-          ' $1="#"'
-        );
-      return `<${tagName}${cleanAttrs}>`;
-    });
+  if (typeof html !== 'string' || !html) return '';
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+    return html;
+  }
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const scripts = doc.querySelectorAll('script');
+    scripts.forEach((s) => s.remove());
+    const all = doc.querySelectorAll('*');
+    for (const el of all) {
+      for (const attr of Array.from(el.attributes)) {
+        const attrName = attr.name.toLowerCase();
+        if (attrName.startsWith('on')) {
+          el.removeAttribute(attr.name);
+        } else if (['href', 'src', 'action', 'formaction', 'xlink:href'].includes(attrName)) {
+          const val = (attr.value || '').trim().toLowerCase();
+          if (
+            val.startsWith('javascript:') ||
+            val.startsWith('vbscript:') ||
+            val.startsWith('data:text/html')
+          ) {
+            el.setAttribute(attr.name, '#');
+          }
+        }
+      }
+    }
+    return doc.body.innerHTML;
+  } catch {
+    return html;
+  }
 }
 
 function normalizeEmbeddedYouTubeHtml(html) {
-  if (typeof html !== 'string') return '';
+  if (typeof html !== 'string' || !html) return '';
   const sanitized = sanitizeArticleHtml(html);
-  if (!/<iframe\b/i.test(sanitized)) return sanitized;
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') return sanitized;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sanitized, 'text/html');
+    const iframes = doc.querySelectorAll('iframe');
+    if (iframes.length === 0) return sanitized;
 
-  return sanitized.replace(
-    /<iframe\b([^>]*)>(\s*<\/iframe>)?/gi,
-    (_fullTag, rawAttrs, closingTag) => {
-      const isSelfClosing = !closingTag && /\/\s*$/.test(rawAttrs);
-      let updatedAttrs = rawAttrs.replace(/\/\s*$/, '').trimEnd();
-      let watchUrl = '';
-
-      const handleEmbedMatch = (quote, videoId, query) => {
-        let cleanQuery = query || '';
-        if (!/[?&]rel=/.test(cleanQuery)) {
-          cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}rel=0`;
+    iframes.forEach((iframe) => {
+      const src = iframe.getAttribute('src') || '';
+      const ytMatch = src.match(/(?:https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]+)/i);
+      if (ytMatch) {
+        const videoId = ytMatch[1];
+        try {
+          const url = new URL(src, 'https://www.youtube.com');
+          url.searchParams.set('rel', '0');
+          url.searchParams.set('modestbranding', '1');
+          iframe.setAttribute('src', url.toString());
+        } catch {
+          iframe.setAttribute('src', `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`);
         }
-        if (!/[?&]modestbranding=/.test(cleanQuery)) {
-          cleanQuery += `${cleanQuery.includes('?') ? '&' : '?'}modestbranding=1`;
+        iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+
+        const nextP = iframe.nextElementSibling;
+        if (!nextP || !nextP.textContent.includes('Abrir tutorial')) {
+          const p = doc.createElement('p');
+          p.className = 'mt-2 mb-3 text-xs';
+          const a = doc.createElement('a');
+          a.href = `https://www.youtube.com/watch?v=${videoId}`;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = 'Abrir tutorial en YouTube';
+          p.appendChild(a);
+          iframe.insertAdjacentElement('afterend', p);
         }
-        watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        return `src=${quote}https://www.youtube.com/embed/${videoId}${cleanQuery}${quote}`;
-      };
-
-      updatedAttrs = updatedAttrs
-        .replace(
-          /src="(?:\s*https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]+)([^"]*)"/i,
-          (_match, videoId, query) => handleEmbedMatch('"', videoId, query)
-        )
-        .replace(
-          /src='(?:\s*https?:)?\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]+)([^']*)'/i,
-          (_match, videoId, query) => handleEmbedMatch("'", videoId, query)
-        );
-
-      if (!/\breferrerpolicy\s*=/i.test(updatedAttrs)) {
-        updatedAttrs += ' referrerpolicy="strict-origin-when-cross-origin"';
       }
-
-      const iframeHtml = isSelfClosing
-        ? `<iframe${updatedAttrs} />`
-        : `<iframe${updatedAttrs}>${closingTag || '</iframe>'}`;
-
-      if (!watchUrl) return iframeHtml;
-
-      return `${iframeHtml}<p class="mt-2 mb-3 text-xs"><a href="${watchUrl}" target="_blank" rel="noopener noreferrer">Abrir tutorial en YouTube</a></p>`;
-    }
-  );
+    });
+    return doc.body.innerHTML;
+  } catch {
+    return sanitized;
+  }
 }
 
 function resolveModalHeader(category, activeTramite, activeArticle, clearReadingMode) {

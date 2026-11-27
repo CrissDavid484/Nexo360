@@ -453,21 +453,67 @@ function parseSpreadsheetMlRows(xml) {
 
 function extractXmlAttributes(attrString) {
   const result = {};
-  const attrRegex = /([a-zA-Z_][\w.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-  let m;
-  while ((m = attrRegex.exec(attrString || '')) !== null) {
-    const key = m[1].includes(':') ? m[1].split(':').pop() : m[1];
-    const val = m[2] !== undefined ? m[2] : m[3];
-    result[key] = decodeXmlEntities(val).replace(/\|/g, '\\|').trim();
+  if (!attrString || typeof attrString !== 'string') return result;
+
+  let i = 0;
+  const len = attrString.length;
+  while (i < len) {
+    while (i < len && attrString.charCodeAt(i) <= 32) i++;
+    if (i >= len) break;
+
+    const nameStart = i;
+    while (i < len && attrString[i] !== '=' && attrString.charCodeAt(i) > 32) i++;
+    const rawKey = attrString.slice(nameStart, i);
+
+    while (i < len && attrString.charCodeAt(i) <= 32) i++;
+    if (i >= len || attrString[i] !== '=') break;
+    i++;
+    while (i < len && attrString.charCodeAt(i) <= 32) i++;
+    if (i >= len) break;
+
+    const quote = attrString[i];
+    let val = '';
+    if (quote === '"' || quote === "'") {
+      i++;
+      const valStart = i;
+      while (i < len && attrString[i] !== quote) i++;
+      val = attrString.slice(valStart, i);
+      if (i < len && attrString[i] === quote) i++;
+    } else {
+      const valStart = i;
+      while (i < len && attrString.charCodeAt(i) > 32 && attrString[i] !== '>') i++;
+      val = attrString.slice(valStart, i);
+    }
+
+    const key = rawKey.includes(':') ? rawKey.split(':').pop() : rawKey;
+    if (key) {
+      result[key] = decodeXmlEntities(val).replace(/\|/g, '\\|').trim();
+    }
   }
   return result;
 }
 
+function stripXmlCommentsAndProlog(xml) {
+  let s = String(xml || '');
+  while (true) {
+    const start = s.indexOf('<?');
+    if (start === -1) break;
+    const end = s.indexOf('?>', start + 2);
+    if (end === -1) break;
+    s = s.slice(0, start) + s.slice(end + 2);
+  }
+  while (true) {
+    const start = s.indexOf('<!--');
+    if (start === -1) break;
+    const end = s.indexOf('-->', start + 4);
+    if (end === -1) break;
+    s = s.slice(0, start) + s.slice(end + 3);
+  }
+  return s.trim();
+}
+
 function parseGenericXmlRecords(xml) {
-  const cleaned = xml
-    .replace(/<\?[\s\S]*?\?>/g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .trim();
+  const cleaned = stripXmlCommentsAndProlog(xml);
   const rootMatch = cleaned.match(/^<([a-zA-Z_][\w:.-]*)\b[^>]*>([\s\S]*)<\/\1\s*>$/);
   const body = rootMatch ? rootMatch[2] : cleaned;
 
