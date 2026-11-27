@@ -72,10 +72,13 @@ class AcademicDataService {
       throw err;
     }
 
-    // Regla IDOR: Si el rol es estudiante, NO puede consultar datos de otro correo
-    if (role === 'student' && targetEmail !== callerEmail) {
-      const err = new Error('Estudiante no autorizado para consultar datos académicos de otro usuario');
+    // Regla IDOR restrictiva por defecto (fail-closed):
+    // Solo roles explícitamente autorizados pueden consultar un targetEmail distinto
+    const ALLOWED_AUDIT_ROLES = new Set(['admin', 'administrador', 'coordinador_paedis', 'coordinador']);
+    if (targetEmail && targetEmail !== callerEmail && !ALLOWED_AUDIT_ROLES.has(role)) {
+      const err = new Error('Usuario no autorizado para consultar datos académicos de otro estudiante');
       err.code = 'FORBIDDEN_IDOR';
+      err.status = 403;
       throw err;
     }
 
@@ -84,6 +87,7 @@ class AcademicDataService {
       studentEmail: finalEmail,
       nombreUsuario: finalEmail.split('@')[0],
       role,
+      userId: user.id || user._id || identityContext.userId || callerEmail,
     };
   }
 
@@ -116,7 +120,7 @@ class AcademicDataService {
    * @returns {Promise<Object>}
    */
   async getStudentAcademicDashboard(identityContext) {
-    const { studentEmail, nombreUsuario } = this._resolveIdentity(identityContext);
+    const { studentEmail, nombreUsuario, userId } = this._resolveIdentity(identityContext);
 
     // Conectar Entra ID al adaptador si está en modo live
     if (this.adapter.isLiveMode() && this.entraId) {
@@ -125,7 +129,7 @@ class AcademicDataService {
 
     let dashboard;
     try {
-      dashboard = await this.adapter.getFullDashboard(nombreUsuario);
+      dashboard = await this.adapter.getFullDashboard(nombreUsuario, userId);
     } catch (err) {
       if (err.message === 'DUOC_TOKEN_EXPIRED') {
         return {
@@ -280,11 +284,11 @@ class AcademicDataService {
    * @returns {Promise<{ sat: Object, predictiveRisk: Object }>}
    */
   async getSatAcademicBaseline(identityContext, providedDashboard = null) {
-    const { studentEmail, nombreUsuario } = this._resolveIdentity(identityContext);
+    const { studentEmail, nombreUsuario, userId } = this._resolveIdentity(identityContext);
 
     let dashboard = providedDashboard;
     if (!dashboard) {
-      dashboard = await this.adapter.getFullDashboard(nombreUsuario);
+      dashboard = await this.adapter.getFullDashboard(nombreUsuario, userId);
     }
 
     if (!dashboard || !dashboard.success || !dashboard.data) {

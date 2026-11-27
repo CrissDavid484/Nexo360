@@ -111,6 +111,26 @@ describe('AcademicDataService (Bloque A) — Tests Unitarios e Integración', ()
       );
     });
 
+    test('Roles restrictivos (estudiante, estudiante_paedis, profesor) reciben FORBIDDEN_IDOR ante targetEmail ajeno', async () => {
+      process.env.DUOC_API_MODE = 'mock';
+      const restrictedRoles = ['estudiante', 'estudiante_paedis', 'profesor', 'desconocido'];
+      for (const role of restrictedRoles) {
+        await assert.rejects(
+          async () => {
+            await academicDataService.getStudentAcademicDashboard({
+              email: 'usuario.restringido@duocuc.cl',
+              role,
+              targetEmail: 'otro.alumno@duocuc.cl',
+            });
+          },
+          (err) => {
+            assert.equal(err.code, 'FORBIDDEN_IDOR');
+            return true;
+          }
+        );
+      }
+    });
+
     test('Estudiante consultando su propio perfil tiene éxito', async () => {
       process.env.DUOC_API_MODE = 'mock';
       const result = await academicDataService.getStudentAcademicDashboard({

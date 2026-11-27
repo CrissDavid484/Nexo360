@@ -38,6 +38,7 @@ import {
   Package,
   GraduationCap,
   Globe,
+  X,
 } from 'lucide-react';
 
 // Vistas complementarias con Code-Splitting (React.lazy)
@@ -60,6 +61,10 @@ const VivoDuocSummaryView = lazyLoad(
 const AcademicDashboardSection = lazyLoad(
   () => import('../components/dashboard/academic/AcademicDashboardSection'),
   'AcademicDashboardSection'
+);
+const SatAttendanceSimulator = lazyLoad(
+  () => import('../components/admin/SatAttendanceSimulator'),
+  'SatAttendanceSimulator'
 );
 const TomaRamosSimulator = lazyLoad(
   () => import('../components/simulation/TomaRamosSimulator'),
@@ -209,6 +214,7 @@ export const DashboardPage = () => {
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [faqExpanded, setFaqExpanded] = useState(null);
   const [vivoViewMode, setVivoViewMode] = useState('academic');
+  const [satSimulatorTarget, setSatSimulatorTarget] = useState(null);
 
   // Registrar uso del simulador para las métricas del panel de administración y restablecer scroll
   useEffect(() => {
@@ -1097,7 +1103,7 @@ export const DashboardPage = () => {
               {vivoViewMode === 'academic' ? (
                 <div id="panel-vivo-academic" role="tabpanel" aria-labelledby="tab-vivo-academic">
                   <AcademicDashboardSection
-                    onNavigateToSat={() => handleTabChange('toma-ramos')}
+                    onNavigateToSat={(courseCode, courseName) => setSatSimulatorTarget({ courseCode, courseName })}
                     onNavigateToManual={() => setVivoViewMode('manual')}
                     onNavigateToHelpCenter={() => handleTabChange('centro-ayuda')}
                   />
@@ -1146,6 +1152,47 @@ export const DashboardPage = () => {
             setSelectedArticle(null);
           }}
         />
+      )}
+
+      {/* Modal de Simulación SAT para Estudiantes */}
+      {satSimulatorTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sat-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in"
+        >
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
+              <div>
+                <h2 id="sat-modal-title" className="text-xl font-bold text-[#002B49]">
+                  Simulador de Asistencia SAT
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {satSimulatorTarget.courseName || satSimulatorTarget.courseCode || 'Proyección de Asistencia'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSatSimulatorTarget(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                aria-label="Cerrar simulador"
+              >
+                <X className="w-5 h-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <Suspense fallback={<div className="p-8 text-center text-slate-500">Cargando simulador...</div>}>
+              <SatAttendanceSimulator
+                course={{
+                  courseCode: satSimulatorTarget.courseCode,
+                  courseName: satSimulatorTarget.courseName,
+                }}
+                student={user}
+              />
+            </Suspense>
+          </div>
+        </div>
       )}
 
       {/* Pie de Página Institucional Duoc UC - Sede Alameda */}

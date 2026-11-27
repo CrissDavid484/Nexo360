@@ -31,13 +31,37 @@ export const AcademicProgress = ({ perfilAcademico = null }) => {
     );
   }
 
-  const creditosTotales = perfilAcademico.creditosTotales || 0;
+  const creditosTotales = perfilAcademico.creditosTotales !== undefined && perfilAcademico.creditosTotales !== null
+    ? perfilAcademico.creditosTotales
+    : null;
   const avanceCreditos = perfilAcademico.avanceCreditos || {};
-  const creditosAprobados = avanceCreditos.aprobados || 0;
-  const creditosInscritos = avanceCreditos.inscritos || 0;
-  const creditosPendientes = avanceCreditos.pendientes || 0;
-  const porcentajeAvance = avanceCreditos.porcentaje || `${Math.round((creditosAprobados / (creditosTotales || 1)) * 100)}%`;
-  const porcentajeNum = Number.parseInt(String(porcentajeAvance).replace('%', ''), 10) || 0;
+  const creditosAprobados = avanceCreditos.aprobados !== undefined && avanceCreditos.aprobados !== null
+    ? avanceCreditos.aprobados
+    : null;
+  const creditosInscritos = avanceCreditos.inscritos !== undefined && avanceCreditos.inscritos !== null
+    ? avanceCreditos.inscritos
+    : null;
+  const creditosPendientes = avanceCreditos.pendientes !== undefined && avanceCreditos.pendientes !== null
+    ? avanceCreditos.pendientes
+    : null;
+
+  const hasCreditosTotales = typeof creditosTotales === 'number' && creditosTotales > 0;
+  const hasCreditosAprobados = typeof creditosAprobados === 'number';
+
+  let porcentajeAvance = avanceCreditos.porcentaje;
+  if (!porcentajeAvance) {
+    if (hasCreditosTotales && hasCreditosAprobados) {
+      porcentajeAvance = `${Math.round((creditosAprobados / creditosTotales) * 100)}%`;
+    } else {
+      porcentajeAvance = 'No disponible';
+    }
+  }
+
+  const porcentajeNum = porcentajeAvance !== 'No disponible'
+    ? Number.parseInt(String(porcentajeAvance).replace('%', ''), 10) || 0
+    : 0;
+
+  const formatCredit = (val) => (typeof val === 'number' ? val : 'No disponible');
 
   const asignaturas = perfilAcademico.asignaturas || {};
   const totalAsig = asignaturas.total || 0;
@@ -45,8 +69,8 @@ export const AcademicProgress = ({ perfilAcademico = null }) => {
   const reprobadasAsig = asignaturas.reprobadas || 0;
   const inscritasAsig = asignaturas.inscritas || 0;
 
-  const avanceEsperado = perfilAcademico.avanceEsperado || {};
-  const isAlDia = avanceEsperado.alDia !== false;
+  const avanceEsperado = perfilAcademico.avanceEsperado;
+  const isAlDia = avanceEsperado?.alDia === true;
 
   return (
     <article aria-labelledby="progress-section-title" className="space-y-4">
@@ -64,16 +88,18 @@ export const AcademicProgress = ({ perfilAcademico = null }) => {
           </p>
         </div>
 
-        <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-            isAlDia
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              : 'bg-amber-50 text-amber-800 border border-amber-200'
-          }`}
-        >
-          <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-          <span>{isAlDia ? 'Trayectoria al Día' : 'En Regularización'}</span>
-        </span>
+        {isAlDia && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Trayectoria al Día</span>
+          </span>
+        )}
+        {!isAlDia && avanceEsperado?.alDia === false && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>En Regularización</span>
+          </span>
+        )}
       </div>
 
       {/* Tarjeta de porcentaje global */}
@@ -90,10 +116,10 @@ export const AcademicProgress = ({ perfilAcademico = null }) => {
 
           <div className="text-left sm:text-right text-xs text-slate-600">
             <span className="block font-medium">
-              {creditosAprobados} de {creditosTotales} créditos aprobados
+              {formatCredit(creditosAprobados)} de {formatCredit(creditosTotales)} créditos aprobados
             </span>
             <span className="text-slate-400">
-              {creditosInscritos} créditos inscritos este semestre
+              {formatCredit(creditosInscritos)} créditos inscritos este semestre
             </span>
           </div>
         </div>
@@ -116,19 +142,19 @@ export const AcademicProgress = ({ perfilAcademico = null }) => {
         <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-100 text-center">
           <div className="p-3 bg-slate-50 rounded-xl">
             <dt className="text-xs text-slate-500 font-medium">Créditos Totales</dt>
-            <dd className="text-lg font-bold text-slate-800 mt-0.5">{creditosTotales}</dd>
+            <dd className="text-lg font-bold text-slate-800 mt-0.5">{formatCredit(creditosTotales)}</dd>
           </div>
           <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
             <dt className="text-xs text-emerald-700 font-medium">Aprobados</dt>
-            <dd className="text-lg font-bold text-emerald-800 mt-0.5">{creditosAprobados}</dd>
+            <dd className="text-lg font-bold text-emerald-800 mt-0.5">{formatCredit(creditosAprobados)}</dd>
           </div>
           <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
             <dt className="text-xs text-blue-700 font-medium">Inscritos</dt>
-            <dd className="text-lg font-bold text-blue-800 mt-0.5">{creditosInscritos}</dd>
+            <dd className="text-lg font-bold text-blue-800 mt-0.5">{formatCredit(creditosInscritos)}</dd>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl">
             <dt className="text-xs text-slate-500 font-medium">Pendientes</dt>
-            <dd className="text-lg font-bold text-slate-800 mt-0.5">{creditosPendientes}</dd>
+            <dd className="text-lg font-bold text-slate-800 mt-0.5">{formatCredit(creditosPendientes)}</dd>
           </div>
         </dl>
       </div>

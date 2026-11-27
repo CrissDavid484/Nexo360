@@ -138,7 +138,7 @@ class VivoDuocAdapter {
     return fetchWithRetry(this.fetchImpl, url, options, this.timeoutMs, allowed);
   }
 
-  async _getAuthHeaders() {
+  async _getAuthHeaders(userId = null) {
     if (!this.isLiveMode()) {
       return { 'Content-Type': 'application/json', Accept: 'application/json' };
     }
@@ -147,7 +147,7 @@ class VivoDuocAdapter {
       throw new Error('[VivoDuocAdapter] Entra ID Adapter no inyectado para modo live');
     }
 
-    const tokenData = await this.entraIdAdapter.getAccessTokenForDuocApi();
+    const tokenData = await this.entraIdAdapter.getAccessTokenForDuocApi(userId);
     if (!tokenData || !tokenData.accessToken) {
       throw new Error('[VivoDuocAdapter] No se pudo obtener access token de Entra ID');
     }
@@ -159,7 +159,7 @@ class VivoDuocAdapter {
     };
   }
 
-  async _request(endpoint, params = {}, cacheUser = null) {
+  async _request(endpoint, params = {}, cacheUser = null, userId = null) {
     const user = cacheUser || params.nombreUsuario || null;
     const mode = this.getMode();
 
@@ -197,7 +197,7 @@ class VivoDuocAdapter {
       throw new Error(`[VivoDuocAdapter] Endpoint no autorizado: ${endpoint}`);
     }
 
-    const headers = await this._getAuthHeaders();
+    const headers = await this._getAuthHeaders(userId);
     const safeBaseUrl = this.baseUrl.startsWith('http') ? this.baseUrl : `https://${this.baseUrl}`;
     const targetUrl = new URL(endpoint, safeBaseUrl);
 
@@ -533,7 +533,7 @@ class VivoDuocAdapter {
     };
   }
 
-  async getFullDashboard(nombreUsuario) {
+  async getFullDashboard(nombreUsuario, userId = null) {
     if (!nombreUsuario) throw new Error('nombreUsuario requerido');
 
     const mode = this.getMode();
@@ -582,7 +582,7 @@ class VivoDuocAdapter {
     const isSimulated = !this.isLiveMode();
 
     // 1. Obtener matrícula vigente
-    const matriculaResult = await this._request('/vivo/v1/matriculaVigente', { nombreUsuario }, nombreUsuario);
+    const matriculaResult = await this._request('/vivo/v1/matriculaVigente', { nombreUsuario }, nombreUsuario, userId);
 
     if (!matriculaResult.success || !matriculaResult.data?.codAlumno) {
       return {
@@ -604,11 +604,11 @@ class VivoDuocAdapter {
 
     // 2. Ejecutar las otras 5 consultas en paralelo
     const results = await Promise.allSettled([
-      this._request('/InfoPersona/InfoPersona', { codAlumno, nombreUsuario }, nombreUsuario),
-      this._request('/perfil-academico/v1/perfil-academico/perfilAcademico', { alumnoId }, nombreUsuario),
-      this._request('/notas/v1/notas/notasAlumno', { codAlumno }, nombreUsuario),
-      this._request('/modyo-duoc-api/attendances/me', {}, nombreUsuario),
-      this._request('/horario/v1/horario/horario', { alumnoId }, nombreUsuario),
+      this._request('/InfoPersona/InfoPersona', { codAlumno, nombreUsuario }, nombreUsuario, userId),
+      this._request('/perfil-academico/v1/perfil-academico/perfilAcademico', { alumnoId }, nombreUsuario, userId),
+      this._request('/notas/v1/notas/notasAlumno', { codAlumno }, nombreUsuario, userId),
+      this._request('/modyo-duoc-api/attendances/me', {}, nombreUsuario, userId),
+      this._request('/horario/v1/horario/horario', { alumnoId }, nombreUsuario, userId),
     ]);
 
     const sectionNames = ['infoPersona', 'perfilAcademico', 'notas', 'asistencias', 'horario'];

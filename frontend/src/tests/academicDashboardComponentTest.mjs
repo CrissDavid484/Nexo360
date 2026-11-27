@@ -236,6 +236,12 @@ for (const relPath of filesToCheck) {
     assert.ok(content.includes('min-h-[44px]'), 'AcademicDashboardSection debe cumplir objetivos táctiles >= 44px');
     assert.ok(content.includes('onNavigateToHelpCenter'), 'AcademicDashboardSection debe admitir navegación a Centro de Ayuda');
     assert.ok(content.includes('Modo de Demostración / Simulación Activo'), 'AcademicDashboardSection debe mostrar advertencia prominente ante datos simulados');
+    assert.ok(content.includes('Integración No Habilitada'), 'AcademicDashboardSection debe mostrar Integración No Habilitada ante not_configured');
+    assert.ok(content.includes('Sin Conexión Académica'), 'AcademicDashboardSection debe mostrar Sin Conexión Académica en errores o unavailable');
+    assert.ok(
+      content.includes("(status === 'complete' || status === 'partial') && source === 'vivo_duoc'"),
+      'AcademicDashboardSection solo debe mostrar Conexión Institucional Oficial si hay datos reales de vivo_duoc'
+    );
   }
 
   if (relPath.includes('AcademicOverview.jsx')) {
@@ -265,11 +271,16 @@ for (const relPath of filesToCheck) {
   if (relPath.includes('AcademicProgress.jsx')) {
     assert.ok(content.includes('role="progressbar"'), 'AcademicProgress debe incluir role="progressbar"');
     assert.ok(content.includes('creditosTotales'), 'AcademicProgress debe considerar creditosTotales');
+    assert.ok(content.includes('avanceEsperado?.alDia === true'), 'AcademicProgress solo debe mostrar Trayectoria al Día si alDia es estrictamente true');
+    assert.ok(!content.includes('alDia !== false'), 'AcademicProgress no debe asumir alDia como true cuando es undefined');
+    assert.ok(content.includes("'No disponible'"), 'AcademicProgress debe mostrar No disponible cuando falten créditos');
   }
 
   if (relPath.includes('DashboardPage.jsx')) {
     assert.ok(content.includes('AcademicDashboardSection'), 'DashboardPage debe importar y renderizar AcademicDashboardSection');
     assert.ok(content.includes('VivoDuocSummaryView'), 'DashboardPage debe conservar VivoDuocSummaryView');
+    assert.ok(content.includes('SatAttendanceSimulator'), 'DashboardPage debe integrar SatAttendanceSimulator');
+    assert.ok(!content.includes("onNavigateToSat={() => handleTabChange('toma-ramos')}"), 'onNavigateToSat no debe desviar a toma-ramos');
   }
 }
 console.log('✓ Verificación de componentes y accesibilidad WCAG 2.2 AA aprobada en todos los archivos');
