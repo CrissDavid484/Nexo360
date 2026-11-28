@@ -437,13 +437,15 @@ class MicrosoftEntraIdAdapter {
    * @param {string} userId
    * @param {string} accessToken
    * @param {number} [expiresIn=3600]
+   * @returns {boolean}
    */
   setDuocApiToken(userId, accessToken, expiresIn = 3600) {
-    if (!userId || !accessToken) return;
+    if (!userId || !accessToken) return false;
     this._duocApiTokenCache.set(userId, {
       accessToken,
       expiresAt: Date.now() + Math.max(1, Number(expiresIn)) * 1000,
     });
+    return true;
   }
 
   /**

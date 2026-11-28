@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const HelpProcedure = require('../models/HelpProcedure');
 const INSTITUTIONAL_MODULES_SEED = require('../data/institutionalModules.json');
+const { escapeRegex } = require('../utils/validationUtils');
 
 /**
  * Servicio de Gestión Editorial de Contenidos y Trámites (Épica E-005)
@@ -102,14 +103,17 @@ class HelpContentService {
     if (isDbReady) {
       try {
         const query = { status: 'published' };
-        if (searchTerm && searchTerm.trim()) {
-          const regex = new RegExp(searchTerm.trim(), 'i');
-          query.$or = [
-            { title: regex },
-            { description: regex },
-            { categoryTitle: regex },
-            { requirements: regex },
-          ];
+        if (typeof searchTerm === 'string' && searchTerm.trim()) {
+          const safeSearch = escapeRegex(searchTerm.trim(), 80);
+          if (safeSearch) {
+            const regex = new RegExp(safeSearch, 'i');
+            query.$or = [
+              { title: regex },
+              { description: regex },
+              { categoryTitle: regex },
+              { requirements: regex },
+            ];
+          }
         }
         procedures = await HelpProcedure.find(query).lean();
       } catch (err) {
@@ -193,11 +197,18 @@ class HelpContentService {
     if (isDbReady) {
       try {
         const query = {};
-        if (status) query.status = status;
-        if (categoryKey) query.categoryKey = categoryKey;
-        if (search && search.trim()) {
-          const regex = new RegExp(search.trim(), 'i');
-          query.$or = [{ title: regex }, { procedureId: regex }, { description: regex }];
+        if (typeof status === 'string' && ['draft', 'published', 'archived'].includes(status.trim())) {
+          query.status = status.trim();
+        }
+        if (typeof categoryKey === 'string' && /^[a-zA-Z0-9._-]+$/.test(categoryKey.trim())) {
+          query.categoryKey = categoryKey.trim();
+        }
+        if (typeof search === 'string' && search.trim()) {
+          const safeSearch = escapeRegex(search.trim(), 80);
+          if (safeSearch) {
+            const regex = new RegExp(safeSearch, 'i');
+            query.$or = [{ title: regex }, { procedureId: regex }, { description: regex }];
+          }
         }
         list = await HelpProcedure.find(query).sort({ updatedAt: -1 }).lean();
       } catch {

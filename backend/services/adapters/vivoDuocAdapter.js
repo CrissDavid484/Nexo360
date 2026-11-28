@@ -200,7 +200,16 @@ class VivoDuocAdapter {
     }
 
     const headers = await this._getAuthHeaders(userId);
-    const safeBaseUrl = this.baseUrl.startsWith('http') ? this.baseUrl : `https://${this.baseUrl}`;
+    let safeBaseUrl = DUOC_BASE_URL;
+    try {
+      const parsedBase = new URL(this.baseUrl.startsWith('http') ? this.baseUrl : `https://${this.baseUrl}`);
+      const h = parsedBase.hostname.toLowerCase();
+      if (h === 'api-oci-ext-prd.duoc.cl' || h.endsWith('.duoc.cl') || h === 'localhost' || h === '127.0.0.1') {
+        safeBaseUrl = parsedBase.origin;
+      }
+    } catch {
+      safeBaseUrl = DUOC_BASE_URL;
+    }
     const targetUrl = new URL(endpoint, safeBaseUrl);
 
     // Sanitización estricta de parámetros para prevenir CSRF/SSRF (Sonar S5144)
@@ -209,9 +218,9 @@ class VivoDuocAdapter {
 
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== null && ALLOWED_PARAM_KEYS.has(k)) {
-        const cleanVal = String(v).trim();
+        const cleanVal = encodeURIComponent(String(v).trim());
         if (SAFE_PARAM_VALUE_REGEX.test(cleanVal)) {
-          targetUrl.searchParams.set(k, cleanVal);
+          targetUrl.searchParams.set(encodeURIComponent(k), cleanVal);
         }
       }
     }

@@ -471,10 +471,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
           <form onSubmit={handleSaveProcedure} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                <label htmlFor="procedureIdInput" className="block text-xs font-bold text-neutral-700 mb-1">
                   Identificador Único (procedureId) *
                 </label>
                 <input
+                  id="procedureIdInput"
                   type="text"
                   value={formData.procedureId}
                   onChange={(e) => setFormData({ ...formData, procedureId: e.target.value })}
@@ -486,10 +487,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                <label htmlFor="procedureCategorySelect" className="block text-xs font-bold text-neutral-700 mb-1">
                   Categoría Institucional *
                 </label>
                 <select
+                  id="procedureCategorySelect"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white font-bold text-neutral-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-400"
@@ -504,10 +506,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-700 mb-1">
+              <label htmlFor="procedureTitleInput" className="block text-xs font-bold text-neutral-700 mb-1">
                 Título del Trámite *
               </label>
               <input
+                id="procedureTitleInput"
                 type="text"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -518,10 +521,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-700 mb-1">
+              <label htmlFor="procedureDescriptionTextarea" className="block text-xs font-bold text-neutral-700 mb-1">
                 Descripción Institucional
               </label>
               <textarea
+                id="procedureDescriptionTextarea"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
@@ -532,10 +536,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                <label htmlFor="procedureStepsTextarea" className="block text-xs font-bold text-neutral-700 mb-1">
                   Pasos a Seguir (uno por línea)
                 </label>
                 <textarea
+                  id="procedureStepsTextarea"
                   value={formData.stepsText}
                   onChange={(e) => setFormData({ ...formData, stepsText: e.target.value })}
                   rows={4}
@@ -545,10 +550,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                <label htmlFor="procedureRequirementsTextarea" className="block text-xs font-bold text-neutral-700 mb-1">
                   Requisitos Previos (uno por línea)
                 </label>
                 <textarea
+                  id="procedureRequirementsTextarea"
                   value={formData.requirementsText}
                   onChange={(e) => setFormData({ ...formData, requirementsText: e.target.value })}
                   rows={4}
@@ -560,10 +566,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                <label htmlFor="procedureOfficialUrlInput" className="block text-xs font-bold text-neutral-700 mb-1">
                   Enlace Oficial Externo (Portal Duoc UC)
                 </label>
                 <input
+                  id="procedureOfficialUrlInput"
                   type="url"
                   value={formData.officialUrl}
                   onChange={(e) => setFormData({ ...formData, officialUrl: e.target.value })}
@@ -573,10 +580,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                <label htmlFor="procedureEstimatedDaysInput" className="block text-xs font-bold text-neutral-700 mb-1">
                   Plazo Estimado (días hábiles)
                 </label>
                 <input
+                  id="procedureEstimatedDaysInput"
                   type="number"
                   min="0"
                   max="60"
@@ -602,10 +610,11 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
 
             {editingProcedure && (
               <div>
-                <label className="block text-xs font-bold text-purple-900 mb-1">
+                <label htmlFor="procedureChangeReasonInput" className="block text-xs font-bold text-purple-900 mb-1">
                   Motivo de la Modificación Editorial (Trazabilidad E-005) *
                 </label>
                 <input
+                  id="procedureChangeReasonInput"
                   type="text"
                   value={formData.changeReason}
                   onChange={(e) => setFormData({ ...formData, changeReason: e.target.value })}

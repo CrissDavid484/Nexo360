@@ -41,11 +41,11 @@ function validateSafeHttpUrl(urlString, allowedHostnames = []) {
   if (process.env.NODE_ENV === 'production') {
     const isPrivateOrLoopback =
       hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
       hostname === '::1' ||
-      hostname === '169.254.169.254' ||
+      hostname.startsWith('127.') ||
       hostname.startsWith('10.') ||
       hostname.startsWith('192.168.') ||
+      hostname.startsWith('169.254.') ||
       /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
 
     if (isPrivateOrLoopback) {
