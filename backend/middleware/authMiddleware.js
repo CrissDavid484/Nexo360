@@ -4,15 +4,15 @@ const UserProfile = require('../models/UserProfile');
 
 const STAFF_ROLE_DEFAULTS = Object.freeze({
   admin: {
-    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config'],
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'manage_help_content', 'audit_logs', 'system_config'],
     badges: ['TI', 'SuperAdmin', 'Seguridad'],
   },
   administrador: {
-    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'audit_logs', 'system_config'],
+    permissions: ['full_access', 'manage_users', 'manage_catalogs', 'manage_help_content', 'audit_logs', 'system_config'],
     badges: ['TI', 'SuperAdmin', 'Seguridad'],
   },
   coordinador_paedis: {
-    permissions: ['paedis_read', 'paedis_write', 'manage_students', 'sat_monitoring'],
+    permissions: ['paedis_read', 'paedis_write', 'manage_students', 'sat_monitoring', 'manage_help_content'],
     badges: ['PAEDIS', 'Inclusión', 'UAP'],
   },
   profesor: {

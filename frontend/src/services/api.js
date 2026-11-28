@@ -488,21 +488,21 @@ export const api = {
   async createAdminProcedure(data) {
     return request('/modules/admin/procedure', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
   async updateAdminProcedure(id, data) {
     return request(`/modules/admin/procedure/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
   async updateAdminProcedureStatus(id, status) {
     return request(`/modules/admin/procedure/${encodeURIComponent(id)}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: { status },
     });
   },
 

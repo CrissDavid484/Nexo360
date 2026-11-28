@@ -1,0 +1,215 @@
+{
+  "timestamp": "2026-11-28T12:40:41.464Z",
+  "fuenteA": {
+    "source": "frontend/src/data/duocModulesData.js",
+    "categoriesCount": 9,
+    "categories": [
+      {
+        "id": "admision-matricula",
+        "title": "Admisión y Matrícula",
+        "iconName": "GraduationCap",
+        "submodulesCount": 4,
+        "articlesCount": 11
+      },
+      {
+        "id": "orientacion-nuevos",
+        "title": "Orientación Estudiantes Nuevos",
+        "iconName": "Compass",
+        "submodulesCount": 7,
+        "articlesCount": 14
+      },
+      {
+        "id": "vida-academica",
+        "title": "Estudiantes",
+        "iconName": "BookOpen",
+        "submodulesCount": 19,
+        "articlesCount": 56
+      },
+      {
+        "id": "beneficios-estudiantiles",
+        "title": "Beneficios estudiantiles",
+        "iconName": "HeartHandshake",
+        "submodulesCount": 4,
+        "articlesCount": 12
+      },
+      {
+        "id": "pagos-deudas",
+        "title": "Pagos y Deudas",
+        "iconName": "CreditCard",
+        "submodulesCount": 2,
+        "articlesCount": 7
+      },
+      {
+        "id": "servicios-digitales",
+        "title": "Servicios Digitales",
+        "iconName": "Laptop",
+        "submodulesCount": 4,
+        "articlesCount": 19
+      },
+      {
+        "id": "titulados",
+        "title": "Titulados",
+        "iconName": "Award",
+        "submodulesCount": 3,
+        "articlesCount": 6
+      },
+      {
+        "id": "convivencia-inclusion",
+        "title": "Convivencia, inclusión y equidad de género",
+        "iconName": "ShieldAlert",
+        "submodulesCount": 1,
+        "articlesCount": 4
+      },
+      {
+        "id": "sostenedor",
+        "title": "Sostenedor",
+        "iconName": "Users",
+        "submodulesCount": 1,
+        "articlesCount": 2
+      }
+    ],
+    "submodulesCount": 45,
+    "articlesCount": 131,
+    "intentShortcutsCount": 9,
+    "promotedArticlesCount": 3,
+    "onlineHelpCenter": {
+      "title": "Centro de Ayuda para estudiantes Online",
+      "description": "Canal de soporte y trámites oficiales para carreras en modalidad 100% online y Campus Virtual Duoc UC.",
+      "url": "https://centrodeayudaonline.duoc.cl"
+    }
+  },
+  "fuenteB": {
+    "source": "backend/data/institutionalModules.json",
+    "categoriesCount": 9,
+    "categories": [
+      {
+        "categoryKey": "admision-matricula",
+        "categoryTitle": "Admisión y Matrícula",
+        "submodulesCount": 3,
+        "faqsCount": 2
+      },
+      {
+        "categoryKey": "orientacion-nuevos",
+        "categoryTitle": "Orientación Estudiantes Nuevos",
+        "submodulesCount": 5,
+        "faqsCount": 1
+      },
+      {
+        "categoryKey": "vida-academica",
+        "categoryTitle": "Estudiantes - Vida Académica",
+        "submodulesCount": 18,
+        "faqsCount": 2
+      },
+      {
+        "categoryKey": "beneficios-estudiantiles",
+        "categoryTitle": "Beneficios Estudiantiles",
+        "submodulesCount": 5,
+        "faqsCount": 1
+      },
+      {
+        "categoryKey": "pagos-deudas",
+        "categoryTitle": "Pagos y Deudas",
+        "submodulesCount": 3,
+        "faqsCount": 1
+      },
+      {
+        "categoryKey": "servicios-digitales",
+        "categoryTitle": "Servicios Digitales",
+        "submodulesCount": 6,
+        "faqsCount": 1
+      },
+      {
+        "categoryKey": "titulados",
+        "categoryTitle": "Titulados",
+        "submodulesCount": 3,
+        "faqsCount": 1
+      },
+      {
+        "categoryKey": "convivencia-inclusion",
+        "categoryTitle": "Convivencia, inclusión y equidad de género",
+        "submodulesCount": 2,
+        "faqsCount": 1
+      },
+      {
+        "categoryKey": "sostenedor",
+        "categoryTitle": "Sostenedor",
+        "submodulesCount": 2,
+        "faqsCount": 1
+      }
+    ],
+    "submodulesCount": 47,
+    "articlesCount": 0,
+    "faqsCount": 11
+  },
+  "comparison": {
+    "commonCount": 15,
+    "uniqueToACount": 30,
+    "uniqueToBCount": 32,
+    "uniqueToA": [
+      "cambio-carrera-jornada-sede",
+      "cambio-otra-institucion",
+      "reintegros-reincorporaciones",
+      "talleres-extracurriculares-inicio",
+      "ingreso-primeros-pasos",
+      "semana-cero-jornada-inicio",
+      "servicios-digitales-nuevos",
+      "interrupcion-semestre-nuevos",
+      "talleres-extracurriculares-continuidad",
+      "certificados-alumnos-notas",
+      "revalidacion-reposicion-tne",
+      "tav-verano",
+      "practicas-profesionales",
+      "continuidad-estudios-contrato",
+      "cambio-carrera-sede-estudiantes",
+      "renuncia-caducidad",
+      "apoyo-estudiantes-cuidadores",
+      "programas-apoyo-estudiante",
+      "paedis-discapacidad",
+      "bienestar-salud-mental",
+      "matricula-arancel-pagos",
+      "deudas-repactacion",
+      "cuentas-accesos-correo-ava-wifi",
+      "seguridad-autenticacion-mfa-clave",
+      "plataformas-herramientas-m365-teams-vivo",
+      "convenios-software-carrera",
+      "diploma-ceremonia-titulos",
+      "cuenta-de-titulados",
+      "convivencia-denuncias-nombre-social",
+      "sostenedor-solicitudes-certificados"
+    ],
+    "uniqueToB": [
+      "cambio-institucion",
+      "reintegros",
+      "talleres-extracurriculares",
+      "semana-cero",
+      "servicios-digitales-induccion",
+      "talleres-academicos",
+      "revalidacion-tne",
+      "tav",
+      "practicas",
+      "continuidad-estudios",
+      "cambio-carrera",
+      "renuncia",
+      "estudiantes-cuidadores",
+      "paedis-modulo",
+      "programas-apoyo",
+      "bienestar",
+      "apoyo-psicologico",
+      "pago-matricula",
+      "pago-arancel",
+      "repactacion",
+      "acceso-ava",
+      "correo-institucional",
+      "wifi-duoc",
+      "microsoft-365",
+      "ciberseguridad",
+      "convenios-software",
+      "diplomas",
+      "ceremonias",
+      "canal-denuncias",
+      "cambio-nombre-social",
+      "solicitudes-sostenedor",
+      "certificados-alumno"
+    ]
+  }
+}

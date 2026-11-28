@@ -44,7 +44,21 @@ const ADMIN_USER = {
   id: 'admin_123',
   email: 'admin.editor@duoc.cl',
   role: 'admin',
-  permissions: ['full_access', 'manage_catalogs', 'manage_users'],
+  permissions: ['full_access', 'manage_catalogs', 'manage_users', 'manage_help_content'],
+};
+
+const COORD_USER = {
+  id: 'coord_456',
+  email: 'coord.paedis@duoc.cl',
+  role: 'coordinador_paedis',
+  permissions: ['manage_help_content', 'paedis_read', 'paedis_write'],
+};
+
+const TEACHER_USER = {
+  id: 'prof_1',
+  email: 'profesor@duocuc.cl',
+  role: 'profesor',
+  permissions: ['class_management'],
 };
 
 const STUDENT_USER = {
@@ -56,6 +70,9 @@ const STUDENT_USER = {
 
 describe('Épica E-005: Sistema de Gestión Editorial de Contenidos (HelpContentService)', () => {
   before(async () => {
+    authService.registerUser(ADMIN_USER);
+    authService.registerUser(COORD_USER);
+    authService.registerUser(TEACHER_USER);
     authService.registerUser(STUDENT_USER);
     await helpContentService.ensureSeedProcedures();
   });
@@ -168,6 +185,122 @@ describe('Épica E-005: Sistema de Gestión Editorial de Contenidos (HelpContent
     });
 
     assert.equal(res.statusCode, 403, 'Estudiante sin permisos debe recibir 403 Forbidden');
+  });
+
+  test('9. HTTP Operaciones: Admin crea procedimiento por POST /api/modules/admin/procedure (201)', async () => {
+    const adminToken = generateTestToken(ADMIN_USER);
+    const { getResponse } = createHttpCallMock(app);
+
+    const res = await getResponse('POST', '/api/modules/admin/procedure', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: {
+        procedureId: 'tramite-http-test',
+        title: 'Trámite HTTP Integración',
+        categoryTitle: 'Financiamiento',
+        categoryKey: 'financiamiento',
+        description: 'Trámite probado mediante llamada HTTP integral.',
+        status: 'draft',
+        requirements: ['Cédula de identidad', 'Certificado socioeconómico'],
+        steps: [
+          'Paso 1: Ingresar a la plataforma',
+          'Paso 2: Adjuntar antecedentes',
+          'Paso 3: Esperar validación',
+        ],
+        estimatedDays: 5,
+      },
+    });
+
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.payload.success, true);
+    assert.equal(res.payload.data.procedureId, 'tramite-http-test');
+    assert.equal(res.payload.data.steps.length, 3);
+    assert.equal(res.payload.data.steps[0].title, 'Paso 1');
+    assert.equal(res.payload.data.steps[0].instruction, 'Ingresar a la plataforma');
+    assert.notEqual(res.payload.data.steps[0].title, '[object Object]');
+  });
+
+  test('10. HTTP Lectura: Coordinador PAEDIS con manage_help_content consulta GET /api/modules/admin/all (200)', async () => {
+    const coordToken = generateTestToken(COORD_USER);
+    const { getResponse } = createHttpCallMock(app);
+
+    const res = await getResponse('GET', '/api/modules/admin/all', {
+      headers: { Authorization: `Bearer ${coordToken}` },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.success, true);
+    assert.ok(Array.isArray(res.payload.data));
+    assert.ok(res.payload.data.length >= 1);
+  });
+
+  test('11. HTTP Edición y Versionado: PUT /api/modules/admin/procedure/:id incrementa versión a 2', async () => {
+    const adminToken = generateTestToken(ADMIN_USER);
+    const { getResponse } = createHttpCallMock(app);
+
+    const res = await getResponse('PUT', '/api/modules/admin/procedure/tramite-http-test', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: {
+        title: 'Trámite HTTP Integración Actualizado',
+        description: 'Descripción actualizada vía PUT.',
+        changeSummary: 'Ajuste de descripción y requisitos',
+        requirements: ['Cédula al día'],
+      },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.success, true);
+    assert.equal(res.payload.data.version, 2);
+    assert.equal(res.payload.data.title, 'Trámite HTTP Integración Actualizado');
+  });
+
+  test('12. HTTP Ciclo Editorial: PATCH status a published (200) y rechazo de estado inválido (400)', async () => {
+    const adminToken = generateTestToken(ADMIN_USER);
+    const { getResponse } = createHttpCallMock(app);
+
+    // Estado válido
+    const resPub = await getResponse('PATCH', '/api/modules/admin/procedure/tramite-http-test/status', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: { status: 'published' },
+    });
+    assert.equal(resPub.statusCode, 200);
+    assert.equal(resPub.payload.data.status, 'published');
+
+    // Estado inválido
+    const resBad = await getResponse('PATCH', '/api/modules/admin/procedure/tramite-http-test/status', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: { status: 'invalido_random' },
+    });
+    assert.equal(resBad.statusCode, 400);
+    assert.equal(resBad.payload.success, false);
+  });
+
+  test('13. HTTP Rollback: POST /rollback/1 restaura versión inicial v1 preservando historial', async () => {
+    const adminToken = generateTestToken(ADMIN_USER);
+    const { getResponse } = createHttpCallMock(app);
+
+    const res = await getResponse('POST', '/api/modules/admin/procedure/tramite-http-test/rollback/1', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.success, true);
+    assert.equal(res.payload.data.title, 'Trámite HTTP Integración');
+    assert.ok(res.payload.data.version >= 3, 'El rollback debe registrarse como nueva versión');
+  });
+
+  test('14. HTTP Seguridad: Docente recibe 403 y llamada sin token recibe 401', async () => {
+    const teacherToken = generateTestToken(TEACHER_USER);
+    const { getResponse } = createHttpCallMock(app);
+
+    // Con token de profesor (sin permisos editoriales)
+    const resTeacher = await getResponse('GET', '/api/modules/admin/all', {
+      headers: { Authorization: `Bearer ${teacherToken}` },
+    });
+    assert.equal(resTeacher.statusCode, 403);
+
+    // Sin token
+    const resNoAuth = await getResponse('GET', '/api/modules/admin/all');
+    assert.equal(resNoAuth.statusCode, 401);
   });
 });
 

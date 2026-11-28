@@ -14,6 +14,26 @@ const StepSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const ArticleExternalLinkSchema = new mongoose.Schema(
+  {
+    text: { type: String, trim: true },
+    url: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
+const ArticleSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    title: { type: String, required: true, trim: true },
+    url: { type: String, trim: true },
+    summary: { type: String, trim: true },
+    body: { type: String },
+    externalLinks: [ArticleExternalLinkSchema],
+  },
+  { _id: false }
+);
+
 const FaqItemSchema = new mongoose.Schema(
   {
     question: { type: String, required: true, trim: true },
@@ -116,6 +136,46 @@ const HelpProcedureSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    estimatedDays: {
+      type: Number,
+      default: 3,
+      min: 0,
+    },
+    intentGoal: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    intentTags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    actionLabel: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    zendeskSectionId: {
+      type: Number,
+    },
+    zendeskCategoryId: {
+      type: Number,
+    },
+    officialCategoryUrl: {
+      type: String,
+      trim: true,
+    },
+    highlight: {
+      type: Boolean,
+      default: false,
+    },
+    badge: {
+      type: String,
+      trim: true,
+    },
+    articles: [ArticleSchema],
     faqs: [FaqItemSchema],
     keywords: [
       {

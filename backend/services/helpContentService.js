@@ -1,7 +1,39 @@
 const mongoose = require('mongoose');
 const HelpProcedure = require('../models/HelpProcedure');
 const INSTITUTIONAL_MODULES_SEED = require('../data/institutionalModules.json');
-const { escapeRegex } = require('../utils/validationUtils');
+
+function normalizeSteps(steps) {
+  if (!Array.isArray(steps)) return [];
+  return steps.map((step, idx) => {
+    if (typeof step === 'string') {
+      const colonIdx = step.indexOf(':');
+      if (colonIdx > 0 && colonIdx < step.length - 1) {
+        return {
+          stepNumber: idx + 1,
+          title: step.slice(0, colonIdx).trim(),
+          instruction: step.slice(colonIdx + 1).trim(),
+        };
+      }
+      return {
+        stepNumber: idx + 1,
+        title: `Paso ${idx + 1}`,
+        instruction: step.trim(),
+      };
+    }
+    if (typeof step === 'object' && step !== null) {
+      return {
+        stepNumber: Number(step.stepNumber) || (idx + 1),
+        title: String(step.title || `Paso ${idx + 1}`).trim(),
+        instruction: String(step.instruction || step.description || step.title || '').trim(),
+      };
+    }
+    return {
+      stepNumber: idx + 1,
+      title: `Paso ${idx + 1}`,
+      instruction: String(step),
+    };
+  });
+}
 
 /**
  * Servicio de Gestión Editorial de Contenidos y Trámites (Épica E-005)
@@ -104,14 +136,13 @@ class HelpContentService {
       try {
         const query = { status: 'published' };
         if (typeof searchTerm === 'string' && searchTerm.trim()) {
-          const safeSearch = escapeRegex(searchTerm.trim(), 80);
-          if (safeSearch) {
-            const regex = new RegExp(safeSearch, 'i');
+          const cleanSearch = searchTerm.trim().replace(/[^\w\s\u00C0-\u017F-]/g, '').slice(0, 60);
+          if (cleanSearch) {
             query.$or = [
-              { title: regex },
-              { description: regex },
-              { categoryTitle: regex },
-              { requirements: regex },
+              { title: { $regex: cleanSearch, $options: 'i' } },
+              { description: { $regex: cleanSearch, $options: 'i' } },
+              { categoryTitle: { $regex: cleanSearch, $options: 'i' } },
+              { requirements: { $regex: cleanSearch, $options: 'i' } },
             ];
           }
         }
@@ -175,9 +206,9 @@ class HelpContentService {
     const isDbReady = mongoose.connection.readyState === 1;
     const cleanId = String(procedureId || '').toLowerCase().trim();
 
-    if (isDbReady) {
+    if (isDbReady && cleanId) {
       try {
-        const found = await HelpProcedure.findOne({ procedureId: cleanId }).lean();
+        const found = await HelpProcedure.findOne({ procedureId: { $eq: cleanId } }).lean();
         if (found) return found;
       } catch {
         // Fallback a memoria
@@ -197,17 +228,30 @@ class HelpContentService {
     if (isDbReady) {
       try {
         const query = {};
-        if (typeof status === 'string' && ['draft', 'published', 'archived'].includes(status.trim())) {
-          query.status = status.trim();
+        const safeStatus = typeof status === 'string' ? status.trim().toLowerCase() : '';
+        if (safeStatus === 'draft') {
+          query.status = 'draft';
+        } else if (safeStatus === 'published') {
+          query.status = 'published';
+        } else if (safeStatus === 'archived') {
+          query.status = 'archived';
         }
-        if (typeof categoryKey === 'string' && /^[a-zA-Z0-9._-]+$/.test(categoryKey.trim())) {
-          query.categoryKey = categoryKey.trim();
+
+        if (typeof categoryKey === 'string') {
+          const cleanCatKey = categoryKey.trim().toLowerCase();
+          if (/^[a-z0-9_-]{1,60}$/.test(cleanCatKey)) {
+            query.categoryKey = { $eq: cleanCatKey };
+          }
         }
+
         if (typeof search === 'string' && search.trim()) {
-          const safeSearch = escapeRegex(search.trim(), 80);
-          if (safeSearch) {
-            const regex = new RegExp(safeSearch, 'i');
-            query.$or = [{ title: regex }, { procedureId: regex }, { description: regex }];
+          const cleanSearch = search.trim().replace(/[^\w\s\u00C0-\u017F-]/g, '').slice(0, 60);
+          if (cleanSearch) {
+            query.$or = [
+              { title: { $regex: cleanSearch, $options: 'i' } },
+              { procedureId: { $regex: cleanSearch, $options: 'i' } },
+              { description: { $regex: cleanSearch, $options: 'i' } },
+            ];
           }
         }
         list = await HelpProcedure.find(query).sort({ updatedAt: -1 }).lean();
@@ -217,6 +261,9 @@ class HelpContentService {
     }
 
     if (list.length === 0) {
+      if (!this._isInitialized) {
+        await this.ensureSeedProcedures();
+      }
       list = Array.from(this._inMemoryProcedures.values());
       if (status) list = list.filter((p) => p.status === status);
       if (categoryKey) list = list.filter((p) => p.categoryKey === categoryKey);
@@ -251,10 +298,16 @@ class HelpContentService {
       throw err;
     }
 
+    const categoryTitle = payload.categoryTitle || payload.category || 'Orientación General';
+    const categoryKey = String(
+      payload.categoryKey ||
+      (payload.category ? payload.category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : 'orientacion-general')
+    ).toLowerCase().trim();
+
     const newDoc = {
       procedureId: cleanId,
-      categoryKey: String(payload.categoryKey || 'orientacion-general').toLowerCase().trim(),
-      categoryTitle: payload.categoryTitle || 'Orientación General',
+      categoryKey,
+      categoryTitle,
       categoryIcon: payload.categoryIcon || 'HelpCircle',
       title: payload.title,
       description: payload.description,
@@ -262,11 +315,12 @@ class HelpContentService {
       purpose: payload.purpose || '',
       requirements: Array.isArray(payload.requirements) ? payload.requirements : [],
       documents: Array.isArray(payload.documents) ? payload.documents : [],
-      steps: Array.isArray(payload.steps) ? payload.steps : [],
+      steps: normalizeSteps(payload.steps),
       officialUrl: payload.officialUrl || '',
       destinationPortal: payload.destinationPortal || 'Portal Institucional Duoc UC',
       paedisTip: payload.paedisTip || '',
       isInstitutionalService: Boolean(payload.isInstitutionalService),
+      estimatedDays: Number(payload.estimatedDays) >= 0 ? Number(payload.estimatedDays) : 3,
       faqs: Array.isArray(payload.faqs) ? payload.faqs : [],
       keywords: Array.isArray(payload.keywords) ? payload.keywords : [],
       version: 1,
@@ -304,7 +358,7 @@ class HelpContentService {
       throw err;
     }
 
-    // Instantánea inmutable de la versión previa
+    // Instantánea inmutable completa de la versión previa
     const snapshot = {
       version: current.version || 1,
       title: current.title,
@@ -313,18 +367,42 @@ class HelpContentService {
       updatedAt: new Date(),
       changeSummary: updatePayload.changeSummary || 'Modificación editorial de contenido',
       snapshotData: {
+        categoryKey: current.categoryKey,
+        categoryTitle: current.categoryTitle,
+        categoryIcon: current.categoryIcon,
+        title: current.title,
         description: current.description,
+        purpose: current.purpose,
         requirements: current.requirements,
         documents: current.documents,
         steps: current.steps,
         officialUrl: current.officialUrl,
+        destinationPortal: current.destinationPortal,
         paedisTip: current.paedisTip,
+        isInstitutionalService: current.isInstitutionalService,
+        estimatedDays: current.estimatedDays,
+        faqs: current.faqs,
+        keywords: current.keywords,
       },
     };
 
     const nextVersion = (current.version || 1) + 1;
+    const normalizedPayload = { ...updatePayload };
+    if (updatePayload.steps !== undefined) {
+      normalizedPayload.steps = normalizeSteps(updatePayload.steps);
+    }
+    if (updatePayload.estimatedDays !== undefined) {
+      normalizedPayload.estimatedDays = Number(updatePayload.estimatedDays) >= 0 ? Number(updatePayload.estimatedDays) : 3;
+    }
+    if (updatePayload.category && !updatePayload.categoryTitle) {
+      normalizedPayload.categoryTitle = updatePayload.category;
+    }
+    if (updatePayload.category && !updatePayload.categoryKey) {
+      normalizedPayload.categoryKey = updatePayload.category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+
     const updatedFields = {
-      ...updatePayload,
+      ...normalizedPayload,
       version: nextVersion,
       lastReviewedAt: new Date(),
       lastReviewedBy: {

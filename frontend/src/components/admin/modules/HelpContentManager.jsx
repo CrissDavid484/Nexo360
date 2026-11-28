@@ -40,9 +40,49 @@ const DEFAULT_CATEGORIES = [
   'Soporte Tecnológico',
 ];
 
+function formatStepsToText(steps) {
+  if (!Array.isArray(steps)) return '';
+  return steps
+    .map((s, idx) => {
+      if (typeof s === 'string') return s;
+      if (typeof s === 'object' && s !== null) {
+        if (s.title && s.instruction && s.title !== s.instruction) {
+          return `${s.title}: ${s.instruction}`;
+        }
+        return s.instruction || s.title || `Paso ${idx + 1}`;
+      }
+      return String(s);
+    })
+    .join('\n');
+}
+
+function parseStepsFromText(text) {
+  if (!text || typeof text !== 'string') return [];
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, idx) => {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx > 0 && colonIdx < line.length - 1) {
+        return {
+          stepNumber: idx + 1,
+          title: line.slice(0, colonIdx).trim(),
+          instruction: line.slice(colonIdx + 1).trim(),
+        };
+      }
+      return {
+        stepNumber: idx + 1,
+        title: `Paso ${idx + 1}`,
+        instruction: line,
+      };
+    });
+}
+
 export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () => ({}), announce = () => {} }) => {
   const [procedures, setProcedures] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [feedback, setFeedback] = useState(null);
@@ -73,15 +113,20 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
 
   const fetchProcedures = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const res = await api.getAdminProcedures(statusFilter === 'all' ? '' : statusFilter);
       if (res && res.success && Array.isArray(res.data)) {
         setProcedures(res.data);
+        setLoadError(null);
       } else {
         setProcedures([]);
+        setLoadError(res?.message || 'No fue posible cargar el catálogo editorial.');
       }
     } catch (err) {
       console.error('[HelpContentManager] Error cargando trámites:', err);
+      setProcedures([]);
+      setLoadError('Error de conexión al cargar trámites.');
       setFeedback({ type: 'error', text: 'No fue posible conectar con el catálogo editorial.' });
     } finally {
       setIsLoading(false);
@@ -99,6 +144,8 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
         !term ||
         p.title?.toLowerCase().includes(term) ||
         p.procedureId?.toLowerCase().includes(term) ||
+        p.categoryTitle?.toLowerCase().includes(term) ||
+        p.categoryKey?.toLowerCase().includes(term) ||
         p.category?.toLowerCase().includes(term);
       return matchesSearch;
     });
@@ -127,12 +174,12 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
     setFormData({
       procedureId: proc.procedureId,
       title: proc.title || '',
-      category: proc.category || DEFAULT_CATEGORIES[0],
+      category: proc.categoryTitle || proc.category || DEFAULT_CATEGORIES[0],
       description: proc.description || '',
-      stepsText: Array.isArray(proc.steps) ? proc.steps.join('\n') : '',
+      stepsText: formatStepsToText(proc.steps),
       requirementsText: Array.isArray(proc.requirements) ? proc.requirements.join('\n') : '',
       officialUrl: proc.officialUrl || '',
-      estimatedDays: proc.estimatedDays || 3,
+      estimatedDays: proc.estimatedDays !== undefined && proc.estimatedDays !== null ? proc.estimatedDays : 3,
       isPaedisPriority: Boolean(proc.isPaedisPriority),
       changeReason: '',
     });
@@ -153,36 +200,49 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
 
     setIsSaving(true);
     try {
-      const steps = formData.stepsText
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const steps = parseStepsFromText(formData.stepsText);
       const requirements = formData.requirementsText
         .split('\n')
         .map((r) => r.trim())
         .filter(Boolean);
 
+      const categorySlug = formData.category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const payload = {
         title: formData.title.trim(),
         category: formData.category,
+        categoryTitle: formData.category,
+        categoryKey: categorySlug || 'orientacion-general',
         description: formData.description.trim(),
         steps,
         requirements,
         officialUrl: formData.officialUrl.trim(),
-        estimatedDays: Number(formData.estimatedDays) || 3,
+        estimatedDays: Number(formData.estimatedDays) >= 0 ? Number(formData.estimatedDays) : 3,
         isPaedisPriority: formData.isPaedisPriority,
         changeReason: formData.changeReason.trim() || (editingProcedure ? 'Actualización editorial de contenido' : 'Creación de trámite'),
       };
 
+      let res;
       if (!editingProcedure) {
         payload.procedureId = formData.procedureId.trim();
-        await api.createAdminProcedure(payload);
-        setFeedback({ type: 'success', text: `Trámite '${payload.title}' creado exitosamente en borrador.` });
+        res = await api.createAdminProcedure(payload);
       } else {
-        await api.updateAdminProcedure(editingProcedure.procedureId, payload);
-        setFeedback({ type: 'success', text: `Trámite '${payload.title}' actualizado a versión incrementada.` });
+        res = await api.updateAdminProcedure(editingProcedure.procedureId, payload);
       }
 
+      if (!res || !res.success) {
+        setFeedback({
+          type: 'error',
+          text: res?.message || 'Error al guardar los cambios editoriales.',
+        });
+        return;
+      }
+
+      setFeedback({
+        type: 'success',
+        text: !editingProcedure
+          ? `Trámite '${payload.title}' creado exitosamente en borrador.`
+          : `Trámite '${payload.title}' actualizado a versión incrementada v${res.data?.version || ''}.`,
+      });
       setIsEditorOpen(false);
       fetchProcedures();
     } catch (err) {
@@ -195,7 +255,14 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
 
   const handleStatusChange = async (proc, newStatus) => {
     try {
-      await api.updateAdminProcedureStatus(proc.procedureId, newStatus);
+      const res = await api.updateAdminProcedureStatus(proc.procedureId, newStatus);
+      if (!res || !res.success) {
+        setFeedback({
+          type: 'error',
+          text: res?.message || `Error al cambiar estado editorial a ${newStatus}.`,
+        });
+        return;
+      }
       const actionName = newStatus === 'published' ? 'publicado' : newStatus === 'archived' ? 'archivado' : 'pasado a borrador';
       setFeedback({ type: 'success', text: `Trámite '${proc.title}' ${actionName} correctamente.` });
       fetchProcedures();
@@ -217,7 +284,14 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
     }
     setIsRollingBack(true);
     try {
-      await api.rollbackAdminProcedure(proc.procedureId, versionNum);
+      const res = await api.rollbackAdminProcedure(proc.procedureId, versionNum);
+      if (!res || !res.success) {
+        setFeedback({
+          type: 'error',
+          text: res?.message || `Error al restaurar a la versión v${versionNum}.`,
+        });
+        return;
+      }
       setFeedback({ type: 'success', text: `Trámite restaurado exitosamente a la versión v${versionNum}.` });
       setIsHistoryOpen(false);
       fetchProcedures();
@@ -335,10 +409,29 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
             <Loader2 className="w-8 h-8 animate-spin text-brand-navy" />
             <p className="text-sm font-bold">Cargando catálogo editorial...</p>
           </div>
+        ) : loadError ? (
+          <div className="p-12 text-center text-rose-700 bg-rose-50/50">
+            <AlertCircle className="w-12 h-12 mx-auto text-rose-500 mb-2" />
+            <p className="text-sm font-bold text-rose-950 mb-1">Error al consultar el catálogo editorial</p>
+            <p className="text-xs text-rose-800 max-w-md mx-auto mb-4">{loadError}</p>
+            <Button variant="secondary" size="sm" onClick={fetchProcedures} className="mx-auto">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Reintentar
+            </Button>
+          </div>
         ) : filteredProcedures.length === 0 ? (
           <div className="p-12 text-center text-neutral-500">
             <BookOpen className="w-12 h-12 mx-auto text-neutral-300 mb-2" />
-            <p className="text-sm font-bold">No se encontraron trámites con los filtros seleccionados.</p>
+            <p className="text-sm font-bold">
+              {searchTerm || statusFilter !== 'all'
+                ? 'No se encontraron trámites con los filtros seleccionados.'
+                : 'No hay trámites registrados en el catálogo editorial.'}
+            </p>
+            <p className="text-xs text-neutral-400 mt-1">
+              {searchTerm || statusFilter !== 'all'
+                ? 'Intenta con otro término de búsqueda o cambia el filtro de estado.'
+                : 'Puedes crear un nuevo trámite institucional usando el botón "Nuevo Trámite".'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -373,7 +466,7 @@ export const HelpContentManager = ({ isAdmin, isCoordinator, getVoiceProps = () 
                       </td>
                       <td className="px-4 py-3.5">
                         <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-neutral-100 text-neutral-800 border border-neutral-200">
-                          {proc.category}
+                          {proc.categoryTitle || proc.category || 'Orientación General'}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
