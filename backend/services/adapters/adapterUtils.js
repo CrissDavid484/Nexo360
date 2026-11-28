@@ -30,9 +30,32 @@ function validateSafeHttpUrl(urlString, allowedHostnames = []) {
     throw new Error(`[AdapterUtils] Protocolo no seguro: ${parsed.protocol}`);
   }
 
+  // HTTPS obligatorio en producción para integraciones institucionales externas
+  if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+    throw new Error(`[AdapterUtils] HTTPS obligatorio en producción para destinos externos: ${parsed.protocol}`);
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Prevención de SSRF contra redes privadas o metadatos de nube en producción
+  if (process.env.NODE_ENV === 'production') {
+    const isPrivateOrLoopback =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '169.254.169.254' ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+
+    if (isPrivateOrLoopback) {
+      throw new Error(`[AdapterUtils] Destino privado o loopback no permitido en producción: ${parsed.hostname}`);
+    }
+  }
+
   if (allowedHostnames && allowedHostnames.length > 0) {
     const isAllowed = allowedHostnames.some(
-      (h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`)
+      (h) => hostname === h.toLowerCase() || hostname.endsWith(`.${h.toLowerCase()}`)
     );
     if (!isAllowed) {
       throw new Error(`[AdapterUtils] Host no autorizado: ${parsed.hostname}`);

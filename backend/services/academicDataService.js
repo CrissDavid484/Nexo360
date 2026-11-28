@@ -46,17 +46,10 @@ class AcademicDataService {
     }
 
     if (typeof identityContext === 'string') {
-      const email = identityContext.trim().toLowerCase();
-      if (!email.includes('@')) {
-        const err = new Error('Formato de correo institucional inválido');
-        err.code = 'INVALID_EMAIL';
-        throw err;
-      }
-      return {
-        studentEmail: email,
-        nombreUsuario: email.split('@')[0],
-        role: 'system',
-      };
+      const err = new Error('Petición insegura: el contexto de identidad académica debe provenir de un usuario autenticado');
+      err.code = 'AUTHENTICATION_REQUIRED';
+      err.status = 401;
+      throw err;
     }
 
     const user = identityContext.user || identityContext;

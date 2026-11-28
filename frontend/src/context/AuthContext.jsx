@@ -11,7 +11,7 @@ function sanitizeSessionUser(u) {
     ...u,
     fullName: sanitizeInstitutionalDisplayName(u.fullName || u.nombre),
     nombre: sanitizeInstitutionalDisplayName(u.nombre || u.fullName),
-    email: (u.email || '').replace(/t\.montes/gi, 'coord.paedis'),
+    email: String(u.email || '').trim().toLowerCase(),
     tutorParAsignado: sanitizeInstitutionalDisplayName(u.tutorParAsignado),
   };
 }
@@ -24,11 +24,29 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     localStorage.removeItem('nexo360_token');
+    try {
+      sessionStorage.clear();
+    } catch {
+      // Entorno sin acceso a sessionStorage
+    }
     setToken(null);
     setUser(null);
     clearDisabilityProfile();
     announce('Sesión cerrada correctamente');
   }, [announce, clearDisabilityProfile]);
+
+  // Sincronización multi-pestaña: si se cierra sesión en otra pestaña, revocar estado local
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'nexo360_token' && !e.newValue) {
+        setToken(null);
+        setUser(null);
+        clearDisabilityProfile();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [clearDisabilityProfile]);
 
   useEffect(() => {
     let isActive = true;

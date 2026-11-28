@@ -433,18 +433,48 @@ class MicrosoftEntraIdAdapter {
   }
 
   /**
+   * Almacena en caché un token de acceso a la API de Duoc UC para un usuario específico.
+   * @param {string} userId
+   * @param {string} accessToken
+   * @param {number} [expiresIn=3600]
+   */
+  setDuocApiToken(userId, accessToken, expiresIn = 3600) {
+    if (!userId || !accessToken) return;
+    this._duocApiTokenCache.set(userId, {
+      accessToken,
+      expiresAt: Date.now() + Math.max(1, Number(expiresIn)) * 1000,
+    });
+  }
+
+  /**
+   * Limpia los tokens en caché de la API de Duoc UC.
+   * @param {string} [userId] - Si se especifica, borra solo ese usuario. Si no, borra toda la caché.
+   */
+  clearDuocApiTokens(userId = null) {
+    if (userId) {
+      this._duocApiTokenCache.delete(userId);
+    } else {
+      this._duocApiTokenCache.clear();
+    }
+  }
+
+  /**
    * Obtiene un access token válido para la API de Duoc UC.
-   * Si no está configurado OIDC, retorna null fail-closed.
    * Si existe un token de servicio institucional o un token en caché para el usuario, lo retorna.
+   * Retorna null cuando no hay ninguna credencial o token válido disponible (fail-closed).
    * @param {string} [userId] - ID del usuario en Nexo360
    * @returns {Promise<{accessToken: string, expiresIn: number}|null>}
    */
   async getAccessTokenForDuocApi(userId) {
-    if (!this.isConfigured()) {
-      return null;
+    const serviceToken = process.env.DUOC_API_SERVICE_TOKEN;
+    if (serviceToken && typeof serviceToken === 'string') {
+      return {
+        accessToken: serviceToken,
+        expiresIn: 3600,
+      };
     }
 
-    if (userId && this._duocApiTokenCache?.has(userId)) {
+    if (userId && this._duocApiTokenCache && this._duocApiTokenCache.has(userId)) {
       const cached = this._duocApiTokenCache.get(userId);
       if (cached && Date.now() < cached.expiresAt) {
         return {
@@ -452,13 +482,6 @@ class MicrosoftEntraIdAdapter {
           expiresIn: Math.max(1, Math.round((cached.expiresAt - Date.now()) / 1000)),
         };
       }
-    }
-
-    if (process.env.DUOC_API_SERVICE_TOKEN) {
-      return {
-        accessToken: process.env.DUOC_API_SERVICE_TOKEN,
-        expiresIn: 3600,
-      };
     }
 
     return null;

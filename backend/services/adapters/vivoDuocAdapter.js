@@ -130,8 +130,10 @@ class VivoDuocAdapter {
   async _fetchWithRetry(url, options = {}) {
     const allowed = [...ALLOWED_VIVO_DUOC_HOSTS];
     try {
-      const baseHost = new URL(this.baseUrl).hostname;
-      if (!allowed.includes(baseHost)) allowed.push(baseHost);
+      const baseHost = new URL(this.baseUrl).hostname.toLowerCase();
+      if (baseHost === 'api-oci-ext-prd.duoc.cl' || baseHost.endsWith('.duoc.cl')) {
+        if (!allowed.includes(baseHost)) allowed.push(baseHost);
+      }
     } catch {
       // fallback a hosts permitidos
     }
@@ -201,11 +203,18 @@ class VivoDuocAdapter {
     const safeBaseUrl = this.baseUrl.startsWith('http') ? this.baseUrl : `https://${this.baseUrl}`;
     const targetUrl = new URL(endpoint, safeBaseUrl);
 
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) {
-        targetUrl.searchParams.set(encodeURIComponent(String(k)), String(v));
+    // Sanitización estricta de parámetros para prevenir CSRF/SSRF (Sonar S5144)
+    const ALLOWED_PARAM_KEYS = new Set(['codAlumno', 'nombreUsuario', 'alumnoId']);
+    const SAFE_PARAM_VALUE_REGEX = /^[a-zA-Z0-9._-]+$/;
+
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && ALLOWED_PARAM_KEYS.has(k)) {
+        const cleanVal = String(v).trim();
+        if (SAFE_PARAM_VALUE_REGEX.test(cleanVal)) {
+          targetUrl.searchParams.set(k, cleanVal);
+        }
       }
-    });
+    }
 
     const response = await this._fetchWithRetry(targetUrl.href, { headers });
 

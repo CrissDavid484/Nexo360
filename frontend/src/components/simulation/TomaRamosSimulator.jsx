@@ -1030,6 +1030,17 @@ export const TomaRamosSimulator = ({ onExit }) => {
             <p className="text-sm text-slate-600 max-w-3xl leading-relaxed">
               ¡Prepárate y practica tu toma de ramos! Revisa el video oficial paso a paso a la izquierda y las instrucciones clave a la derecha antes de simular tu horario.
             </p>
+
+            <div
+              role="note"
+              aria-label="Aviso legal de simulación formativa"
+              className="mt-3 p-3.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-950 text-xs sm:text-sm font-medium flex items-center gap-2.5 shadow-xs"
+            >
+              <Info className="w-4 h-4 text-amber-700 shrink-0" aria-hidden="true" />
+              <span>
+                <strong>Simulador formativo sin efectos oficiales:</strong> Esta herramienta permite ejercitar la selección de asignaturas. <strong>No modifica la inscripción oficial en SICOL</strong> ni reserva cupos reales en el sistema curricular institucional.
+              </span>
+            </div>
           </div>
 
           <div className="shrink-0 flex flex-wrap items-center gap-2.5">

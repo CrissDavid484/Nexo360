@@ -27,9 +27,9 @@ export const AcademicAttendance = ({
 }) => {
   const items = Array.isArray(asistencias) ? asistencias : [];
 
-  const handleSimular = (courseCode, courseName) => {
+  const handleSimular = (courseCode, courseName, courseData = {}) => {
     if (typeof onNavigateToSat === 'function') {
-      onNavigateToSat(courseCode, courseName);
+      onNavigateToSat(courseCode, courseName, courseData);
     }
   };
 
@@ -209,7 +209,7 @@ export const AcademicAttendance = ({
 
                 <button
                   type="button"
-                  onClick={() => handleSimular(code, name)}
+                  onClick={() => handleSimular(code, name, { totalSessions: total, attendedSessions: attended, percentage, minAttendanceRequired: 70 })}
                   className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[44px] min-w-[44px] rounded-lg text-xs font-semibold text-[#002B49] hover:bg-slate-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#002B49]"
                   aria-label={`Simular asistencia para ${name}`}
                 >

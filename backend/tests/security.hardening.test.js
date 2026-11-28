@@ -853,4 +853,78 @@ describe('Bloque 1 — Hardening de Seguridad y Autenticación P0 (Nexo360)', ()
       }
     );
   });
+
+  test('10. [Configuración Prod Fail-Fast] validateProductionConfig aborta ante secretos inseguros o faltantes', async () => {
+    const app = require('../server');
+
+    // 10.1 JWT_SECRET faltante en producción -> Error
+    await withEnv({ NODE_ENV: 'production', JWT_SECRET: '' }, async () => {
+      assert.throws(() => app.validateProductionConfig(), /JWT_SECRET no configurado/i);
+    });
+
+    // 10.2 JWT_SECRET placeholder en producción -> Error
+    await withEnv({ NODE_ENV: 'production', JWT_SECRET: '<REEMPLAZAR_POR_SECRET>' }, async () => {
+      assert.throws(() => app.validateProductionConfig(), /JWT_SECRET no configurado/i);
+    });
+
+    // 10.3 MONGODB_URI faltante o placeholder en producción -> Error
+    await withEnv({ NODE_ENV: 'production', JWT_SECRET: 'una_clave_larga_de_mas_de_32_caracteres_segura', MONGODB_URI: '' }, async () => {
+      assert.throws(() => app.validateProductionConfig(), /MONGODB_URI no configurado/i);
+    });
+
+    // 10.4 ENABLE_DEMO_ACCOUNTS=true en producción -> Error
+    await withEnv(
+      {
+        NODE_ENV: 'production',
+        JWT_SECRET: 'una_clave_larga_de_mas_de_32_caracteres_segura',
+        MONGODB_URI: 'mongodb://mongo:27017/nexo360',
+        ENABLE_DEMO_ACCOUNTS: 'true',
+      },
+      async () => {
+        assert.throws(() => app.validateProductionConfig(), /ENABLE_DEMO_ACCOUNTS no puede estar activo/i);
+      }
+    );
+  });
+
+  test('11. [Activación Concurrente] activateAccountWithToken previene doble consumo (Race Condition)', async () => {
+    const authService = require('../services/authService');
+    const crypto = require('crypto');
+
+    // Crear usuario pendiente en memoria con token de activación
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const testUser = {
+      email: 'concurrente.test@duocuc.cl',
+      fullName: 'Estudiante Concurrente',
+      activationTokenHash: tokenHash,
+      activationTokenExpiresAt: new Date(Date.now() + 3600000),
+      isActivated: false,
+    };
+    authService.registerUser(testUser);
+
+    // Ejecutar dos activaciones simultáneas con el mismo token
+    const [res1, res2] = await Promise.allSettled([
+      authService.activateAccountWithToken(rawToken, 'Password123!', { aceptado: true }),
+      authService.activateAccountWithToken(rawToken, 'Password123!', { aceptado: true }),
+    ]);
+
+    // Exactamente una debe haber tenido éxito y la otra debe haber sido rechazada
+    const fulfilled = [res1, res2].filter((r) => r.status === 'fulfilled');
+    const rejected = [res1, res2].filter((r) => r.status === 'rejected');
+
+    assert.equal(fulfilled.length, 1, 'Exactamente una solicitud de activación debe tener éxito');
+    assert.equal(rejected.length, 1, 'La solicitud concurrente duplicada debe ser rechazada');
+    assert.match(rejected[0].reason?.message || '', /inválido, expirado o ya utilizado/i);
+  });
+
+  test('12. [AcademicDataService Identity] Rechaza peticiones con string como contexto de identidad', () => {
+    const academicDataService = require('../services/academicDataService');
+    assert.throws(
+      () => academicDataService._resolveIdentity('estudiante@duocuc.cl'),
+      (err) => {
+        assert.equal(err.code, 'AUTHENTICATION_REQUIRED');
+        return true;
+      }
+    );
+  });
 });

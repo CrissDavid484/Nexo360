@@ -1103,7 +1103,7 @@ export const DashboardPage = () => {
               {vivoViewMode === 'academic' ? (
                 <div id="panel-vivo-academic" role="tabpanel" aria-labelledby="tab-vivo-academic">
                   <AcademicDashboardSection
-                    onNavigateToSat={(courseCode, courseName) => setSatSimulatorTarget({ courseCode, courseName })}
+                    onNavigateToSat={(courseCode, courseName, courseData = {}) => setSatSimulatorTarget({ courseCode, courseName, ...courseData })}
                     onNavigateToManual={() => setVivoViewMode('manual')}
                     onNavigateToHelpCenter={() => handleTabChange('centro-ayuda')}
                   />
@@ -1187,6 +1187,9 @@ export const DashboardPage = () => {
                 course={{
                   courseCode: satSimulatorTarget.courseCode,
                   courseName: satSimulatorTarget.courseName,
+                  totalSessions: satSimulatorTarget.totalSessions,
+                  attendedSessions: satSimulatorTarget.attendedSessions,
+                  minAttendanceRequired: satSimulatorTarget.minAttendanceRequired || 70,
                 }}
                 student={user}
               />

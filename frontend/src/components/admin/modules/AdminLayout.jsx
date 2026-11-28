@@ -46,6 +46,7 @@ import { PaedisManagement } from './PaedisManagement';
 import { AcademicCatalog } from './AcademicCatalog';
 import { AuditLog } from './AuditLog';
 import { OfertaAcademica } from './OfertaAcademica';
+import { HelpContentManager } from './HelpContentManager';
 import { AdminTeamManagement } from '@/components/admin/modules/AdminTeamManagement';
 import { ADMIN_THEME } from '@components/admin/adminTheme';
 import { AcademicWeekBadge } from '@components/common/AcademicWeekBadge';
@@ -89,6 +90,7 @@ const ADMIN_SUB_TABS = [
   { id: 'sat', label: 'Alerta Temprana (SAT)', icon: AlertOctagon, iconColor: 'text-rose-400', announceMsg: 'Sistema de Alerta Temprana (SAT) seleccionado.', roles: ['admin', 'coordinador_paedis'] },
   { id: 'paedis', label: 'Gestión PAEDIS', icon: HeartHandshake, iconColor: 'text-purple-400', announceMsg: 'Gestión PAEDIS y Ajustes Razonables seleccionada.', roles: ['coordinador_paedis'] },
   { id: 'oferta', label: 'Oferta Académica', icon: FileSpreadsheet, iconColor: 'text-green-400', announceMsg: 'Oferta Académica y Catálogo seleccionada.', roles: ['admin'] },
+  { id: 'tramites', label: 'Gestión Trámites', icon: BookOpen, iconColor: 'text-indigo-400', announceMsg: 'Gestión Editorial de Trámites y Contenidos seleccionada.', roles: ['admin', 'coordinador_paedis'] },
   { id: 'catalog', label: 'Carreras & Sedes', icon: Building2, iconColor: 'text-blue-400', announceMsg: 'Gestión de Carreras y Sedes seleccionada.', roles: ['admin'] },
   { id: 'audit', label: 'Auditoría', icon: ScrollText, iconColor: 'text-sky-400', announceMsg: 'Bitácora de auditoría seleccionada.', roles: ['admin'] },
 ];
@@ -230,6 +232,7 @@ export const AdminLayout = ({ onExit }) => {
       {adminSubTab === 'sat' && <SatMonitoring announce={announce} />}
       {adminSubTab === 'paedis' && <PaedisManagement students={students} onStudentUpdated={handlePaedisStudentUpdated} announce={announce} />}
       {adminSubTab === 'oferta' && <OfertaAcademica isAdmin={isAdmin} isCoordinator={!isAdmin} getVoiceProps={getVoiceProps} announce={announce} />}
+      {adminSubTab === 'tramites' && <HelpContentManager isAdmin={isAdmin} isCoordinator={!isAdmin} getVoiceProps={getVoiceProps} announce={announce} />}
       {adminSubTab === 'catalog' && <AcademicCatalog isAdmin={isAdmin} isCoordinator={!isAdmin} getVoiceProps={getVoiceProps} announce={announce} />}
       {adminSubTab === 'audit' && isAdmin && <AuditLog isAdmin={isAdmin} getVoiceProps={getVoiceProps} announce={announce} />}
 

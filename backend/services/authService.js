@@ -719,11 +719,63 @@ class AuthService {
 
     const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
     let userDoc;
+
     if (mongoose.connection.readyState === 1) {
-      userDoc = await UserProfile.findOne({
+      // 1. Verificación previa de existencia y estado activo
+      const targetUser = await UserProfile.findOne({
         activationTokenHash: tokenHash,
         activationTokenExpiresAt: { $gt: new Date() },
       }).select('+password +activationTokenHash');
+
+      if (!targetUser) {
+        throw createAuthError(400, 'Token de activación inválido, expirado o ya utilizado.');
+      }
+
+      if (isUserBlockedOrInactive(targetUser)) {
+        throw createAuthError(403, 'Acceso denegado: Esta cuenta institucional se encuentra deshabilitada o suspendida.');
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      const isConsentProvided = consentimiento?.aceptado === true;
+      const consentPayload = {
+        aceptado: isConsentProvided,
+        fechaAceptacion: isConsentProvided ? new Date() : null,
+        estado: isConsentProvided ? 'ACEPTADO' : 'PENDIENTE',
+        mecanismo: 'ACTIVACION_TITULAR',
+        finalidadTratamiento: 'Gestión académica, alertas tempranas SAT y acompañamiento PAEDIS según Ley N° 21.719',
+      };
+
+      // 2. Consumo atómico del token para evitar replay/concurrency race conditions
+      const updateFields = {
+        password: hashedPassword,
+        activationTokenHash: null,
+        activationTokenExpiresAt: null,
+        isActivated: true,
+        mustChangePassword: false,
+        statusUpdatedAt: new Date(),
+        consentimientoLey21719: consentPayload,
+      };
+      if (targetUser.consentMetadata) {
+        updateFields['consentMetadata.consentGiven'] = isConsentProvided;
+        updateFields['consentMetadata.consentDate'] = isConsentProvided ? new Date() : null;
+      }
+
+      const updated = await UserProfile.findOneAndUpdate(
+        {
+          _id: targetUser._id,
+          activationTokenHash: tokenHash, // Cláusula optimista/atómica: consume el token solo si aún no ha sido consumido
+          activationTokenExpiresAt: { $gt: new Date() },
+        },
+        { $set: updateFields },
+        { returnDocument: 'after' }
+      );
+
+      if (!updated) {
+        throw createAuthError(400, 'Token de activación inválido, expirado o ya utilizado.');
+      }
+      userDoc = updated;
     } else {
       userDoc = Array.from(inMemoryUsers.values()).find(
         (u) =>
@@ -731,45 +783,32 @@ class AuthService {
           u.activationTokenExpiresAt &&
           new Date(u.activationTokenExpiresAt) > new Date()
       );
-    }
 
-    if (!userDoc) {
-      throw createAuthError(400, 'Token de activación inválido, expirado o ya utilizado.');
-    }
-
-    if (isUserBlockedOrInactive(userDoc)) {
-      throw createAuthError(403, 'Acceso denegado: Esta cuenta institucional se encuentra deshabilitada o suspendida.');
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    const isConsentProvided = consentimiento?.aceptado === true;
-    const consentPayload = {
-      aceptado: isConsentProvided,
-      fechaAceptacion: isConsentProvided ? new Date() : null,
-      estado: isConsentProvided ? 'ACEPTADO' : 'PENDIENTE',
-      mecanismo: 'ACTIVACION_TITULAR',
-      finalidadTratamiento: 'Gestión académica, alertas tempranas SAT y acompañamiento PAEDIS según Ley N° 21.719',
-    };
-
-    if (mongoose.connection.readyState === 1 && typeof userDoc.save === 'function') {
-      userDoc.password = hashedPassword;
-      userDoc.activationTokenHash = null;
-      userDoc.activationTokenExpiresAt = null;
-      userDoc.isActivated = true;
-      userDoc.mustChangePassword = false;
-      userDoc.statusUpdatedAt = new Date();
-      userDoc.consentimientoLey21719 = consentPayload;
-      if (userDoc.consentMetadata) {
-        userDoc.consentMetadata.consentGiven = isConsentProvided;
-        userDoc.consentMetadata.consentDate = isConsentProvided ? new Date() : null;
+      if (!userDoc) {
+        throw createAuthError(400, 'Token de activación inválido, expirado o ya utilizado.');
       }
-      await userDoc.save();
-    } else {
-      userDoc.password = hashedPassword;
+
+      if (isUserBlockedOrInactive(userDoc)) {
+        throw createAuthError(403, 'Acceso denegado: Esta cuenta institucional se encuentra deshabilitada o suspendida.');
+      }
+
+      // Reclamo atómico síncrono del token antes de la operación asíncrona de hash bcrypt
       userDoc.activationTokenHash = null;
       userDoc.activationTokenExpiresAt = null;
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      const isConsentProvided = consentimiento?.aceptado === true;
+      const consentPayload = {
+        aceptado: isConsentProvided,
+        fechaAceptacion: isConsentProvided ? new Date() : null,
+        estado: isConsentProvided ? 'ACEPTADO' : 'PENDIENTE',
+        mecanismo: 'ACTIVACION_TITULAR',
+        finalidadTratamiento: 'Gestión académica, alertas tempranas SAT y acompañamiento PAEDIS según Ley N° 21.719',
+      };
+
+      userDoc.password = hashedPassword;
       userDoc.isActivated = true;
       userDoc.mustChangePassword = false;
       userDoc.statusUpdatedAt = new Date();

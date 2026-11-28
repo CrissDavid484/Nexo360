@@ -14,6 +14,7 @@ const simulatorSnapshotService = require('./services/simulatorSnapshotService');
 const academicCalendarService = require('./services/academicCalendarService');
 const catalogService = require('./services/catalogService');
 const authService = require('./services/authService');
+const helpContentService = require('./services/helpContentService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -145,34 +146,27 @@ function validateProductionConfig() {
     normalizedJwt.includes('<reemplazar_');
 
   if (isMissingOrInsecure) {
-    // Para evitar que el despliegue en Render/Cloud falle si el administrador aún no configura el secreto en el dashboard,
-    // generamos un secreto criptográfico de 256 bits aleatorio (CSPRNG) seguro en tiempo de ejecución.
-    const autoSecret = crypto.randomBytes(32).toString('hex');
-    process.env.JWT_SECRET = autoSecret;
-    console.warn(
-      '[Configuración Producción / Render]: JWT_SECRET no configurado o inseguro en variables de entorno. Se generó automáticamente una clave criptográfica de 256 bits segura (CSPRNG) para garantizar el despliegue.'
+    throw new Error(
+      '[Seguridad Producción Crítica]: JWT_SECRET no configurado externamente, menor a 32 caracteres o usando valor predeterminado/placeholder. El arranque de producción está bloqueado.'
     );
   }
 
   const mongoUri = String(process.env.MONGODB_URI || '').trim();
   if (!mongoUri || mongoUri.toLowerCase().includes('<reemplazar_')) {
-    process.env.MONGODB_URI = 'mongodb://localhost:27017/nexo360';
-    console.warn(
-      '[Configuración Producción / Render]: MONGODB_URI no configurado en entorno. Usando valor por defecto mientras se provisiona MongoDB institucional.'
+    throw new Error(
+      '[Seguridad Producción Crítica]: MONGODB_URI no configurado o contiene placeholders no reemplazados. El arranque de producción está bloqueado.'
     );
   }
 
   if (process.env.ENABLE_DEMO_ACCOUNTS === 'true') {
-    process.env.ENABLE_DEMO_ACCOUNTS = 'false';
-    console.warn(
-      '[Configuración Producción / Render Advertencia]: ENABLE_DEMO_ACCOUNTS no puede estar activo en producción. Se desactivó automáticamente para proteger la seguridad institucional y permitir el arranque del servicio.'
+    throw new Error(
+      '[Seguridad Producción Crítica]: ENABLE_DEMO_ACCOUNTS no puede estar activo en producción. Desactive esta variable.'
     );
   }
 
   if (process.env.ALLOW_IN_MEMORY_FALLBACK === 'true') {
-    process.env.ALLOW_IN_MEMORY_FALLBACK = 'false';
-    console.warn(
-      '[Configuración Producción / Render Advertencia]: ALLOW_IN_MEMORY_FALLBACK fue desactivado automáticamente en producción.'
+    throw new Error(
+      '[Seguridad Producción Crítica]: ALLOW_IN_MEMORY_FALLBACK no puede estar activo en producción. La persistencia en MongoDB es obligatoria.'
     );
   }
 }
@@ -279,6 +273,7 @@ async function startServer() {
     await academicCalendarService.ensureSeedCalendars();
     await catalogService.migrateCatalogDuocData();
     await authService.syncPaedisRecordsMigration();
+    await helpContentService.ensureSeedProcedures();
     simulatorSnapshotService.startSnapshotScheduler();
   } catch (err) {
     console.error('[MongoDB Error] Fallo al conectar en inicio:', err.message);

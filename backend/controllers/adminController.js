@@ -858,7 +858,11 @@ function buildNewUserDocument({
     sanitizeString(body.roleLabel, 120) || ROLE_LABELS[role] || 'Estudiante Duoc UC';
 
   const isStudentRole = role === 'estudiante' || role === 'estudiante_paedis';
-  const isDemoAccount = Boolean(body.isDemoAccount || body.source === 'DEMO');
+  // Cuentas demo estrictamente restringidas a entornos no-productivos con flag explícito
+  const isDemoAccount =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.ENABLE_DEMO_ACCOUNTS === 'true' &&
+    Boolean(body.isDemoAccount || body.source === 'DEMO');
 
   let initialCourses = Array.isArray(body.enrolledCourses) && body.enrolledCourses.length > 0
     ? body.enrolledCourses
@@ -886,11 +890,18 @@ function buildNewUserDocument({
     ? Boolean(body.consentimientoLey21719?.aceptado)
     : false;
 
+  // Permisos: Estudiantes nunca reciben permisos staff; personal administrativo se valida contra catálogo
+  const resolvedPermissions = isStaffRole
+    ? (Array.isArray(body.permissions)
+        ? body.permissions.map((p) => sanitizeString(p, 50)).filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p))
+        : (STAFF_ROLE_META[role]?.permissions || []))
+    : [];
+
   return {
     email,
     password: hashedPassword,
     mustChangePassword,
-    isActivated: body.isActivated !== undefined ? Boolean(body.isActivated) : isActivated,
+    isActivated: Boolean(isActivated),
     activationTokenHash: activationTokenHash || null,
     activationTokenExpiresAt: activationTokenExpiresAt || null,
     firstName: identity.firstName,
@@ -922,9 +933,7 @@ function buildNewUserDocument({
     accessibilityPreferences: profileSetup.accessibilityPreferences,
     enrolledCourses: initialCourses,
     courseAttendance: initialCourseAttendance,
-    permissions: Array.isArray(body.permissions)
-      ? body.permissions.map((p) => sanitizeString(p, 50)).filter((p) => p && ALL_SYSTEM_PERMISSIONS.includes(p))
-      : (STAFF_ROLE_META[role]?.permissions || []),
+    permissions: resolvedPermissions,
     badges: Array.isArray(body.badges)
       ? body.badges.map((b) => sanitizeString(b, 40)).filter(Boolean).slice(0, 10)
       : (STAFF_ROLE_META[role]?.badges || []),
@@ -1015,6 +1024,14 @@ exports.createStudent = async (req, res) => {
     const cleanRut = sanitizeString(body.rut, 20) || 'Sin RUT';
     const explicitPassword = sanitizeString(body.password, 256);
 
+    // Prevención de escalación de privilegios: Solo actores con full_access o admin pueden crear staff privilegiado
+    if (hasPrivilegeEscalation(req.user, role, body.permissions)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado: No tiene facultades para asignar roles o privilegios administrativos a este usuario.',
+      });
+    }
+
     let hashedPassword;
     let mustChangePassword;
     let isActivated;
@@ -1022,7 +1039,13 @@ exports.createStudent = async (req, res) => {
     let activationTokenHash = null;
     let activationTokenExpiresAt = null;
 
-    const isExplicitPasswordAllowed = (process.env.NODE_ENV === 'test' || body.isDemoAccount) && Boolean(explicitPassword);
+    // Solo se permite contraseña explícita directa en entorno de testing o cuentas demo aisladas en desarrollo
+    const isExplicitPasswordAllowed =
+      (process.env.NODE_ENV === 'test' ||
+        (process.env.NODE_ENV !== 'production' &&
+          process.env.ENABLE_DEMO_ACCOUNTS === 'true' &&
+          Boolean(body.isDemoAccount))) &&
+      Boolean(explicitPassword);
 
     if (isExplicitPasswordAllowed) {
       const salt = await bcrypt.genSalt(10);
@@ -1044,8 +1067,12 @@ exports.createStudent = async (req, res) => {
       isActivated = false;
     }
 
+    let frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+    if (process.env.NODE_ENV === 'production' && !frontendBase.startsWith('https://')) {
+      frontendBase = frontendBase.replace(/^http:\/\//i, 'https://');
+    }
     const activationUrl = activationToken
-      ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/activar-cuenta?token=${activationToken}`
+      ? `${frontendBase}/activar-cuenta?token=${activationToken}`
       : null;
 
     const newUserData = buildNewUserDocument({
@@ -1068,6 +1095,12 @@ exports.createStudent = async (req, res) => {
     if (mongoose.connection.readyState === 1) {
       createdUser = await UserProfile.create(newUserData);
     } else {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(503).json({
+          success: false,
+          message: 'Base de datos no disponible para operaciones de persistencia.',
+        });
+      }
       createdUser = { _id: `local_${Date.now()}`, ...newUserData };
       authService.registerUser(createdUser);
     }

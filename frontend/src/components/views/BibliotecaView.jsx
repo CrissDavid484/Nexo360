@@ -243,6 +243,17 @@ export const BibliotecaView = () => {
           <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-normal">
             Entorno interactivo de práctica formativa para <strong>Duoc UC - {DEFAULT_CAMPUS}</strong>. Permite ejercitar la selección de bloques horarios y validación de check-in sin alterar el sistema de inventario oficial. Para reservas vinculantes, accede directamente a LibCal mediante los accesos oficiales contiguos.
           </p>
+
+          <div
+            role="note"
+            aria-label="Aviso legal de simulación formativa de biblioteca"
+            className="p-3.5 rounded-2xl border border-amber-300 bg-amber-50 text-amber-950 text-xs font-medium flex items-center gap-2.5 shadow-xs mt-2"
+          >
+            <span className="w-4 h-4 text-amber-700 font-bold shrink-0">ℹ</span>
+            <span>
+              <strong>Simulación formativa de reserva — No vinculante con Springshare LibCal:</strong> Las reservas reales de salas y recursos se realizan exclusivamente en el portal oficial de Bibliotecas Duoc UC.
+            </span>
+          </div>
         </div>
 
         {/* Botones directos a las rutas oficiales de Duoc UC */}

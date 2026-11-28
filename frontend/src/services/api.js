@@ -478,6 +478,41 @@ export const api = {
   },
 
   /**
+   * Métodos Editoriales de Contenido (Épica E-005)
+   */
+  async getAdminProcedures(status = '') {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request(`/modules/admin/all${qs}`);
+  },
+
+  async createAdminProcedure(data) {
+    return request('/modules/admin/procedure', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateAdminProcedure(id, data) {
+    return request(`/modules/admin/procedure/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateAdminProcedureStatus(id, status) {
+    return request(`/modules/admin/procedure/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async rollbackAdminProcedure(id, version) {
+    return request(`/modules/admin/procedure/${encodeURIComponent(id)}/rollback/${encodeURIComponent(version)}`, {
+      method: 'POST',
+    });
+  },
+
+  /**
    * Catálogo de Asignaturas para el Simulador Toma de Ramos (con aleatorización y filtro por carrera)
    */
   async getCourses(params = {}) {
